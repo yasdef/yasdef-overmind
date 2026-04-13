@@ -13,7 +13,7 @@ This repository contains the standalone Overmind project. The original extractio
 0. Read this carefully:
 - ⚠️ This is pre-alpha — things may break. Use at your own risk. Take precautions before integrating this repo into your project!
 1. clone `yasdef-overmind` to your local machine
-2. run project_setup_first_init_machine.sh to establish and set up the asdlc folder for future project work - you need to provide the place where exactly the asdlc folder will exist in your system,
+2. run `overmind/scripts/project_mgmt/project_setup_first_init_machine.sh` to establish and set up the asdlc folder for future project work - you need to provide the place where exactly the asdlc folder will exist in your system,
 after this script finishes, the staged ASDLC commands live under your generated `asdlc/` workspace; later updates can be pulled from this repo and re-applied by running the same setup script again
 3. in asdlc folder run `.commands/project_setup_add_new_project.sh` to create a new project. On this step you may provide paths to project repos, for example backend and frontend (if they exist), if it's a completely new project we need a reference to best-practice MCP (this functionality is not supported yet). You can always add or change this info later in projects/<project_id>/init_progress_definition.yaml (see meta_info part)
 4. when project is created, if it includes repos, you can collect info about common contracts, for this run script `.commands/init_common_contract_definition.sh --path projects/<project-id>`
@@ -24,6 +24,8 @@ project is created in a new branch so make sure you've merged it to your main/ma
 --- here we finished with feature planning, but who will work it out? ---
 7. register new workers with `.commands/project_register_worker.sh`, one run per worker with a strict class (backend|frontend|mobile|infrastructure). Currently orchestrator can't distribute tasks across multiple workers of same class so it doesn't make sense to register 2 workers of same class (2 backend for example)
 8. now give worker uuid to the developer responsible for that worker so he can finish registration from his side
+
+you can manualy run scripts for different steps after asdlc folder init, check  
 
 ## Most critical issues
 - coordinator (overmind) can't distribute tasks for multiple workers (f.e. 2 backend)
