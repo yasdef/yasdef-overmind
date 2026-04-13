@@ -1,0 +1,425 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SOURCE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+SCRIPT_SRC="$SOURCE_ROOT/overmind/scripts/feature_implementation_plan_semantic_review.sh"
+RULE_SRC="$SOURCE_ROOT/overmind/rules/implementation_plan_semantic_review_rule.md"
+TEMPLATE_SRC="$SOURCE_ROOT/overmind/templates/implementation_plan_semantic_review_TEMPLATE.md"
+GOLDEN_EXAMPLE_SRC="$SOURCE_ROOT/overmind/golden_examples/implementation_plan_semantic_review_GOLDEN_EXAMPLE.md"
+
+TMP_ROOT="$(mktemp -d)"
+trap 'rm -rf "$TMP_ROOT"' EXIT
+
+assert_contains() {
+  local haystack="$1"
+  local needle="$2"
+  if [[ "$haystack" != *"$needle"* ]]; then
+    echo "Assertion failed: expected output to contain: $needle" >&2
+    echo "Actual output:" >&2
+    echo "$haystack" >&2
+    exit 1
+  fi
+}
+
+assert_not_contains() {
+  local haystack="$1"
+  local needle="$2"
+  if [[ "$haystack" == *"$needle"* ]]; then
+    echo "Assertion failed: expected output to NOT contain: $needle" >&2
+    echo "Actual output:" >&2
+    echo "$haystack" >&2
+    exit 1
+  fi
+}
+
+assert_equal() {
+  local expected="$1"
+  local actual="$2"
+  if [[ "$expected" != "$actual" ]]; then
+    echo "Assertion failed: expected '$expected', got '$actual'" >&2
+    exit 1
+  fi
+}
+
+assert_nonzero_status() {
+  local status="$1"
+  if [[ "$status" -eq 0 ]]; then
+    echo "Assertion failed: expected non-zero status" >&2
+    exit 1
+  fi
+}
+
+assert_file_exists() {
+  local path="$1"
+  if [[ ! -f "$path" ]]; then
+    echo "Assertion failed: expected file to exist: $path" >&2
+    exit 1
+  fi
+}
+
+setup_workspace_layout() {
+  local repo_dir="$1"
+  mkdir -p \
+    "$repo_dir/asdlc/.commands" \
+    "$repo_dir/asdlc/.rules" \
+    "$repo_dir/asdlc/.templates" \
+    "$repo_dir/asdlc/.golden_examples" \
+    "$repo_dir/asdlc/.setup" \
+    "$repo_dir/asdlc/projects/p1/feature-a"
+
+  cp "$SCRIPT_SRC" "$repo_dir/asdlc/.commands/feature_implementation_plan_semantic_review.sh"
+  cp "$RULE_SRC" "$repo_dir/asdlc/.rules/implementation_plan_semantic_review_rule.md"
+  cp "$TEMPLATE_SRC" "$repo_dir/asdlc/.templates/implementation_plan_semantic_review_TEMPLATE.md"
+  cp "$GOLDEN_EXAMPLE_SRC" "$repo_dir/asdlc/.golden_examples/implementation_plan_semantic_review_GOLDEN_EXAMPLE.md"
+  chmod +x "$repo_dir/asdlc/.commands/feature_implementation_plan_semantic_review.sh"
+
+  cat >"$repo_dir/asdlc/asdlc_metadata.yaml" <<'OUT'
+meta:
+  description: "test"
+projects:
+OUT
+}
+
+setup_models_file() {
+  local repo_dir="$1"
+  cat >"$repo_dir/asdlc/.setup/models.md" <<'OUT'
+# Phase | Command | Model | Extra Arg 1 (optional) | Extra Arg 2 (optional) | ...
+implementation_plan_semantic_review | codex | gpt-5.4 | --config | model_reasoning_effort='high'
+OUT
+}
+
+seed_feature_sources() {
+  local repo_dir="$1"
+  local feature_path="${2:-projects/p1/feature-a}"
+  mkdir -p "$repo_dir/asdlc/$feature_path"
+
+  cat >"$repo_dir/asdlc/$feature_path/implementation_plan.md" <<'OUT'
+# Implementation Plan
+
+### Step 1.1 Backend status guard foundation [REQ-1]
+#### Repo: backend
+#### Depends on: none
+#### Evidence: gap/TECH_REQ-1, comp/backend-status-guard
+- [ ] Plan and discuss the step
+- [ ] Add ACTIVE status guard in backend access middleware
+- [ ] Add backend tests for ACTIVE guard behavior
+- [ ] Review step implementation
+
+### Step 1.2 Client workspace alignment [REQ-1] [REQ-2]
+#### Repo: frontend
+#### Depends on: 1.1
+#### Evidence: gap/TECH_REQ-2, comp/frontend-workspace-client
+- [ ] Plan and discuss the step
+- [ ] Update client state for ACTIVE guard responses
+- [ ] Add client tests for ACTIVE guard handling
+- [ ] Review step implementation
+OUT
+
+  cat >"$repo_dir/asdlc/$feature_path/requirements_ears.md" <<'OUT'
+# Requirements (EARS)
+
+## Requirements
+
+### Requirement 1 - ACTIVE guard
+**Acceptance Criteria (EARS):**
+- WHEN a workspace request is executed for a non-ACTIVE admin, THE System SHALL deny access.
+
+### Requirement 2 - Client feedback
+**Acceptance Criteria (EARS):**
+- WHEN access is denied for non-ACTIVE admin state, THE System SHALL show a deterministic guard message.
+OUT
+
+  cat >"$repo_dir/asdlc/$feature_path/technical_requirements.md" <<'OUT'
+# Technical Requirements
+
+## 1. Document Meta
+- feature_id: FEAT-SEM-001
+- feature_title: workspace-active-guard
+- project_type_code: B
+
+## 4. Requirement Coverage and Gaps
+### Requirement: REQ-1
+- gap_to_close: add backend ACTIVE guard checks and tests
+
+### Requirement: REQ-2
+- gap_to_close: add frontend ACTIVE-denial handling and tests
+
+## 5. Impacted Components
+### Component: backend status guard
+- repo: backend
+- gap_to_close: add ACTIVE status middleware
+
+### Component: frontend workspace client
+- repo: frontend
+- gap_to_close: add ACTIVE-denial state handling
+OUT
+}
+
+setup_codex_stub() {
+  local repo_dir="$1"
+  mkdir -p "$repo_dir/bin"
+  cat >"$repo_dir/bin/codex" <<'OUT'
+#!/usr/bin/env bash
+set -euo pipefail
+
+capture_dir="${TEST_CAPTURE_DIR:?TEST_CAPTURE_DIR must be set}"
+target_plan="${TARGET_PLAN_FILE:-projects/p1/feature-a/implementation_plan.md}"
+target_review="${TARGET_REVIEW_FILE:-projects/p1/feature-a/implementation_plan_semantic_review.md}"
+
+printf '%s\n' "$@" >"$capture_dir/codex_args.txt"
+printf '%s' "${!#}" >"$capture_dir/codex_prompt.txt"
+
+mkdir -p "$(dirname "$target_plan")" "$(dirname "$target_review")"
+
+cat >"$target_plan" <<'PLAN'
+# Implementation Plan
+
+### Step 1.1 Backend status guard foundation [REQ-1]
+#### Repo: backend
+#### Depends on: none
+#### Evidence: gap/TECH_REQ-1, comp/backend-status-guard
+- [ ] Plan and discuss the step
+- [ ] Add ACTIVE status guard in backend access middleware
+- [ ] Add backend tests for ACTIVE guard behavior
+- [ ] Review step implementation
+
+### Step 1.2 Client ACTIVE-state alignment [REQ-1]
+#### Repo: frontend
+#### Depends on: 1.1
+#### Evidence: gap/TECH_REQ-2, comp/frontend-workspace-client
+- [ ] Plan and discuss the step
+- [ ] Update client state transitions for ACTIVE guard responses
+- [ ] Add client tests for ACTIVE guard state handling
+- [ ] Review step implementation
+
+### Step 1.3 Client denial messaging polish [REQ-2]
+#### Repo: frontend
+#### Depends on: 1.2
+#### Evidence: gap/TECH_REQ-2, comp/frontend-workspace-client
+- [ ] Plan and discuss the step
+- [ ] Update denial message rendering and copy hook
+- [ ] Add UI tests for denial messaging behavior
+- [ ] Review step implementation
+PLAN
+
+cat >"$target_review" <<'REVIEW'
+# Implementation Plan Semantic Review
+
+## 1. Document Meta
+- feature_id: FEAT-SEM-001
+- feature_title: workspace-active-guard
+- source_implementation_plan: projects/p1/feature-a/implementation_plan.md
+- source_requirements_ears: projects/p1/feature-a/requirements_ears.md
+- source_technical_requirements: projects/p1/feature-a/technical_requirements.md
+- review_status: complete
+- last_updated: 2026-04-11
+
+## 2. Review Guidance
+- completion_rule: Set review_status complete only when every finding is terminal (applied, rejected, postponed) or no_findings true.
+- user_question_format: Which finding numbers should I apply to implementation_plan.md? (examples: 1,3 | all | none | postpone 2 | reject 4)
+- allowed_finding_types: step_scope_overlap, technical_gap_mix, dependency_ordering, requirement_grouping
+- allowed_severity: High, Medium, Low
+- allowed_states: added, applied, rejected, postponed
+
+## 3. Findings Ledger
+### Finding 1 - Split client alignment into two steps
+- severity: Medium
+- finding_type: step_scope_overlap
+- state: applied
+- target_steps: Step 1.2
+- related_requirements: REQ-1, REQ-2
+- related_evidence: gap/TECH_REQ-2, comp/frontend-workspace-client
+- summary: One client step combined ACTIVE-state logic and denial messaging.
+- rationale: Independent slices improve sequencing and review.
+- recommendation: Split client step into ACTIVE-state alignment and denial messaging.
+- user_selection: selected
+- plan_patch_summary: Split Step 1.2 into Step 1.2 and Step 1.3.
+- resolution_notes: User selected finding 1 and plan was updated.
+REVIEW
+OUT
+  chmod +x "$repo_dir/bin/codex"
+}
+
+setup_git_workspace() {
+  local repo_dir="$1"
+  setup_workspace_layout "$repo_dir"
+  setup_models_file "$repo_dir"
+  seed_feature_sources "$repo_dir"
+
+  (
+    cd "$repo_dir/asdlc"
+    git init -q
+    git config user.name "Test User"
+    git config user.email "test@example.com"
+    echo "seed" >README.md
+    git add .
+    git commit -qm "seed"
+  )
+}
+
+test_requires_feature_path_argument() {
+  local repo_dir="$TMP_ROOT/repo-missing-arg"
+  mkdir -p "$repo_dir"
+  setup_git_workspace "$repo_dir"
+
+  local status=0
+  local out=""
+  set +e
+  out="$(cd "$repo_dir/asdlc" && .commands/feature_implementation_plan_semantic_review.sh 2>&1)"
+  status=$?
+  set -e
+
+  assert_nonzero_status "$status"
+  assert_contains "$out" "Missing required argument: --feature_path <feature-folder-path>."
+}
+
+test_requires_staged_command_location() {
+  local repo_dir="$TMP_ROOT/repo-staged-required"
+  mkdir -p "$repo_dir"
+  setup_git_workspace "$repo_dir"
+
+  cp "$repo_dir/asdlc/.commands/feature_implementation_plan_semantic_review.sh" "$repo_dir/feature_implementation_plan_semantic_review.sh"
+  chmod +x "$repo_dir/feature_implementation_plan_semantic_review.sh"
+
+  local status=0
+  local out=""
+  set +e
+  out="$($repo_dir/feature_implementation_plan_semantic_review.sh --feature_path "$repo_dir/asdlc/projects/p1/feature-a" 2>&1)"
+  status=$?
+  set -e
+
+  assert_nonzero_status "$status"
+  assert_contains "$out" "Run this command from ASDLC staged path"
+}
+
+test_fails_when_required_file_is_missing() {
+  local repo_dir="$TMP_ROOT/repo-missing-required-file"
+  mkdir -p "$repo_dir"
+  setup_git_workspace "$repo_dir"
+  rm -f "$repo_dir/asdlc/.rules/implementation_plan_semantic_review_rule.md"
+
+  local status=0
+  local out=""
+  set +e
+  out="$(cd "$repo_dir/asdlc" && .commands/feature_implementation_plan_semantic_review.sh --feature_path "projects/p1/feature-a" 2>&1)"
+  status=$?
+  set -e
+
+  assert_nonzero_status "$status"
+  assert_contains "$out" "Required file not found: .rules/implementation_plan_semantic_review_rule.md"
+}
+
+test_fails_when_model_phase_missing() {
+  local repo_dir="$TMP_ROOT/repo-missing-model-phase"
+  mkdir -p "$repo_dir"
+  setup_git_workspace "$repo_dir"
+
+  cat >"$repo_dir/asdlc/.setup/models.md" <<'OUT'
+# Phase | Command | Model | Extra Arg 1 (optional) | Extra Arg 2 (optional) | ...
+repository_implementation_plan | codex | gpt-5.4
+OUT
+
+  local status=0
+  local out=""
+  set +e
+  out="$(cd "$repo_dir/asdlc" && .commands/feature_implementation_plan_semantic_review.sh --feature_path "projects/p1/feature-a" 2>&1)"
+  status=$?
+  set -e
+
+  assert_nonzero_status "$status"
+  assert_contains "$out" "Invalid or missing 'implementation_plan_semantic_review' entry"
+}
+
+test_runs_codex_and_commits_plan_and_review_outputs() {
+  local repo_dir="$TMP_ROOT/repo-success-default"
+  local capture_dir="$TMP_ROOT/capture-success-default"
+  mkdir -p "$repo_dir" "$capture_dir"
+  setup_git_workspace "$repo_dir"
+  setup_codex_stub "$repo_dir"
+
+  local requirements_before=""
+  local technical_before=""
+  requirements_before="$(cat "$repo_dir/asdlc/projects/p1/feature-a/requirements_ears.md")"
+  technical_before="$(cat "$repo_dir/asdlc/projects/p1/feature-a/technical_requirements.md")"
+  echo "local-change" >>"$repo_dir/asdlc/README.md"
+
+  local out=""
+  out="$(
+    cd "$repo_dir/asdlc" &&
+    PATH="$repo_dir/bin:$PATH" TEST_CAPTURE_DIR="$capture_dir" .commands/feature_implementation_plan_semantic_review.sh --feature_path "projects/p1/feature-a"
+  )"
+
+  assert_contains "$out" "Updated projects/p1/feature-a/implementation_plan.md"
+  assert_contains "$out" "Updated projects/p1/feature-a/implementation_plan_semantic_review.md"
+  assert_file_exists "$repo_dir/asdlc/projects/p1/feature-a/implementation_plan.md"
+  assert_file_exists "$repo_dir/asdlc/projects/p1/feature-a/implementation_plan_semantic_review.md"
+  assert_file_exists "$capture_dir/codex_args.txt"
+  assert_file_exists "$capture_dir/codex_prompt.txt"
+
+  local codex_args
+  codex_args="$(cat "$capture_dir/codex_args.txt")"
+  assert_contains "$codex_args" "-m"
+  assert_contains "$codex_args" "gpt-5.4"
+  assert_contains "$codex_args" "--config"
+  assert_contains "$codex_args" "model_reasoning_effort='high'"
+
+  local codex_prompt
+  codex_prompt="$(cat "$capture_dir/codex_prompt.txt")"
+  assert_contains "$codex_prompt" "Run optional Step 8.3 implementation-plan semantic review phase for this feature."
+  assert_contains "$codex_prompt" ".rules/implementation_plan_semantic_review_rule.md"
+  assert_contains "$codex_prompt" "Update only projects/p1/feature-a/implementation_plan.md and projects/p1/feature-a/implementation_plan_semantic_review.md."
+  assert_contains "$codex_prompt" "Which finding numbers should I apply to implementation_plan.md?"
+  assert_not_contains "$codex_prompt" "check_implementation_plan_semantic_review_quality.sh"
+
+  assert_equal "$requirements_before" "$(cat "$repo_dir/asdlc/projects/p1/feature-a/requirements_ears.md")"
+  assert_equal "$technical_before" "$(cat "$repo_dir/asdlc/projects/p1/feature-a/technical_requirements.md")"
+
+  assert_equal "Review and apply implementation plan semantic findings" "$(git -C "$repo_dir/asdlc" log -1 --pretty=%s)"
+  local committed_files
+  committed_files="$(git -C "$repo_dir/asdlc" show --name-only --pretty='' HEAD)"
+  assert_contains "$committed_files" "projects/p1/feature-a/implementation_plan.md"
+  assert_contains "$committed_files" "projects/p1/feature-a/implementation_plan_semantic_review.md"
+  assert_not_contains "$committed_files" "projects/p1/feature-a/requirements_ears.md"
+  assert_not_contains "$committed_files" "projects/p1/feature-a/technical_requirements.md"
+  assert_not_contains "$committed_files" "README.md"
+}
+
+test_runs_with_absolute_feature_path() {
+  local repo_dir="$TMP_ROOT/repo-success-override"
+  local capture_dir="$TMP_ROOT/capture-success-override"
+  local feature_path="projects/p1/custom-folder"
+  local absolute_feature_path=""
+  mkdir -p "$repo_dir" "$capture_dir"
+  setup_git_workspace "$repo_dir"
+  setup_codex_stub "$repo_dir"
+  seed_feature_sources "$repo_dir" "$feature_path"
+  absolute_feature_path="$repo_dir/asdlc/$feature_path"
+
+  local out=""
+  out="$(
+    cd "$repo_dir/asdlc" &&
+    PATH="$repo_dir/bin:$PATH" TEST_CAPTURE_DIR="$capture_dir" TARGET_PLAN_FILE="$feature_path/implementation_plan.md" TARGET_REVIEW_FILE="$feature_path/implementation_plan_semantic_review.md" \
+      .commands/feature_implementation_plan_semantic_review.sh --feature_path "$absolute_feature_path"
+  )"
+
+  assert_contains "$out" "Updated $feature_path/implementation_plan.md"
+  assert_contains "$out" "Updated $feature_path/implementation_plan_semantic_review.md"
+  assert_file_exists "$repo_dir/asdlc/$feature_path/implementation_plan.md"
+  assert_file_exists "$repo_dir/asdlc/$feature_path/implementation_plan_semantic_review.md"
+
+  local codex_prompt
+  codex_prompt="$(cat "$capture_dir/codex_prompt.txt")"
+  assert_contains "$codex_prompt" "Feature root: $feature_path"
+  assert_contains "$codex_prompt" "Mutable plan target: $feature_path/implementation_plan.md"
+  assert_contains "$codex_prompt" "Mutable semantic review target: $feature_path/implementation_plan_semantic_review.md"
+  assert_not_contains "$codex_prompt" "Mutable plan target: projects/p1/feature-a/implementation_plan.md"
+}
+
+test_requires_feature_path_argument
+test_requires_staged_command_location
+test_fails_when_required_file_is_missing
+test_fails_when_model_phase_missing
+test_runs_codex_and_commits_plan_and_review_outputs
+test_runs_with_absolute_feature_path
+
+echo "All implementation plan semantic review initializer tests passed."

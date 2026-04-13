@@ -6,15 +6,15 @@ Its main functions:
 - manage (register/deregister/assign tasks) workers in a project
 - consume feedback from workers and adjust feature plans according to it (currently not implemented)
 
-For Overmind's place in yasdef architecture, see yasdef-core: https://github.com/yasdef/yasdef-core/blob/main/Readme.md
+This repository contains the standalone Overmind project. The original extraction source was the `overmind/` subtree in `yasdef-core`.
 
 ## Quick start
 
 0. Read this carefully:
 - ⚠️ This is pre-alpha — things may break. Use at your own risk. Take precautions before integrating this repo into your project!
-1. copy yasdef-overmind to your local machine
+1. clone `yasdef-overmind` to your local machine
 2. run project_setup_first_init_machine.sh to establish and set up the asdlc folder for future project work - you need to provide the place where exactly the asdlc folder will exist in your system,
-after this script finishes you don't need yasdef-orchestrator any more, but if you keep it, you can pull the latest changes from repo later and run the same script to update all asdlc scripts and rules
+after this script finishes, the staged ASDLC commands live under your generated `asdlc/` workspace; later updates can be pulled from this repo and re-applied by running the same setup script again
 3. in asdlc folder run `.commands/project_setup_add_new_project.sh` to create a new project. On this step you may provide paths to project repos, for example backend and frontend (if they exist), if it's a completely new project we need a reference to best-practice MCP (this functionality is not supported yet). You can always add or change this info later in projects/<project_id>/init_progress_definition.yaml (see meta_info part)
 4. when project is created, if it includes repos, you can collect info about common contracts, for this run script `.commands/init_common_contract_definition.sh --path projects/<project-id>`
 project is created in a new branch so make sure you've merged it to your main/master before you proceed

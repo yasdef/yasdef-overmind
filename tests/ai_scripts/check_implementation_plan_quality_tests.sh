@@ -1,0 +1,459 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SOURCE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+HELPER_SRC="$SOURCE_ROOT/overmind/scripts/helper/check_implementation_plan_quality.sh"
+GOLDEN_SRC="$SOURCE_ROOT/overmind/golden_examples/implementation_plan_GOLDEN_EXAMPLE.md"
+
+TMP_ROOT="$(mktemp -d)"
+trap 'rm -rf "$TMP_ROOT"' EXIT
+
+assert_contains() {
+  local haystack="$1"
+  local needle="$2"
+  if [[ "$haystack" != *"$needle"* ]]; then
+    echo "Assertion failed: expected output to contain: $needle" >&2
+    echo "Actual output:" >&2
+    echo "$haystack" >&2
+    exit 1
+  fi
+}
+
+assert_equal() {
+  local expected="$1"
+  local actual="$2"
+  if [[ "$expected" != "$actual" ]]; then
+    echo "Assertion failed: expected '$expected', got '$actual'" >&2
+    exit 1
+  fi
+}
+
+setup_repo_with_helper() {
+  local repo_dir="$1"
+  mkdir -p "$repo_dir/overmind/scripts/helper"
+  cp "$HELPER_SRC" "$repo_dir/overmind/scripts/helper/check_implementation_plan_quality.sh"
+  chmod +x "$repo_dir/overmind/scripts/helper/check_implementation_plan_quality.sh"
+
+  (
+    cd "$repo_dir"
+    git init -q
+    git config user.name "Test User"
+    git config user.email "test@example.com"
+    echo "seed" >README.md
+    git add README.md overmind
+    git commit -qm "seed"
+  )
+}
+
+write_project_definition() {
+  local repo_dir="$1"
+  mkdir -p "$repo_dir/projects/p1"
+  cat >"$repo_dir/projects/p1/init_progress_definition.yaml" <<'OUT'
+meta_info:
+  project_id: "p1"
+  project_classes:
+    - backend
+    - frontend
+    - mobile
+  project_type_code: "B"
+  project_type_label: "Existing project with partial context"
+steps: []
+OUT
+}
+
+write_requirements() {
+  local repo_dir="$1"
+  mkdir -p "$repo_dir/projects/p1/feature-a"
+  cat >"$repo_dir/projects/p1/feature-a/requirements_ears.md" <<'OUT'
+# Requirements (EARS)
+
+## Requirements
+
+### Requirement 4 — Order creation
+**User Story:** As a user, I want to create an order, so that work can start.
+
+**Acceptance Criteria (EARS):**
+- WHEN a user creates an order, THE System SHALL persist the order.
+
+**Verification:** API and persistence tests.
+
+### Requirement 6 — Order query
+**User Story:** As a user, I want to query orders, so that I can see them.
+
+**Acceptance Criteria (EARS):**
+- WHEN a user queries orders, THE System SHALL return the matching order projection.
+
+**Verification:** Query endpoint tests.
+
+### Requirement 7 — Projection consistency
+**User Story:** As an operator, I want order projections to stay consistent, so that reads remain correct.
+
+**Acceptance Criteria (EARS):**
+- WHEN order state changes, THE System SHALL rebuild projections deterministically.
+
+**Verification:** Projection rebuild tests.
+
+### NFR 1 — Query latency
+**Goal:** Projection-backed order queries stay within the expected latency budget.
+
+**Acceptance Criteria (EARS):**
+- WHEN a user queries orders under normal operating conditions, THE System SHALL respond within the agreed latency budget.
+
+**Verification:** Latency-focused verification.
+OUT
+}
+
+write_technical_requirements() {
+  local repo_dir="$1"
+  cat >"$repo_dir/projects/p1/feature-a/technical_requirements.md" <<'OUT'
+# Technical Requirements
+
+## 1. Document Meta
+- feature_id: ORD-42
+- feature_title: order-projection-refresh
+- project_type_code: B
+- source_requirements_ears: projects/p1/feature-a/requirements_ears.md
+- source_common_contract_definition: projects/p1/common_contract_definition.md
+- source_surface_map_artifacts: upstream-only
+- analyzed_repo_classes: backend, frontend, mobile
+- last_updated: 2026-04-10
+- confidence_level: medium
+
+## 2. Feature Scope and Inputs
+- feature_summary: complete projection-backed order flow
+- included_behavior: backend query completion plus frontend/mobile projection consumers
+- excluded_behavior: unrelated order editing
+
+## 3. Repository Evidence
+### Repository: backend
+- class: backend
+- evidence_scope: backend query and projection persistence
+- primary_paths: src/backend/order
+- key_findings: backend projection persistence exists, query path remains incomplete
+- constraints: backend response shape stays canonical
+- open_gaps: query controller wiring and tests remain
+
+### Repository: frontend
+- class: frontend
+- evidence_scope: frontend order client
+- primary_paths: src/frontend/order
+- key_findings: frontend client ignores projection status fields
+- constraints: frontend follows backend payload
+- open_gaps: adapter and UI state updates remain
+
+### Repository: mobile
+- class: mobile
+- evidence_scope: mobile order client
+- primary_paths: src/mobile/order
+- key_findings: mobile client ignores projection status fields
+- constraints: mobile follows backend payload
+- open_gaps: mapper and view-model updates remain
+
+## 4. Requirement Coverage and Gaps
+### Requirement: REQ-4
+- requirement_summary: create orders
+- current_state: clients need projection-backed status support
+- gap_status: partially_implemented
+- repo_impact: multiple
+- evidence: backend create flow exists; clients lag
+- gap_to_close: finish client mapping and state handling
+
+### Requirement: REQ-6
+- requirement_summary: query orders
+- current_state: backend read path remains incomplete
+- gap_status: partially_implemented
+- repo_impact: backend
+- evidence: partial query wiring only
+- gap_to_close: finish read service, controller mapping, and tests
+
+### Requirement: REQ-7
+- requirement_summary: rebuild projections
+- current_state: backend rebuild exists
+- gap_status: fully_implemented
+- repo_impact: backend
+- evidence: rebuild coverage is present
+- gap_to_close: no remaining gap
+
+### Requirement: NFR-1
+- requirement_summary: query latency budget
+- current_state: backend query flow exists but feature-specific latency verification is incomplete
+- gap_status: unclear
+- repo_impact: backend
+- evidence: query path behavior is covered functionally, but latency verification is not yet recorded for this feature
+- gap_to_close: add latency-focused verification for projection-backed order queries
+
+## 5. Impacted Components
+### Component: backend projection persistence
+- repo: backend
+- component_kind: persistence
+- relevant_paths: src/backend/order/projection
+- requirement_refs: REQ-6, REQ-7
+- current_state: persistence slice already implemented
+- required_behavior: keep persisted projection shape stable for consumers
+- gap_to_close: no remaining gap
+- dependency_notes: client work depends on this existing shape
+- evidence: existing projection repository and tests
+
+### Component: frontend order projection client
+- repo: frontend
+- component_kind: api_client
+- relevant_paths: src/frontend/order/orders.ts
+- requirement_refs: REQ-4, REQ-6
+- current_state: frontend mapper is incomplete
+- required_behavior: map projection-backed status fields
+- gap_to_close: adapter, UI state, and tests
+- dependency_notes: depends on backend projection persistence
+- evidence: adapter ignores projection fields
+
+### Component: mobile order projection client
+- repo: mobile
+- component_kind: api_client
+- relevant_paths: src/mobile/order/orders.ts
+- requirement_refs: REQ-4, REQ-6
+- current_state: mobile mapper is incomplete
+- required_behavior: map projection-backed status fields
+- gap_to_close: mapper, view model, and tests
+- dependency_notes: depends on backend projection persistence
+- evidence: mobile mapper ignores projection fields
+
+## 6. Cross-Repo Constraints and Planning Signals
+- constraint_1: backend projection payload remains canonical
+- prep_1: represent existing backend foundation before client follow-up work
+
+## 7. Known Risks / Uncertainties
+- risk_1: frontend and mobile may use different local names for projection status
+OUT
+}
+
+write_valid_plan() {
+  local repo_dir="$1"
+  cp "$GOLDEN_SRC" "$repo_dir/projects/p1/feature-a/implementation_plan.md"
+}
+
+run_helper() {
+  local repo_dir="$1"
+  local target_arg="$2"
+  local out=""
+  local status=0
+
+  set +e
+  out="$(cd "$repo_dir" && overmind/scripts/helper/check_implementation_plan_quality.sh "$target_arg" 2>&1)"
+  status=$?
+  set -e
+
+  printf '%s\n%s\n' "$status" "$out"
+}
+
+setup_valid_fixture() {
+  local repo_dir="$1"
+  mkdir -p "$repo_dir"
+  setup_repo_with_helper "$repo_dir"
+  write_project_definition "$repo_dir"
+  write_requirements "$repo_dir"
+  write_technical_requirements "$repo_dir"
+  write_valid_plan "$repo_dir"
+}
+
+test_passes_with_valid_shared_plan() {
+  local repo_dir="$TMP_ROOT/repo-pass"
+  setup_valid_fixture "$repo_dir"
+
+  local result=""
+  result="$(run_helper "$repo_dir" "projects/p1/feature-a/implementation_plan.md")"
+  local status=""
+  status="$(printf '%s\n' "$result" | head -n1)"
+  local out=""
+  out="$(printf '%s\n' "$result" | tail -n +2)"
+
+  assert_equal "0" "$status"
+  assert_contains "$out" "quality gate passed"
+}
+
+test_fails_when_technical_requirements_is_missing() {
+  local repo_dir="$TMP_ROOT/repo-missing-technical-requirements"
+  setup_valid_fixture "$repo_dir"
+  rm -f "$repo_dir/projects/p1/feature-a/technical_requirements.md"
+
+  local result=""
+  result="$(run_helper "$repo_dir" "projects/p1/feature-a/implementation_plan.md")"
+  local status=""
+  status="$(printf '%s\n' "$result" | head -n1)"
+  local out=""
+  out="$(printf '%s\n' "$result" | tail -n +2)"
+
+  assert_equal "2" "$status"
+  assert_contains "$out" "Required sibling artifact not found for quality check: projects/p1/feature-a/technical_requirements.md"
+}
+
+test_fails_when_repo_header_is_missing() {
+  local repo_dir="$TMP_ROOT/repo-missing-repo"
+  setup_valid_fixture "$repo_dir"
+  perl -0pi -e 's/#### Repo: backend\n//' "$repo_dir/projects/p1/feature-a/implementation_plan.md"
+
+  local result=""
+  result="$(run_helper "$repo_dir" "projects/p1/feature-a/implementation_plan.md")"
+  local status=""
+  status="$(printf '%s\n' "$result" | head -n1)"
+  local out=""
+  out="$(printf '%s\n' "$result" | tail -n +2)"
+
+  assert_equal "1" "$status"
+  assert_contains "$out" "missing #### Repo"
+}
+
+test_fails_when_dependency_points_to_later_step() {
+  local repo_dir="$TMP_ROOT/repo-late-dependency"
+  setup_valid_fixture "$repo_dir"
+  perl -0pi -e 's/#### Depends on: 1\.1/#### Depends on: 1.4/' "$repo_dir/projects/p1/feature-a/implementation_plan.md"
+
+  local result=""
+  result="$(run_helper "$repo_dir" "projects/p1/feature-a/implementation_plan.md")"
+  local status=""
+  status="$(printf '%s\n' "$result" | head -n1)"
+  local out=""
+  out="$(printf '%s\n' "$result" | tail -n +2)"
+
+  assert_equal "1" "$status"
+  assert_contains "$out" "depends on unknown or later step 1.4"
+}
+
+test_fails_when_requirement_reference_is_unknown() {
+  local repo_dir="$TMP_ROOT/repo-unknown-req"
+  setup_valid_fixture "$repo_dir"
+  perl -0pi -e 's/\[REQ-6\]/[REQ-99]/' "$repo_dir/projects/p1/feature-a/implementation_plan.md"
+
+  local result=""
+  result="$(run_helper "$repo_dir" "projects/p1/feature-a/implementation_plan.md")"
+  local status=""
+  status="$(printf '%s\n' "$result" | head -n1)"
+  local out=""
+  out="$(printf '%s\n' "$result" | tail -n +2)"
+
+  assert_equal "1" "$status"
+  assert_contains "$out" 'step heading "### Step 1.1 Order projection persistence foundation [REQ-99] [REQ-7]" references unknown requirement id REQ-99'
+}
+
+test_fails_when_step_heading_has_no_requirement_links() {
+  local repo_dir="$TMP_ROOT/repo-missing-heading-links"
+  setup_valid_fixture "$repo_dir"
+  perl -0pi -e 's/### Step 1\.2 Order query endpoint read-path completion \[REQ-6\] \[NFR-1\]/### Step 1.2 Order query endpoint read-path completion/' "$repo_dir/projects/p1/feature-a/implementation_plan.md"
+
+  local result=""
+  result="$(run_helper "$repo_dir" "projects/p1/feature-a/implementation_plan.md")"
+  local status=""
+  status="$(printf '%s\n' "$result" | head -n1)"
+  local out=""
+  out="$(printf '%s\n' "$result" | tail -n +2)"
+
+  assert_equal "1" "$status"
+  assert_contains "$out" 'step heading "### Step 1.2 Order query endpoint read-path completion" must reference at least one REQ-* or NFR-* id'
+}
+
+test_fails_when_requirement_has_no_related_step() {
+  local repo_dir="$TMP_ROOT/repo-uncovered-requirement"
+  setup_valid_fixture "$repo_dir"
+  perl -0pi -e 's/\[REQ-6\] \[REQ-7\]/[REQ-6]/' "$repo_dir/projects/p1/feature-a/implementation_plan.md"
+
+  local result=""
+  result="$(run_helper "$repo_dir" "projects/p1/feature-a/implementation_plan.md")"
+  local status=""
+  status="$(printf '%s\n' "$result" | head -n1)"
+  local out=""
+  out="$(printf '%s\n' "$result" | tail -n +2)"
+
+  assert_equal "1" "$status"
+  assert_contains "$out" "requirement id REQ-7 is not covered by any implementation step heading"
+}
+
+test_fails_when_evidence_line_is_missing() {
+  local repo_dir="$TMP_ROOT/repo-missing-evidence-line"
+  setup_valid_fixture "$repo_dir"
+  perl -0pi -e 's/\n#### Evidence: gap\/TECH_REQ-6, gap\/TECH_REQ-NFR-1\n/\n/' "$repo_dir/projects/p1/feature-a/implementation_plan.md"
+
+  local result=""
+  result="$(run_helper "$repo_dir" "projects/p1/feature-a/implementation_plan.md")"
+  local status=""
+  status="$(printf '%s\n' "$result" | head -n1)"
+  local out=""
+  out="$(printf '%s\n' "$result" | tail -n +2)"
+
+  assert_equal "1" "$status"
+  assert_contains "$out" "step 1.2 is missing #### Evidence"
+}
+
+test_fails_when_evidence_token_is_unknown() {
+  local repo_dir="$TMP_ROOT/repo-unknown-evidence-token"
+  setup_valid_fixture "$repo_dir"
+  perl -0pi -e 's/#### Evidence: gap\/TECH_REQ-6, gap\/TECH_REQ-NFR-1/#### Evidence: gap\/TECH_REQ-99, gap\/TECH_REQ-NFR-1/' "$repo_dir/projects/p1/feature-a/implementation_plan.md"
+
+  local result=""
+  result="$(run_helper "$repo_dir" "projects/p1/feature-a/implementation_plan.md")"
+  local status=""
+  status="$(printf '%s\n' "$result" | head -n1)"
+  local out=""
+  out="$(printf '%s\n' "$result" | tail -n +2)"
+
+  assert_equal "1" "$status"
+  assert_contains "$out" "step 1.2 references unknown evidence token gap/TECH_REQ-99"
+}
+
+test_fails_when_unresolved_requirement_evidence_is_uncovered() {
+  local repo_dir="$TMP_ROOT/repo-uncovered-unresolved-requirement"
+  setup_valid_fixture "$repo_dir"
+  perl -0pi -e 's/gap\/TECH_REQ-6/gap\/TECH_REQ-4/g' "$repo_dir/projects/p1/feature-a/implementation_plan.md"
+
+  local result=""
+  result="$(run_helper "$repo_dir" "projects/p1/feature-a/implementation_plan.md")"
+  local status=""
+  status="$(printf '%s\n' "$result" | head -n1)"
+  local out=""
+  out="$(printf '%s\n' "$result" | tail -n +2)"
+
+  assert_equal "1" "$status"
+  assert_contains "$out" "unresolved requirement evidence token gap/TECH_REQ-6 is not covered by any implementation step"
+}
+
+test_fails_when_unresolved_component_evidence_is_uncovered() {
+  local repo_dir="$TMP_ROOT/repo-uncovered-unresolved-component"
+  setup_valid_fixture "$repo_dir"
+  perl -0pi -e 's/#### Evidence: gap\/TECH_REQ-4, comp\/mobile-order-projection-client\n/#### Evidence: gap\/TECH_REQ-4\n/' "$repo_dir/projects/p1/feature-a/implementation_plan.md"
+
+  local result=""
+  result="$(run_helper "$repo_dir" "projects/p1/feature-a/implementation_plan.md")"
+  local status=""
+  status="$(printf '%s\n' "$result" | head -n1)"
+  local out=""
+  out="$(printf '%s\n' "$result" | tail -n +2)"
+
+  assert_equal "1" "$status"
+  assert_contains "$out" "unresolved component evidence token comp/mobile-order-projection-client is not covered by any implementation step"
+}
+
+test_fails_when_applicable_repo_has_no_steps() {
+  local repo_dir="$TMP_ROOT/repo-missing-mobile"
+  setup_valid_fixture "$repo_dir"
+  perl -0pi -e 's/\n### Step 1\.4[\s\S]*$//s' "$repo_dir/projects/p1/feature-a/implementation_plan.md"
+
+  local result=""
+  result="$(run_helper "$repo_dir" "projects/p1/feature-a/implementation_plan.md")"
+  local status=""
+  status="$(printf '%s\n' "$result" | head -n1)"
+  local out=""
+  out="$(printf '%s\n' "$result" | tail -n +2)"
+
+  assert_equal "1" "$status"
+  assert_contains "$out" "repo mobile has impacted components in technical requirements but no plan step is allocated to it"
+}
+
+test_passes_with_valid_shared_plan
+test_fails_when_technical_requirements_is_missing
+test_fails_when_repo_header_is_missing
+test_fails_when_dependency_points_to_later_step
+test_fails_when_requirement_reference_is_unknown
+test_fails_when_step_heading_has_no_requirement_links
+test_fails_when_requirement_has_no_related_step
+test_fails_when_evidence_line_is_missing
+test_fails_when_evidence_token_is_unknown
+test_fails_when_unresolved_requirement_evidence_is_uncovered
+test_fails_when_unresolved_component_evidence_is_uncovered
+test_fails_when_applicable_repo_has_no_steps
