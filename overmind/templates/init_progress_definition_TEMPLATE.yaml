@@ -1,0 +1,309 @@
+meta_info:
+  project_id: ""
+  project_classes: []
+  project_type_code: ""
+  project_type_label: ""
+  class_repo_paths: {}
+
+steps:
+  - step_number: 1
+    phase_name: "init"
+    step_name: "Initialize Repo ASDLC Metadata"
+    input_required:
+      - type: "user_input"
+        value: "project_type"
+      - type: "user_input"
+        value: "project_classes"
+      - type: "user_input"
+        value: "class_repo_paths for active project classes"
+    finished_only_if_artefacts_present:
+      - file: "init_progress_definition.yaml"
+    finished_only_if_conditions_meet:
+      - condition: "overmind/init_progress_definition.yaml exists as the repo-level ASDLC metadata source of truth."
+      - condition: "project_type_code, project_type_label, project_classes, and class_repo_paths for active project classes are persisted in overmind/init_progress_definition.yaml."
+
+  - step_number: 2
+    phase_name: "init"
+    step_name: "Create Cross-Repository Contract Definition For This Project"
+    input_required:
+      - type: "document"
+        value: "init_progress_definition.yaml"
+    finished_only_if_artefacts_present:
+      - file: "common_contract_definition.md"
+        special_folder: "/product"
+    finished_only_if_conditions_meet:
+      - condition: "For project types B and C, active BE/FE/Mobile lines provide req/resp contract evidence to the Product Owner using the configured repo paths."
+      - condition: "For project types B and C, class-specific contract inventory artifacts may be prepared as supporting evidence before reconciliation."
+      - condition: "For project type A, contract guidance is sourced from MCP."
+      - condition: "common_contract_definition.md reconciles applicable cross-project contract overlaps, mismatches, and shared definitions."
+      - condition: "When only one source is applicable by project class/type, common_contract_definition.md explicitly documents the single-source basis."
+
+  - step_number: 3
+    phase_name: "feature"
+    step_name: "Initialize and Enrich Business Requirements Structuring"
+    input_required:
+      - type: "user_input"
+        value: "Epic or Story input"
+      - type: "user_input"
+        value: "project_type"
+      - type: "user_input"
+        value: "class_repo_paths for active project classes"
+    finished_only_if_artefacts_present:
+      - file: "feature_br_summary.md"
+        special_folder: "/product"
+    finished_only_if_conditions_meet:
+      - condition: "feature_br_summary.md is created as the feature-phase business requirements working document scaffold."
+      - condition: "Feature metadata needed for downstream BR enrichment is initialized in feature_br_summary.md."
+
+  - step_number: 4.1
+    phase_name: "feature"
+    step_name: "Scan repo and apply task-to-BR update"
+    input_required:
+      - type: "document"
+        value: "feature_br_summary.md"
+      - type: "user_input"
+        value: "Epic or Story input"
+      - type: "user_input"
+        value: "project_type"
+    finished_only_if_artefacts_present:
+      - file: "user_br_input.md"
+        special_folder: "/product"
+    finished_only_if_conditions_meet:
+      - condition: "feature_task_to_br.sh output is captured in user_br_input.md for this feature."
+      - condition: "For project types B and C, repository scan context has been requested from active BE/FE/Mobile lines at most once per line and only for non-new projects."
+      - condition: "For project type A, repository scan is explicitly skipped as not applicable."
+
+  - step_number: 4.2
+    phase_name: "feature"
+    step_name: "Clarify BR and check EARS readiness"
+    input_required:
+      - type: "document"
+        value: "feature_br_summary.md"
+      - type: "document"
+        value: "user_br_input.md"
+    finished_only_if_artefacts_present:
+      - file: "feature_br_summary.md"
+        special_folder: "/product"
+        check_key_value:
+          key: "ready_to_ears"
+          equals: "true"
+          section: "## 1. Document Meta"
+    finished_only_if_conditions_meet:
+      - condition: "feature_br_summary.md has been iteratively enriched until required quality is reached."
+      - condition: "Epic or Story input is incorporated into feature_br_summary.md during enrichment."
+      - condition: "No required template fields remain empty, weak, or unclear beyond the accepted threshold."
+      - condition: "If additional document analysis was repeated, each repeated run was triggered only by newly provided files."
+      - condition: "If Q&A was used, user answers were first logged and then merged into feature_br_summary.md only after the Q&A session ended."
+      - condition: "For project type A, the feature was checked and confirmed as a valid starting feature for a new project."
+
+  - step_number: 5
+    phase_name: "feature"
+    step_name: "Convert Business Requirements Structuring to EARS"
+    input_required:
+      - type: "document"
+        value: "feature_br_summary.md"
+    finished_only_if_artefacts_present:
+      - file: "requirements_ears.md"
+        special_folder: "/product"
+    finished_only_if_conditions_meet:
+      - condition: "requirements_ears.md is derived from the validated feature_br_summary.md."
+      - condition: "Requirements are written in EARS-style statements."
+      - condition: "Requirement IDs are present and consistent."
+      - condition: "Coverage is complete for all in-scope feature requirements."
+
+  - step_number: 5.1
+    phase_name: "feature"
+    step_name: "(optional) requirement_ears extra review"
+    optional: true
+    input_required:
+      - type: "document"
+        value: "user_br_input.md"
+      - type: "document"
+        value: "requirements_ears.md"
+    finished_only_if_artefacts_present:
+      - file: "requirements_ears_review.md"
+        special_folder: "/product"
+        check_key_value:
+          key: "review_status"
+          equals: "complete"
+          section: "## 1. Document Meta"
+    finished_only_if_conditions_meet:
+      - condition: "requirements_ears_review.md records the review findings discovered by checking requirements_ears.md against user_br_input.md."
+      - condition: "Each review finding is tracked with one state from: escalated, added to ears, rejected, postponed."
+      - condition: "When review_status is complete, no escalated findings remain."
+
+  - step_number: 6
+    phase_name: "feature"
+    step_name: "Define Feature Contract Delta"
+    input_required:
+      - type: "document"
+        value: "requirements_ears.md"
+      - type: "document"
+        value: "common_contract_definition.md"
+      - type: "user_input"
+        value: "project_type"
+    finished_only_if_artefacts_present:
+      - file: "feature_contract_delta.md"
+        special_folder: "/product"
+    finished_only_if_conditions_meet:
+      - condition: "feature_contract_delta.md defines the feature-specific contract additions or changes against the stable baseline in common_contract_definition.md."
+      - condition: "For project types B and C, the Product Owner provides the same feature_contract_delta.md artifact to active BE/FE/Mobile lines before step 7 starts."
+      - condition: "feature_contract_delta.md focuses on feature-level contract deltas and does not redefine stable cross-project contract types, ownership, or source-of-truth rules already captured in common_contract_definition.md."
+      - condition: "When no shared contract change is needed, feature_contract_delta.md explicitly records that no contract delta is required for this feature."
+
+  - step_number: 7
+    phase_name: "feature"
+    step_name: "Analyze Repos And Prepare Repo Execution Context"
+    input_required:
+      - type: "document"
+        value: "init_progress_definition.yaml"
+      - type: "document"
+        value: "requirements_ears.md"
+      - type: "document"
+        value: "feature_contract_delta.md"
+    finished_only_if_artefacts_present:
+      - file: "project_surface_struct_resp_map_backend.md"
+        special_folder: "/product"
+        required_if:
+          meta_info:
+            project_classes:
+              any_of: ["backend"]
+      - file: "project_surface_struct_resp_map_frontend.md"
+        special_folder: "/product"
+        required_if:
+          meta_info:
+            project_classes:
+              any_of: ["frontend"]
+      - file: "project_surface_struct_resp_map_mobile.md"
+        special_folder: "/product"
+        required_if:
+          meta_info:
+            project_classes:
+              any_of: ["mobile"]
+    finished_only_if_conditions_meet:
+      - condition: "For project types B and C, repo execution-context analysis runs one ready repo class at a time using the active repo path from meta_info.class_repo_paths."
+      - condition: "Backend analysis produces project_surface_struct_resp_map_backend.md when backend class is active."
+      - condition: "Frontend analysis produces project_surface_struct_resp_map_frontend.md when frontend class is active."
+      - condition: "Mobile analysis produces project_surface_struct_resp_map_mobile.md when mobile class is active."
+      - condition: "For project type A, best-practice repository execution context is requested from MCP and handled separately per active repo class, producing the same per-class artifact names."
+      - condition: "project_surface_struct_resp_map_backend.md, project_surface_struct_resp_map_frontend.md, and project_surface_struct_resp_map_mobile.md capture feature-scoped repo context for their respective classes, grounded in project-level repo metadata."
+      - condition: "These artifacts do not redefine stable cross-project contract governance already captured in common_contract_definition.md."
+      - condition: "Sources used to prepare these documents follow project type rules: C from code analysis, B from code analysis or knowledge base, A from knowledge base only."
+
+  - step_number: 8
+    phase_name: "feature"
+    step_name: "Create Feature-Scoped Technical Requirements"
+    input_required:
+      - type: "document"
+        value: "requirements_ears.md"
+      - type: "document"
+        value: "common_contract_definition.md"
+      - type: "document"
+        value: "project_surface_struct_resp_map_backend.md"
+      - type: "document"
+        value: "project_surface_struct_resp_map_frontend.md"
+      - type: "document"
+        value: "project_surface_struct_resp_map_mobile.md"
+    finished_only_if_artefacts_present:
+      - file: "technical_requirements.md"
+        special_folder: "/product"
+        required_if:
+          meta_info:
+            project_classes:
+              any_of: ["backend", "frontend", "mobile"]
+    finished_only_if_conditions_meet:
+      - condition: "For project types B and C, technical_requirements.md is created as one shared feature-scoped artifact when at least one repo class is active."
+      - condition: "For project type A, technical_requirements.md would be created from requirements_ears.md, common_contract_definition.md, and the applicable per-class project surface maps plus MCP best-practice context."
+      - condition: "technical_requirements.md consolidates feature-scoped repository evidence, requirement coverage/gaps, impacted components, and planning signals for the whole feature."
+      - condition: "For project types B and C, direct code evidence used for this artifact is limited to feature-scoped paths selected by the applicable project_surface_struct_resp_map_backend.md, project_surface_struct_resp_map_frontend.md, and project_surface_struct_resp_map_mobile.md artifacts plus the smallest adjacent evidence files needed to confirm behavior."
+      - condition: "Each impacted component entry in technical_requirements.md carries explicit repo ownership metadata."
+      - condition: "This artifact does not redefine stable cross-project contract governance already captured in common_contract_definition.md."
+
+  - step_number: 8.1
+    phase_name: "feature"
+    step_name: "Create Implementation Slice Planning Artifact"
+    input_required:
+      - type: "document"
+        value: "requirements_ears.md"
+      - type: "document"
+        value: "technical_requirements.md"
+      - type: "document"
+        value: "feature_contract_delta.md"
+      - type: "document"
+        value: "project_surface_struct_resp_map_backend.md"
+      - type: "document"
+        value: "project_surface_struct_resp_map_frontend.md"
+      - type: "document"
+        value: "project_surface_struct_resp_map_mobile.md"
+    finished_only_if_artefacts_present:
+      - file: "implementation_slices.md"
+        special_folder: "/product"
+        required_if:
+          meta_info:
+            project_classes:
+              any_of: ["backend", "frontend", "mobile"]
+    finished_only_if_conditions_meet:
+      - condition: "For project types B and C, planning produces one shared implementation_slices.md artifact when at least one repo class is active."
+      - condition: "For project type A, implementation_slices.md would be created from requirements_ears.md, technical_requirements.md, feature_contract_delta.md, applicable surface-map artifacts, and MCP best-practice context."
+      - condition: "implementation_slices.md is implementation-driven and prioritizes thin executable slices and first usable increments."
+      - condition: "implementation_slices.md may use requirements_ears.md, technical_requirements.md, feature_contract_delta.md, and applicable surface-map artifacts to recover execution context."
+      - condition: "implementation_slices.md captures local prerequisite intent only and does not force full global ordering."
+      - condition: "implementation_slices.md does not force full REQ/NFR traceability coverage; full traceability enforcement belongs to the next phase."
+      - condition: "This artifact does not redefine stable cross-project contract governance already captured in common_contract_definition.md."
+
+  - step_number: 8.2
+    phase_name: "feature"
+    step_name: "Create Shared Repository Implementation Plan"
+    input_required:
+      - type: "document"
+        value: "implementation_slices.md"
+      - type: "document"
+        value: "requirements_ears.md"
+      - type: "document"
+        value: "technical_requirements.md"
+      - type: "document"
+        value: "feature_contract_delta.md"
+    finished_only_if_artefacts_present:
+      - file: "implementation_plan.md"
+        special_folder: "/product"
+        required_if:
+          meta_info:
+            project_classes:
+              any_of: ["backend", "frontend", "mobile"]
+    finished_only_if_conditions_meet:
+      - condition: "For project types B and C, planning produces one shared implementation_plan.md when at least one repo class is active."
+      - condition: "For project type A, implementation_plan.md would be created from implementation_slices.md, requirements_ears.md, technical_requirements.md, and feature_contract_delta.md plus MCP best-practice context."
+      - condition: "implementation_plan.md is based on implementation_slices.md plus requirements_ears.md, technical_requirements.md, and feature_contract_delta.md."
+      - condition: "Each implementation step in implementation_plan.md is allocated to exactly one repo class using explicit repo ownership metadata."
+      - condition: "Implementation steps/slices are defined in executable implementation order."
+      - condition: "Cross-repo dependencies are made explicit when sequencing matters."
+      - condition: "implementation_slices.md is the canonical source of implementation-driven slice decomposition for this phase."
+      - condition: "technical_requirements.md remains the canonical source of current-state evidence, impacted components, and explicit gaps used to validate coverage."
+      - condition: "Already implemented slices may be included when they materially explain remaining work or prerequisite state."
+      - condition: "For project types B and C, missing prerequisites required to begin implementation are identified and included when needed."
+      - condition: "For project type B, required refactoring of existing code is identified and included when needed."
+      - condition: "This artifact does not redefine stable cross-project contract governance already captured in common_contract_definition.md."
+
+  - step_number: 8.3
+    phase_name: "feature"
+    step_name: "(optional) implementation plan semantic review"
+    optional: true
+    input_required:
+      - type: "document"
+        value: "implementation_plan.md"
+      - type: "document"
+        value: "requirements_ears.md"
+      - type: "document"
+        value: "technical_requirements.md"
+    finished_only_if_artefacts_present:
+      - file: "implementation_plan_semantic_review.md"
+        special_folder: "/product"
+        check_key_value:
+          key: "review_status"
+          equals: "complete"
+          section: "## 1. Document Meta"
+    finished_only_if_conditions_meet:
+      - condition: "implementation_plan_semantic_review.md records semantic cohesion, split-quality, and dependency-ordering findings for implementation_plan.md."
+      - condition: "Findings use one type from: step_scope_overlap, technical_gap_mix, dependency_ordering, requirement_grouping."
+      - condition: "When findings exist, user-selected findings are applied to implementation_plan.md and each finding is marked with terminal decision state."
+      - condition: "When no semantic findings are present, implementation_plan_semantic_review.md records no_findings: true."
