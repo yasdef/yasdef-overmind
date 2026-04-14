@@ -36,10 +36,17 @@ you can manualy run scripts for different steps after asdlc folder init, check
 - we need to read epic/story from jira, current way - add them as a text/md files can remain optional but not main
 - we need sophisticated still convenient git management logic because asdlc folder belongs specific work place (laptop) but each project folder should be independent git-tracked repo to store all artefact in this project git (near codebase)
 
-## Scripts
+## Release-notes
 
-- `overmind/scripts/bootstrap_overmind.sh`
-  Bootstraps coordinator branch/state: checks out or creates `overmind`, ensures `overmind/worker_registry.yaml`, commits registry changes, and pushes `overmind` to `origin`.
+V-0.0.1 (current)
+- inint mode to setup asdlc folder in file system with all necessary scripts, rules etc
+- add projects, add repos to project, scan repos for project metainfo
+- add workers to project (types: backend|frontend|mobile|infra)
+- add new feature flow end 2 end from story to requirement_ears and inplementation_plan
+- assign workers to implementation plan
+
+
+## Scripts
 
 - `overmind/scripts/project_mgmt/project_setup_first_init_machine.sh`
   Bootstraps or updates ASDLC workspace under `<selected_parent>/asdlc`. In update mode, it repairs missing staged commands, refreshes `quickrun.md`, and synchronizes only whitelisted support assets (`.rules`, `.templates`, `.golden_examples`, `.helper`, `.setup`).
@@ -107,10 +114,19 @@ you can manualy run scripts for different steps after asdlc folder init, check
 - `overmind/scripts/feature_assing_workers.sh`
   Staged command (`<asdlc>/.commands/feature_assing_workers.sh --feature_path <.../feature-folder>`) that requires a ready parseable `implementation_plan.md`, resolves active workers strictly by step repo class, asks for one class worker when multiple are available, and writes deterministic `#### Assigned:` values (worker UUID or class-scoped error message) on every step.
 
-## Staged Feature-Path Contract
+## Staged Commands Input Contract
 
-The following staged commands require `--feature_path <asdlc/projects/<project-id>/<feature-folder>>` and must run from `<asdlc>/.commands/`:
+All staged commands are expected to run from `<asdlc>/.commands/`.
 
+Scripts working on **project level** require:
+- `--path <asdlc/projects/<project-id>>`
+- `init_common_contract_definition.sh`
+- `project_register_worker.sh`
+- `project_add_feature_e2e.sh`
+- `feature_br_scaffold.sh`
+
+Scripts working on **feature level** require:
+- `--feature_path <asdlc/projects/<project-id>/<feature-folder>>`
 - `feature_scan_repo_for_br.sh`
 - `feature_task_to_br.sh`
 - `feature_user_br_clarification.sh`
@@ -125,36 +141,19 @@ The following staged commands require `--feature_path <asdlc/projects/<project-i
 - `feature_implementation_plan_semantic_review.sh`
 - `feature_assing_workers.sh`
 
-## Staged Project-Path Feature Orchestrator
-
-- `project_register_worker.sh` requires `--path <asdlc/projects/<project-id>>`.
-- `<project>/workers.yaml` stores top-level `project_id` plus worker entries with `uuid`, `class`, `status`, and `registered_at`.
-- `feature_assing_workers.sh` requires `--feature_path <asdlc/projects/<project-id>/<feature-folder>>` and fills each plan-step `#### Assigned:` line with class-matched worker UUIDs or deterministic `ERROR: no active worker available for class <class>`.
-- `project_add_feature_e2e.sh` requires `--path <asdlc/projects/<project-id>>`.
-- Project-level startup discovers unfinished feature folders first; when any exist, the operator chooses whether to start a new feature or continue one of the unfinished features.
-- The state file `.project_add_feature_e2e_state.env` stores only the last selected feature path as a convenience cache and does not override discovery or explicit user choice.
-- New-feature flow creates a feature via `feature_br_scaffold.sh`, saves `feature_path`, then calls `init_progress_scanner.sh --path <saved-feature-path>` and resumes from scanner `next step`.
-- Continue flow lists only unfinished features together with their scanner `next step`; `--resume <step>` overrides scanner-derived start after a feature is selected.
+Feature-level exception:
+- `init_progress_scanner.sh` works on a feature folder but expects `--path <asdlc/projects/<project-id>/<feature-folder>>`.
 
 `--feature_path` must:
-- exist and be a directory,
-- be inside ASDLC `projects/`,
-- contain `feature_br_summary.md`.
+- exist and be a directory
+- be inside ASDLC `projects/`
+- contain `feature_br_summary.md`
+
+Project worker data lives in:
+- `projects/<project-id>/workers.yaml`
 
 ## Notes
 
 - Run scripts from inside a git repository.
-- Active quality helpers:
-  - `overmind/scripts/helper/check_business_context_filled_from_repo.sh`
-  - `overmind/scripts/helper/check_task_to_br_quality.sh`
-  - `overmind/scripts/helper/check_common_contract_definition_quality.sh`
-  - `overmind/scripts/helper/check_requirements_ears_quality.sh`
-  - `overmind/scripts/helper/check_feature_contract_delta_quality.sh`
-  - `overmind/scripts/helper/check_feature_technical_requirements_quality.sh`
-  - `overmind/scripts/helper/check_implementation_slices_quality.sh`
-  - `overmind/scripts/helper/check_implementation_plan_quality.sh`
-  - `overmind/scripts/helper/check_feature_repo_surface_and_exec_context_be_quality.sh`
-  - `overmind/scripts/helper/check_feature_repo_surface_and_exec_context_fe_quality.sh`
-  - `overmind/scripts/helper/check_requirements_ears_review_quality.sh`
+- Quality helper scripts live under `overmind/scripts/helper/`.
 - Script tests are in `tests/ai_scripts/`.
-- For adding a new Overmind phase scaffold, use the local skill `$overmind-new-pipeline-step`.
