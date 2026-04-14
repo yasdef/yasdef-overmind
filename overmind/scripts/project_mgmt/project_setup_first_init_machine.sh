@@ -20,6 +20,7 @@ FEATURE_TECHNICAL_REQUIREMENTS_SCRIPT="overmind/scripts/feature_technical_requir
 FEATURE_IMPLEMENTATION_SLICES_SCRIPT="overmind/scripts/feature_implementation_slices.sh"
 FEATURE_IMPLEMENTATION_PLAN_SCRIPT="overmind/scripts/feature_implementation_plan.sh"
 FEATURE_IMPLEMENTATION_PLAN_SEMANTIC_REVIEW_SCRIPT="overmind/scripts/feature_implementation_plan_semantic_review.sh"
+FEATURE_ASSIGN_WORKERS_SCRIPT="overmind/scripts/feature_assing_workers.sh"
 TEMPLATE_SOURCE_FILE="overmind/templates/init_progress_definition_TEMPLATE.yaml"
 RULES_SOURCE_DIR="overmind/rules"
 TEMPLATES_SOURCE_DIR="overmind/templates"
@@ -476,6 +477,7 @@ stage_commands() {
   stage_command_script "$repo_root" "$FEATURE_IMPLEMENTATION_SLICES_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
   stage_command_script "$repo_root" "$FEATURE_IMPLEMENTATION_PLAN_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
   stage_command_script "$repo_root" "$FEATURE_IMPLEMENTATION_PLAN_SEMANTIC_REVIEW_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
+  stage_command_script "$repo_root" "$FEATURE_ASSIGN_WORKERS_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
 }
 
 remove_obsolete_staged_commands() {
@@ -604,6 +606,11 @@ Resume examples:
 \`\`\`bash
 .commands/feature_implementation_plan_semantic_review.sh --feature_path projects/<project-id>/<feature-folder>
 \`\`\`
+7. Assign workers to implementation-plan steps:
+\`\`\`bash
+.commands/feature_assing_workers.sh --feature_path projects/<project-id>/<feature-folder>
+\`\`\`
+This command writes \`#### Assigned:\` for every plan step with a class-matched worker UUID or \`ERROR: no active worker available for class <class>\`.
 
 ## 4. Check Current Feature Progress
 

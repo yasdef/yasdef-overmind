@@ -22,6 +22,7 @@ OPTION_15_HELPER_SRC="$SOURCE_ROOT/overmind/scripts/feature_technical_requiremen
 FEATURE_IMPLEMENTATION_SLICES_SRC="$SOURCE_ROOT/overmind/scripts/feature_implementation_slices.sh"
 OPTION_16_HELPER_SRC="$SOURCE_ROOT/overmind/scripts/feature_implementation_plan.sh"
 OPTION_17_HELPER_SRC="$SOURCE_ROOT/overmind/scripts/feature_implementation_plan_semantic_review.sh"
+OPTION_18_HELPER_SRC="$SOURCE_ROOT/overmind/scripts/feature_assing_workers.sh"
 TEMPLATE_SRC="$SOURCE_ROOT/overmind/templates/init_progress_definition_TEMPLATE.yaml"
 RULES_DIR_SRC="$SOURCE_ROOT/overmind/rules"
 TEMPLATES_DIR_SRC="$SOURCE_ROOT/overmind/templates"
@@ -259,6 +260,7 @@ assert_feature_requirements_and_plan_commands_use_staged_runtime_assets() {
   local implementation_slices_cmd_path="$asdlc_root/.commands/feature_implementation_slices.sh"
   local implementation_plan_cmd_path="$asdlc_root/.commands/feature_implementation_plan.sh"
   local implementation_plan_semantic_review_cmd_path="$asdlc_root/.commands/feature_implementation_plan_semantic_review.sh"
+  local assign_workers_cmd_path="$asdlc_root/.commands/feature_assing_workers.sh"
 
   assert_contains "$(cat "$technical_requirements_cmd_path")" 'MODELS_FILE=".setup/models.md"'
   assert_contains "$(cat "$technical_requirements_cmd_path")" 'RULE_FILE=".rules/technical_requirements_rule.md"'
@@ -282,6 +284,9 @@ assert_feature_requirements_and_plan_commands_use_staged_runtime_assets() {
   assert_contains "$(cat "$implementation_plan_semantic_review_cmd_path")" 'RULE_FILE=".rules/implementation_plan_semantic_review_rule.md"'
   assert_contains "$(cat "$implementation_plan_semantic_review_cmd_path")" 'REVIEW_TEMPLATE_FILE=".templates/implementation_plan_semantic_review_TEMPLATE.md"'
   assert_contains "$(cat "$implementation_plan_semantic_review_cmd_path")" 'REVIEW_GOLDEN_EXAMPLE_FILE=".golden_examples/implementation_plan_semantic_review_GOLDEN_EXAMPLE.md"'
+
+  assert_contains "$(cat "$assign_workers_cmd_path")" 'Missing required argument: --feature_path <asdlc/projects/<project-id>/<feature-folder>>.'
+  assert_contains "$(cat "$assign_workers_cmd_path")" 'ERROR: no active worker available for class'
 }
 
 count_project_records() {
@@ -392,6 +397,7 @@ setup_repo_layout() {
   cp "$FEATURE_IMPLEMENTATION_SLICES_SRC" "$repo_dir/overmind/scripts/feature_implementation_slices.sh"
   cp "$OPTION_16_HELPER_SRC" "$repo_dir/overmind/scripts/feature_implementation_plan.sh"
   cp "$OPTION_17_HELPER_SRC" "$repo_dir/overmind/scripts/feature_implementation_plan_semantic_review.sh"
+  cp "$OPTION_18_HELPER_SRC" "$repo_dir/overmind/scripts/feature_assing_workers.sh"
   cp -R "$RULES_DIR_SRC" "$repo_dir/overmind/rules"
   cp -R "$TEMPLATES_DIR_SRC" "$repo_dir/overmind/templates"
   cp -R "$GOLDEN_EXAMPLES_DIR_SRC" "$repo_dir/overmind/golden_examples"
@@ -417,6 +423,7 @@ setup_repo_layout() {
   chmod +x "$repo_dir/overmind/scripts/feature_implementation_slices.sh"
   chmod +x "$repo_dir/overmind/scripts/feature_implementation_plan.sh"
   chmod +x "$repo_dir/overmind/scripts/feature_implementation_plan_semantic_review.sh"
+  chmod +x "$repo_dir/overmind/scripts/feature_assing_workers.sh"
   find "$repo_dir/overmind/scripts/helper" -maxdepth 1 -type f -exec chmod +x {} +
 }
 
@@ -492,6 +499,7 @@ test_first_init_machine_bootstraps_asdlc_workspace_with_local_template() {
   assert_file_exists "$asdlc_root/.commands/feature_implementation_slices.sh"
   assert_file_exists "$asdlc_root/.commands/feature_implementation_plan.sh"
   assert_file_exists "$asdlc_root/.commands/feature_implementation_plan_semantic_review.sh"
+  assert_file_exists "$asdlc_root/.commands/feature_assing_workers.sh"
   assert_file_executable "$asdlc_root/.commands/project_setup_add_new_project.sh"
   assert_file_executable "$asdlc_root/.commands/project_setup_update_project.sh"
   assert_file_executable "$asdlc_root/.commands/init_progress_scanner.sh"
@@ -511,6 +519,7 @@ test_first_init_machine_bootstraps_asdlc_workspace_with_local_template() {
   assert_file_executable "$asdlc_root/.commands/feature_implementation_slices.sh"
   assert_file_executable "$asdlc_root/.commands/feature_implementation_plan.sh"
   assert_file_executable "$asdlc_root/.commands/feature_implementation_plan_semantic_review.sh"
+  assert_file_executable "$asdlc_root/.commands/feature_assing_workers.sh"
   assert_file_content_equal \
     "$repo_dir/overmind/templates/init_progress_definition_TEMPLATE.yaml" \
     "$asdlc_root/.templates/init_progress_definition_TEMPLATE.yaml"
@@ -553,6 +562,8 @@ test_first_init_machine_bootstraps_asdlc_workspace_with_local_template() {
   assert_contains "$quickrun" ".commands/feature_implementation_plan.sh --feature_path projects/<project-id>/<feature-folder>"
   assert_contains "$quickrun" "Optionally run implementation-plan semantic review (Step 8.3):"
   assert_contains "$quickrun" ".commands/feature_implementation_plan_semantic_review.sh --feature_path projects/<project-id>/<feature-folder>"
+  assert_contains "$quickrun" ".commands/feature_assing_workers.sh --feature_path projects/<project-id>/<feature-folder>"
+  assert_contains "$quickrun" 'This command writes `#### Assigned:` for every plan step with a class-matched worker UUID or `ERROR: no active worker available for class <class>`.'
   assert_contains "$quickrun" ".commands/init_progress_scanner.sh --path projects/<project-id>/<feature-folder>"
   assert_contains "$quickrun" "Careful: provide a feature path here, not a project path."
   assert_contains "$metadata" "meta:"
@@ -633,6 +644,7 @@ test_first_init_machine_update_mode_repairs_missing_commands_without_overwriting
   local feature_implementation_slices_cmd_path="$asdlc_root/.commands/feature_implementation_slices.sh"
   local repository_implementation_plan_cmd_path="$asdlc_root/.commands/feature_implementation_plan.sh"
   local implementation_plan_semantic_review_cmd_path="$asdlc_root/.commands/feature_implementation_plan_semantic_review.sh"
+  local assign_workers_cmd_path="$asdlc_root/.commands/feature_assing_workers.sh"
   local stale_rule_path="$asdlc_root/.rules/repo_br_scan_rule.md"
   local stale_legacy_template_path="$asdlc_root/templates/init_progress_definition_TEMPLATE.yaml"
   local stale_golden_example_path="$asdlc_root/.golden_examples/step_state_GOLDEN_EXAMPLE.md"
@@ -676,7 +688,8 @@ test_first_init_machine_update_mode_repairs_missing_commands_without_overwriting
     "$feature_technical_requirements_cmd_path" \
     "$feature_implementation_slices_cmd_path" \
     "$repository_implementation_plan_cmd_path" \
-    "$implementation_plan_semantic_review_cmd_path"
+    "$implementation_plan_semantic_review_cmd_path" \
+    "$assign_workers_cmd_path"
 
   local out=""
   out="$(
@@ -703,6 +716,7 @@ test_first_init_machine_update_mode_repairs_missing_commands_without_overwriting
   assert_contains "$out" "Update mode added file: $feature_implementation_slices_cmd_path"
   assert_contains "$out" "Update mode added file: $repository_implementation_plan_cmd_path"
   assert_contains "$out" "Update mode added file: $implementation_plan_semantic_review_cmd_path"
+  assert_contains "$out" "Update mode added file: $assign_workers_cmd_path"
   assert_contains "$out" "ASDLC workspace update completed: $asdlc_root"
   assert_file_exists "$add_cmd_path"
   assert_file_exists "$update_cmd_path"
@@ -723,6 +737,7 @@ test_first_init_machine_update_mode_repairs_missing_commands_without_overwriting
   assert_file_exists "$feature_implementation_slices_cmd_path"
   assert_file_exists "$repository_implementation_plan_cmd_path"
   assert_file_exists "$implementation_plan_semantic_review_cmd_path"
+  assert_file_exists "$assign_workers_cmd_path"
   assert_file_executable "$update_cmd_path"
   assert_file_executable "$scanner_cmd_path"
   assert_file_executable "$feature_orchestrator_cmd_path"
@@ -741,12 +756,14 @@ test_first_init_machine_update_mode_repairs_missing_commands_without_overwriting
   assert_file_executable "$feature_implementation_slices_cmd_path"
   assert_file_executable "$repository_implementation_plan_cmd_path"
   assert_file_executable "$implementation_plan_semantic_review_cmd_path"
+  assert_file_executable "$assign_workers_cmd_path"
   assert_equal "$metadata_before" "$(cat "$metadata_path")"
   assert_equal "$add_cmd_before" "$(cat "$add_cmd_path")"
   assert_file_exists "$sentinel_project_file"
   assert_contains "$(cat "$update_cmd_path")" "ASDLC_PROJECTS_DIR_DEFAULT=\"$asdlc_root/projects\""
   assert_contains "$(cat "$scanner_cmd_path")" "ASDLC_PROJECTS_DIR_DEFAULT=\"$asdlc_root/projects\""
   assert_contains "$(cat "$register_worker_cmd_path")" "ASDLC_PROJECTS_DIR_DEFAULT=\"$asdlc_root/projects\""
+  assert_contains "$(cat "$assign_workers_cmd_path")" "ASDLC_PROJECTS_DIR_DEFAULT=\"$asdlc_root/projects\""
   assert_contains "$(cat "$feature_br_cmd_path")" 'TEMPLATE_FILE=".templates/feature_br_summary_TEMPLATE.md"'
   assert_contains "$(cat "$scan_repo_cmd_path")" 'RULE_FILE=".rules/repo_br_scan_rule.md"'
   assert_contains "$(cat "$task_to_br_cmd_path")" 'HELPER_SCRIPT=".helper/check_task_to_br_quality.sh"'
@@ -814,6 +831,8 @@ OUT
   assert_contains "$quickrun" ".commands/feature_implementation_plan.sh --feature_path projects/<project-id>/<feature-folder>"
   assert_contains "$quickrun" "Optionally run implementation-plan semantic review (Step 8.3):"
   assert_contains "$quickrun" ".commands/feature_implementation_plan_semantic_review.sh --feature_path projects/<project-id>/<feature-folder>"
+  assert_contains "$quickrun" ".commands/feature_assing_workers.sh --feature_path projects/<project-id>/<feature-folder>"
+  assert_contains "$quickrun" 'This command writes `#### Assigned:` for every plan step with a class-matched worker UUID or `ERROR: no active worker available for class <class>`.'
   assert_contains "$quickrun" ".commands/feature_repo_surface_and_exec_context.sh --feature_path projects/<project-id>/<feature-folder>"
 }
 
@@ -854,6 +873,7 @@ test_first_init_machine_update_mode_recreates_commands_directory_when_missing() 
   assert_contains "$out" "Update mode added file: $asdlc_root/.commands/feature_implementation_slices.sh"
   assert_contains "$out" "Update mode added file: $asdlc_root/.commands/feature_implementation_plan.sh"
   assert_contains "$out" "Update mode added file: $asdlc_root/.commands/feature_implementation_plan_semantic_review.sh"
+  assert_contains "$out" "Update mode added file: $asdlc_root/.commands/feature_assing_workers.sh"
   assert_contains "$out" "ASDLC workspace update completed: $asdlc_root"
   assert_dir_exists "$asdlc_root/.commands"
   assert_file_exists "$asdlc_root/.commands/project_setup_add_new_project.sh"
@@ -875,6 +895,7 @@ test_first_init_machine_update_mode_recreates_commands_directory_when_missing() 
   assert_file_exists "$asdlc_root/.commands/feature_implementation_slices.sh"
   assert_file_exists "$asdlc_root/.commands/feature_implementation_plan.sh"
   assert_file_exists "$asdlc_root/.commands/feature_implementation_plan_semantic_review.sh"
+  assert_file_exists "$asdlc_root/.commands/feature_assing_workers.sh"
   assert_file_executable "$asdlc_root/.commands/project_setup_add_new_project.sh"
   assert_file_executable "$asdlc_root/.commands/project_setup_update_project.sh"
   assert_file_executable "$asdlc_root/.commands/init_progress_scanner.sh"
@@ -894,11 +915,13 @@ test_first_init_machine_update_mode_recreates_commands_directory_when_missing() 
   assert_file_executable "$asdlc_root/.commands/feature_implementation_slices.sh"
   assert_file_executable "$asdlc_root/.commands/feature_implementation_plan.sh"
   assert_file_executable "$asdlc_root/.commands/feature_implementation_plan_semantic_review.sh"
+  assert_file_executable "$asdlc_root/.commands/feature_assing_workers.sh"
   assert_contains "$(cat "$asdlc_root/.commands/project_setup_add_new_project.sh")" "ASDLC_PROJECTS_DIR_DEFAULT=\"$asdlc_root/projects\""
   assert_contains "$(cat "$asdlc_root/.commands/project_setup_update_project.sh")" "ASDLC_PROJECTS_DIR_DEFAULT=\"$asdlc_root/projects\""
   assert_contains "$(cat "$asdlc_root/.commands/init_progress_scanner.sh")" "ASDLC_PROJECTS_DIR_DEFAULT=\"$asdlc_root/projects\""
   assert_contains "$(cat "$asdlc_root/.commands/init_common_contract_definition.sh")" "ASDLC_PROJECTS_DIR_DEFAULT=\"$asdlc_root/projects\""
   assert_contains "$(cat "$asdlc_root/.commands/project_register_worker.sh")" "ASDLC_PROJECTS_DIR_DEFAULT=\"$asdlc_root/projects\""
+  assert_contains "$(cat "$asdlc_root/.commands/feature_assing_workers.sh")" "ASDLC_PROJECTS_DIR_DEFAULT=\"$asdlc_root/projects\""
   assert_contains "$(cat "$asdlc_root/.commands/feature_br_scaffold.sh")" 'TEMPLATE_FILE=".templates/feature_br_summary_TEMPLATE.md"'
   assert_contains "$(cat "$asdlc_root/.commands/feature_scan_repo_for_br.sh")" 'RULE_FILE=".rules/repo_br_scan_rule.md"'
   assert_contains "$(cat "$asdlc_root/.commands/feature_task_to_br.sh")" 'HELPER_SCRIPT=".helper/check_task_to_br_quality.sh"'

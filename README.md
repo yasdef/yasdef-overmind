@@ -24,6 +24,7 @@ project is created in a new branch so make sure you've merged it to your main/ma
 --- here we finished with feature planning, but who will work it out? ---
 7. register new workers with `.commands/project_register_worker.sh`, one run per worker with a strict class (backend|frontend|mobile|infrastructure). Currently orchestrator can't distribute tasks across multiple workers of same class so it doesn't make sense to register 2 workers of same class (2 backend for example)
 8. now give worker uuid to the developer responsible for that worker so he can finish registration from his side
+9. when `implementation_plan.md` is ready for a feature, run `.commands/feature_assing_workers.sh --feature_path projects/<project-id>/<feature-folder>` to fill `#### Assigned:` for each step based on class-matched active workers
 
 you can manualy run scripts for different steps after asdlc folder init, check  
 
@@ -103,6 +104,9 @@ you can manualy run scripts for different steps after asdlc folder init, check
 - `overmind/scripts/feature_implementation_plan_semantic_review.sh`
   Staged command (`<asdlc>/.commands/feature_implementation_plan_semantic_review.sh --feature_path <.../feature-folder>`) that optionally runs Step `8.3` semantic review, asks the user which finding numbers to apply, updates `implementation_plan.md`, and records decisions in `implementation_plan_semantic_review.md`.
 
+- `overmind/scripts/feature_assing_workers.sh`
+  Staged command (`<asdlc>/.commands/feature_assing_workers.sh --feature_path <.../feature-folder>`) that requires a ready parseable `implementation_plan.md`, resolves active workers strictly by step repo class, asks for one class worker when multiple are available, and writes deterministic `#### Assigned:` values (worker UUID or class-scoped error message) on every step.
+
 ## Staged Feature-Path Contract
 
 The following staged commands require `--feature_path <asdlc/projects/<project-id>/<feature-folder>>` and must run from `<asdlc>/.commands/`:
@@ -119,11 +123,13 @@ The following staged commands require `--feature_path <asdlc/projects/<project-i
 - `feature_implementation_slices.sh`
 - `feature_implementation_plan.sh`
 - `feature_implementation_plan_semantic_review.sh`
+- `feature_assing_workers.sh`
 
 ## Staged Project-Path Feature Orchestrator
 
 - `project_register_worker.sh` requires `--path <asdlc/projects/<project-id>>`.
 - `<project>/workers.yaml` stores top-level `project_id` plus worker entries with `uuid`, `class`, `status`, and `registered_at`.
+- `feature_assing_workers.sh` requires `--feature_path <asdlc/projects/<project-id>/<feature-folder>>` and fills each plan-step `#### Assigned:` line with class-matched worker UUIDs or deterministic `ERROR: no active worker available for class <class>`.
 - `project_add_feature_e2e.sh` requires `--path <asdlc/projects/<project-id>>`.
 - Project-level startup discovers unfinished feature folders first; when any exist, the operator chooses whether to start a new feature or continue one of the unfinished features.
 - The state file `.project_add_feature_e2e_state.env` stores only the last selected feature path as a convenience cache and does not override discovery or explicit user choice.
