@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
-### Requirement: Step 8.1.5 coordinator assets under overmind/
-The coordinator-owned planning assets stored under `overmind/` SHALL include the Step `8.1.5` rule, template, golden example, generator script, and quality helper introduced by this change.
+### Requirement: Step 8.2 coordinator assets under overmind/
+The coordinator-owned planning assets stored under `overmind/` SHALL include the Step `8.2` rule, template, golden example, generator script, and quality helper introduced by this change.
 
 #### Scenario: Rule file present at expected path
 - **WHEN** the `overmind/` directory is inspected
@@ -25,4 +25,4 @@ The coordinator-owned planning assets stored under `overmind/` SHALL include the
 
 #### Scenario: Assets staged to ASDLC projects by setup scripts
 - **WHEN** `project_setup_first_init_machine.sh` or `project_setup_update_project.sh` is run
-- **THEN** both scripts SHALL stage the Step `8.1.5` generator and quality helper to the project `.commands/` directory alongside the existing Step `8.1` and `8.2` scripts
+- **THEN** both scripts SHALL stage the Step `8.2` generator and quality helper to the project `.commands/` directory alongside the existing Step `8.1` and `8.3` scripts

@@ -22,7 +22,12 @@
 - [ ] 4.1 Update `tests/ai_scripts/feature_repo_surface_and_exec_context_tests.sh` with passing coverage for valid split form and failing coverage for missing/blank subfields and conflated single-line form.
 - [ ] 4.2 Update `tests/ai_scripts/feature_technical_requirements_tests.sh` with the same coverage against `current_state`.
 
-## 5. Validate change readiness
+## 5. Update pipeline documentation
 
-- [ ] 5.1 Run the relevant `tests/ai_scripts/` suites for surface-map generation, technical-requirements generation, and their quality validators.
-- [ ] 5.2 Run `openspec status --change crp-108-surface-map-and-tech-req-transport-vs-user-reachable-split` and confirm the change is apply-ready.
+- [ ] 5.1 Update `overmind/init_progress_definition_sequence_diagram.md`: add a note to the Step `7` and Step `8` blocks indicating that both surface maps and `technical_requirements.md` now record `transport_layer` and `user_reachable_surface` as separate subfields; no step renumbering required for this change
+- [ ] 5.2 Update `overmind/templates/init_progress_definition_TEMPLATE.yaml`: add a `finished_only_if_conditions_meet` condition to the Step `7` and Step `8` entries stating that `user_reachable_surface` subfields are required in the produced artifacts alongside `transport_layer`
+
+## 6. Validate change readiness
+
+- [ ] 6.1 Run the relevant `tests/ai_scripts/` suites for surface-map generation, technical-requirements generation, and their quality validators.
+- [ ] 6.2 Run `openspec status --change crp-108-surface-map-and-tech-req-transport-vs-user-reachable-split` and confirm the change is apply-ready.

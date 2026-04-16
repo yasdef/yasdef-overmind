@@ -30,17 +30,16 @@
 
 ## 5. E2E Orchestrator Integration
 
-- [ ] 5.1 Insert `"8.1.5"` into the `PHASE_IDS` array in `project_add_feature_e2e.sh` between `"8.1"` and `"8.2"`
-- [ ] 5.2 Insert `"false"` into the `PHASE_OPTIONAL` array at the matching index
-- [ ] 5.3 Add the step label `"Prerequisite Gap Trace"` for phase `8.1.5` in the label-lookup function
-- [ ] 5.4 Add script name `feature_prerequisite_gaps.sh` for phase `8.1.5` in the script-name-lookup function
-- [ ] 5.5 Add resume alias entries for `8.1.5`, `prerequisite-gap-trace`, and `prerequisite-gaps` in the resume-step normalization logic
-- [ ] 5.6 Update the `--resume` help text to include `8.1.5` in the list of valid step identifiers
+- [ ] 5.1 Renumber existing step IDs in `project_add_feature_e2e.sh`: rename `"8.2"` → `"8.3"` and `"8.3"` → `"8.4"` in `PHASE_IDS`, `PHASE_OPTIONAL`, all label-lookup, script-name-lookup, and resume-alias branches; then insert `"8.2"` (prerequisite gap trace) between `"8.1"` and `"8.3"` with `"false"` at the matching `PHASE_OPTIONAL` index
+- [ ] 5.2 Add the step label `"Prerequisite Gap Trace"` for phase `8.2` in the label-lookup function
+- [ ] 5.3 Add script name `feature_prerequisite_gaps.sh` for phase `8.2` in the script-name-lookup function
+- [ ] 5.4 Add resume alias entries for `8.2`, `prerequisite-gap-trace`, and `prerequisite-gaps` in the resume-step normalization logic
+- [ ] 5.5 Update the `--resume` help text to list `8.2` (prerequisite gap trace), `8.3` (implementation plan), and `8.4` (optional semantic review) as the updated valid step identifiers
 
 ## 6. Progress Scanner and Definition Template
 
-- [ ] 6.1 Update `overmind/scripts/project_mgmt/init_progress_scanner.sh` to detect `prerequisite_gaps.md` as the completion artifact for Step `8.1.5` and to recognize the step-name string `"run prerequisite gap trace"` for scanner-based step identification
-- [ ] 6.2 Add a `step_number: 8.1.5` block to `overmind/templates/init_progress_definition_TEMPLATE.yaml` between the `8.1` and `8.2` blocks with `step_name: "Run Prerequisite Gap Trace"` and `finished_only_if_artefacts_present: prerequisite_gaps.md`
+- [ ] 6.1 Update `overmind/scripts/project_mgmt/init_progress_scanner.sh` to detect `prerequisite_gaps.md` as the completion artifact for Step `8.2` and to recognize the step-name string `"run prerequisite gap trace"` for scanner-based step identification; also renumber any hardcoded `8.2` and `8.3` step references in the scanner to `8.3` and `8.4` respectively
+- [ ] 6.2 Update `overmind/templates/init_progress_definition_TEMPLATE.yaml`: renumber the existing `step_number: 8.2` block to `8.3` and the `step_number: 8.3` block to `8.4`, then insert a new `step_number: 8.2` block between the `8.1` and `8.3` blocks with `step_name: "Run Prerequisite Gap Trace"` and `finished_only_if_artefacts_present: prerequisite_gaps.md`
 
 ## 7. Plan Generator Context Input
 
@@ -53,11 +52,11 @@
 
 ## 9. Documentation
 
-- [ ] 9.1 Add a Step `8.1.5` node to `overmind/init_progress_definition_sequence_diagram.md` between the `8.1` and `8.2` alt blocks, showing input artifacts and output `prerequisite_gaps.md`
-- [ ] 9.2 Update `overmind/README.md` to document Step `8.1.5`, its purpose, inputs, output, and gate condition
+- [ ] 9.1 Update `overmind/init_progress_definition_sequence_diagram.md`: renumber all existing Step `8.2` references to `8.3` and Step `8.3` references to `8.4`; insert a new Step `8.2` node between the `8.1` and `8.3` alt blocks showing `prerequisite_gaps.md` as input/output and the `unmet`-gate condition
+- [ ] 9.2 Update `overmind/README.md`: renumber Step `8.2` → `8.3` and Step `8.3` → `8.4` in any step reference tables or prose, then add a section documenting Step `8.2` (Prerequisite Gap Trace) with its purpose, inputs, output artifact, and gate condition
 
 ## 10. Tests
 
 - [ ] 10.1 Create `tests/ai_scripts/check_prerequisite_gaps_quality_tests.sh` covering: all-resolved passes, unmet entry fails, missing evidence fails, missing slice_ref fails, slice_ref not resolving to an existing slice fails, missing input file fails, literal URL path in `requirements_ears.md` absent from both `prerequisite_gaps.md` and `user_reachable_surface` fails, backend scheduled-job identifier missing from both sources fails
-- [ ] 10.2 Add Step `8.1.5` detection cases to `tests/ai_scripts/init_progress_scanner_tests.sh`: artifact present → finished, artifact absent after 8.1 → next step is 8.1.5
+- [ ] 10.2 Add Step `8.2` detection cases to `tests/ai_scripts/init_progress_scanner_tests.sh`: artifact present → finished, artifact absent after `8.1` → next step is `8.2`; also update any existing test cases that hardcode step numbers `8.2` or `8.3` to reflect the renumbering to `8.3` and `8.4`
 - [ ] 10.3 Add `scheduled_in_slices` prerequisite coverage cases to `tests/ai_scripts/check_implementation_plan_quality_tests.sh`: `slice/<id>` token accepted as valid evidence-token format, uncovered `slice_ref` fails, all covered passes, absent `prerequisite_gaps.md` emits helper failure, malformed `slice/<id>` token (regex violation) fails with invalid evidence token format
