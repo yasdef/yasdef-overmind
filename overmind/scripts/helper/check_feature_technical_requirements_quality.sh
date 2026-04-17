@@ -239,7 +239,9 @@ function validate_requirement_block(    normalized_gap, normalized_repo_impact) 
   if (!(current_requirement_ref in valid_refs)) fail_quality("requirement block references unknown requirement id " current_requirement_ref)
   if (current_requirement_ref in requirement_seen) fail_quality("duplicate requirement block for " current_requirement_ref)
   if (is_unfilled(current_requirement_summary)) fail_quality("requirement " current_requirement_ref " has unfilled key requirement_summary")
-  if (is_unfilled(current_requirement_state)) fail_quality("requirement " current_requirement_ref " has unfilled key current_state")
+  if (!is_unfilled(current_requirement_state)) fail_quality("requirement " current_requirement_ref " uses conflated current_state: line — use transport_layer and user_reachable_surface subfields instead")
+  if (is_unfilled(current_requirement_transport_layer)) fail_quality("requirement " current_requirement_ref " is missing transport_layer subfield")
+  if (is_unfilled(current_requirement_user_reachable)) fail_quality("requirement " current_requirement_ref " is missing user_reachable_surface subfield")
   if (is_unfilled(current_requirement_gap_status)) fail_quality("requirement " current_requirement_ref " has unfilled key gap_status")
   if (is_unfilled(current_requirement_repo_impact)) fail_quality("requirement " current_requirement_ref " has unfilled key repo_impact")
   if (is_unfilled(current_requirement_evidence)) fail_quality("requirement " current_requirement_ref " has unfilled key evidence")
@@ -341,6 +343,9 @@ BEGIN {
   constraint_count = 0
   prep_count = 0
   risk_count = 0
+  current_requirement_transport_layer = ""
+  current_requirement_user_reachable = ""
+  current_requirement_state = ""
 }
 {
   if (toupper($0) ~ /\[UNFILLED\]/) {
@@ -400,6 +405,8 @@ BEGIN {
   current_requirement_ref = parse_heading_value($0)
   current_requirement_summary = ""
   current_requirement_state = ""
+  current_requirement_transport_layer = ""
+  current_requirement_user_reachable = ""
   current_requirement_gap_status = ""
   current_requirement_repo_impact = ""
   current_requirement_evidence = ""
@@ -454,6 +461,8 @@ BEGIN {
   } else if (in_requirement_block) {
     if (key == "requirement_summary") current_requirement_summary = value
     else if (key == "current_state") current_requirement_state = value
+    else if (key == "transport_layer") current_requirement_transport_layer = value
+    else if (key == "user_reachable_surface") current_requirement_user_reachable = value
     else if (key == "gap_status") current_requirement_gap_status = value
     else if (key == "repo_impact") current_requirement_repo_impact = value
     else if (key == "evidence") current_requirement_evidence = value

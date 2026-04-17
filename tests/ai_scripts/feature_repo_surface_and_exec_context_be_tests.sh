@@ -428,6 +428,25 @@ test_runs_with_absolute_feature_path() {
   assert_file_not_exists "$capture_dir/helper_args.txt"
 }
 
+test_prompt_references_rule_file() {
+  local repo_dir="$TMP_ROOT/repo-be-rule-ref"
+  local capture_dir="$TMP_ROOT/capture-be-rule-ref"
+  local backend_repo="$TMP_ROOT/backend-repo-rule-ref"
+  mkdir -p "$repo_dir" "$capture_dir" "$backend_repo"
+  setup_git_workspace "$repo_dir" "$backend_repo"
+  setup_codex_stub "$repo_dir"
+
+  (
+    cd "$repo_dir/asdlc" &&
+    PATH="$repo_dir/bin:$PATH" TEST_CAPTURE_DIR="$capture_dir" \
+      .commands/feature_repo_surface_and_exec_context.sh --feature_path "projects/p1/feature-a" >/dev/null
+  )
+
+  local codex_prompt
+  codex_prompt="$(cat "$capture_dir/codex_prompt.txt")"
+  assert_contains "$codex_prompt" "feature_repo_surface_and_exec_context_rule.md"
+}
+
 test_requires_feature_path_argument
 test_requires_staged_command_location
 test_fails_when_model_phase_missing
@@ -436,5 +455,6 @@ test_does_not_run_quality_helper_directly
 test_runs_codex_and_commits_only_target_files
 test_skips_empty_commit_when_output_is_unchanged
 test_runs_with_absolute_feature_path
+test_prompt_references_rule_file
 
 echo "All backend repo-surface/execution-context initializer tests passed."

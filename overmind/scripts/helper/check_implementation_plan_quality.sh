@@ -384,6 +384,7 @@ validate_content() {
   local valid_comp_evidence_csv="$6"
   local unresolved_req_evidence_csv="$7"
   local unresolved_comp_evidence_csv="$8"
+  local scheduled_slice_refs_csv="${9:-}"
 
   set +e
   awk \
@@ -393,7 +394,8 @@ validate_content() {
     -v valid_req_evidence_csv="$valid_req_evidence_csv" \
     -v valid_comp_evidence_csv="$valid_comp_evidence_csv" \
     -v unresolved_req_evidence_csv="$unresolved_req_evidence_csv" \
-    -v unresolved_comp_evidence_csv="$unresolved_comp_evidence_csv" '
+    -v unresolved_comp_evidence_csv="$unresolved_comp_evidence_csv" \
+    -v scheduled_slice_refs_csv="$scheduled_slice_refs_csv" '
 function trim(v) {
   sub(/^[[:space:]]+/, "", v)
   sub(/[[:space:]]+$/, "", v)
@@ -518,6 +520,12 @@ function validate_previous_step(    depends_value, dep_parts, dep_count, dep, re
         continue
       }
 
+      if (token ~ /^slice\/[A-Za-z0-9][A-Za-z0-9_.-]*$/) {
+        covered_evidence_tokens[token] = 1
+        valid_evidence_token_count++
+        continue
+      }
+
       fail_quality("step " current_step " has invalid evidence token format: " token)
     }
 
@@ -558,6 +566,7 @@ BEGIN {
   required_repo_order_count = parse_csv_order(required_repo_csv, required_repo_order, seen_required_repo_order, required_repo_order_count)
   unresolved_req_order_count = parse_csv_order(unresolved_req_evidence_csv, unresolved_req_order, seen_unresolved_req_order, unresolved_req_order_count)
   unresolved_comp_order_count = parse_csv_order(unresolved_comp_evidence_csv, unresolved_comp_order, seen_unresolved_comp_order, unresolved_comp_order_count)
+  scheduled_slice_refs_order_count = parse_csv_order(scheduled_slice_refs_csv, scheduled_slice_refs_order, seen_scheduled_slice_refs_order, scheduled_slice_refs_order_count)
 }
 {
   if (toupper($0) ~ /\[UNFILLED\]/) {
@@ -717,6 +726,12 @@ END {
       fail_quality("unresolved component evidence token " comp_token " is not covered by any implementation step")
     }
   }
+  for (i = 1; i <= scheduled_slice_refs_order_count; i++) {
+    slice_token = "slice/" scheduled_slice_refs_order[i]
+    if (!(slice_token in covered_evidence_tokens)) {
+      fail_quality("scheduled prerequisite slice_ref " scheduled_slice_refs_order[i] " from prerequisite_gaps.md is not covered by any plan step evidence token (expected: " slice_token ")")
+    }
+  }
   if (has_errors) {
     exit 1
   }
@@ -744,6 +759,7 @@ main() {
   local project_dir=""
   local requirements_path=""
   local technical_requirements_path=""
+  local prerequisite_gaps_path=""
   local definition_path=""
   local active_classes_csv=""
   local requirement_refs_csv=""
@@ -752,6 +768,7 @@ main() {
   local valid_comp_evidence_csv=""
   local unresolved_req_evidence_csv=""
   local unresolved_comp_evidence_csv=""
+  local scheduled_slice_refs_csv=""
   local parsed_classes=""
   local parsed_refs=""
   local parsed_evidence_catalog=""
@@ -776,6 +793,7 @@ main() {
   project_dir="$(cd "$target_dir/.." && pwd -P)"
   requirements_path="$target_dir/requirements_ears.md"
   technical_requirements_path="$target_dir/technical_requirements.md"
+  prerequisite_gaps_path="$target_dir/prerequisite_gaps.md"
   definition_path="$project_dir/init_progress_definition.yaml"
 
   if [[ ! -f "$requirements_path" ]]; then
@@ -783,6 +801,9 @@ main() {
   fi
   if [[ ! -f "$technical_requirements_path" ]]; then
     helper_fail "Required sibling artifact not found for quality check: ${technical_requirements_path#$workspace_root/}"
+  fi
+  if [[ ! -f "$prerequisite_gaps_path" ]]; then
+    exit "$EXIT_HELPER_FAILURE"
   fi
   if [[ ! -f "$definition_path" ]]; then
     helper_fail "Required project definition not found for quality check: ${definition_path#$workspace_root/}"
@@ -855,6 +876,32 @@ main() {
     helper_fail "No technical requirement or component evidence tokens found in ${technical_requirements_path#$workspace_root/}"
   fi
 
+  local slice_ref=""
+  while IFS= read -r slice_ref; do
+    slice_ref="$(trim_value "$slice_ref")"
+    [[ -n "$slice_ref" ]] || continue
+    append_csv_value scheduled_slice_refs_csv "$slice_ref"
+  done < <(
+    awk '
+function trim(v) { sub(/^[[:space:]]+/, "", v); sub(/[[:space:]]+$/, "", v); return v }
+function is_unfilled(v) { v = trim(v); if (v == "" || v == "[UNFILLED]" || v == "none") return 1; return 0 }
+BEGIN { current_status = ""; in_prereq = 0 }
+/^#### Prerequisite:/ { in_prereq = 1; current_status = ""; current_slice_ref = ""; next }
+/^### Requirement:/ { in_prereq = 0; next }
+/^[[:space:]]*-[[:space:]]*status:[[:space:]]*/ {
+  if (!in_prereq) next
+  line = $0; sub(/^[[:space:]]*-[[:space:]]*status:[[:space:]]*/, "", line); current_status = trim(line); next
+}
+/^[[:space:]]*-[[:space:]]*slice_ref:[[:space:]]*/ {
+  if (!in_prereq) next
+  line = $0; sub(/^[[:space:]]*-[[:space:]]*slice_ref:[[:space:]]*/, "", line)
+  val = trim(line)
+  if (current_status == "scheduled_in_slices" && !is_unfilled(val)) { print val }
+  next
+}
+' "$prerequisite_gaps_path"
+  )
+
   validate_content \
     "$target_path" \
     "$active_classes_csv" \
@@ -863,7 +910,8 @@ main() {
     "$valid_req_evidence_csv" \
     "$valid_comp_evidence_csv" \
     "$unresolved_req_evidence_csv" \
-    "$unresolved_comp_evidence_csv"
+    "$unresolved_comp_evidence_csv" \
+    "$scheduled_slice_refs_csv"
   status=$?
   if [[ "$status" -ne 0 ]]; then
     exit "$EXIT_CONTENT_FAILURE"

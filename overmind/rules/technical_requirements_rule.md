@@ -79,6 +79,19 @@ Must not own:
 - Resolve outputs under the runtime feature root.
 - Do not hardcode `overmind/product/...` paths when runtime override is supplied.
 
+## Current-State Transport vs User-Reachable Split
+
+Each `### Requirement:` block in `technical_requirements.md` SHALL record current state using two explicit subfields:
+- `transport_layer`: callable transport-layer code currently present for this requirement (API clients, services, hooks, repositories, helpers). Use `none` when no transport-layer code exists.
+- `user_reachable_surface`: operator-invocable surfaces currently present for this requirement (routes, pages, screens, CLI commands, scheduled jobs, public HTTP endpoints). Use `none` when no user-reachable surface exists.
+
+A single conflated `current_state:` prose line that mixes transport and reachability information SHALL NOT be used. The quality helper will reject it.
+
+The split applies to every `### Requirement:` block regardless of whether it is functional (REQ-*) or non-functional (NFR-*). Use `none` for whichever side is not applicable.
+
+### none Marker
+When one side of the split is absent, use the literal value `none` rather than leaving the subfield blank or omitting it entirely. A blank or omitted subfield is invalid and the quality helper will fail identifying the missing subfield.
+
 ## Completion Gate
 - Before finalizing, run the prompt-provided quality gate command.
 - If the gate fails, revise the output and rerun the gate command.

@@ -70,7 +70,7 @@ V-0.0.1 (current)
   Staged command (`<asdlc>/.commands/feature_br_scaffold.sh --path <asdlc/projects/<project-id>>`) that creates a feature folder and seeds `feature_br_summary.md`.
 
 - `overmind/scripts/project_mgmt/project_add_feature_e2e.sh`
-  Staged command (`<asdlc>/.commands/project_add_feature_e2e.sh --path <asdlc/projects/<project-id>> [--resume <step>]`) that discovers unfinished project feature folders first, asks whether to start a new feature or continue one of the unfinished features, keeps `projects/<project-id>/.project_add_feature_e2e_state.env` only as a last-selected cache, runs `init_progress_scanner.sh` for the selected feature, and orchestrates confirmed execution through Step `8.3`.
+  Staged command (`<asdlc>/.commands/project_add_feature_e2e.sh --path <asdlc/projects/<project-id>> [--resume <step>]`) that discovers unfinished project feature folders first, asks whether to start a new feature or continue one of the unfinished features, keeps `projects/<project-id>/.project_add_feature_e2e_state.env` only as a last-selected cache, runs `init_progress_scanner.sh` for the selected feature, and orchestrates confirmed execution through Step `8.4`.
 
 - `overmind/scripts/feature_task_to_br.sh`
   Staged command (`<asdlc>/.commands/feature_task_to_br.sh --feature_path <.../feature-folder>`) that captures business input and generates/updates BR artifacts.
@@ -105,11 +105,14 @@ V-0.0.1 (current)
 - `overmind/scripts/feature_implementation_slices.sh`
   Staged command (`<asdlc>/.commands/feature_implementation_slices.sh --feature_path <.../feature-folder>`) that runs Step `8.1` and generates one shared `implementation_slices.md` artifact from `requirements_ears.md`, `technical_requirements.md`, `feature_contract_delta.md`, and relevant surface-map artifacts.
 
+- `overmind/scripts/feature_prerequisite_gaps.sh`
+  Staged command (`<asdlc>/.commands/feature_prerequisite_gaps.sh --feature_path <.../feature-folder>`) that runs Step `8.2` (Prerequisite Gap Trace) and generates `prerequisite_gaps.md` from `requirements_ears.md`, `technical_requirements.md`, and `implementation_slices.md`. For each EARS requirement, it derives externally-invocable prerequisites (frontend routes/pages/screens, backend HTTP endpoints/CLI commands/scheduled jobs/admin tools, mobile screens/deep links) and classifies each as `present_in_repo`, `scheduled_in_slices`, or `unmet`. The quality gate rejects any `unmet` entry; all missing prerequisites must be promoted to `implementation_slices.md` before Step `8.3` can begin.
+
 - `overmind/scripts/feature_implementation_plan.sh`
-  Staged command (`<asdlc>/.commands/feature_implementation_plan.sh --feature_path <.../feature-folder>`) that runs Step `8.2` and generates one shared `implementation_plan.md` for the feature using `implementation_slices.md`, `requirements_ears.md`, `technical_requirements.md`, and `feature_contract_delta.md`.
+  Staged command (`<asdlc>/.commands/feature_implementation_plan.sh --feature_path <.../feature-folder>`) that runs Step `8.3` and generates one shared `implementation_plan.md` for the feature using `prerequisite_gaps.md`, `implementation_slices.md`, `requirements_ears.md`, `technical_requirements.md`, and `feature_contract_delta.md`.
 
 - `overmind/scripts/feature_implementation_plan_semantic_review.sh`
-  Staged command (`<asdlc>/.commands/feature_implementation_plan_semantic_review.sh --feature_path <.../feature-folder>`) that optionally runs Step `8.3` semantic review, asks the user which finding numbers to apply, updates `implementation_plan.md`, and records decisions in `implementation_plan_semantic_review.md`.
+  Staged command (`<asdlc>/.commands/feature_implementation_plan_semantic_review.sh --feature_path <.../feature-folder>`) that optionally runs Step `8.4` semantic review, asks the user which finding numbers to apply, updates `implementation_plan.md`, and records decisions in `implementation_plan_semantic_review.md`.
 
 - `overmind/scripts/feature_assing_workers.sh`
   Staged command (`<asdlc>/.commands/feature_assing_workers.sh --feature_path <.../feature-folder>`) that requires a ready parseable `implementation_plan.md`, resolves active workers strictly by step repo class, asks for one class worker when multiple are available, and writes deterministic `#### Assigned:` values (worker UUID or class-scoped error message) on every step.
@@ -137,6 +140,7 @@ Scripts working on **feature level** require:
 - `feature_repo_surface_and_exec_context.sh`
 - `feature_technical_requirements.sh`
 - `feature_implementation_slices.sh`
+- `feature_prerequisite_gaps.sh`
 - `feature_implementation_plan.sh`
 - `feature_implementation_plan_semantic_review.sh`
 - `feature_assing_workers.sh`

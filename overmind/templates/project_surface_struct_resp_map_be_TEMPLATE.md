@@ -22,36 +22,50 @@
 - responsibility_summary: [UNFILLED]
 - main_repo_paths: [UNFILLED]
 - key_components: [UNFILLED]
+- transport_layer: [UNFILLED]
+- user_reachable_surface: [UNFILLED]
 
 ### 3.2 Application / Service Layer
 - responsibility_summary: [UNFILLED]
 - main_repo_paths: [UNFILLED]
 - key_components: [UNFILLED]
+- transport_layer: [UNFILLED]
+- user_reachable_surface: [UNFILLED]
 
 ### 3.3 Domain Layer
 - responsibility_summary: [UNFILLED]
 - main_repo_paths: [UNFILLED]
 - key_components: [UNFILLED]
+- transport_layer: [UNFILLED]
+- user_reachable_surface: [UNFILLED]
 
 ### 3.4 Persistence / Data Layer
 - responsibility_summary: [UNFILLED]
 - main_repo_paths: [UNFILLED]
 - key_components: [UNFILLED]
+- transport_layer: [UNFILLED]
+- user_reachable_surface: [UNFILLED]
 
 ### 3.5 Integration Layer
 - responsibility_summary: [UNFILLED]
 - main_repo_paths: [UNFILLED]
 - key_components: [UNFILLED]
+- transport_layer: [UNFILLED]
+- user_reachable_surface: [UNFILLED]
 
 ### 3.6 Runtime / Ops Layer
 - responsibility_summary: [UNFILLED]
 - main_repo_paths: [UNFILLED]
 - key_components: [UNFILLED]
+- transport_layer: [UNFILLED]
+- user_reachable_surface: [UNFILLED]
 
 ### 3.7 Test Layer
 - responsibility_summary: [UNFILLED]
 - main_repo_paths: [UNFILLED]
 - key_components: [UNFILLED]
+- transport_layer: [UNFILLED]
+- user_reachable_surface: [UNFILLED]
 
 ### 3.8 Another Layer(s)
 > add as much new layers as needed based on same pattern and follow number convention
@@ -65,6 +79,8 @@
 - why_feature_touches_it: [UNFILLED]
 - expected_changes: [UNFILLED]
 - evidence: [UNFILLED]
+- transport_layer: [UNFILLED]
+- user_reachable_surface: [UNFILLED]
 
 ### 4.2 Application / Service Surface
 - surface_summary: Use-case orchestration, services, command handlers, business flow coordination.
@@ -73,6 +89,8 @@
 - why_feature_touches_it: [UNFILLED]
 - expected_changes: [UNFILLED]
 - evidence: [UNFILLED]
+- transport_layer: [UNFILLED]
+- user_reachable_surface: [UNFILLED]
 
 ### 4.3 Domain Surface
 - surface_summary: Domain models, business rules, value objects, state transitions, policy logic.
@@ -81,6 +99,8 @@
 - why_feature_touches_it: [UNFILLED]
 - expected_changes: [UNFILLED]
 - evidence: [UNFILLED]
+- transport_layer: [UNFILLED]
+- user_reachable_surface: [UNFILLED]
 
 ### 4.4 Persistence / Data Surface
 - surface_summary: Repositories, DAOs, ORM mappings, SQL queries, migrations, indexes.
@@ -89,6 +109,8 @@
 - why_feature_touches_it: [UNFILLED]
 - expected_changes: [UNFILLED]
 - evidence: [UNFILLED]
+- transport_layer: [UNFILLED]
+- user_reachable_surface: [UNFILLED]
 
 ### 4.5 Integration Surface
 - surface_summary: External clients, event producers or consumers, queue handlers, adapter boundaries.
@@ -97,6 +119,8 @@
 - why_feature_touches_it: [UNFILLED]
 - expected_changes: [UNFILLED]
 - evidence: [UNFILLED]
+- transport_layer: [UNFILLED]
+- user_reachable_surface: [UNFILLED]
 
 ### 4.6 Runtime / Ops Surface
 - surface_summary: Config, feature flags, DI wiring, logging, metrics, tracing, jobs, rollout controls.
@@ -105,6 +129,8 @@
 - why_feature_touches_it: [UNFILLED]
 - expected_changes: [UNFILLED]
 - evidence: [UNFILLED]
+- transport_layer: [UNFILLED]
+- user_reachable_surface: [UNFILLED]
 
 ### 4.7 Test Surface
 - surface_summary: Unit, integration, contract, and other verification assets for touched backend areas.
@@ -113,6 +139,8 @@
 - why_feature_touches_it: [UNFILLED]
 - expected_changes: [UNFILLED]
 - evidence: [UNFILLED]
+- transport_layer: [UNFILLED]
+- user_reachable_surface: [UNFILLED]
 
 ### 4.8 Unexpected Backend Surface
 - surface_summary: Any real backend surface that does not fit the standard categories above.
@@ -121,3 +149,5 @@
 - why_feature_touches_it: [UNFILLED]
 - expected_changes: [UNFILLED]
 - evidence: [UNFILLED]
+- transport_layer: [UNFILLED]
+- user_reachable_surface: [UNFILLED]

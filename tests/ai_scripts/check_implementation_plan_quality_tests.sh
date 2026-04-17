@@ -230,6 +230,35 @@ write_valid_plan() {
   cp "$GOLDEN_SRC" "$repo_dir/projects/p1/feature-a/implementation_plan.md"
 }
 
+write_prerequisite_gaps() {
+  local repo_dir="$1"
+  cat >"$repo_dir/projects/p1/feature-a/prerequisite_gaps.md" <<'OUT'
+# Prerequisite Gaps
+
+## 1. Document Meta
+- feature_id: ORD-42
+- last_updated: 2026-04-10
+
+## 2. Prerequisite Trace
+
+### Requirement: REQ-4
+- requirement_summary: Order creation
+- prerequisites: none
+
+### Requirement: REQ-6
+- requirement_summary: Query orders
+- prerequisites: none
+
+### Requirement: REQ-7
+- requirement_summary: Rebuild projections
+- prerequisites: none
+
+### Requirement: NFR-1
+- requirement_summary: Query latency
+- prerequisites: none
+OUT
+}
+
 run_helper() {
   local repo_dir="$1"
   local target_arg="$2"
@@ -251,6 +280,7 @@ setup_valid_fixture() {
   write_project_definition "$repo_dir"
   write_requirements "$repo_dir"
   write_technical_requirements "$repo_dir"
+  write_prerequisite_gaps "$repo_dir"
   write_valid_plan "$repo_dir"
 }
 
@@ -445,6 +475,125 @@ test_fails_when_applicable_repo_has_no_steps() {
   assert_contains "$out" "repo mobile has impacted components in technical requirements but no plan step is allocated to it"
 }
 
+test_fails_when_prerequisite_gaps_is_absent() {
+  local repo_dir="$TMP_ROOT/repo-missing-prerequisite-gaps"
+  setup_valid_fixture "$repo_dir"
+  rm -f "$repo_dir/projects/p1/feature-a/prerequisite_gaps.md"
+
+  local result=""
+  result="$(run_helper "$repo_dir" "projects/p1/feature-a/implementation_plan.md")"
+  local status=""
+  status="$(printf '%s\n' "$result" | head -n1)"
+
+  assert_equal "2" "$status"
+}
+
+test_passes_when_slice_token_accepted_as_valid_evidence() {
+  local repo_dir="$TMP_ROOT/repo-slice-token-pass"
+  setup_valid_fixture "$repo_dir"
+
+  cat >"$repo_dir/projects/p1/feature-a/prerequisite_gaps.md" <<'OUT'
+# Prerequisite Gaps
+
+## 2. Prerequisite Trace
+
+### Requirement: REQ-4
+- requirement_summary: Order creation
+- prerequisites: see entries below
+
+#### Prerequisite: Order creation UI route
+- status: scheduled_in_slices
+- evidence: Slice slice-3 adds /orders/create page
+- slice_ref: slice-3
+
+### Requirement: REQ-6
+- requirement_summary: Query orders
+- prerequisites: none
+
+### Requirement: REQ-7
+- requirement_summary: Rebuild projections
+- prerequisites: none
+
+### Requirement: NFR-1
+- requirement_summary: Query latency
+- prerequisites: none
+OUT
+
+  perl -0pi -e 's/(#### Evidence: gap\/TECH_REQ-4, comp\/frontend-order-projection-client)/$1, slice\/slice-3/' \
+    "$repo_dir/projects/p1/feature-a/implementation_plan.md"
+
+  local result=""
+  result="$(run_helper "$repo_dir" "projects/p1/feature-a/implementation_plan.md")"
+  local status=""
+  status="$(printf '%s\n' "$result" | head -n1)"
+  local out=""
+  out="$(printf '%s\n' "$result" | tail -n +2)"
+
+  assert_equal "0" "$status"
+  assert_contains "$out" "quality gate passed"
+}
+
+test_fails_when_scheduled_slice_ref_not_covered_by_plan_evidence() {
+  local repo_dir="$TMP_ROOT/repo-slice-ref-uncovered"
+  setup_valid_fixture "$repo_dir"
+
+  cat >"$repo_dir/projects/p1/feature-a/prerequisite_gaps.md" <<'OUT'
+# Prerequisite Gaps
+
+## 2. Prerequisite Trace
+
+### Requirement: REQ-4
+- requirement_summary: Order creation
+- prerequisites: see entries below
+
+#### Prerequisite: Order creation UI route
+- status: scheduled_in_slices
+- evidence: Slice slice-3 adds /orders/create page
+- slice_ref: slice-3
+
+### Requirement: REQ-6
+- requirement_summary: Query orders
+- prerequisites: none
+
+### Requirement: REQ-7
+- requirement_summary: Rebuild projections
+- prerequisites: none
+
+### Requirement: NFR-1
+- requirement_summary: Query latency
+- prerequisites: none
+OUT
+
+  local result=""
+  result="$(run_helper "$repo_dir" "projects/p1/feature-a/implementation_plan.md")"
+  local status=""
+  status="$(printf '%s\n' "$result" | head -n1)"
+  local out=""
+  out="$(printf '%s\n' "$result" | tail -n +2)"
+
+  assert_equal "1" "$status"
+  assert_contains "$out" "slice-3"
+  assert_contains "$out" "not covered by any plan step evidence token"
+}
+
+test_fails_when_slice_token_has_malformed_format() {
+  local repo_dir="$TMP_ROOT/repo-malformed-slice-token"
+  setup_valid_fixture "$repo_dir"
+
+  perl -0pi -e 's/(#### Evidence: gap\/TECH_REQ-4, comp\/frontend-order-projection-client)/$1, slice\/-bad-start/' \
+    "$repo_dir/projects/p1/feature-a/implementation_plan.md"
+
+  local result=""
+  result="$(run_helper "$repo_dir" "projects/p1/feature-a/implementation_plan.md")"
+  local status=""
+  status="$(printf '%s\n' "$result" | head -n1)"
+  local out=""
+  out="$(printf '%s\n' "$result" | tail -n +2)"
+
+  assert_equal "1" "$status"
+  assert_contains "$out" "invalid evidence token format"
+}
+
 test_passes_with_valid_shared_plan
 test_fails_when_technical_requirements_is_missing
 test_fails_when_repo_header_is_missing
@@ -457,3 +606,9 @@ test_fails_when_evidence_token_is_unknown
 test_fails_when_unresolved_requirement_evidence_is_uncovered
 test_fails_when_unresolved_component_evidence_is_uncovered
 test_fails_when_applicable_repo_has_no_steps
+test_fails_when_prerequisite_gaps_is_absent
+test_passes_when_slice_token_accepted_as_valid_evidence
+test_fails_when_scheduled_slice_ref_not_covered_by_plan_evidence
+test_fails_when_slice_token_has_malformed_format
+
+echo "All implementation plan quality tests passed."

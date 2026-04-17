@@ -147,7 +147,8 @@ write_valid_technical_requirements() {
 ## 4. Requirement Coverage and Gaps
 ### Requirement: REQ-1
 - requirement_summary: Users can create orders successfully.
-- current_state: Backend and frontend both contain partial order-create paths.
+- transport_layer: OrderController, OrderService, OrderRepository
+- user_reachable_surface: POST /api/v1/orders
 - gap_status: partially_implemented
 - repo_impact: multiple
 - evidence: Current repo evidence shows create-order flow code exists in both repos but needs alignment.
@@ -155,7 +156,8 @@ write_valid_technical_requirements() {
 
 ### Requirement: NFR-1
 - requirement_summary: Core latency remains within the target budget.
-- current_state: No dedicated latency verification exists yet for the current feature slice.
+- transport_layer: none
+- user_reachable_surface: none
 - gap_status: unclear
 - repo_impact: backend
 - evidence: Current inputs focus on functional behavior and do not provide latency evidence for the new flow.
@@ -298,8 +300,80 @@ test_fails_when_applicable_repo_has_no_component_block() {
   assert_contains "$out" "repo frontend has applicable touched surfaces but no impacted component block is allocated to it"
 }
 
+test_fails_when_requirement_missing_transport_layer() {
+  local repo_dir="$TMP_ROOT/repo-missing-transport-layer"
+  setup_valid_fixture "$repo_dir"
+  sed -i.bak 's/- transport_layer: OrderController, OrderService, OrderRepository//' \
+    "$repo_dir/projects/p1/feature-a/technical_requirements.md"
+
+  local result=""
+  result="$(run_helper "$repo_dir" "projects/p1/feature-a/technical_requirements.md")"
+  local status=""
+  status="$(printf '%s\n' "$result" | head -n1)"
+  local out=""
+  out="$(printf '%s\n' "$result" | tail -n +2)"
+
+  assert_equal "1" "$status"
+  assert_contains "$out" "REQ-1"
+  assert_contains "$out" "transport_layer"
+}
+
+test_fails_when_requirement_missing_user_reachable_surface() {
+  local repo_dir="$TMP_ROOT/repo-missing-user-reachable"
+  setup_valid_fixture "$repo_dir"
+  sed -i.bak 's/- user_reachable_surface: POST \/api\/v1\/orders//' \
+    "$repo_dir/projects/p1/feature-a/technical_requirements.md"
+
+  local result=""
+  result="$(run_helper "$repo_dir" "projects/p1/feature-a/technical_requirements.md")"
+  local status=""
+  status="$(printf '%s\n' "$result" | head -n1)"
+  local out=""
+  out="$(printf '%s\n' "$result" | tail -n +2)"
+
+  assert_equal "1" "$status"
+  assert_contains "$out" "REQ-1"
+  assert_contains "$out" "user_reachable_surface"
+}
+
+test_fails_when_requirement_uses_conflated_current_state() {
+  local repo_dir="$TMP_ROOT/repo-conflated-current-state"
+  setup_valid_fixture "$repo_dir"
+  perl -0pi -e 's/- transport_layer: OrderController, OrderService, OrderRepository\n- user_reachable_surface: POST \/api\/v1\/orders/- current_state: Backend and frontend both contain partial order-create paths./g' \
+    "$repo_dir/projects/p1/feature-a/technical_requirements.md"
+
+  local result=""
+  result="$(run_helper "$repo_dir" "projects/p1/feature-a/technical_requirements.md")"
+  local status=""
+  status="$(printf '%s\n' "$result" | head -n1)"
+  local out=""
+  out="$(printf '%s\n' "$result" | tail -n +2)"
+
+  assert_equal "1" "$status"
+  assert_contains "$out" "conflated current_state"
+}
+
+test_passes_when_user_reachable_surface_is_none() {
+  local repo_dir="$TMP_ROOT/repo-none-user-reachable"
+  setup_valid_fixture "$repo_dir"
+
+  local result=""
+  result="$(run_helper "$repo_dir" "projects/p1/feature-a/technical_requirements.md")"
+  local status=""
+  status="$(printf '%s\n' "$result" | head -n1)"
+  local out=""
+  out="$(printf '%s\n' "$result" | tail -n +2)"
+
+  assert_equal "0" "$status"
+  assert_contains "$out" "quality gate passed"
+}
+
 test_passes_with_valid_feature_technical_requirements
 test_fails_when_target_missing
 test_fails_when_target_is_empty
 test_fails_when_requirement_block_is_missing
 test_fails_when_applicable_repo_has_no_component_block
+test_fails_when_requirement_missing_transport_layer
+test_fails_when_requirement_missing_user_reachable_surface
+test_fails_when_requirement_uses_conflated_current_state
+test_passes_when_user_reachable_surface_is_none

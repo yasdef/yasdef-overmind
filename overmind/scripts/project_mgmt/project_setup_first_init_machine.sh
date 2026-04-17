@@ -18,6 +18,7 @@ INIT_FEATURE_CONTRACT_DELTA_SCRIPT="overmind/scripts/feature_contract_delta.sh"
 INIT_REPO_SURFACE_EXECUTION_CONTEXT_SCRIPT="overmind/scripts/feature_repo_surface_and_exec_context.sh"
 FEATURE_TECHNICAL_REQUIREMENTS_SCRIPT="overmind/scripts/feature_technical_requirements.sh"
 FEATURE_IMPLEMENTATION_SLICES_SCRIPT="overmind/scripts/feature_implementation_slices.sh"
+FEATURE_PREREQUISITE_GAPS_SCRIPT="overmind/scripts/feature_prerequisite_gaps.sh"
 FEATURE_IMPLEMENTATION_PLAN_SCRIPT="overmind/scripts/feature_implementation_plan.sh"
 FEATURE_IMPLEMENTATION_PLAN_SEMANTIC_REVIEW_SCRIPT="overmind/scripts/feature_implementation_plan_semantic_review.sh"
 FEATURE_ASSIGN_WORKERS_SCRIPT="overmind/scripts/feature_assing_workers.sh"
@@ -57,6 +58,7 @@ STAGED_RULE_FILES=(
   "task_to_br_rule.md"
   "technical_requirements_rule.md"
   "user_br_clarification_rule.md"
+  "prerequisite_gaps_rule.md"
 )
 STAGED_TEMPLATE_FILES=(
   "common_contract_definition_TEMPLATE.md"
@@ -71,6 +73,7 @@ STAGED_TEMPLATE_FILES=(
   "requirements_ears_review_TEMPLATE.md"
   "reqirements_ears_TEMPLATE.md"
   "technical_requirements_TEMPLATE.md"
+  "prerequisite_gaps_TEMPLATE.md"
 )
 STAGED_GOLDEN_EXAMPLE_FILES=(
   "common_contract_definition_GOLDEN_EXAMPLE.md"
@@ -85,6 +88,7 @@ STAGED_GOLDEN_EXAMPLE_FILES=(
   "requirements_ears_review_GOLDEN_EXAMPLE.md"
   "reqirements_ears_GOLDEN_EXAMPLE.md"
   "technical_requirements_GOLDEN_EXAMPLE.md"
+  "prerequisite_gaps_GOLDEN_EXAMPLE.md"
 )
 STAGED_HELPER_FILES=(
   "check_business_context_filled_from_repo.sh"
@@ -92,6 +96,7 @@ STAGED_HELPER_FILES=(
   "check_feature_contract_delta_quality.sh"
   "check_feature_technical_requirements_quality.sh"
   "check_implementation_slices_quality.sh"
+  "check_prerequisite_gaps_quality.sh"
   "check_implementation_plan_quality.sh"
   "check_feature_repo_surface_and_exec_context_be_quality.sh"
   "check_feature_repo_surface_and_exec_context_fe_quality.sh"
@@ -475,6 +480,7 @@ stage_commands() {
   stage_command_script "$repo_root" "$INIT_REPO_SURFACE_EXECUTION_CONTEXT_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
   stage_command_script "$repo_root" "$FEATURE_TECHNICAL_REQUIREMENTS_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
   stage_command_script "$repo_root" "$FEATURE_IMPLEMENTATION_SLICES_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
+  stage_command_script "$repo_root" "$FEATURE_PREREQUISITE_GAPS_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
   stage_command_script "$repo_root" "$FEATURE_IMPLEMENTATION_PLAN_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
   stage_command_script "$repo_root" "$FEATURE_IMPLEMENTATION_PLAN_SEMANTIC_REVIEW_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
   stage_command_script "$repo_root" "$FEATURE_ASSIGN_WORKERS_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"

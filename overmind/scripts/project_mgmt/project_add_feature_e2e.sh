@@ -21,8 +21,8 @@ PHASE7_COMPLETED_REPO_CLASSES=()
 PHASE7_PENDING_REPO_CLASSES=()
 PHASE_EXECUTION_FAILED_RC=40
 
-PHASE_IDS=("3" "4.1" "4.2" "5" "5.1" "6" "7" "8.1" "8.2" "8.3")
-PHASE_OPTIONAL=("false" "false" "false" "false" "true" "false" "false" "false" "false" "true")
+PHASE_IDS=("3" "4.1" "4.2" "5" "5.1" "6" "7" "8.1" "8.2" "8.3" "8.4")
+PHASE_OPTIONAL=("false" "false" "false" "false" "true" "false" "false" "false" "false" "false" "true")
 
 
 die() {
@@ -36,7 +36,7 @@ Usage: project_add_feature_e2e.sh --path <project-folder-path> [--resume <step>]
 
 Options:
   --path <project-folder-path>  ASDLC project folder (for example: projects/<project-id>)
-  --resume <step>               Optional step override (for example: 3, 4.1, 4.2, 5, 5.1, 6, 7, 8.1, 8.2, 8.3)
+  --resume <step>               Optional step override (for example: 3, 4.1, 4.2, 5, 5.1, 6, 7, 8.1, 8.2 (prerequisite gap trace), 8.3 (implementation plan), 8.4 (optional semantic review))
 USAGE
 }
 
@@ -429,8 +429,9 @@ phase_label() {
     6) printf '%s' "Feature Contract Delta" ;;
     7) printf '%s' "Repo Surface and Technical Requirements" ;;
     8.1) printf '%s' "Implementation Slices" ;;
-    8.2) printf '%s' "Implementation Plan" ;;
-    8.3) printf '%s' "Optional Implementation Plan Semantic Review" ;;
+    8.2) printf '%s' "Prerequisite Gap Trace" ;;
+    8.3) printf '%s' "Implementation Plan" ;;
+    8.4) printf '%s' "Optional Implementation Plan Semantic Review" ;;
     *) printf '%s' "$1" ;;
   esac
 }
@@ -472,9 +473,12 @@ phase_scripts() {
       printf '%s\n' "feature_implementation_slices.sh"
       ;;
     8.2)
-      printf '%s\n' "feature_implementation_plan.sh"
+      printf '%s\n' "feature_prerequisite_gaps.sh"
       ;;
     8.3)
+      printf '%s\n' "feature_implementation_plan.sh"
+      ;;
+    8.4)
       printf '%s\n' "feature_implementation_plan_semantic_review.sh"
       ;;
     *)
@@ -890,8 +894,9 @@ map_scanner_step_to_phase() {
     *"analyze repos and prepare repo execution context"*) printf '%s' "7"; return 0 ;;
     *"create feature-scoped technical requirements"*) printf '%s' "7"; return 0 ;;
     *"create implementation slice planning artifact"*) printf '%s' "8.1"; return 0 ;;
-    *"create shared repository implementation plan"*) printf '%s' "8.2"; return 0 ;;
-    *"implementation plan semantic review"*) printf '%s' "8.3"; return 0 ;;
+    *"run prerequisite gap trace"*) printf '%s' "8.2"; return 0 ;;
+    *"create shared repository implementation plan"*) printf '%s' "8.3"; return 0 ;;
+    *"implementation plan semantic review"*) printf '%s' "8.4"; return 0 ;;
   esac
 
   case "$scanner_step_number" in
@@ -907,6 +912,7 @@ map_scanner_step_to_phase() {
     8.1) printf '%s' "8.1" ;;
     8.2) printf '%s' "8.2" ;;
     8.3) printf '%s' "8.3" ;;
+    8.4) printf '%s' "8.4" ;;
     *) return 1 ;;
   esac
 }
@@ -926,8 +932,9 @@ map_resume_to_phase() {
     6|5|contract-delta) printf '%s' "6" ;;
     7|8|6|repo-surface|technical-requirements) printf '%s' "7" ;;
     8.1|implementation-slices) printf '%s' "8.1" ;;
-    8.2|implementation-plan) printf '%s' "8.2" ;;
-    8.3|semantic-review|implementation-plan-semantic-review) printf '%s' "8.3" ;;
+    8.2|prerequisite-gap-trace|prerequisite-gaps) printf '%s' "8.2" ;;
+    8.3|implementation-plan) printf '%s' "8.3" ;;
+    8.4|semantic-review|implementation-plan-semantic-review) printf '%s' "8.4" ;;
     *) return 1 ;;
   esac
 }

@@ -36,7 +36,8 @@
 ## 4. Requirement Coverage and Gaps
 ### Requirement: REQ-1
 - requirement_summary: Trusted internal callers can submit Telegram user data and receive a usable identity result.
-- current_state: Backend expose the identify-or-register endpoint and the frontend already has an identity client path, but consumer and producer success-contract details are not yet fully aligned.
+- transport_layer: Backend identify-or-register controller/service flow exists; frontend has a partial identity client path in src/api/identities.ts
+- user_reachable_surface: POST /api/v1/telegram/identify
 - gap_status: partially_implemented
 - repo_impact: multiple
 - evidence: Backend controller/service flow exists and the common contract baseline marks the identity contract as drifted between repos.
@@ -44,7 +45,8 @@
 
 ### Requirement: REQ-7
 - requirement_summary: Concurrent duplicate account-create requests keep the first success and reject later duplicates predictably.
-- current_state: Backend uniqueness constraints prevent duplicate account rows, but concurrency behavior is only partially documented through current service/error handling and is not fully locked down by explicit tests.
+- transport_layer: Backend uniqueness constraint on account type per Telegram user; AccountService.createAccount() handles conflict path
+- user_reachable_surface: POST /api/v1/accounts
 - gap_status: partially_implemented
 - repo_impact: backend
 - evidence: Persistence uniqueness exists on account type per Telegram user and the feature contract delta requires explicit first-success-later-duplicate verification.
@@ -52,7 +54,8 @@
 
 ### Requirement: NFR-1
 - requirement_summary: The core flow responds within the expected latency budget.
-- current_state: Existing runtime structure supports the current flows, but this feature does not yet add specific performance verification for the new failure-path expectations.
+- transport_layer: Existing runtime structure handles current flows within observed latency; no explicit performance instrumentation for the updated failure-path
+- user_reachable_surface: none
 - gap_status: unclear
 - repo_impact: backend
 - evidence: Current inputs focus on contract/error semantics rather than measurable latency coverage for the updated flow.

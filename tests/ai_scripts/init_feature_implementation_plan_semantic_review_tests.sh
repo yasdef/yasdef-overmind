@@ -153,6 +153,29 @@ OUT
 - repo: frontend
 - gap_to_close: add ACTIVE-denial state handling
 OUT
+
+  cat >"$repo_dir/asdlc/$feature_path/prerequisite_gaps.md" <<'OUT'
+# Prerequisite Gaps
+
+## Requirement: REQ-1
+
+### Prerequisite: backend-status-guard middleware
+- status: present_in_repo
+- evidence: src/middleware/status_guard.rb
+- slice_ref:
+
+### Prerequisite: frontend-workspace-client
+- status: present_in_repo
+- evidence: src/components/WorkspaceClient.tsx
+- slice_ref:
+
+## Requirement: REQ-2
+
+### Prerequisite: denial message component
+- status: present_in_repo
+- evidence: src/components/DenialMessage.tsx
+- slice_ref:
+OUT
 }
 
 setup_codex_stub() {
@@ -365,8 +388,9 @@ test_runs_codex_and_commits_plan_and_review_outputs() {
 
   local codex_prompt
   codex_prompt="$(cat "$capture_dir/codex_prompt.txt")"
-  assert_contains "$codex_prompt" "Run optional Step 8.3 implementation-plan semantic review phase for this feature."
+  assert_contains "$codex_prompt" "Run optional Step 8.4 implementation-plan semantic review phase for this feature."
   assert_contains "$codex_prompt" ".rules/implementation_plan_semantic_review_rule.md"
+  assert_contains "$codex_prompt" "prerequisite_gaps.md"
   assert_contains "$codex_prompt" "Update only projects/p1/feature-a/implementation_plan.md and projects/p1/feature-a/implementation_plan_semantic_review.md."
   assert_contains "$codex_prompt" "Which finding numbers should I apply to implementation_plan.md?"
   assert_not_contains "$codex_prompt" "check_implementation_plan_semantic_review_quality.sh"
@@ -381,6 +405,7 @@ test_runs_codex_and_commits_plan_and_review_outputs() {
   assert_contains "$committed_files" "projects/p1/feature-a/implementation_plan_semantic_review.md"
   assert_not_contains "$committed_files" "projects/p1/feature-a/requirements_ears.md"
   assert_not_contains "$committed_files" "projects/p1/feature-a/technical_requirements.md"
+  assert_not_contains "$committed_files" "projects/p1/feature-a/prerequisite_gaps.md"
   assert_not_contains "$committed_files" "README.md"
 }
 

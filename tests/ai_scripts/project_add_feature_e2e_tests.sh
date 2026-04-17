@@ -438,15 +438,15 @@ test_default_resume_uses_scanner_next_step() {
       printf '1\n'
       printf 'y\n'
       printf 'n\n'
-    } | TEST_LOG_FILE="$log_file" TEST_SCANNER_NEXT_LINE="next step: 8.2 (Create Shared Repository Implementation Plan)" \
+    } | TEST_LOG_FILE="$log_file" TEST_SCANNER_NEXT_LINE="next step: 8.3 (Implementation Plan)" \
       .commands/project_add_feature_e2e.sh --path projects/project-a 2>&1
   )"
 
   assert_contains "$out" "Loaded saved feature_path cache: projects/project-a/feature-alpha"
   assert_contains "$out" "Project feature options:"
   assert_contains "$out" "Selected unfinished feature: projects/project-a/feature-alpha"
-  assert_contains "$out" "Optional phase declined at 8.3; skipping."
-  assert_contains "$out" "Execution finished: no remaining required phases after declined optional phase 8.3."
+  assert_contains "$out" "Optional phase declined at 8.4; skipping."
+  assert_contains "$out" "Execution finished: no remaining required phases after declined optional phase 8.4."
 
   local log_content
   log_content="$(read_log "$log_file")"
@@ -473,7 +473,7 @@ test_resume_override_starts_from_requested_phase() {
       printf 'y\n'
       printf 'y\n'
       printf 'n\n'
-    } | TEST_LOG_FILE="$log_file" TEST_SCANNER_NEXT_LINE="next step: 8.2 (Create Shared Repository Implementation Plan)" \
+    } | TEST_LOG_FILE="$log_file" TEST_SCANNER_NEXT_LINE="next step: 8.3 (Implementation Plan)" \
       .commands/project_add_feature_e2e.sh --path projects/project-a --resume 4.2 2>&1
   )"
 
@@ -683,7 +683,7 @@ test_continue_flow_lists_only_unfinished_features_and_uses_selected_target() {
   printf 'feature_path=projects/project-a/feature-alpha\n' >"$asdlc_root/projects/project-a/.project_add_feature_e2e_state.env"
 
   local scanner_map=""
-  scanner_map=$'projects/project-a/feature-alpha=next step: none\nprojects/project-a/feature-beta=next step: 8.2 (Create Shared Repository Implementation Plan)'
+  scanner_map=$'projects/project-a/feature-alpha=next step: none\nprojects/project-a/feature-beta=next step: 8.3 (Implementation Plan)'
 
   local out=""
   out="$(
@@ -698,7 +698,7 @@ test_continue_flow_lists_only_unfinished_features_and_uses_selected_target() {
   )"
 
   assert_contains "$out" "Unfinished features:"
-  assert_contains "$out" "projects/project-a/feature-beta [next step: 8.2 (Create Shared Repository Implementation Plan)]"
+  assert_contains "$out" "projects/project-a/feature-beta [next step: 8.3 (Implementation Plan)]"
   assert_not_contains "$out" "projects/project-a/feature-alpha [next step:"
   assert_contains "$out" "Selected unfinished feature: projects/project-a/feature-beta"
 

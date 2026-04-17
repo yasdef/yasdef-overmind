@@ -1,7 +1,7 @@
 # Init Progress Definition
 
 Single source of truth (Mermaid embedded below).
-Operational note: staged `.commands/project_add_feature_e2e.sh --path projects/<project-id>` runs Step `3` scaffold, resolves/saves `feature_path`, calls `.commands/init_progress_scanner.sh --path <feature_path>` on each run, then continues from scanner `next step` (or from `--resume <step>` override).
+Operational note: `project_add_feature_e2e.sh --path projects/<project-id>` runs Step 3 scaffold, resolves `feature_path`, calls `init_progress_scanner.sh` each run, then continues from scanner `next step` (or `--resume <step>`).
 
 ```mermaid
 sequenceDiagram
@@ -11,98 +11,104 @@ sequenceDiagram
   actor FE as Repo_FE/MB
   actor KB as MDC knowledge base
 
-  Note over PO: Owns business context and phase orchestration
-  Note over BE, FE: Step 7 prepares repo execution context<br/>Step 8 consolidates current-state evidence<br/>Step 8.1 discovers executable slices<br/>Step 8.2 produces one shared implementation plan with repo-owned steps
-  Note over KB: For project type A, provide technical best-practices
+  Note over PO: Business context + phase orchestration
+  Note over BE, FE: 7: surface map (transport_layer / user_reachable_surface per layer)<br/>8: technical_requirements.md (same split per Requirement block)<br/>8.1: implementation_slices.md<br/>8.2: prerequisite_gaps.md — gate: zero unmet before 8.3<br/>8.3: implementation_plan.md
+  Note over KB: Type A: provides technical best-practices
 
   rect rgb(236, 244, 251)
     Note over PO,FE: Phase: init
-    PO->>PO: 1. Initialize Repo ASDLC Metadata<br/>Output: init_progress_definition.yaml
+    PO->>PO: 1. Init ASDLC metadata → init_progress_definition.yaml
 
-    alt Project type B or C
-      par Contract input collection
-        PO->>BE: 2.1 Request backend req/resp contract evidence (if backend class active)
-        BE-->>PO: Backend req/resp contract evidence
+    alt Type B/C
+      par
+        PO->>BE: 2.1 Request BE contract evidence
+        BE-->>PO: BE contract evidence
       and
-        PO->>FE: 2.2 Request frontend/mobile req/resp contract evidence (if frontend/mobile class active)
-        FE-->>PO: Frontend/mobile req/resp contract evidence
+        PO->>FE: 2.2 Request FE/MB contract evidence
+        FE-->>PO: FE/MB contract evidence
       end
-    else Project type A
+    else Type A
       PO->>KB: 2.1 Request MCP contract best practices
-      KB-->>PO: MCP contract guidance
+      KB-->>PO: MCP guidance
     end
 
-    PO->>PO: 2.3 Create Cross-Project Contract Inventory and Common Contracts Definition<br/>Input: BE/FE req/resp evidence or MCP guidance<br/>Output: common_contract_definition.md
+    PO->>PO: 2.3 Common Contracts Definition → common_contract_definition.md
   end
 
   rect rgb(247, 248, 240)
     Note over PO,FE: Phase: feature
-    par Product Owner track
-      PO->>PO: 3. Initialize and Enrich Business Requirements Structuring (scaffold)<br/>Output: feature_br_summary.md
-      PO->>PO: 4.1 Scan repo and apply task-to-BR update<br/>Output: user_br_input.md
-      loop Until ready_to_ears == true
-        PO->>PO: 4.2 user_br_clarification
-        alt Project type B or C
-          par Req/resp fetch for step 4.1
-            PO->>BE: 4.1 Request backend business-context req/resp data (if backend class active)
-            BE-->>PO: Backend business-context req/resp data
+    par PO track
+      PO->>PO: 3. BR scaffold → feature_br_summary.md
+      PO->>PO: 4.1 Scan repo + task-to-BR → user_br_input.md
+      loop Until ready_to_ears
+        PO->>PO: 4.2 BR clarification
+        alt Type B/C
+          par
+            PO->>BE: 4.1 Request BE business-context data
+            BE-->>PO: BE data
           and
-            PO->>FE: 4.1 Request frontend/mobile business-context req/resp data (if frontend/mobile class active)
-            FE-->>PO: Frontend/mobile business-context req/resp data
+            PO->>FE: 4.1 Request FE/MB business-context data
+            FE-->>PO: FE/MB data
           end
-        else Project type A
-          PO->>PO: 4.1 skipped for project type A
+        else Type A
+          PO->>PO: 4.1 skipped
         end
-        PO->>PO: 4.2 ready_to_ears conversion check
+        PO->>PO: 4.2 EARS readiness check
       end
-      PO->>PO: 5. Convert Business Requirements Structuring to EARS<br/>Output: requirements_ears.md
-      opt 5.1 Optional requirements_ears extra review
-        loop Until review ledger has no escalated findings
-          PO->>PO: 5.1 Review requirements_ears.md against user_br_input.md<br/>Output: requirements_ears_review.md
-          PO->>PO: Show finding + recommendation, then ask: "Should I add recommended changes?"<br/>Apply accepted EARS edits or record rejection/postponement
+      PO->>PO: 5. BR → EARS → requirements_ears.md
+      opt 5.1 Optional EARS review
+        loop Until no escalated findings
+          PO->>PO: 5.1 Review EARS vs user_br_input.md → requirements_ears_review.md
+          PO->>PO: Apply accepted edits or record rejection
         end
       end
-      PO->>PO: 6. Define Feature Contract Delta<br/>Input: requirements_ears.md + common_contract_definition.md<br/>Output: feature_contract_delta.md
-      PO-->>BE: Provide feature_contract_delta.md (if backend class active)
-      PO-->>FE: Provide feature_contract_delta.md (if frontend/mobile class active)
+      PO->>PO: 6. Contract delta → feature_contract_delta.md
+      PO-->>BE: feature_contract_delta.md
+      PO-->>FE: feature_contract_delta.md
     and Technical tracks
-      alt Project type B or C
-        par Repo analysis + execution context track
-          BE->>BE: 7. Analyze selected repo and prepare execution context (backend iteration)<br/>Input: project-level init_progress_definition.yaml + requirements_ears.md + feature_contract_delta.md + selected ready backend repo path<br/>Output: project_surface_struct_resp_map_backend.md
+      alt Type B/C
+        par
+          BE->>BE: 7. BE surface map<br/>in: init_progress_definition.yaml + requirements_ears.md + feature_contract_delta.md + BE repo<br/>→ project_surface_struct_resp_map_backend.md
         and
-          FE->>FE: 7. Analyze selected repo and prepare execution context (frontend/mobile iteration)<br/>Input: project-level init_progress_definition.yaml + requirements_ears.md + feature_contract_delta.md + selected ready frontend or mobile repo path<br/>Output: project_surface_struct_resp_map_frontend.md or project_surface_struct_resp_map_mobile.md
+          FE->>FE: 7. FE/MB surface map<br/>in: same + FE/MB repo<br/>→ project_surface_struct_resp_map_frontend/mobile.md
         end
-      else Project type A
-        par MCP best-practice execution context track
-          BE->>KB: 7. Request backend repo execution best practices (if backend class active)
-          KB-->>BE: Backend best-practice req/resp
-          BE->>BE: Create backend map from requirements_ears.md + feature_contract_delta.md + MCP response<br/>Output: project_surface_struct_resp_map_backend.md
+      else Type A
+        par
+          BE->>KB: 7. Request BE best practices
+          KB-->>BE: BE best-practice guidance
+          BE->>BE: 7. BE surface map (MCP)<br/>in: requirements_ears.md + feature_contract_delta.md + MCP<br/>→ project_surface_struct_resp_map_backend.md
         and
-          FE->>KB: 7. Request frontend/mobile repo execution best practices (if frontend/mobile class active)
-          KB-->>FE: Frontend/mobile best-practice req/resp
-          FE->>FE: Create selected frontend/mobile map from requirements_ears.md + feature_contract_delta.md + MCP response<br/>Output: project_surface_struct_resp_map_frontend.md or project_surface_struct_resp_map_mobile.md
+          FE->>KB: 7. Request FE/MB best practices
+          KB-->>FE: FE/MB best-practice guidance
+          FE->>FE: 7. FE/MB surface map (MCP)<br/>in: same + MCP<br/>→ project_surface_struct_resp_map_frontend/mobile.md
         end
       end
 
-      alt Project type B or C
-        BE->>BE: 8. Create shared feature-scoped technical requirements<br/>Input: applicable project_surface_struct_resp_map_*.md + requirements_ears.md + common_contract_definition.md + targeted repo evidence<br/>Output: technical_requirements.md
-      else Project type A
-        BE->>BE: 8. Create shared feature-scoped technical requirements using maps + requirements/contracts + MCP context<br/>Output: technical_requirements.md
+      alt Type B/C
+        PO->>PO: 8. Technical requirements<br/>in: surface_map_*.md + requirements_ears.md + common_contract_definition.md<br/>→ technical_requirements.md
+      else Type A
+        PO->>PO: 8. Technical requirements (MCP)<br/>in: requirements_ears.md + common_contract_definition.md + MCP<br/>→ technical_requirements.md
       end
 
-      alt Project type B or C
-        BE->>BE: 8.1 Create shared implementation slices<br/>Input: technical_requirements.md + requirements_ears.md + feature_contract_delta.md + project_surface_struct_resp_map_*.md<br/>Output: implementation_slices.md
-      else Project type A
-        BE->>BE: 8.1 Create shared implementation slices using technical requirements + requirements/contracts + maps + MCP context<br/>Output: implementation_slices.md
+      alt Type B/C
+        PO->>PO: 8.1 Implementation slices<br/>in: technical_requirements.md + requirements_ears.md + feature_contract_delta.md + surface_map_*.md<br/>→ implementation_slices.md
+      else Type A
+        PO->>PO: 8.1 Implementation slices (MCP)<br/>in: technical_requirements.md + requirements_ears.md + MCP<br/>→ implementation_slices.md
       end
 
-      alt Project type B or C
-        BE->>BE: 8.2 Create shared implementation plan<br/>Input: implementation_slices.md + technical_requirements.md + requirements_ears.md + feature_contract_delta.md<br/>Output: implementation_plan.md
-      else Project type A
-        BE->>BE: 8.2 Create shared implementation plan using slices + technical requirements + requirements/contracts + MCP context<br/>Output: implementation_plan.md
+      alt Type B/C
+        PO->>PO: 8.2 Prerequisite gap trace<br/>in: requirements_ears.md + technical_requirements.md + implementation_slices.md<br/>→ prerequisite_gaps.md | gate: zero unmet before 8.3
+      else Type A
+        PO->>PO: 8.2 skipped
       end
-      opt 8.3 Optional implementation-plan semantic review
-        BE->>BE: 8.3 Review implementation_plan.md, summarize findings, ask which finding numbers to apply, then update plan + review ledger<br/>Input: implementation_plan.md + requirements_ears.md + technical_requirements.md<br/>Output: implementation_plan.md + implementation_plan_semantic_review.md
+
+      alt Type B/C
+        PO->>PO: 8.3 Implementation plan<br/>in: prerequisite_gaps.md + implementation_slices.md + technical_requirements.md + requirements_ears.md + feature_contract_delta.md<br/>→ implementation_plan.md
+      else Type A
+        PO->>PO: 8.3 Implementation plan (MCP)<br/>in: implementation_slices.md + technical_requirements.md + requirements_ears.md + MCP<br/>→ implementation_plan.md
+      end
+      opt 8.4 Optional semantic review
+        PO->>PO: 8.4 Semantic review<br/>in: implementation_plan.md + requirements_ears.md + technical_requirements.md + prerequisite_gaps.md<br/>→ implementation_plan.md + implementation_plan_semantic_review.md
       end
     end
   end

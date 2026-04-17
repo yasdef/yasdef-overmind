@@ -7,6 +7,7 @@ FEATURE_PATH=""
 IMPLEMENTATION_PLAN_FILE=""
 REQUIREMENTS_EARS_FILE=""
 TECHNICAL_REQUIREMENTS_FILE=""
+PREREQUISITE_GAPS_FILE=""
 IMPLEMENTATION_PLAN_SEMANTIC_REVIEW_FILE=""
 
 REVIEW_TEMPLATE_FILE=".templates/implementation_plan_semantic_review_TEMPLATE.md"
@@ -122,6 +123,7 @@ set_artifact_paths() {
   IMPLEMENTATION_PLAN_FILE="$FEATURE_PATH/implementation_plan.md"
   REQUIREMENTS_EARS_FILE="$FEATURE_PATH/requirements_ears.md"
   TECHNICAL_REQUIREMENTS_FILE="$FEATURE_PATH/technical_requirements.md"
+  PREREQUISITE_GAPS_FILE="$FEATURE_PATH/prerequisite_gaps.md"
   IMPLEMENTATION_PLAN_SEMANTIC_REVIEW_FILE="$FEATURE_PATH/implementation_plan_semantic_review.md"
 }
 
@@ -129,6 +131,7 @@ prepare_readonly_inputs() {
   READONLY_INPUT_FILES=(
     "$REQUIREMENTS_EARS_FILE"
     "$TECHNICAL_REQUIREMENTS_FILE"
+    "$PREREQUISITE_GAPS_FILE"
   )
 }
 
@@ -138,6 +141,7 @@ ensure_required_files() {
     "$IMPLEMENTATION_PLAN_FILE"
     "$REQUIREMENTS_EARS_FILE"
     "$TECHNICAL_REQUIREMENTS_FILE"
+    "$PREREQUISITE_GAPS_FILE"
     "$REVIEW_TEMPLATE_FILE"
     "$REVIEW_GOLDEN_EXAMPLE_FILE"
     "$MODELS_FILE"
@@ -224,7 +228,7 @@ build_prompt() {
   readonly_lines="$(render_readonly_input_lines)"
 
   cat <<EOF_PROMPT
-Run optional Step 8.3 implementation-plan semantic review phase for this feature.
+Run optional Step 8.4 implementation-plan semantic review phase for this feature.
 
 Hard constraints:
 - Read and follow $RULE_FILE fully before editing.
@@ -253,6 +257,7 @@ Context:
 - Mutable semantic review target: $IMPLEMENTATION_PLAN_SEMANTIC_REVIEW_FILE
 - Read-only requirements source: $REQUIREMENTS_EARS_FILE
 - Read-only technical requirements source: $TECHNICAL_REQUIREMENTS_FILE
+- Read-only prerequisite gaps source: $PREREQUISITE_GAPS_FILE
 - Rule file: $RULE_FILE
 - Template file: $REVIEW_TEMPLATE_FILE
 - Golden example file: $REVIEW_GOLDEN_EXAMPLE_FILE

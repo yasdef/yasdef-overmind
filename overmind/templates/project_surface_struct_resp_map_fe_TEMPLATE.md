@@ -22,48 +22,66 @@
 - responsibility_summary: [UNFILLED]
 - main_repo_paths: [UNFILLED]
 - key_components: [UNFILLED]
+- transport_layer: [UNFILLED]
+- user_reachable_surface: [UNFILLED]
 
 ### 3.2 Component Layer
 - responsibility_summary: [UNFILLED]
 - main_repo_paths: [UNFILLED]
 - key_components: [UNFILLED]
+- transport_layer: [UNFILLED]
+- user_reachable_surface: [UNFILLED]
 
 ### 3.3 State / Data Layer
 - responsibility_summary: [UNFILLED]
 - main_repo_paths: [UNFILLED]
 - key_components: [UNFILLED]
+- transport_layer: [UNFILLED]
+- user_reachable_surface: [UNFILLED]
 
 ### 3.4 API Integration Layer
 - responsibility_summary: [UNFILLED]
 - main_repo_paths: [UNFILLED]
 - key_components: [UNFILLED]
+- transport_layer: [UNFILLED]
+- user_reachable_surface: [UNFILLED]
 
 ### 3.5 UX Behavior Layer
 - responsibility_summary: [UNFILLED]
 - main_repo_paths: [UNFILLED]
 - key_components: [UNFILLED]
+- transport_layer: [UNFILLED]
+- user_reachable_surface: [UNFILLED]
 
 ### 3.6 Platform / Runtime Layer
 - responsibility_summary: [UNFILLED]
 - main_repo_paths: [UNFILLED]
 - key_components: [UNFILLED]
+- transport_layer: [UNFILLED]
+- user_reachable_surface: [UNFILLED]
 
 #### Mobile-only: Native / Device Integration Layer
 > only for mobile repositories
 - responsibility_summary: [UNFILLED]
 - main_repo_paths: [UNFILLED]
 - key_components: [UNFILLED]
+- transport_layer: [UNFILLED]
+- user_reachable_surface: [UNFILLED]
 
 #### Mobile-only: Local Storage / Offline / Sync Layer
 > only for mobile repositories
 - responsibility_summary: [UNFILLED]
 - main_repo_paths: [UNFILLED]
 - key_components: [UNFILLED]
+- transport_layer: [UNFILLED]
+- user_reachable_surface: [UNFILLED]
 
 ### 3.7 Test Layer
 - responsibility_summary: [UNFILLED]
 - main_repo_paths: [UNFILLED]
 - key_components: [UNFILLED]
+- transport_layer: [UNFILLED]
+- user_reachable_surface: [UNFILLED]
 
 ### 3.8 Another Layer(s)
 > add as much new layers as needed based on same pattern and follow number convention
@@ -77,6 +95,8 @@
 - why_feature_touches_it: [UNFILLED]
 - expected_changes: [UNFILLED]
 - evidence: [UNFILLED]
+- transport_layer: [UNFILLED]
+- user_reachable_surface: [UNFILLED]
 
 ### 4.2 Component Surface
 - surface_summary: Shared or feature-specific UI components, props, display variants, and view pieces.
@@ -85,6 +105,8 @@
 - why_feature_touches_it: [UNFILLED]
 - expected_changes: [UNFILLED]
 - evidence: [UNFILLED]
+- transport_layer: [UNFILLED]
+- user_reachable_surface: [UNFILLED]
 
 ### 4.3 State / Data Surface
 - surface_summary: Client state, stores, hooks, selectors, query cache, view-model state.
@@ -93,6 +115,8 @@
 - why_feature_touches_it: [UNFILLED]
 - expected_changes: [UNFILLED]
 - evidence: [UNFILLED]
+- transport_layer: [UNFILLED]
+- user_reachable_surface: [UNFILLED]
 
 ### 4.4 API Integration Surface
 - surface_summary: API clients, adapters, request builders, response mappers, client-side contract mapping.
@@ -101,6 +125,8 @@
 - why_feature_touches_it: [UNFILLED]
 - expected_changes: [UNFILLED]
 - evidence: [UNFILLED]
+- transport_layer: [UNFILLED]
+- user_reachable_surface: [UNFILLED]
 
 ### 4.5 UX Behavior Surface
 - surface_summary: Navigation flow, loading states, empty states, error states, optimistic or degraded behavior.
@@ -109,6 +135,8 @@
 - why_feature_touches_it: [UNFILLED]
 - expected_changes: [UNFILLED]
 - evidence: [UNFILLED]
+- transport_layer: [UNFILLED]
+- user_reachable_surface: [UNFILLED]
 
 ### 4.6 Platform / Runtime Surface
 - surface_summary: Feature flags, env config, analytics hooks, i18n, accessibility hooks, platform wiring.
@@ -117,6 +145,8 @@
 - why_feature_touches_it: [UNFILLED]
 - expected_changes: [UNFILLED]
 - evidence: [UNFILLED]
+- transport_layer: [UNFILLED]
+- user_reachable_surface: [UNFILLED]
 
 #### Mobile-only: Native / Device Surface
 > only for mobile repositories
@@ -126,6 +156,8 @@
 - why_feature_touches_it: [UNFILLED]
 - expected_changes: [UNFILLED]
 - evidence: [UNFILLED]
+- transport_layer: [UNFILLED]
+- user_reachable_surface: [UNFILLED]
 
 #### Mobile-only: Local Storage / Offline / Sync Surface
 > only for mobile repositories
@@ -135,6 +167,8 @@
 - why_feature_touches_it: [UNFILLED]
 - expected_changes: [UNFILLED]
 - evidence: [UNFILLED]
+- transport_layer: [UNFILLED]
+- user_reachable_surface: [UNFILLED]
 
 ### 4.7 Test Surface
 - surface_summary: Component, integration, end-to-end, snapshot, and other verification assets for touched client areas.
@@ -143,6 +177,8 @@
 - why_feature_touches_it: [UNFILLED]
 - expected_changes: [UNFILLED]
 - evidence: [UNFILLED]
+- transport_layer: [UNFILLED]
+- user_reachable_surface: [UNFILLED]
 
 ### 4.8 Unexpected Frontend / Mobile Surface
 - surface_summary: Any real client-side surface that does not fit the standard categories above.
@@ -151,3 +187,5 @@
 - why_feature_touches_it: [UNFILLED]
 - expected_changes: [UNFILLED]
 - evidence: [UNFILLED]
+- transport_layer: [UNFILLED]
+- user_reachable_surface: [UNFILLED]

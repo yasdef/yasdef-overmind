@@ -446,6 +446,27 @@ test_runs_with_absolute_feature_path() {
   assert_file_not_exists "$capture_dir/helper_args.txt"
 }
 
+test_prompt_references_rule_file() {
+  local repo_dir="$TMP_ROOT/repo-fe-rule-ref"
+  local capture_dir="$TMP_ROOT/capture-fe-rule-ref"
+  local fe_repo="$TMP_ROOT/fe-repo-rule-ref"
+  local mobile_repo="$TMP_ROOT/mobile-repo-rule-ref"
+  mkdir -p "$repo_dir" "$capture_dir" "$fe_repo" "$mobile_repo"
+  setup_git_workspace "$repo_dir" "$fe_repo" "$mobile_repo"
+  seed_feature_sources "$repo_dir"
+  setup_codex_stub "$repo_dir"
+
+  (
+    cd "$repo_dir/asdlc" &&
+    PATH="$repo_dir/bin:$PATH" TEST_CAPTURE_DIR="$capture_dir" \
+      .commands/feature_repo_surface_and_exec_context.sh --feature_path "projects/p1/feature-a" <<<"frontend" >/dev/null
+  )
+
+  local codex_prompt
+  codex_prompt="$(cat "$capture_dir/codex_prompt.txt")"
+  assert_contains "$codex_prompt" "feature_repo_surface_and_exec_context_rule.md"
+}
+
 test_requires_feature_path_argument
 test_requires_staged_command_location
 test_fails_when_model_phase_missing
@@ -454,5 +475,6 @@ test_selects_mobile_by_number
 test_does_not_run_quality_helper_directly
 test_skips_empty_commit_when_output_is_unchanged
 test_runs_with_absolute_feature_path
+test_prompt_references_rule_file
 
 echo "All frontend/mobile repo-surface/execution-context initializer tests passed."

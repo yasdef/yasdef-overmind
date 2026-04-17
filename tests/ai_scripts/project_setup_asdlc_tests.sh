@@ -20,6 +20,7 @@ OPTION_13_HELPER_SRC="$SOURCE_ROOT/overmind/scripts/feature_contract_delta.sh"
 OPTION_14_HELPER_SRC="$SOURCE_ROOT/overmind/scripts/feature_repo_surface_and_exec_context.sh"
 OPTION_15_HELPER_SRC="$SOURCE_ROOT/overmind/scripts/feature_technical_requirements.sh"
 FEATURE_IMPLEMENTATION_SLICES_SRC="$SOURCE_ROOT/overmind/scripts/feature_implementation_slices.sh"
+FEATURE_PREREQUISITE_GAPS_SRC="$SOURCE_ROOT/overmind/scripts/feature_prerequisite_gaps.sh"
 OPTION_16_HELPER_SRC="$SOURCE_ROOT/overmind/scripts/feature_implementation_plan.sh"
 OPTION_17_HELPER_SRC="$SOURCE_ROOT/overmind/scripts/feature_implementation_plan_semantic_review.sh"
 OPTION_18_HELPER_SRC="$SOURCE_ROOT/overmind/scripts/feature_assing_workers.sh"
@@ -36,6 +37,7 @@ STAGED_RULE_FILES=(
   "implementation_slices_rule.md"
   "implementation_plan_rule.md"
   "implementation_plan_semantic_review_rule.md"
+  "prerequisite_gaps_rule.md"
   "requirements_ears_review_rule.md"
   "repo_br_scan_rule.md"
   "feature_repo_surface_and_exec_context_rule.md"
@@ -52,6 +54,7 @@ STAGED_TEMPLATE_FILES=(
   "implementation_plan_semantic_review_TEMPLATE.md"
   "init_progress_definition_TEMPLATE.yaml"
   "missing_br_data_TEMPLATE.md"
+  "prerequisite_gaps_TEMPLATE.md"
   "project_surface_struct_resp_map_be_TEMPLATE.md"
   "project_surface_struct_resp_map_fe_TEMPLATE.md"
   "requirements_ears_review_TEMPLATE.md"
@@ -66,6 +69,7 @@ STAGED_GOLDEN_EXAMPLE_FILES=(
   "implementation_plan_GOLDEN_EXAMPLE.md"
   "implementation_plan_semantic_review_GOLDEN_EXAMPLE.md"
   "missing_br_data_GOLDEN_EXAMPLE.md"
+  "prerequisite_gaps_GOLDEN_EXAMPLE.md"
   "project_surface_struct_resp_map_be_GOLDEN_EXAMPLE.md"
   "project_surface_struct_resp_map_fe_GOLDEN_EXAMPLE.md"
   "requirements_ears_review_GOLDEN_EXAMPLE.md"
@@ -79,6 +83,7 @@ STAGED_HELPER_FILES=(
   "check_feature_technical_requirements_quality.sh"
   "check_implementation_slices_quality.sh"
   "check_implementation_plan_quality.sh"
+  "check_prerequisite_gaps_quality.sh"
   "check_feature_repo_surface_and_exec_context_be_quality.sh"
   "check_feature_repo_surface_and_exec_context_fe_quality.sh"
   "check_requirements_ears_review_quality.sh"
@@ -258,6 +263,7 @@ assert_feature_requirements_and_plan_commands_use_staged_runtime_assets() {
   local asdlc_root="$1"
   local technical_requirements_cmd_path="$asdlc_root/.commands/feature_technical_requirements.sh"
   local implementation_slices_cmd_path="$asdlc_root/.commands/feature_implementation_slices.sh"
+  local prerequisite_gaps_cmd_path="$asdlc_root/.commands/feature_prerequisite_gaps.sh"
   local implementation_plan_cmd_path="$asdlc_root/.commands/feature_implementation_plan.sh"
   local implementation_plan_semantic_review_cmd_path="$asdlc_root/.commands/feature_implementation_plan_semantic_review.sh"
   local assign_workers_cmd_path="$asdlc_root/.commands/feature_assing_workers.sh"
@@ -273,6 +279,10 @@ assert_feature_requirements_and_plan_commands_use_staged_runtime_assets() {
   assert_contains "$(cat "$implementation_slices_cmd_path")" 'IMPLEMENTATION_SLICES_TEMPLATE_FILE=".templates/implementation_slices_TEMPLATE.md"'
   assert_contains "$(cat "$implementation_slices_cmd_path")" 'IMPLEMENTATION_SLICES_GOLDEN_EXAMPLE_FILE=".golden_examples/implementation_slices_GOLDEN_EXAMPLE.md"'
   assert_contains "$(cat "$implementation_slices_cmd_path")" 'QUALITY_GATE_HELPER=".helper/check_implementation_slices_quality.sh"'
+
+  assert_contains "$(cat "$prerequisite_gaps_cmd_path")" 'MODELS_FILE=".setup/models.md"'
+  assert_contains "$(cat "$prerequisite_gaps_cmd_path")" 'RULE_FILE=".rules/prerequisite_gaps_rule.md"'
+  assert_contains "$(cat "$prerequisite_gaps_cmd_path")" 'QUALITY_GATE_HELPER=".helper/check_prerequisite_gaps_quality.sh"'
 
   assert_contains "$(cat "$implementation_plan_cmd_path")" 'MODELS_FILE=".setup/models.md"'
   assert_contains "$(cat "$implementation_plan_cmd_path")" 'RULE_FILE=".rules/implementation_plan_rule.md"'
@@ -395,6 +405,7 @@ setup_repo_layout() {
   cp "$OPTION_14_HELPER_SRC" "$repo_dir/overmind/scripts/feature_repo_surface_and_exec_context.sh"
   cp "$OPTION_15_HELPER_SRC" "$repo_dir/overmind/scripts/feature_technical_requirements.sh"
   cp "$FEATURE_IMPLEMENTATION_SLICES_SRC" "$repo_dir/overmind/scripts/feature_implementation_slices.sh"
+  cp "$FEATURE_PREREQUISITE_GAPS_SRC" "$repo_dir/overmind/scripts/feature_prerequisite_gaps.sh"
   cp "$OPTION_16_HELPER_SRC" "$repo_dir/overmind/scripts/feature_implementation_plan.sh"
   cp "$OPTION_17_HELPER_SRC" "$repo_dir/overmind/scripts/feature_implementation_plan_semantic_review.sh"
   cp "$OPTION_18_HELPER_SRC" "$repo_dir/overmind/scripts/feature_assing_workers.sh"
@@ -421,6 +432,7 @@ setup_repo_layout() {
   chmod +x "$repo_dir/overmind/scripts/feature_repo_surface_and_exec_context.sh"
   chmod +x "$repo_dir/overmind/scripts/feature_technical_requirements.sh"
   chmod +x "$repo_dir/overmind/scripts/feature_implementation_slices.sh"
+  chmod +x "$repo_dir/overmind/scripts/feature_prerequisite_gaps.sh"
   chmod +x "$repo_dir/overmind/scripts/feature_implementation_plan.sh"
   chmod +x "$repo_dir/overmind/scripts/feature_implementation_plan_semantic_review.sh"
   chmod +x "$repo_dir/overmind/scripts/feature_assing_workers.sh"

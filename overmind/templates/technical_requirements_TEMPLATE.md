@@ -30,7 +30,8 @@
 > Use one or more requirement blocks. Add one `### Requirement:` block for each relevant `REQ-*` or `NFR-*`.
 ### Requirement: [REQ-1 | NFR-1]
 - requirement_summary: [UNFILLED]
-- current_state: [UNFILLED]
+- transport_layer: [UNFILLED]
+- user_reachable_surface: [UNFILLED]
 - gap_status: [fully_implemented | partially_implemented | not_implemented | unclear]
 - repo_impact: [backend | frontend | mobile | multiple]
 - evidence: [UNFILLED]

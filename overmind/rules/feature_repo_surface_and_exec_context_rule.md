@@ -63,6 +63,32 @@ Must not own:
 - Resolve outputs under runtime feature root.
 - Do not hardcode `overmind/product/...` when runtime override is supplied.
 
+## Transport vs User-Reachable Split
+
+Every Section 3 layer block and every Section 4 surface block in the output surface map SHALL record two explicit subfields:
+- `transport_layer`: internal callable code present in the repository (API clients, services, hooks, repositories, helpers) that other code can invoke. Use `none` when no transport-layer code exists for this block.
+- `user_reachable_surface`: operator-invocable entry points that an operator or end user can invoke without writing code. Use `none` when no user-reachable surface exists.
+
+A single conflated line that mixes both forms SHALL NOT be used. The quality helper will reject a block missing either subfield.
+
+### User-Reachable Taxonomy per Project Class
+The following defines what counts as user-reachable for each project class:
+- **frontend**: a mounted route, page, or top-level screen an operator can navigate to (e.g., `/admin/login`, `/checkout/summary`).
+- **mobile**: a registered screen or deep link an operator can land on (e.g., `checkout://risk-screen`).
+- **backend**: an operator-reachable HTTP endpoint, CLI command, scheduled job, or admin tool. Internal-only services, repositories, and helpers do NOT qualify.
+
+### Token Requirements for user_reachable_surface
+Each `user_reachable_surface` entry SHALL be a concrete navigable token — a route path, full HTTP method+path, CLI command name, or job identifier — rather than prose. This field is the ground-truth contract consumed by downstream prerequisite-gap tooling and must be machine-parseable.
+
+Valid examples: `/admin/login`, `POST /api/v2/orders`, `bin/reconcile`, `reconcile-accounts-daily`.
+Invalid: `the admin login page` (prose description, not parseable).
+
+### Forbid Restating Transport Coverage as User-Reachable Presence
+Transport-layer presence (callable code exists) does NOT imply user-reachable presence. Do NOT list an internal service, repository, or helper in `user_reachable_surface`. A backend service method or a frontend API client is transport-layer code; it is NOT a user-reachable surface entry.
+
+### none Marker
+Use the literal value `none` when a subfield has no applicable value. A blank or omitted subfield is invalid.
+
 ## Completion Gate
 - Before finalizing, run the prompt-provided quality gate command.
 - If the gate fails, revise the output and rerun the gate command.

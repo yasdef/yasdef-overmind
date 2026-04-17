@@ -189,6 +189,7 @@ steps:
       - condition: "project_surface_struct_resp_map_backend.md, project_surface_struct_resp_map_frontend.md, and project_surface_struct_resp_map_mobile.md capture feature-scoped repo context for their respective classes, grounded in project-level repo metadata."
       - condition: "These artifacts do not redefine stable cross-project contract governance already captured in common_contract_definition.md."
       - condition: "Sources used to prepare these documents follow project type rules: C from code analysis, B from code analysis or knowledge base, A from knowledge base only."
+      - condition: "Every Section 3 layer block and every Section 4 surface block in each surface map artifact carries both a transport_layer subfield and a user_reachable_surface subfield. Neither subfield may be blank or omitted; use none when one side has no applicable entry."
 
   - step_number: 8
     phase_name: "feature"
@@ -218,6 +219,7 @@ steps:
       - condition: "For project types B and C, direct code evidence used for this artifact is limited to feature-scoped paths selected by the applicable project_surface_struct_resp_map_backend.md, project_surface_struct_resp_map_frontend.md, and project_surface_struct_resp_map_mobile.md artifacts plus the smallest adjacent evidence files needed to confirm behavior."
       - condition: "Each impacted component entry in technical_requirements.md carries explicit repo ownership metadata."
       - condition: "This artifact does not redefine stable cross-project contract governance already captured in common_contract_definition.md."
+      - condition: "Every ### Requirement: block in technical_requirements.md records current state using two explicit subfields — transport_layer and user_reachable_surface — rather than a single conflated current_state line. Neither subfield may be blank or omitted; use none when one side has no applicable entry."
 
   - step_number: 8.1
     phase_name: "feature"
@@ -253,6 +255,30 @@ steps:
 
   - step_number: 8.2
     phase_name: "feature"
+    step_name: "Run Prerequisite Gap Trace"
+    input_required:
+      - type: "document"
+        value: "requirements_ears.md"
+      - type: "document"
+        value: "technical_requirements.md"
+      - type: "document"
+        value: "implementation_slices.md"
+    finished_only_if_artefacts_present:
+      - file: "prerequisite_gaps.md"
+        special_folder: "/product"
+        required_if:
+          meta_info:
+            project_classes:
+              any_of: ["backend", "frontend", "mobile"]
+    finished_only_if_conditions_meet:
+      - condition: "prerequisite_gaps.md records one ### Requirement: block per EARS requirement and one #### Prerequisite: entry per externally-invocable prerequisite derived from each requirement."
+      - condition: "Every prerequisite entry carries a status of present_in_repo, scheduled_in_slices, or unmet. No unmet entries may remain; each must be resolved by adding a slice to implementation_slices.md before this step is complete."
+      - condition: "present_in_repo entries carry a non-empty evidence field grounded in a user_reachable_surface token from technical_requirements.md. Transport-layer presence alone does not satisfy present_in_repo."
+      - condition: "scheduled_in_slices entries carry a non-empty evidence field and a non-empty slice_ref matching a slice identifier in implementation_slices.md exactly."
+      - condition: "slice_ref values match the regex [A-Za-z0-9][A-Za-z0-9_.-]* and are referenceable as slice/<slice_ref> evidence tokens in implementation_plan.md."
+
+  - step_number: 8.3
+    phase_name: "feature"
     step_name: "Create Shared Repository Implementation Plan"
     input_required:
       - type: "document"
@@ -284,7 +310,7 @@ steps:
       - condition: "For project type B, required refactoring of existing code is identified and included when needed."
       - condition: "This artifact does not redefine stable cross-project contract governance already captured in common_contract_definition.md."
 
-  - step_number: 8.3
+  - step_number: 8.4
     phase_name: "feature"
     step_name: "(optional) implementation plan semantic review"
     optional: true

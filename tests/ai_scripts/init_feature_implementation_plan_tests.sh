@@ -293,6 +293,28 @@ OUT
 - risk_1: frontend and mobile may have diverged local assumptions about status field naming
 OUT
 
+  cat >"$repo_dir/asdlc/$feature_path/prerequisite_gaps.md" <<'OUT'
+# Prerequisite Gaps
+
+## 1. Document Meta
+- feature_id: ORD-42
+- last_updated: 2026-04-12
+
+## 2. Prerequisite Trace
+
+### Requirement: REQ-4
+- requirement_summary: Order creation
+- prerequisites: none
+
+### Requirement: REQ-6
+- requirement_summary: Query orders
+- prerequisites: none
+
+### Requirement: REQ-7
+- requirement_summary: Rebuild projections
+- prerequisites: none
+OUT
+
   cat >"$repo_dir/asdlc/$feature_path/implementation_slices.md" <<'OUT'
 # Implementation Slices
 

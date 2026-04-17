@@ -263,6 +263,12 @@ END {
     if (is_unfilled(layer_value[layer, "key_components"])) {
       fail_quality("missing key_components in " layer)
     }
+    if (is_unfilled(layer_value[layer, "transport_layer"])) {
+      fail_quality("missing or blank transport_layer in " layer)
+    }
+    if (is_unfilled(layer_value[layer, "user_reachable_surface"])) {
+      fail_quality("missing or blank user_reachable_surface in " layer)
+    }
   }
 
   if (!saw_3_8) {
@@ -292,6 +298,12 @@ END {
     }
     if (is_unfilled(surface_value[surface, "evidence"])) {
       fail_quality("missing evidence in " surface)
+    }
+    if (is_unfilled(surface_value[surface, "transport_layer"])) {
+      fail_quality("missing or blank transport_layer in " surface)
+    }
+    if (is_unfilled(surface_value[surface, "user_reachable_surface"])) {
+      fail_quality("missing or blank user_reachable_surface in " surface)
     }
     if (surface_value[surface, "applicability"] == "applicable") {
       touched_surface_count++

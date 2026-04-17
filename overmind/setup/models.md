@@ -10,6 +10,7 @@ feature_contract_delta | codex | gpt-5.4 | --config | model_reasoning_effort='hi
 feature_repo_surface_and_exec_context | codex | gpt-5.4 | --config | model_reasoning_effort='high'
 feature_technical_requirements | codex | gpt-5.4 | --config | model_reasoning_effort='high'
 repository_implementation_slices | codex | gpt-5.4 | --config | model_reasoning_effort='high'
+prerequisite_gap_trace | codex | gpt-5.4 | --config | model_reasoning_effort='high'
 repository_implementation_plan | codex | gpt-5.4 | --config | model_reasoning_effort='high'
 implementation_plan_semantic_review | codex | gpt-5.4 | --config | model_reasoning_effort='high'
 user_br_clarification | codex | gpt-5.4 | --config | model_reasoning_effort='medium'

@@ -22,36 +22,50 @@
 - responsibility_summary: Owns pages, screens, routes, and layout-level feature composition that determines where and how the user sees the feature in the product flow.
 - main_repo_paths: /workspace/repos/order-portal/src/features/checkout, /workspace/repos/order-mobile/src/ui/checkout
 - key_components: CheckoutSummary, CheckoutRiskScreen, checkout route-level screens
+- transport_layer: CheckoutSummary component, CheckoutRiskScreen component
+- user_reachable_surface: /checkout/summary, checkout://risk-screen
 
 ### 3.2 Component Layer
 - responsibility_summary: Owns reusable and feature-specific UI components that render concrete pieces of the experience such as badges, cards, and display variants.
 - main_repo_paths: /workspace/repos/order-portal/src/components, /workspace/repos/order-mobile/src/ui/components
 - key_components: RiskBadge, summary cards, feature-specific display components
+- transport_layer: RiskBadge component, summary cards, display variant helpers
+- user_reachable_surface: none
 
 ### 3.3 State / Data Layer
 - responsibility_summary: Owns client state storage and transformation, including hooks, stores, selectors, query cache, and view-model state used by the feature.
 - main_repo_paths: /workspace/repos/order-portal/src/features/checkout/state, /workspace/repos/order-mobile/src/viewmodels
 - key_components: useCheckoutRisk, CheckoutRiskViewModel, feature state holders
+- transport_layer: useCheckoutRisk hook, CheckoutRiskViewModel
+- user_reachable_surface: none
 
 ### 3.4 API Integration Layer
 - responsibility_summary: Owns API clients, adapters, and mappers that translate backend contracts into client-side models usable by screens and components.
 - main_repo_paths: /workspace/repos/order-portal/src/integration, /workspace/repos/order-mobile/src/network
 - key_components: checkoutRiskAdapter, CheckoutRiskMapper, response mappers
+- transport_layer: checkoutRiskAdapter, CheckoutRiskMapper, response mappers
+- user_reachable_surface: none
 
 ### 3.5 UX Behavior Layer
 - responsibility_summary: Owns behavior of the feature in motion, including loading states, degraded paths, empty states, error handling, and navigation flow behavior.
 - main_repo_paths: /workspace/repos/order-portal/src/features/checkout, /workspace/repos/order-mobile/src/navigation
 - key_components: checkoutRiskFlow, CheckoutFlowCoordinator, fallback behavior helpers
+- transport_layer: checkoutRiskFlow, CheckoutFlowCoordinator, fallback behavior helpers
+- user_reachable_surface: none
 
 ### 3.6 Platform / Runtime Layer
 - responsibility_summary: Owns cross-cutting client runtime concerns such as feature flags, analytics hooks, i18n, accessibility support, and app-level platform wiring.
 - main_repo_paths: /workspace/repos/order-portal/src/platform, /workspace/repos/order-mobile/src/platform
 - key_components: feature-flag hooks, analytics wiring, runtime configuration helpers
+- transport_layer: feature-flag hooks, analytics wiring, runtime configuration helpers
+- user_reachable_surface: none
 
 ### 3.7 Test Layer
 - responsibility_summary: Owns verification of client behavior across rendering, state, adapters, and runtime compatibility for web and mobile.
 - main_repo_paths: /workspace/repos/order-portal/src, /workspace/repos/order-mobile/src/test
 - key_components: CheckoutSummary.test.tsx, CheckoutRiskViewModelTest.kt, adapter and UI tests
+- transport_layer: CheckoutSummary.test.tsx, CheckoutRiskViewModelTest.kt, adapter and UI tests
+- user_reachable_surface: none
 
 ### 3.8 Another Layer(s)
 > add as much new layers as needed based on same pattern and follow number convention
@@ -65,6 +79,8 @@
 - why_feature_touches_it: Checkout screens must show additive risk score information.
 - expected_changes: Update top-level checkout presentation on web and mobile.
 - evidence: Current checkout UI shows only binary risk outcome.
+- transport_layer: CheckoutSummary.tsx, CheckoutRiskScreen.kt
+- user_reachable_surface: /checkout/summary, checkout://risk-screen
 
 ### 4.2 Component Surface
 - surface_summary: Shared or feature-specific UI components, props, display variants, and view pieces.
@@ -73,6 +89,8 @@
 - why_feature_touches_it: Existing risk display components need score-aware variants and content.
 - expected_changes: Update risk badge and related presentation components.
 - evidence: Current component set supports safe or unsafe display only.
+- transport_layer: RiskBadge.tsx, RiskBadge.kt, display variant helpers
+- user_reachable_surface: none
 
 ### 4.3 State / Data Surface
 - surface_summary: Client state, stores, hooks, selectors, query cache, view-model state.
@@ -81,6 +99,8 @@
 - why_feature_touches_it: Client state must hold additive score fields and fallback behavior.
 - expected_changes: Extend state model and view-model logic for score-aware data.
 - evidence: Existing state layer does not carry score or signal id information.
+- transport_layer: useCheckoutRisk.ts, CheckoutRiskViewModel.kt
+- user_reachable_surface: none
 
 ### 4.4 API Integration Surface
 - surface_summary: API clients, adapters, request builders, response mappers, client-side contract mapping.
@@ -89,6 +109,8 @@
 - why_feature_touches_it: New backend response fields must be mapped into client models.
 - expected_changes: Update adapters and response mappers for additive fields.
 - evidence: Current adapter layer ignores risk score and signal id fields.
+- transport_layer: checkoutRiskAdapter.ts, CheckoutRiskMapper.kt
+- user_reachable_surface: none
 
 ### 4.5 UX Behavior Surface
 - surface_summary: Navigation flow, loading states, empty states, error states, optimistic or degraded behavior.
@@ -97,6 +119,8 @@
 - why_feature_touches_it: The feature must remain stable when new fields are missing during staged rollout.
 - expected_changes: Add degraded-display and fallback handling for mixed payload versions.
 - evidence: Current flow assumes binary payloads and has no score-specific fallback path.
+- transport_layer: checkoutRiskFlow.ts, CheckoutFlowCoordinator.kt
+- user_reachable_surface: none
 
 ### 4.6 Platform / Runtime Surface
 - surface_summary: Feature flags, env config, analytics hooks, i18n, accessibility hooks, platform wiring.
@@ -105,6 +129,8 @@
 - why_feature_touches_it: No platform-level client wiring change was found for this feature slice.
 - expected_changes: No change.
 - evidence: Repository scan showed the feature can be implemented within existing client platform wiring.
+- transport_layer: none
+- user_reachable_surface: none
 
 ### 4.7 Test Surface
 - surface_summary: Component, integration, end-to-end, snapshot, and other verification assets for touched client areas.
@@ -113,6 +139,8 @@
 - why_feature_touches_it: Rendering, mapping, and fallback behavior all need verification.
 - expected_changes: Extend component, adapter, and state tests for additive risk score behavior.
 - evidence: Current test coverage verifies binary risk display only.
+- transport_layer: CheckoutSummary.test.tsx, CheckoutRiskViewModelTest.kt
+- user_reachable_surface: none
 
 ### 4.8 Unexpected Frontend / Mobile Surface
 - surface_summary: Any real client-side surface that does not fit the standard categories above.
@@ -121,3 +149,5 @@
 - why_feature_touches_it: No unexpected client-side surface was discovered for this feature.
 - expected_changes: No change.
 - evidence: Standard client surfaces were sufficient to explain the observed impact.
+- transport_layer: none
+- user_reachable_surface: none

@@ -8,17 +8,15 @@ PROJECT_ROOT=""
 PROJECT_DEFINITION_FILE=""
 REQUIREMENTS_EARS_FILE=""
 TECHNICAL_REQUIREMENTS_FILE=""
-FEATURE_CONTRACT_DELTA_FILE=""
 IMPLEMENTATION_SLICES_FILE=""
 PREREQUISITE_GAPS_FILE=""
-IMPLEMENTATION_PLAN_FILE=""
 
-IMPLEMENTATION_PLAN_TEMPLATE_FILE=".templates/implementation_plan_TEMPLATE.md"
-IMPLEMENTATION_PLAN_GOLDEN_EXAMPLE_FILE=".golden_examples/implementation_plan_GOLDEN_EXAMPLE.md"
+PREREQUISITE_GAPS_TEMPLATE_FILE=".templates/prerequisite_gaps_TEMPLATE.md"
+PREREQUISITE_GAPS_GOLDEN_EXAMPLE_FILE=".golden_examples/prerequisite_gaps_GOLDEN_EXAMPLE.md"
 MODELS_FILE=".setup/models.md"
-RULE_FILE=".rules/implementation_plan_rule.md"
-QUALITY_GATE_HELPER=".helper/check_implementation_plan_quality.sh"
-MODEL_PHASE="repository_implementation_plan"
+RULE_FILE=".rules/prerequisite_gaps_rule.md"
+QUALITY_GATE_HELPER=".helper/check_prerequisite_gaps_quality.sh"
+MODEL_PHASE="prerequisite_gap_trace"
 
 MODEL_CMD=""
 MODEL_MODEL=""
@@ -39,7 +37,7 @@ fail_project_type_undefined() {
 }
 
 fail_mcp_not_supported_for_project_a() {
-  echo "project type A is not supported yet: shared repository implementation planning with MCP extraction is unavailable" >&2
+  echo "project type A is not supported yet: prerequisite gap trace with MCP extraction is unavailable" >&2
   exit 1
 }
 
@@ -170,10 +168,8 @@ resolve_project_root() {
 set_artifact_paths() {
   REQUIREMENTS_EARS_FILE="$FEATURE_PATH/requirements_ears.md"
   TECHNICAL_REQUIREMENTS_FILE="$FEATURE_PATH/technical_requirements.md"
-  FEATURE_CONTRACT_DELTA_FILE="$FEATURE_PATH/feature_contract_delta.md"
   IMPLEMENTATION_SLICES_FILE="$FEATURE_PATH/implementation_slices.md"
   PREREQUISITE_GAPS_FILE="$FEATURE_PATH/prerequisite_gaps.md"
-  IMPLEMENTATION_PLAN_FILE="$FEATURE_PATH/implementation_plan.md"
 }
 
 extract_meta_scalar() {
@@ -202,7 +198,7 @@ BEGIN {
 }
 /^steps:[[:space:]]*$/ {
   if (in_meta == 1) {
-    exit 1
+    exit 0
   }
 }
 {
@@ -210,27 +206,24 @@ BEGIN {
     next
   }
 
-  line = $0
-  if (line !~ /^[[:space:]]{2}[A-Za-z0-9_.-]+:[[:space:]]*/) {
-    next
-  }
-
-  sub(/^[[:space:]]{2}/, "", line)
-  colon_index = index(line, ":")
-  if (colon_index <= 0) {
-    next
-  }
-
-  key = trim(substr(line, 1, colon_index - 1))
-  value = strip_quotes(trim(substr(line, colon_index + 1)))
-  if (key == target_key) {
-    print value
-    found = 1
-    exit 0
+  if ($0 ~ /^[[:space:]]+[a-z_]+:[[:space:]]*/) {
+    key = $0
+    sub(/^[[:space:]]+/, "", key)
+    sub(/:.*$/, "", key)
+    value = $0
+    sub(/^[[:space:]]+[^:]+:[[:space:]]*/, "", value)
+    value = strip_quotes(trim(value))
+    if (key == target_key) {
+      print value
+      found = 1
+      exit 0
+    }
   }
 }
 END {
-  exit(found ? 0 : 1)
+  if (!found) {
+    exit 1
+  }
 }
 ' "$definition_path"
 }
@@ -257,6 +250,7 @@ BEGIN {
 }
 /^meta_info:[[:space:]]*$/ {
   in_meta = 1
+  in_classes = 0
   next
 }
 /^steps:[[:space:]]*$/ {
@@ -392,7 +386,7 @@ collect_supported_repo_classes() {
   done
 
   if [[ ${#APPLICABLE_REPO_CLASSES[@]} -eq 0 ]]; then
-    die "No supported repo classes found for shared implementation planning in $PROJECT_DEFINITION_FILE."
+    die "No supported repo classes found for prerequisite gap trace in $PROJECT_DEFINITION_FILE."
   fi
 }
 
@@ -402,13 +396,11 @@ ensure_required_files() {
     "$PROJECT_DEFINITION_FILE"
     "$REQUIREMENTS_EARS_FILE"
     "$TECHNICAL_REQUIREMENTS_FILE"
-    "$FEATURE_CONTRACT_DELTA_FILE"
     "$IMPLEMENTATION_SLICES_FILE"
-    "$PREREQUISITE_GAPS_FILE"
     "$MODELS_FILE"
     "$RULE_FILE"
-    "$IMPLEMENTATION_PLAN_TEMPLATE_FILE"
-    "$IMPLEMENTATION_PLAN_GOLDEN_EXAMPLE_FILE"
+    "$PREREQUISITE_GAPS_TEMPLATE_FILE"
+    "$PREREQUISITE_GAPS_GOLDEN_EXAMPLE_FILE"
     "$QUALITY_GATE_HELPER"
   )
   local relative_path=""
@@ -425,9 +417,7 @@ prepare_readonly_inputs() {
     "$PROJECT_DEFINITION_FILE"
     "$REQUIREMENTS_EARS_FILE"
     "$TECHNICAL_REQUIREMENTS_FILE"
-    "$FEATURE_CONTRACT_DELTA_FILE"
     "$IMPLEMENTATION_SLICES_FILE"
-    "$PREREQUISITE_GAPS_FILE"
   )
 }
 
@@ -478,11 +468,11 @@ load_model_config() {
 }
 
 failure_line() {
-  printf '%s' "repository implementation plan gate cannot pass with current requirements/technical-requirements/contract/slice inputs. Please provide instructions what to do, or adjust inputs and rerun this phase"
+  printf '%s' "prerequisite gap trace gate cannot pass with current requirements/technical-requirements/slices inputs. Please provide instructions what to do, or adjust inputs and rerun this phase"
 }
 
 success_line() {
-  printf '%s' "Repository implementation plan phase is finished. Nothing else to do now; press Ctrl-C so orchestrator can start the next phase"
+  printf '%s' "Prerequisite gap trace phase is finished. Nothing else to do now; press Ctrl-C so orchestrator can start the next phase"
 }
 
 render_readonly_input_lines() {
@@ -508,7 +498,7 @@ render_repo_class_list() {
 build_prompt() {
   local runtime_root="$1"
   local project_type_code="$2"
-  local quality_command="$QUALITY_GATE_HELPER $IMPLEMENTATION_PLAN_FILE"
+  local quality_command="$QUALITY_GATE_HELPER $PREREQUISITE_GAPS_FILE $REQUIREMENTS_EARS_FILE $TECHNICAL_REQUIREMENTS_FILE"
   local failure_msg=""
   local success_msg=""
   local repo_class_list=""
@@ -520,24 +510,22 @@ build_prompt() {
   readonly_lines="$(render_readonly_input_lines)"
 
   cat <<EOF
-Run Step 8.3 repository implementation planning for this feature.
+Run Step 8.2 prerequisite gap trace for this feature.
 
 Hard constraints:
 - Read and follow $RULE_FILE fully before editing.
 - Treat $RULE_FILE as authoritative for this phase.
-- Keep this prompt concise: detailed planning and formatting rules are owned by $RULE_FILE.
-- Use $IMPLEMENTATION_PLAN_TEMPLATE_FILE as the structure contract for $IMPLEMENTATION_PLAN_FILE.
-- Use $IMPLEMENTATION_PLAN_GOLDEN_EXAMPLE_FILE as the style contract for $IMPLEMENTATION_PLAN_FILE.
+- Keep this prompt concise: detailed derivation and formatting rules are owned by $RULE_FILE.
+- Use $PREREQUISITE_GAPS_TEMPLATE_FILE as the structure contract for $PREREQUISITE_GAPS_FILE.
+- Use $PREREQUISITE_GAPS_GOLDEN_EXAMPLE_FILE as the style contract for $PREREQUISITE_GAPS_FILE.
 - Read these as input only and do not modify them:
 $readonly_lines
-- Update only: $IMPLEMENTATION_PLAN_FILE
-- Worker discovery remains UUID-only and is handled later. Do not add \`#### Assigned:\` lines by default.
-- Use $IMPLEMENTATION_SLICES_FILE as the authoritative execution-slice discovery input from Step 8.1.
-- Use $PREREQUISITE_GAPS_FILE as the prerequisite gate output from Step 8.2: for each scheduled_in_slices prerequisite, emit the evidence token slice/<slice_ref> on the plan step that covers it.
-- Then use $TECHNICAL_REQUIREMENTS_FILE as the authoritative current-state and gap artifact to validate completeness.
-- Then use $FEATURE_CONTRACT_DELTA_FILE to identify shared-contract, rollout, compatibility, or cross-track prerequisite work that must be planned before repo-specific implementation steps.
-- Use $REQUIREMENTS_EARS_FILE as the authoritative source of behavioral scope and valid \`REQ-*\` / \`NFR-*\` ids.
-- Draft the implementation plan in $IMPLEMENTATION_PLAN_FILE before running any quality gate command.
+- Update only: $PREREQUISITE_GAPS_FILE
+- Derive externally-invocable prerequisites per EARS requirement using the class taxonomy in $RULE_FILE.
+- Use $TECHNICAL_REQUIREMENTS_FILE user_reachable_surface subfields as the ground truth for present_in_repo status.
+- Use $IMPLEMENTATION_SLICES_FILE as the ground truth for scheduled_in_slices status.
+- Any unmet prerequisite must be resolved before this phase can pass the quality gate.
+- Draft $PREREQUISITE_GAPS_FILE before running any quality gate command.
 - Use this quality gate command before finalizing: $quality_command
 - If you need to understand the gate, read $QUALITY_GATE_HELPER as a file; only execute $quality_command against a concrete draft artifact.
 - Evaluate whether gate compliance is feasible with current inputs and constraints.
@@ -554,14 +542,12 @@ Context:
 - Active repo classes for this run: $repo_class_list
 - Project definition source: $PROJECT_DEFINITION_FILE
 - Requirements source: $REQUIREMENTS_EARS_FILE
-- Implementation slices source: $IMPLEMENTATION_SLICES_FILE
-- Prerequisite gaps source: $PREREQUISITE_GAPS_FILE
 - Technical requirements source: $TECHNICAL_REQUIREMENTS_FILE
-- Feature contract delta source: $FEATURE_CONTRACT_DELTA_FILE
-- Target artifact: $IMPLEMENTATION_PLAN_FILE
+- Implementation slices source: $IMPLEMENTATION_SLICES_FILE
+- Target artifact: $PREREQUISITE_GAPS_FILE
 - Rule file: $RULE_FILE
-- Template file: $IMPLEMENTATION_PLAN_TEMPLATE_FILE
-- Golden example file: $IMPLEMENTATION_PLAN_GOLDEN_EXAMPLE_FILE
+- Template file: $PREREQUISITE_GAPS_TEMPLATE_FILE
+- Golden example file: $PREREQUISITE_GAPS_GOLDEN_EXAMPLE_FILE
 - Quality gate helper: $QUALITY_GATE_HELPER
 - Quality gate command: $quality_command
 EOF
@@ -601,16 +587,16 @@ ensure_readonly_inputs_unchanged() {
 commit_output_if_changed() {
   local runtime_root="$1"
 
-  if ! git -C "$runtime_root" add -- "$IMPLEMENTATION_PLAN_FILE"; then
-    die "Failed to stage $IMPLEMENTATION_PLAN_FILE."
+  if ! git -C "$runtime_root" add -- "$PREREQUISITE_GAPS_FILE"; then
+    die "Failed to stage $PREREQUISITE_GAPS_FILE."
   fi
 
-  if git -C "$runtime_root" diff --cached --quiet -- "$IMPLEMENTATION_PLAN_FILE"; then
+  if git -C "$runtime_root" diff --cached --quiet -- "$PREREQUISITE_GAPS_FILE"; then
     return 0
   fi
 
-  if ! git -C "$runtime_root" commit -m "Generate shared repository implementation plan" -- "$IMPLEMENTATION_PLAN_FILE" >/dev/null 2>&1; then
-    die "Failed to commit $IMPLEMENTATION_PLAN_FILE."
+  if ! git -C "$runtime_root" commit -m "Generate prerequisite gap trace" -- "$PREREQUISITE_GAPS_FILE" >/dev/null 2>&1; then
+    die "Failed to commit $PREREQUISITE_GAPS_FILE."
   fi
 }
 
@@ -638,7 +624,7 @@ main() {
 
   definition_path="$runtime_root/$PROJECT_DEFINITION_FILE"
   models_path="$runtime_root/$MODELS_FILE"
-  output_path="$runtime_root/$IMPLEMENTATION_PLAN_FILE"
+  output_path="$runtime_root/$PREREQUISITE_GAPS_FILE"
 
   project_type_code="$(resolve_project_type_code "$definition_path")"
   resolve_project_classes "$definition_path"
@@ -675,13 +661,8 @@ main() {
     "${cmd[@]}"
   )
 
-  if [[ ! -f "$output_path" ]]; then
-    die "Model run did not produce required file: $IMPLEMENTATION_PLAN_FILE"
-  fi
-
   ensure_readonly_inputs_unchanged "$runtime_root"
   commit_output_if_changed "$runtime_root"
-  echo "Updated $IMPLEMENTATION_PLAN_FILE"
 }
 
 main "$@"

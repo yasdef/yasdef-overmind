@@ -518,11 +518,11 @@ EOF_DEF
   assert_contains "$out" "next step: none"
 }
 
-test_scanner_handles_optional_step_8_3_semantic_review_without_blocking_later_required_steps() {
-  local asdlc_root="$TMP_ROOT/asdlc-optional-step-8-3"
+test_scanner_detects_step_8_2_prerequisite_gaps() {
+  local asdlc_root="$TMP_ROOT/asdlc-step-8-2"
   setup_asdlc_with_scanner "$asdlc_root"
 
-  local project_dir="$asdlc_root/projects/project-optional-8-3"
+  local project_dir="$asdlc_root/projects/project-step-8-2"
   local feature_dir="$project_dir/feature-a"
   mkdir -p "$feature_dir"
 
@@ -536,11 +536,65 @@ steps:
         special_folder: "/product"
   - step_number: 8.2
     phase_name: "feature"
+    step_name: "Run Prerequisite Gap Trace"
+    finished_only_if_artefacts_present:
+      - file: "prerequisite_gaps.md"
+        special_folder: "/product"
+  - step_number: 8.3
+    phase_name: "feature"
     step_name: "Create Shared Repository Implementation Plan"
     finished_only_if_artefacts_present:
       - file: "implementation_plan.md"
         special_folder: "/product"
+EOF_DEF
+
+  echo "slices" >"$feature_dir/implementation_slices.md"
+
+  local out_after_8_1
+  out_after_8_1="$($asdlc_root/.commands/init_progress_scanner.sh --path "$feature_dir")"
+  assert_contains "$out_after_8_1" "- [x] 8.1 Create Implementation Slice Planning Artifact"
+  assert_contains "$out_after_8_1" "- [ ] 8.2 Run Prerequisite Gap Trace"
+  assert_contains "$out_after_8_1" "next step: 8.2 (Run Prerequisite Gap Trace)"
+
+  echo "gaps" >"$feature_dir/prerequisite_gaps.md"
+
+  local out_after_8_2
+  out_after_8_2="$($asdlc_root/.commands/init_progress_scanner.sh --path "$feature_dir")"
+  assert_contains "$out_after_8_2" "- [x] 8.1 Create Implementation Slice Planning Artifact"
+  assert_contains "$out_after_8_2" "- [x] 8.2 Run Prerequisite Gap Trace"
+  assert_contains "$out_after_8_2" "- [ ] 8.3 Create Shared Repository Implementation Plan"
+  assert_contains "$out_after_8_2" "next step: 8.3 (Create Shared Repository Implementation Plan)"
+}
+
+test_scanner_handles_optional_step_8_4_semantic_review_without_blocking_later_required_steps() {
+  local asdlc_root="$TMP_ROOT/asdlc-optional-step-8-4"
+  setup_asdlc_with_scanner "$asdlc_root"
+
+  local project_dir="$asdlc_root/projects/project-optional-8-4"
+  local feature_dir="$project_dir/feature-a"
+  mkdir -p "$feature_dir"
+
+  cat >"$project_dir/init_progress_definition.yaml" <<'EOF_DEF'
+steps:
+  - step_number: 8.1
+    phase_name: "feature"
+    step_name: "Create Implementation Slice Planning Artifact"
+    finished_only_if_artefacts_present:
+      - file: "implementation_slices.md"
+        special_folder: "/product"
+  - step_number: 8.2
+    phase_name: "feature"
+    step_name: "Run Prerequisite Gap Trace"
+    finished_only_if_artefacts_present:
+      - file: "prerequisite_gaps.md"
+        special_folder: "/product"
   - step_number: 8.3
+    phase_name: "feature"
+    step_name: "Create Shared Repository Implementation Plan"
+    finished_only_if_artefacts_present:
+      - file: "implementation_plan.md"
+        special_folder: "/product"
+  - step_number: 8.4
     phase_name: "feature"
     step_name: "(optional) implementation plan semantic review"
     optional: true
@@ -560,14 +614,16 @@ steps:
 EOF_DEF
 
   echo "slices" >"$feature_dir/implementation_slices.md"
+  echo "gaps" >"$feature_dir/prerequisite_gaps.md"
   echo "plan" >"$feature_dir/implementation_plan.md"
   echo "ready" >"$feature_dir/handoff_ready.md"
 
   local out_without_review
   out_without_review="$($asdlc_root/.commands/init_progress_scanner.sh --path "$feature_dir")"
   assert_contains "$out_without_review" "- [x] 8.1 Create Implementation Slice Planning Artifact"
-  assert_contains "$out_without_review" "- [x] 8.2 Create Shared Repository Implementation Plan"
-  assert_contains "$out_without_review" "- [ ] 8.3 (optional) implementation plan semantic review"
+  assert_contains "$out_without_review" "- [x] 8.2 Run Prerequisite Gap Trace"
+  assert_contains "$out_without_review" "- [x] 8.3 Create Shared Repository Implementation Plan"
+  assert_contains "$out_without_review" "- [ ] 8.4 (optional) implementation plan semantic review"
   assert_contains "$out_without_review" "- [x] 9 Ready for implementation handoff"
   assert_contains "$out_without_review" "next step: none"
 
@@ -581,8 +637,9 @@ EOF_REVIEW
   local out_with_review
   out_with_review="$($asdlc_root/.commands/init_progress_scanner.sh --path "$feature_dir")"
   assert_contains "$out_with_review" "- [x] 8.1 Create Implementation Slice Planning Artifact"
-  assert_contains "$out_with_review" "- [x] 8.2 Create Shared Repository Implementation Plan"
-  assert_contains "$out_with_review" "- [x] 8.3 (optional) implementation plan semantic review"
+  assert_contains "$out_with_review" "- [x] 8.2 Run Prerequisite Gap Trace"
+  assert_contains "$out_with_review" "- [x] 8.3 Create Shared Repository Implementation Plan"
+  assert_contains "$out_with_review" "- [x] 8.4 (optional) implementation plan semantic review"
   assert_contains "$out_with_review" "- [x] 9 Ready for implementation handoff"
   assert_contains "$out_with_review" "next step: none"
 }
@@ -599,6 +656,7 @@ test_scanner_applies_required_if_project_classes
 test_scanner_fails_on_malformed_required_if
 test_scanner_reports_split_required_steps_4_1_then_4_2
 test_scanner_does_not_block_on_incomplete_optional_step
-test_scanner_handles_optional_step_8_3_semantic_review_without_blocking_later_required_steps
+test_scanner_detects_step_8_2_prerequisite_gaps
+test_scanner_handles_optional_step_8_4_semantic_review_without_blocking_later_required_steps
 
 echo "All init progress scanner tests passed."
