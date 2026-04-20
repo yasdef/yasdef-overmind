@@ -134,13 +134,80 @@ append_csv_value() {
   fi
 }
 
+extract_required_missing_surfaces() {
+  local prerequisite_gaps_path="$1"
+
+  awk '
+function trim(v) {
+  sub(/^[[:space:]]+/, "", v)
+  sub(/[[:space:]]+$/, "", v)
+  return v
+}
+function is_unfilled(v) {
+  v = trim(v)
+  if (v == "" || v == "[UNFILLED]" || tolower(v) == "none") return 1
+  return 0
+}
+BEGIN {
+  in_prereq = 0
+  current_status = ""
+  current_surface_kind = ""
+  current_surface_identity = ""
+}
+function flush_prereq() {
+  if (!in_prereq) return
+  if ((current_status == "scheduled_in_slices" || current_status == "unmet") && current_surface_kind == "required_missing_user_reachable_surface" && !is_unfilled(current_surface_identity)) {
+    print current_surface_identity
+  }
+  current_status = ""
+  current_surface_kind = ""
+  current_surface_identity = ""
+  in_prereq = 0
+}
+/^#### Prerequisite:/ {
+  flush_prereq()
+  in_prereq = 1
+  next
+}
+/^### Requirement:/ {
+  flush_prereq()
+  next
+}
+/^[[:space:]]*-[[:space:]]*status:[[:space:]]*/ {
+  if (!in_prereq) next
+  line = $0
+  sub(/^[[:space:]]*-[[:space:]]*status:[[:space:]]*/, "", line)
+  current_status = trim(line)
+  next
+}
+/^[[:space:]]*-[[:space:]]*surface_kind:[[:space:]]*/ {
+  if (!in_prereq) next
+  line = $0
+  sub(/^[[:space:]]*-[[:space:]]*surface_kind:[[:space:]]*/, "", line)
+  current_surface_kind = trim(line)
+  next
+}
+/^[[:space:]]*-[[:space:]]*surface_identity:[[:space:]]*/ {
+  if (!in_prereq) next
+  line = $0
+  sub(/^[[:space:]]*-[[:space:]]*surface_identity:[[:space:]]*/, "", line)
+  current_surface_identity = trim(line)
+  next
+}
+END {
+  flush_prereq()
+}
+' "$prerequisite_gaps_path" | sort -u
+}
+
 validate_content() {
   local target_path="$1"
   local active_classes_csv="$2"
+  local required_surfaces_csv="${3:-}"
   local status=0
 
   set +e
-  awk -v active_classes_csv="$active_classes_csv" '
+  awk -v active_classes_csv="$active_classes_csv" -v required_surfaces_csv="$required_surfaces_csv" '
 function trim(v) {
   sub(/^[[:space:]]+/, "", v)
   sub(/[[:space:]]+$/, "", v)
@@ -159,6 +226,72 @@ function is_unfilled(v) {
 function fail_quality(message) {
   print "quality gate failed: " message
   has_errors = 1
+}
+function canonical_surface(v) {
+  v = tolower(trim(v))
+  gsub(/sign[[:space:]-]*in|log[[:space:]-]*in|authenticate|authentication/, "login", v)
+  gsub(/screen|view/, "page", v)
+  gsub(/path|url|entry[[:space:]]*point|entry/, "route", v)
+  gsub(/portal|console|dashboard/, "route", v)
+  gsub(/container/, "shell", v)
+  gsub(/search|find/, "lookup", v)
+  gsub(/cli[[:space:]]+tool|admin[[:space:]]+tool|tooling[[:space:]]+command|tool[[:space:]]+command/, "command", v)
+  gsub(/cli/, "command", v)
+  gsub(/scheduled[[:space:]]+task|cron[[:space:]]+job/, "job", v)
+  gsub(/rest[[:space:]]+endpoint|api[[:space:]]+endpoint|http[[:space:]]+endpoint/, "endpoint", v)
+  gsub(/\b(post|get|put|patch|delete)[[:space:]]+\/[^[:space:]]+/, "endpoint", v)
+  gsub(/[^a-z0-9]+/, " ", v)
+  gsub(/[[:space:]]+/, " ", v)
+  return trim(v)
+}
+function has_surface_terms(v) {
+  v = canonical_surface(v)
+  return (v ~ /(login|shell|route|lookup|page|workspace|form|command|job|endpoint|tool|link)/)
+}
+function looks_supporting_only(v) {
+  v = tolower(v)
+  has_support = (v ~ /(auth|token|api|contract|schema|state|coordination|middleware|service|repository|adapter|dto|mapper|payload)/)
+  has_surface = (v ~ /(login|sign[ -]?in|route|page|screen|shell|workspace|entry|lookup|search|dashboard|portal|console|form|command|cli|job|endpoint|tool|http|deep link|deeplink)/)
+  return (has_support && !has_surface)
+}
+function is_weak_content_token(token) {
+  return (token ~ /^(operator|admin|user|protected|authenticated|workflow|surface|account)$/)
+}
+function surface_matches(required, candidate, req_tokens, cand_tokens, token, i, req_count, cand_count, shared_specific, required_specific, shared_content, required_content) {
+  required = canonical_surface(required)
+  candidate = canonical_surface(candidate)
+  if (required == "" || candidate == "") return 0
+  if (required == candidate || index(candidate, required) > 0 || index(required, candidate) > 0) return 1
+
+  req_count = split(required, req_tokens, /[[:space:]]+/)
+  cand_count = split(candidate, cand_tokens, /[[:space:]]+/)
+  shared_specific = 0
+  required_specific = 0
+
+  delete cand_index
+  for (i = 1; i <= cand_count; i++) {
+    token = trim(cand_tokens[i])
+    if (token != "") cand_index[token] = 1
+  }
+  for (i = 1; i <= req_count; i++) {
+    token = trim(req_tokens[i])
+    if (token == "") continue
+    if (token ~ /^(login|shell|route|lookup|command|job|endpoint|tool)$/) {
+      required_specific++
+      if (token in cand_index) shared_specific++
+      continue
+    }
+    if (token ~ /^(page|form|link)$/ || is_weak_content_token(token)) continue
+    required_content++
+    if (token in cand_index) shared_content++
+  }
+  if (required_specific > 0) {
+    if (required_content > 0) return (shared_specific > 0 && shared_content > 0)
+    return (shared_specific > 0)
+  }
+
+  if (shared_content >= 2) return 1
+  return 0
 }
 function register_csv(csv, target, parts, i, token, count) {
   count = split(csv, parts, /,/)
@@ -197,9 +330,10 @@ function finalize_slice(evidence_line, tokens, token, i, token_count) {
   required_slice_fields[3] = "objective"
   required_slice_fields[4] = "first_increment"
   required_slice_fields[5] = "prerequisites"
-  required_slice_fields[6] = "evidence"
+  required_slice_fields[6] = "preserved_operator_surface"
+  required_slice_fields[7] = "evidence"
 
-  for (i = 1; i <= 6; i++) {
+  for (i = 1; i <= 7; i++) {
     key = required_slice_fields[i]
     composite = current_slice "|" key
     if (!(composite in slice_fields) || is_unfilled(slice_fields[composite])) {
@@ -245,6 +379,21 @@ function finalize_slice(evidence_line, tokens, token, i, token_count) {
   if (slice_bullet_count[current_slice] < 2) {
     fail_quality("slice " current_slice " must include at least 2 concrete checklist bullets")
   }
+
+  preserved_surface = trim(slice_fields[current_slice "|preserved_operator_surface"])
+  if (tolower(preserved_surface) != "none") {
+    if (!has_surface_terms(preserved_surface)) {
+      fail_quality("slice " current_slice " preserved_operator_surface is not operator-facing: " preserved_surface)
+    }
+
+    coverage_text = tolower(slice_heading[current_slice] " " slice_fields[current_slice "|objective"] " " slice_fields[current_slice "|first_increment"] " " slice_text[current_slice])
+    if (looks_supporting_only(coverage_text)) {
+      fail_quality("slice " current_slice " marks preserved_operator_surface but describes supporting-only scaffolding work")
+    }
+
+    covered_surface_count++
+    covered_surfaces[covered_surface_count] = preserved_surface
+  }
 }
 BEGIN {
   has_errors = 0
@@ -257,8 +406,13 @@ BEGIN {
   saw_section_3 = 0
   saw_section_4 = 0
   planned_count = 0
+  required_surface_count = 0
+  covered_surface_count = 0
 
   register_csv(active_classes_csv, active_classes)
+  if (trim(required_surfaces_csv) != "") {
+    required_surface_count = split(required_surfaces_csv, required_surface_values, /,/)
+  }
 }
 {
   if (toupper($0) ~ /\[UNFILLED\]/) {
@@ -295,6 +449,7 @@ BEGIN {
     slice_total++
     current_slice = slice_total
     slice_heading[current_slice] = normalize($0)
+    slice_text[current_slice] = tolower(normalize($0))
     slice_bullet_count[current_slice] = 0
   }
   next
@@ -305,6 +460,9 @@ BEGIN {
     bullet_text = $0
     sub(/^- \[[ xX]\][[:space:]]+/, "", bullet_text)
     bullet_text = trim(bullet_text)
+    if (bullet_text != "") {
+      slice_text[current_slice] = slice_text[current_slice] " " tolower(bullet_text)
+    }
     if (bullet_text == "Plan and discuss the slice" || bullet_text == "Review slice readiness") {
       fail_quality("slice " current_slice " contains forbidden lifecycle boilerplate bullet: " bullet_text)
     }
@@ -365,6 +523,23 @@ END {
     fail_quality("slice candidates must contain at least one planned slice")
   }
 
+  if (required_surface_count > 0) {
+    for (i = 1; i <= required_surface_count; i++) {
+      required_surface = trim(required_surface_values[i])
+      if (required_surface == "") continue
+      matched = 0
+      for (j = 1; j <= covered_surface_count; j++) {
+        if (surface_matches(required_surface, covered_surfaces[j])) {
+          matched = 1
+          break
+        }
+      }
+      if (!matched) {
+        fail_quality("required missing operator-facing surface is not preserved by any slice: " required_surface)
+      }
+    }
+  }
+
   required_handoff[1] = "ordering_intent"
   required_handoff[2] = "unresolved_ordering_questions"
   required_handoff[3] = "unresolved_traceability_questions"
@@ -416,7 +591,10 @@ main() {
   local technical_requirements_path=""
   local feature_contract_delta_path=""
   local definition_path=""
+  local prerequisite_gaps_path=""
   local parsed_classes=""
+  local required_surfaces_csv=""
+  local parsed_required_surfaces=""
   local class_name=""
   local normalized_class=""
   local active_classes_csv=""
@@ -437,6 +615,7 @@ main() {
   requirements_path="$target_dir/requirements_ears.md"
   technical_requirements_path="$target_dir/technical_requirements.md"
   feature_contract_delta_path="$target_dir/feature_contract_delta.md"
+  prerequisite_gaps_path="$target_dir/prerequisite_gaps.md"
   definition_path="$project_dir/init_progress_definition.yaml"
 
   if [[ ! -f "$requirements_path" ]]; then
@@ -471,7 +650,18 @@ main() {
     helper_fail "No supported repo classes found in ${definition_path#$workspace_root/}"
   fi
 
-  if ! validate_content "$target_path" "$active_classes_csv"; then
+  if [[ -f "$prerequisite_gaps_path" ]]; then
+    if ! parsed_required_surfaces="$(extract_required_missing_surfaces "$prerequisite_gaps_path" 2>/dev/null)"; then
+      helper_fail "Failed to read required missing operator-facing surfaces from ${prerequisite_gaps_path#$workspace_root/}"
+    fi
+    while IFS= read -r class_name; do
+      class_name="$(trim_value "$class_name")"
+      [[ -n "$class_name" ]] || continue
+      append_csv_value required_surfaces_csv "$class_name"
+    done <<<"$parsed_required_surfaces"
+  fi
+
+  if ! validate_content "$target_path" "$active_classes_csv" "$required_surfaces_csv"; then
     exit "$EXIT_CONTENT_FAILURE"
   fi
 }

@@ -225,20 +225,22 @@ cat >"$target_file" <<'DOC'
 - objective: Complete backend query read-path behavior.
 - first_increment: Query endpoint returns stable projection fields.
 - prerequisites: none
+- preserved_operator_surface: none
 - evidence: gap/TECH_REQ-6, comp/backend-order-query-controller
 - [ ] Complete read service + controller mapping for query path
 - [ ] Add DTO mapping and error-response alignment for query path
 - [ ] Add query integration tests for stable projection responses
 
-### Slice 2: Frontend projection client alignment [REQ-4] [REQ-6]
+### Slice 2: Frontend operator entry surface alignment [REQ-4] [REQ-6]
 - repo: frontend
 - status: planned
-- objective: Align frontend projection mapping with backend payload.
-- first_increment: Frontend renders projection-backed status.
+- objective: Deliver admin sign-in screen and align projection mapping for operator flow entry.
+- first_increment: Frontend sign-in screen renders and then shows projection-backed status after entry.
 - prerequisites: Slice 1 backend payload stability
+- preserved_operator_surface: Admin sign-in screen
 - evidence: gap/TECH_REQ-4, comp/frontend-order-projection-client
-- [ ] Update frontend adapter mapping for projection fields
-- [ ] Update frontend state/rendering for projection-backed status
+- [ ] Deliver admin sign-in screen route and entry form surface
+- [ ] Update frontend adapter/state mapping for projection-backed status after sign-in
 - [ ] Add client tests for projection-backed state handling
 
 ## 4. Handoff To Ordered Plan
@@ -363,6 +365,10 @@ test_generates_slices_and_builds_expected_prompt() {
 
   assert_contains "$out" "Updated projects/p1/feature-a/implementation_slices.md"
   assert_file_exists "$repo_dir/asdlc/projects/p1/feature-a/implementation_slices.md"
+  local generated_slices=""
+  generated_slices="$(cat "$repo_dir/asdlc/projects/p1/feature-a/implementation_slices.md")"
+  assert_contains "$generated_slices" "- preserved_operator_surface: none"
+  assert_contains "$generated_slices" "- preserved_operator_surface: Admin sign-in screen"
   assert_equal "$requirements_before" "$(cat "$repo_dir/asdlc/projects/p1/feature-a/requirements_ears.md")"
   assert_equal "$technical_before" "$(cat "$repo_dir/asdlc/projects/p1/feature-a/technical_requirements.md")"
   assert_equal "$delta_before" "$(cat "$repo_dir/asdlc/projects/p1/feature-a/feature_contract_delta.md")"

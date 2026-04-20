@@ -34,6 +34,7 @@ This phase prioritizes thin vertical cuts, first usable increments, and minimal 
 - objective: [UNFILLED]
 - first_increment: [UNFILLED]
 - prerequisites: [none|UNFILLED]
+- preserved_operator_surface: [none|UNFILLED]
 - evidence: [gap/TECH_REQ-1 | gap/TECH_REQ-NFR-1, comp/component-slug]
 - [ ] [UNFILLED concrete implementation slice]
 - [ ] [UNFILLED concrete implementation slice]
