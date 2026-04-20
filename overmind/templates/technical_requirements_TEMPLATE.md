@@ -51,9 +51,17 @@
 - evidence: [UNFILLED]
 
 ## 6. Cross-Repo Constraints and Planning Signals
-> Use one or more numbered constraint/prep entries (`constraint_1`, `prep_1`, ...).
-- constraint_1: [UNFILLED]
-- prep_1: [UNFILLED]
+> Use zero or more typed `### Planning Signal:` blocks.
+> If no signal is needed, use the exact line: `- planning_signals: none`.
+### Planning Signal: [UNFILLED]
+- signal_id: [UNFILLED]
+- signal_type: [cross_repo_contract_lock]
+- owner_repo: [backend | frontend | mobile]
+- consumer_repos: [backend | frontend | mobile]
+- required_artifact: [UNFILLED]
+- must_precede: [UNFILLED]
+- output_requirements: [UNFILLED]
+- source_evidence: [REQ-1 | NFR-1 | comp/component-slug]
 
 ## 7. Known Risks / Uncertainties
 > Use one or more numbered risk entries (`risk_1`, `risk_2`, ...).

@@ -187,12 +187,24 @@ write_valid_technical_requirements() {
 - evidence: Frontend surface map identifies api integration as applicable and repo evidence confirms the partial client path.
 
 ## 6. Cross-Repo Constraints and Planning Signals
-- constraint_1: Backend remains the source of truth for create-order request and error semantics.
-- prep_1: Finalize backend validation/error handling before locking frontend request/response assertions.
+### Planning Signal: signal_1
+- signal_id: signal_1
+- signal_type: cross_repo_contract_lock
+- owner_repo: backend
+- consumer_repos: frontend
+- required_artifact: feature_contract_delta.md
+- must_precede: implementation_slices.md, implementation_plan.md
+- output_requirements: Lock backend request/error fields before frontend finalizes client mapping.
+- source_evidence: REQ-1, comp/ordercontroller, comp/src-api-orders-ts
 
 ## 7. Known Risks / Uncertainties
 - risk_1: Backend/frontend drift may reappear if client aliases are preserved instead of adopting backend field names.
 OUT
+}
+
+replace_section6_with_empty_marker() {
+  local target_file="$1"
+  perl -0pi -e 's@\n## 6\. Cross-Repo Constraints and Planning Signals.*?\n## 7\. Known Risks / Uncertainties@\n## 6. Cross-Repo Constraints and Planning Signals\n- planning_signals: none\n\n## 7. Known Risks / Uncertainties@s' "$target_file"
 }
 
 run_helper() {
@@ -368,6 +380,106 @@ test_passes_when_user_reachable_surface_is_none() {
   assert_contains "$out" "quality gate passed"
 }
 
+test_passes_with_empty_marker_for_multi_repo_feature() {
+  local repo_dir="$TMP_ROOT/repo-empty-marker"
+  setup_valid_fixture "$repo_dir"
+  replace_section6_with_empty_marker "$repo_dir/projects/p1/feature-a/technical_requirements.md"
+
+  local result=""
+  result="$(run_helper "$repo_dir" "projects/p1/feature-a/technical_requirements.md")"
+  local status=""
+  status="$(printf '%s\n' "$result" | head -n1)"
+  local out=""
+  out="$(printf '%s\n' "$result" | tail -n +2)"
+
+  assert_equal "0" "$status"
+  assert_contains "$out" "quality gate passed"
+}
+
+test_fails_with_unsupported_signal_type() {
+  local repo_dir="$TMP_ROOT/repo-unsupported-signal-type"
+  setup_valid_fixture "$repo_dir"
+  sed -i.bak 's/signal_type: cross_repo_contract_lock/signal_type: cross_repo_dependency_hint/' \
+    "$repo_dir/projects/p1/feature-a/technical_requirements.md"
+
+  local result=""
+  result="$(run_helper "$repo_dir" "projects/p1/feature-a/technical_requirements.md")"
+  local status=""
+  status="$(printf '%s\n' "$result" | head -n1)"
+  local out=""
+  out="$(printf '%s\n' "$result" | tail -n +2)"
+
+  assert_equal "1" "$status"
+  assert_contains "$out" "unsupported signal_type"
+}
+
+test_fails_with_duplicate_signal_id() {
+  local repo_dir="$TMP_ROOT/repo-duplicate-signal-id"
+  setup_valid_fixture "$repo_dir"
+  perl -0pi -e 's@\n## 7\. Known Risks / Uncertainties@\n### Planning Signal: signal_2\n- signal_id: signal_1\n- signal_type: cross_repo_contract_lock\n- owner_repo: backend\n- consumer_repos: frontend\n- required_artifact: feature_contract_delta.md\n- must_precede: implementation_plan.md\n- output_requirements: Keep backend request/error fields canonical.\n- source_evidence: REQ-1, comp/ordercontroller\n\n## 7. Known Risks / Uncertainties@s' "$repo_dir/projects/p1/feature-a/technical_requirements.md"
+
+  local result=""
+  result="$(run_helper "$repo_dir" "projects/p1/feature-a/technical_requirements.md")"
+  local status=""
+  status="$(printf '%s\n' "$result" | head -n1)"
+  local out=""
+  out="$(printf '%s\n' "$result" | tail -n +2)"
+
+  assert_equal "1" "$status"
+  assert_contains "$out" "duplicate planning signal id"
+}
+
+test_fails_with_unresolved_source_evidence() {
+  local repo_dir="$TMP_ROOT/repo-unresolved-signal-evidence"
+  setup_valid_fixture "$repo_dir"
+  sed -i.bak 's/source_evidence: REQ-1, comp\/ordercontroller, comp\/src-api-orders-ts/source_evidence: REQ-1, comp\/missing-component/' \
+    "$repo_dir/projects/p1/feature-a/technical_requirements.md"
+
+  local result=""
+  result="$(run_helper "$repo_dir" "projects/p1/feature-a/technical_requirements.md")"
+  local status=""
+  status="$(printf '%s\n' "$result" | head -n1)"
+  local out=""
+  out="$(printf '%s\n' "$result" | tail -n +2)"
+
+  assert_equal "1" "$status"
+  assert_contains "$out" "unknown source_evidence token"
+}
+
+test_fails_with_invalid_repo_ownership() {
+  local repo_dir="$TMP_ROOT/repo-invalid-signal-repo"
+  setup_valid_fixture "$repo_dir"
+  sed -i.bak 's/owner_repo: backend/owner_repo: ops/' \
+    "$repo_dir/projects/p1/feature-a/technical_requirements.md"
+
+  local result=""
+  result="$(run_helper "$repo_dir" "projects/p1/feature-a/technical_requirements.md")"
+  local status=""
+  status="$(printf '%s\n' "$result" | head -n1)"
+  local out=""
+  out="$(printf '%s\n' "$result" | tail -n +2)"
+
+  assert_equal "1" "$status"
+  assert_contains "$out" "owner_repo"
+  assert_contains "$out" "outside active project classes"
+}
+
+test_fails_with_legacy_section6_entries() {
+  local repo_dir="$TMP_ROOT/repo-legacy-section6"
+  setup_valid_fixture "$repo_dir"
+  perl -0pi -e 's@\n## 6\. Cross-Repo Constraints and Planning Signals.*?\n## 7\. Known Risks / Uncertainties@\n## 6. Cross-Repo Constraints and Planning Signals\n- constraint_1: Backend remains canonical.\n- prep_1: Finalize backend first.\n\n## 7. Known Risks / Uncertainties@s' "$repo_dir/projects/p1/feature-a/technical_requirements.md"
+
+  local result=""
+  result="$(run_helper "$repo_dir" "projects/p1/feature-a/technical_requirements.md")"
+  local status=""
+  status="$(printf '%s\n' "$result" | head -n1)"
+  local out=""
+  out="$(printf '%s\n' "$result" | tail -n +2)"
+
+  assert_equal "1" "$status"
+  assert_contains "$out" "retired loose-entry format"
+}
+
 test_passes_with_valid_feature_technical_requirements
 test_fails_when_target_missing
 test_fails_when_target_is_empty
@@ -377,3 +489,9 @@ test_fails_when_requirement_missing_transport_layer
 test_fails_when_requirement_missing_user_reachable_surface
 test_fails_when_requirement_uses_conflated_current_state
 test_passes_when_user_reachable_surface_is_none
+test_passes_with_empty_marker_for_multi_repo_feature
+test_fails_with_unsupported_signal_type
+test_fails_with_duplicate_signal_id
+test_fails_with_unresolved_source_evidence
+test_fails_with_invalid_repo_ownership
+test_fails_with_legacy_section6_entries
