@@ -83,6 +83,7 @@ STAGED_HELPER_FILES=(
   "check_feature_technical_requirements_quality.sh"
   "check_implementation_slices_quality.sh"
   "check_implementation_plan_quality.sh"
+  "check_implementation_plan_semantic_review_quality.sh"
   "check_prerequisite_gaps_quality.sh"
   "check_feature_repo_surface_and_exec_context_be_quality.sh"
   "check_feature_repo_surface_and_exec_context_fe_quality.sh"
@@ -294,6 +295,7 @@ assert_feature_requirements_and_plan_commands_use_staged_runtime_assets() {
   assert_contains "$(cat "$implementation_plan_semantic_review_cmd_path")" 'RULE_FILE=".rules/implementation_plan_semantic_review_rule.md"'
   assert_contains "$(cat "$implementation_plan_semantic_review_cmd_path")" 'REVIEW_TEMPLATE_FILE=".templates/implementation_plan_semantic_review_TEMPLATE.md"'
   assert_contains "$(cat "$implementation_plan_semantic_review_cmd_path")" 'REVIEW_GOLDEN_EXAMPLE_FILE=".golden_examples/implementation_plan_semantic_review_GOLDEN_EXAMPLE.md"'
+  assert_contains "$(cat "$implementation_plan_semantic_review_cmd_path")" 'QUALITY_GATE_HELPER=".helper/check_implementation_plan_semantic_review_quality.sh"'
 
   assert_contains "$(cat "$assign_workers_cmd_path")" 'Missing required argument: --feature_path <asdlc/projects/<project-id>/<feature-folder>>.'
   assert_contains "$(cat "$assign_workers_cmd_path")" 'ERROR: no active worker available for class'

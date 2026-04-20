@@ -4,6 +4,8 @@ set -euo pipefail
 SCRIPT_BASENAME="$(basename "${BASH_SOURCE[0]}")"
 FEATURE_PATH_INPUT=""
 FEATURE_PATH=""
+PROJECT_ROOT=""
+PROJECT_DEFINITION_FILE=""
 IMPLEMENTATION_PLAN_FILE=""
 REQUIREMENTS_EARS_FILE=""
 TECHNICAL_REQUIREMENTS_FILE=""
@@ -14,6 +16,7 @@ REVIEW_TEMPLATE_FILE=".templates/implementation_plan_semantic_review_TEMPLATE.md
 REVIEW_GOLDEN_EXAMPLE_FILE=".golden_examples/implementation_plan_semantic_review_GOLDEN_EXAMPLE.md"
 MODELS_FILE=".setup/models.md"
 RULE_FILE=".rules/implementation_plan_semantic_review_rule.md"
+QUALITY_GATE_HELPER=".helper/check_implementation_plan_semantic_review_quality.sh"
 MODEL_PHASE="implementation_plan_semantic_review"
 
 MODEL_CMD=""
@@ -21,6 +24,9 @@ MODEL_MODEL=""
 MODEL_ARGS=()
 READONLY_INPUT_FILES=()
 READONLY_SNAPSHOTS=()
+APPLICABLE_SURFACE_MAP_FILES=()
+PROJECT_CLASSES=()
+ACTIVE_REPO_CLASSES=()
 
 die() {
   echo "ERROR: $*" >&2
@@ -119,6 +125,151 @@ resolve_feature_path() {
   FEATURE_PATH="${resolved_path#"$runtime_root/"}"
 }
 
+trim_value() {
+  printf '%s' "$1" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'
+}
+
+array_contains() {
+  local needle="$1"
+  shift || true
+  local value=""
+
+  for value in "$@"; do
+    if [[ "$value" == "$needle" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+resolve_project_root() {
+  local relative_after_projects=""
+  local project_id=""
+
+  if [[ "$FEATURE_PATH" != projects/* ]]; then
+    die "Feature path must resolve under projects/<project-id>/<feature-folder>: $FEATURE_PATH"
+  fi
+
+  relative_after_projects="${FEATURE_PATH#projects/}"
+  project_id="${relative_after_projects%%/*}"
+
+  if [[ -z "$project_id" || "$project_id" == "$relative_after_projects" ]]; then
+    die "Feature path must resolve to projects/<project-id>/<feature-folder>: $FEATURE_PATH"
+  fi
+
+  PROJECT_ROOT="projects/$project_id"
+  PROJECT_DEFINITION_FILE="$PROJECT_ROOT/init_progress_definition.yaml"
+}
+
+extract_meta_project_classes() {
+  local definition_path="$1"
+
+  awk '
+function trim(v) {
+  sub(/^[[:space:]]+/, "", v)
+  sub(/[[:space:]]+$/, "", v)
+  return v
+}
+function strip_quotes(v) {
+  v = trim(v)
+  if ((v ~ /^".*"$/) || (v ~ /^'\''.*'\''$/)) {
+    v = substr(v, 2, length(v) - 2)
+  }
+  return trim(v)
+}
+BEGIN {
+  in_meta = 0
+  in_classes = 0
+}
+/^meta_info:[[:space:]]*$/ {
+  in_meta = 1
+  next
+}
+/^steps:[[:space:]]*$/ {
+  if (in_meta == 1) {
+    exit 0
+  }
+}
+{
+  if (in_meta == 0) {
+    next
+  }
+
+  if ($0 ~ /^[[:space:]]{2}project_classes:[[:space:]]*\[[^]]*\][[:space:]]*$/) {
+    line = $0
+    sub(/^[[:space:]]{2}project_classes:[[:space:]]*\[/, "", line)
+    sub(/\][[:space:]]*$/, "", line)
+    line = trim(line)
+    if (line == "") {
+      exit 0
+    }
+    count = split(line, parts, ",")
+    for (i = 1; i <= count; i++) {
+      value = strip_quotes(parts[i])
+      if (value != "") {
+        print value
+      }
+    }
+    exit 0
+  }
+
+  if ($0 ~ /^[[:space:]]{2}project_classes:[[:space:]]*$/) {
+    in_classes = 1
+    next
+  }
+
+  if (in_classes == 1) {
+    if ($0 ~ /^[[:space:]]{4}-[[:space:]]*/) {
+      line = $0
+      sub(/^[[:space:]]{4}-[[:space:]]*/, "", line)
+      line = strip_quotes(line)
+      if (line != "") {
+        print line
+      }
+      next
+    }
+    in_classes = 0
+  }
+}
+' "$definition_path"
+}
+
+resolve_project_classes() {
+  local definition_path="$1"
+  local parsed_classes=""
+  local class_name=""
+  local normalized_class=""
+
+  PROJECT_CLASSES=()
+  ACTIVE_REPO_CLASSES=()
+
+  if ! parsed_classes="$(extract_meta_project_classes "$definition_path" 2>/dev/null)"; then
+    die "Unable to parse project_classes from $PROJECT_DEFINITION_FILE"
+  fi
+
+  while IFS= read -r class_name; do
+    class_name="$(trim_value "$class_name")"
+    [[ -n "$class_name" ]] || continue
+    normalized_class="$(printf '%s' "$class_name" | tr '[:upper:]' '[:lower:]')"
+
+    case "$normalized_class" in
+      backend | frontend | mobile | infrastructure)
+        if ! array_contains "$normalized_class" "${PROJECT_CLASSES[@]-}"; then
+          PROJECT_CLASSES+=("$normalized_class")
+        fi
+        if [[ "$normalized_class" == "backend" || "$normalized_class" == "frontend" || "$normalized_class" == "mobile" ]]; then
+          if ! array_contains "$normalized_class" "${ACTIVE_REPO_CLASSES[@]-}"; then
+            ACTIVE_REPO_CLASSES+=("$normalized_class")
+          fi
+        fi
+        ;;
+      *)
+        die "Unsupported project class in $PROJECT_DEFINITION_FILE: $normalized_class"
+        ;;
+    esac
+  done <<<"$parsed_classes"
+}
+
 set_artifact_paths() {
   IMPLEMENTATION_PLAN_FILE="$FEATURE_PATH/implementation_plan.md"
   REQUIREMENTS_EARS_FILE="$FEATURE_PATH/requirements_ears.md"
@@ -127,12 +278,50 @@ set_artifact_paths() {
   IMPLEMENTATION_PLAN_SEMANTIC_REVIEW_FILE="$FEATURE_PATH/implementation_plan_semantic_review.md"
 }
 
+collect_applicable_surface_maps() {
+  local runtime_root="$1"
+  local required_map_path=""
+  local class_name=""
+  local missing_classes=()
+
+  APPLICABLE_SURFACE_MAP_FILES=()
+  for class_name in "${ACTIVE_REPO_CLASSES[@]-}"; do
+    case "$class_name" in
+      backend)
+        required_map_path="$FEATURE_PATH/project_surface_struct_resp_map_backend.md"
+        ;;
+      frontend)
+        required_map_path="$FEATURE_PATH/project_surface_struct_resp_map_frontend.md"
+        ;;
+      mobile)
+        required_map_path="$FEATURE_PATH/project_surface_struct_resp_map_mobile.md"
+        ;;
+      *)
+        continue
+        ;;
+    esac
+
+    if [[ -f "$runtime_root/$required_map_path" ]]; then
+      APPLICABLE_SURFACE_MAP_FILES+=("$required_map_path")
+    else
+      missing_classes+=("$class_name")
+    fi
+  done
+
+  if [[ ${#missing_classes[@]} -gt 0 ]]; then
+    die "Required surface-map artifacts not found for active repo classes: ${missing_classes[*]}"
+  fi
+}
+
 prepare_readonly_inputs() {
   READONLY_INPUT_FILES=(
     "$REQUIREMENTS_EARS_FILE"
     "$TECHNICAL_REQUIREMENTS_FILE"
     "$PREREQUISITE_GAPS_FILE"
   )
+  if [[ ${#APPLICABLE_SURFACE_MAP_FILES[@]} -gt 0 ]]; then
+    READONLY_INPUT_FILES+=("${APPLICABLE_SURFACE_MAP_FILES[@]}")
+  fi
 }
 
 ensure_required_files() {
@@ -146,6 +335,8 @@ ensure_required_files() {
     "$REVIEW_GOLDEN_EXAMPLE_FILE"
     "$MODELS_FILE"
     "$RULE_FILE"
+    "$QUALITY_GATE_HELPER"
+    "$PROJECT_DEFINITION_FILE"
   )
   local relative_path=""
 
@@ -217,15 +408,45 @@ render_readonly_input_lines() {
   done
 }
 
+render_applicable_surface_map_lines() {
+  local surface_map_path=""
+  local class_name=""
+
+  for surface_map_path in "${APPLICABLE_SURFACE_MAP_FILES[@]}"; do
+    printf '  - %s\n' "$surface_map_path"
+  done
+
+  if [[ ${#APPLICABLE_SURFACE_MAP_FILES[@]} -eq 0 ]]; then
+    printf '%s\n' "  - none"
+  fi
+}
+
+render_active_repo_class_lines() {
+  local class_name=""
+
+  for class_name in "${ACTIVE_REPO_CLASSES[@]-}"; do
+    printf '  - %s\n' "$class_name"
+  done
+
+  if [[ ${#ACTIVE_REPO_CLASSES[@]} -eq 0 ]]; then
+    printf '%s\n' "  - none"
+  fi
+}
+
 build_prompt() {
   local runtime_root="$1"
   local failure_msg=""
   local success_msg=""
   local readonly_lines=""
+  local surface_map_lines=""
+  local active_repo_class_lines=""
+  local quality_gate_command="$QUALITY_GATE_HELPER $IMPLEMENTATION_PLAN_SEMANTIC_REVIEW_FILE"
 
   failure_msg="$(failure_line)"
   success_msg="$(success_line)"
   readonly_lines="$(render_readonly_input_lines)"
+  surface_map_lines="$(render_applicable_surface_map_lines)"
+  active_repo_class_lines="$(render_active_repo_class_lines)"
 
   cat <<EOF_PROMPT
 Run optional Step 8.4 implementation-plan semantic review phase for this feature.
@@ -244,7 +465,9 @@ $readonly_lines
 - After user answer, update $IMPLEMENTATION_PLAN_FILE for selected findings and update each finding state to one of: added, applied, rejected, postponed.
 - Keep \'added\' only if user answer is incomplete and the finding still needs explicit decision.
 - Set review_status complete only when all findings are terminal (applied/rejected/postponed) or no_findings true.
+- Do not allow terminal delivered_surface_consumption_unclear findings with empty resolution_notes.
 - Keep plan edits minimal and directly linked to selected findings.
+- Before finishing, run this quality gate command: $quality_gate_command
 - If completion is not feasible with current inputs or user direction, end with this exact line:
   "$failure_msg"
 - If complete, end with this exact last line:
@@ -258,9 +481,15 @@ Context:
 - Read-only requirements source: $REQUIREMENTS_EARS_FILE
 - Read-only technical requirements source: $TECHNICAL_REQUIREMENTS_FILE
 - Read-only prerequisite gaps source: $PREREQUISITE_GAPS_FILE
+- Active repo classes:
+$active_repo_class_lines
+- Read-only applicable surface-map artifacts:
+$surface_map_lines
 - Rule file: $RULE_FILE
 - Template file: $REVIEW_TEMPLATE_FILE
 - Golden example file: $REVIEW_GOLDEN_EXAMPLE_FILE
+- Quality gate helper: $QUALITY_GATE_HELPER
+- Quality gate command: $quality_gate_command
 EOF_PROMPT
 }
 
@@ -293,6 +522,15 @@ ensure_readonly_inputs_unchanged() {
       die "This phase must not modify ${READONLY_INPUT_FILES[$idx]}; it is read-only input."
     fi
   done
+}
+
+run_quality_gate() {
+  local runtime_root="$1"
+  local helper_path="$runtime_root/$QUALITY_GATE_HELPER"
+
+  if ! "$helper_path" "$IMPLEMENTATION_PLAN_SEMANTIC_REVIEW_FILE"; then
+    die "Semantic review quality gate failed for: $IMPLEMENTATION_PLAN_SEMANTIC_REVIEW_FILE"
+  fi
 }
 
 commit_output_if_changed() {
@@ -330,7 +568,10 @@ main() {
 
   runtime_root="$(ensure_staged_command_runtime)"
   resolve_feature_path "$runtime_root" "$FEATURE_PATH_INPUT"
+  resolve_project_root
   set_artifact_paths
+  resolve_project_classes "$runtime_root/$PROJECT_DEFINITION_FILE"
+  collect_applicable_surface_maps "$runtime_root"
   prepare_readonly_inputs
   ensure_required_files "$runtime_root"
 
@@ -364,6 +605,7 @@ main() {
   fi
 
   ensure_readonly_inputs_unchanged "$runtime_root"
+  run_quality_gate "$runtime_root"
   commit_output_if_changed "$runtime_root"
   echo "Updated $IMPLEMENTATION_PLAN_FILE"
   echo "Updated $IMPLEMENTATION_PLAN_SEMANTIC_REVIEW_FILE"

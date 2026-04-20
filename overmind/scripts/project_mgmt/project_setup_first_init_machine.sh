@@ -98,6 +98,7 @@ STAGED_HELPER_FILES=(
   "check_implementation_slices_quality.sh"
   "check_prerequisite_gaps_quality.sh"
   "check_implementation_plan_quality.sh"
+  "check_implementation_plan_semantic_review_quality.sh"
   "check_feature_repo_surface_and_exec_context_be_quality.sh"
   "check_feature_repo_surface_and_exec_context_fe_quality.sh"
   "check_requirements_ears_review_quality.sh"
