@@ -102,6 +102,13 @@ Must not own:
 - Include prerequisite or refactoring steps when current inputs show they are needed to start safe implementation.
 - Do not restate stable contract governance already captured in `common_contract_definition.md`.
 
+## Coordination Plan Steps
+
+- A plan step derived from a coordination slice may be marked `#### Coordination: true`. This marker is optional; omitting it means the step is a normal feature-delivery step.
+- A coordination slice is only lifted into a plan step when at least one downstream implementation step cannot safely begin without the coordination artifact being resolved. The coordination step is not required merely because a coordination slice exists; absence of a coordination plan step is a valid plan outcome.
+- A plan step marked `#### Coordination: true` must not be the sole coverage for a required missing operator-facing surface identified in `prerequisite_gaps.md`. If a required surface is tracked, at least one non-coordination plan step with `#### Preserved Surface:` referencing that surface must also exist.
+- Every `#### Depends on:` edge from a downstream implementation step to a coordination plan step must reflect a real per-step dependency reason. The same coordination dependency edge must not be applied blanket to every consumer-repo step; each dependency must be justified by that specific step's need for the coordination artifact.
+
 ## Final Self-Review
 Before finishing, review the full generated plan once more and correct it if needed so that:
 - prerequisite steps appear before dependent implementation work

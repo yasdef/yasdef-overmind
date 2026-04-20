@@ -320,7 +320,7 @@ function parse_kv(line, section_name, key, value, colon_index) {
   }
   return 1
 }
-function finalize_slice(evidence_line, tokens, token, i, token_count) {
+function finalize_slice(evidence_line, tokens, token, i, token_count, kind_key, kind_value, signal_ref_key, signal_ref_value) {
   if (current_slice == 0) {
     return
   }
@@ -374,6 +374,17 @@ function finalize_slice(evidence_line, tokens, token, i, token_count) {
   }
   if (valid_token_count == 0) {
     fail_quality("slice " current_slice " must include at least one valid evidence token")
+  }
+
+  kind_key = current_slice "|kind"
+  if (kind_key in slice_fields) {
+    kind_value = tolower(normalize(slice_fields[kind_key]))
+    if (kind_value == "coordination") {
+      signal_ref_key = current_slice "|signal_ref"
+      if (!(signal_ref_key in slice_fields) || trim(slice_fields[signal_ref_key]) == "" || toupper(trim(slice_fields[signal_ref_key])) == "[UNFILLED]") {
+        fail_quality("slice " current_slice " has kind: coordination but signal_ref is missing or empty")
+      }
+    }
   }
 
   if (slice_bullet_count[current_slice] < 2) {

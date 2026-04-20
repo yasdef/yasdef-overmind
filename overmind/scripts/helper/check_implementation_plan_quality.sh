@@ -604,6 +604,7 @@ function validate_previous_step(    depends_value, dep_parts, dep_count, dep, re
     }
     preserved_surface_count++
     preserved_surfaces[preserved_surface_count] = current_preserved_surface
+    preserved_surface_is_coordination[preserved_surface_count] = current_is_coordination
   }
 
   depends_value = trim(current_depends)
@@ -697,6 +698,7 @@ BEGIN {
   current_has_plan_bullet = 0
   current_has_review_bullet = 0
   current_preserved_surface = ""
+  current_is_coordination = 0
   current_heading_text = ""
   current_bullets_text = ""
   last_major = -1
@@ -755,6 +757,7 @@ BEGIN {
   current_has_plan_bullet = 0
   current_has_review_bullet = 0
   current_preserved_surface = ""
+  current_is_coordination = 0
   current_heading_text = heading
   current_bullets_text = ""
 
@@ -845,6 +848,16 @@ BEGIN {
   }
   next
 }
+/^#### Coordination:[[:space:]]*/ {
+  if (current_step != "") {
+    coord_value = $0
+    sub(/^#### Coordination:[[:space:]]*/, "", coord_value)
+    if (tolower(trim(coord_value)) == "true") {
+      current_is_coordination = 1
+    }
+  }
+  next
+}
 /^#### Assigned:[[:space:]]*/ {
   if (current_step == "") {
     fail_quality("#### Assigned appears before any step heading")
@@ -913,15 +926,21 @@ END {
   for (i = 1; i <= required_surface_order_count; i++) {
     required_surface = trim(required_surface_order[i])
     if (required_surface == "") continue
-    matched = 0
+    matched_any = 0
+    matched_non_coord = 0
     for (j = 1; j <= preserved_surface_count; j++) {
       if (surface_matches(required_surface, preserved_surfaces[j])) {
-        matched = 1
-        break
+        matched_any = 1
+        if (!preserved_surface_is_coordination[j]) {
+          matched_non_coord = 1
+          break
+        }
       }
     }
-    if (!matched) {
+    if (!matched_any) {
       fail_quality("required missing operator-facing surface is not preserved by any implementation plan step: " required_surface)
+    } else if (!matched_non_coord) {
+      fail_quality("required missing operator-facing surface has no non-coordination plan step coverage: " required_surface)
     }
   }
   if (has_errors) {

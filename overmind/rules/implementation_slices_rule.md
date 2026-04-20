@@ -68,6 +68,14 @@ Must not own:
 - Preserve operator-facing surface coverage semantically (page/screen/shell/route, CLI/admin tool/job/endpoint, or equivalent wording); do not rely on one hardcoded route literal, one UI framework label, or one delivery surface vocabulary.
 - Mark assumptions as `[Inference]` when needed.
 
+## Coordination Slices
+
+- A coordination slice (`kind: coordination`) is optional and must be emitted only when at least one of the following conditions is met: shared contract semantics are materially ambiguous, multiple repos would otherwise implement incompatible interpretations, a concrete shared artifact must be frozen before safe parallel delivery, or a `cross_repo_contract_lock` signal in `technical_requirements.md` section 6 makes the drift risk explicit.
+- Absence of any coordination slice is always a valid outcome; coordination slices must never be emitted reflexively based on scope alone.
+- A coordination slice must carry both a `kind: coordination` field and a non-empty `signal_ref` field that identifies the upstream planning signal justifying the coordination work.
+- Coordination slices are distinct from feature-delivery slices in intent; a coordination slice must not serve as the sole coverage for a required missing operator-facing surface.
+- The following conditions are insufficient on their own to emit a coordination slice: multi-repo feature scope, `delta_needed: true` in `feature_contract_delta.md`, shared `comp/*` evidence overlap, or the presence of one or more planning signals.
+
 ## Final Self-Review
 Before finishing, verify that:
 - at least one slice exists,

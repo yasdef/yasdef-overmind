@@ -902,6 +902,163 @@ test_passes_with_equivalent_operator_tool_wording() {
   assert_contains "$out" "quality gate passed"
 }
 
+write_coordination_plan_fixture_pass() {
+  local repo_dir="$1"
+  cat >"$repo_dir/projects/p1/feature-a/implementation_plan.md" <<'OUT'
+# Implementation Plan
+
+### Step 1.1 Contract coordination [REQ-4]
+#### Repo: backend
+#### Coordination: true
+#### Depends on: none
+#### Evidence: gap/TECH_REQ-4, comp/backend-projection-persistence
+#### Preserved Surface: none
+- [ ] Plan and discuss the step
+- [ ] Coordinate the shared order payload contract document with consumer repo owners
+- [ ] Confirm consumer repo owners acknowledge the frozen contract before downstream steps start
+- [ ] Review step implementation
+
+### Step 1.2 Backend query foundation [REQ-6] [REQ-7]
+#### Repo: backend
+#### Depends on: 1.1
+#### Evidence: gap/TECH_REQ-6, comp/backend-projection-persistence
+#### Preserved Surface: none
+- [ ] Plan and discuss the step
+- [ ] Finalize backend query payload readiness for consumers
+- [ ] Add backend query and rebuild verification
+- [ ] Review step implementation
+
+### Step 1.3 Operator sign-in surface delivery [REQ-4]
+#### Repo: frontend
+#### Depends on: 1.2
+#### Evidence: gap/TECH_REQ-4, comp/frontend-order-projection-client, slice/slice-10
+#### Preserved Surface: Admin sign-in screen
+- [ ] Plan and discuss the step
+- [ ] Deliver admin sign-in screen route and entry form
+- [ ] Add sign-in surface checks for operator entry
+- [ ] Review step implementation
+
+### Step 1.4 Protected shell and admin route delivery [REQ-6]
+#### Repo: frontend
+#### Depends on: 1.3
+#### Evidence: gap/TECH_REQ-4, comp/frontend-order-projection-client, slice/slice-11, slice/slice-12
+#### Preserved Surface: Admin workspace shell route
+- [ ] Plan and discuss the step
+- [ ] Deliver protected admin workspace shell and admin portal route
+- [ ] Add shell and route entry checks for authenticated access
+- [ ] Review step implementation
+
+### Step 1.5 Operator lookup surface delivery [REQ-4] [NFR-1]
+#### Repo: mobile
+#### Depends on: 1.2
+#### Evidence: gap/TECH_REQ-4, gap/TECH_REQ-NFR-1, comp/mobile-order-projection-client, slice/slice-13
+#### Preserved Surface: Operator account search screen
+- [ ] Plan and discuss the step
+- [ ] Deliver operator account lookup screen with projection-backed query state
+- [ ] Add lookup surface checks and latency-focused verification
+- [ ] Review step implementation
+OUT
+}
+
+write_coordination_plan_fixture_fail() {
+  local repo_dir="$1"
+  cat >"$repo_dir/projects/p1/feature-a/implementation_plan.md" <<'OUT'
+# Implementation Plan
+
+### Step 1.1 Contract coordination sign-in alignment [REQ-4]
+#### Repo: frontend
+#### Coordination: true
+#### Depends on: none
+#### Evidence: gap/TECH_REQ-4, comp/frontend-order-projection-client, slice/slice-10
+#### Preserved Surface: Admin sign-in screen
+- [ ] Plan and discuss the step
+- [ ] Coordinate sign-in surface contract requirements with auth and consumer repo owners
+- [ ] Confirm contract document is accepted before downstream steps start
+- [ ] Review step implementation
+
+### Step 1.2 Backend query foundation [REQ-6] [REQ-7]
+#### Repo: backend
+#### Depends on: none
+#### Evidence: gap/TECH_REQ-6, comp/backend-projection-persistence
+#### Preserved Surface: none
+- [ ] Plan and discuss the step
+- [ ] Finalize backend query payload readiness for consumers
+- [ ] Add backend query and rebuild verification
+- [ ] Review step implementation
+
+### Step 1.3 Protected shell and admin route delivery [REQ-6]
+#### Repo: frontend
+#### Depends on: 1.1
+#### Evidence: gap/TECH_REQ-4, comp/frontend-order-projection-client, slice/slice-11, slice/slice-12
+#### Preserved Surface: Admin workspace shell route
+- [ ] Plan and discuss the step
+- [ ] Deliver protected admin workspace shell and admin portal route
+- [ ] Add shell and route entry checks for authenticated access
+- [ ] Review step implementation
+
+### Step 1.4 Operator lookup surface delivery [REQ-4] [NFR-1]
+#### Repo: mobile
+#### Depends on: 1.2
+#### Evidence: gap/TECH_REQ-4, gap/TECH_REQ-NFR-1, comp/mobile-order-projection-client, slice/slice-13
+#### Preserved Surface: Operator account search screen
+- [ ] Plan and discuss the step
+- [ ] Deliver operator account lookup screen with projection-backed query state
+- [ ] Add lookup surface checks and latency-focused verification
+- [ ] Review step implementation
+OUT
+}
+
+test_passes_with_coordination_step_beside_preserved_surface_step() {
+  local repo_dir="$TMP_ROOT/repo-plan-coordination-step-pass"
+  setup_valid_fixture "$repo_dir"
+  write_required_operator_surface_prerequisite_gaps "$repo_dir"
+  write_coordination_plan_fixture_pass "$repo_dir"
+
+  local result=""
+  result="$(run_helper "$repo_dir" "projects/p1/feature-a/implementation_plan.md")"
+  local status=""
+  status="$(printf '%s\n' "$result" | head -n1)"
+  local out=""
+  out="$(printf '%s\n' "$result" | tail -n +2)"
+
+  assert_equal "0" "$status"
+  assert_contains "$out" "quality gate passed"
+}
+
+test_fails_when_coordination_step_is_sole_surface_coverage() {
+  local repo_dir="$TMP_ROOT/repo-plan-coordination-sole-coverage"
+  setup_valid_fixture "$repo_dir"
+  write_required_operator_surface_prerequisite_gaps "$repo_dir"
+  write_coordination_plan_fixture_fail "$repo_dir"
+
+  local result=""
+  result="$(run_helper "$repo_dir" "projects/p1/feature-a/implementation_plan.md")"
+  local status=""
+  status="$(printf '%s\n' "$result" | head -n1)"
+  local out=""
+  out="$(printf '%s\n' "$result" | tail -n +2)"
+
+  assert_equal "1" "$status"
+  assert_contains "$out" "no non-coordination plan step coverage"
+}
+
+test_passes_with_no_coordination_step() {
+  local repo_dir="$TMP_ROOT/repo-plan-no-coordination-step"
+  setup_valid_fixture "$repo_dir"
+  write_required_operator_surface_prerequisite_gaps "$repo_dir"
+  write_surface_preserving_plan_fixture "$repo_dir"
+
+  local result=""
+  result="$(run_helper "$repo_dir" "projects/p1/feature-a/implementation_plan.md")"
+  local status=""
+  status="$(printf '%s\n' "$result" | head -n1)"
+  local out=""
+  out="$(printf '%s\n' "$result" | tail -n +2)"
+
+  assert_equal "0" "$status"
+  assert_contains "$out" "quality gate passed"
+}
+
 test_passes_with_valid_shared_plan
 test_fails_when_technical_requirements_is_missing
 test_fails_when_repo_header_is_missing
@@ -925,5 +1082,8 @@ test_fails_when_required_lookup_surface_is_missing_from_plan
 test_fails_when_surface_step_is_supporting_only
 test_passes_with_equivalent_surface_wording
 test_passes_with_equivalent_operator_tool_wording
+test_passes_with_coordination_step_beside_preserved_surface_step
+test_fails_when_coordination_step_is_sole_surface_coverage
+test_passes_with_no_coordination_step
 
 echo "All implementation plan quality tests passed."
