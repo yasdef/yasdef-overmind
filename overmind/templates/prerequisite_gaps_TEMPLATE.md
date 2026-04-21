@@ -19,5 +19,7 @@
 
 #### Prerequisite: [UNFILLED]
 - status: [present_in_repo | scheduled_in_slices | unmet]
+- surface_kind: [required_missing_user_reachable_surface | present_user_reachable_surface | transport_or_internal_execution_gap]
+- surface_identity: [UNFILLED | none]
 - evidence: [UNFILLED]
 - slice_ref: [UNFILLED | none]

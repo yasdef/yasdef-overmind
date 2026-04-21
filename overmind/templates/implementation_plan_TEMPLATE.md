@@ -9,6 +9,7 @@ Each step must belong to exactly one repo class so backend, frontend, and mobile
 - Immediately under each step add `#### Repo: <backend|frontend|mobile>`.
 - Add `#### Depends on: <none|step ids>` to show cross-repo ordering when relevant.
 - Add `#### Evidence: <gap/TECH_REQ-1 | gap/TECH_REQ-NFR-1, comp/component-slug, ...>` and keep evidence links at step scope (not checklist bullets).
+- Add `#### Preserved Surface: <none|operator-facing surface identity>` so required missing operator-facing delivery remains explicit through planning, whether the surface is a page/route/shell, CLI/admin tool, job, or endpoint.
 - Add `#### Assigned: <worker-uuid>` only after a worker is explicitly assigned.
 - Keep bullets outcome-oriented, implementation-shaped, and sized for one worker.
 - If one functional slice touches multiple repos, split it into multiple steps and connect them with `#### Depends on:`.
@@ -17,6 +18,7 @@ Each step must belong to exactly one repo class so backend, frontend, and mobile
 #### Repo: [backend|frontend|mobile]
 #### Depends on: [none|1.0]
 #### Evidence: [gap/TECH_REQ-1 | gap/TECH_REQ-NFR-1, comp/component-slug]
+#### Preserved Surface: [none|UNFILLED]
 #### Assigned: [OPTIONAL]
 - [ ] Plan and discuss the step
 - [ ] [UNFILLED concrete component slice]

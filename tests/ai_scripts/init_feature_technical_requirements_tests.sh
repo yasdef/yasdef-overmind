@@ -168,13 +168,13 @@ OUT
 - producer_repositories: backend
 - consumer_repositories: frontend
 - contract_surface: POST /api/v1/orders
-- contract_status: aligned
+- contract_status: drifted
 - source_of_truth: backend order create controller
 - canonical_shape: request:{name}; response:{id,status}
 - shared_types: OrderId, OrderStatus
 - trust_boundary: internal
 - compatibility_rule: additive fields allowed; removing required fields is breaking
-- planning_implication: add contract tests
+- planning_implication: contract delta likely required before downstream client lock
 - notes: Frontend follows backend response shape.
 
 ## 4. Reconciliation Decisions
@@ -297,8 +297,7 @@ cat >"$target_file" <<'DOC'
 - evidence: Frontend surface map identifies api integration as applicable.
 
 ## 6. Cross-Repo Constraints and Planning Signals
-- constraint_1: Backend remains the source of truth for create-order request and error semantics.
-- prep_1: Stabilize backend validation/error behavior before finalizing frontend assertions.
+- planning_signals: none
 
 ## 7. Known Risks / Uncertainties
 - risk_1: Backend/frontend drift may recur if frontend preserves proposal-only aliases.
@@ -422,6 +421,9 @@ test_generates_technical_requirements_and_builds_expected_prompt() {
 
   assert_contains "$out" "Updated projects/p1/feature-a/technical_requirements.md"
   assert_file_exists "$repo_dir/asdlc/projects/p1/feature-a/technical_requirements.md"
+  assert_contains "$(cat "$repo_dir/asdlc/projects/p1/feature-a/technical_requirements.md")" "- planning_signals: none"
+  assert_not_contains "$(cat "$repo_dir/asdlc/projects/p1/feature-a/technical_requirements.md")" "- constraint_1:"
+  assert_not_contains "$(cat "$repo_dir/asdlc/projects/p1/feature-a/technical_requirements.md")" "- prep_1:"
   assert_equal "$requirements_before" "$(cat "$repo_dir/asdlc/projects/p1/feature-a/requirements_ears.md")"
   assert_equal "$common_contract_before" "$(cat "$repo_dir/asdlc/projects/p1/common_contract_definition.md")"
   assert_equal "$backend_before" "$(cat "$repo_dir/asdlc/projects/p1/feature-a/project_surface_struct_resp_map_backend.md")"

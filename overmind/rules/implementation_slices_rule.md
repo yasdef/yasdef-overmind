@@ -6,6 +6,7 @@ Read this file fully before generating output.
 - Generate implementation-driven executable slices before final ordered implementation-plan generation.
 - Answer one question only:
   `What thin, executable slices should exist for this feature before Step 8.2 turns them into a fully ordered, fully traceable implementation plan?`
+- Preserve required missing operator-facing surface delivery from upstream evidence so supporting-only slices cannot replace required surface outcomes.
 - Produce deterministic output for `<TARGET_IMPLEMENTATION_SLICES_ARTIFACT>`.
 
 ## Ownership Boundaries
@@ -16,6 +17,7 @@ Owns:
 - local prerequisite capture needed to begin implementation safely
 - scaffold-aware frontend/mobile decomposition when relevant
 - practical handoff notes for the later ordered implementation-plan phase
+- explicit preservation of required missing operator-facing surfaces as feature-delivery slices
 
 Must not own:
 - full global step ordering across all slices
@@ -53,6 +55,8 @@ Must not own:
 - Re-open applicable surface maps when needed to recover execution structure lost during Step 7 consolidation, especially for thin or scaffold-heavy frontend/mobile repos.
 - Use `<FEATURE_CONTRACT_DELTA_ARTIFACT>` for real contract, payload, schema, rollout, or compatibility prerequisites that affect whether a slice can begin.
 - Use `<REQUIREMENTS_EARS_ARTIFACT>` to keep slices aligned with behavioral scope, but do not force full REQ/NFR coverage in this phase.
+- For every required missing operator-facing surface identified by upstream requirement meaning and prerequisite evidence, include at least one explicit feature-delivery slice that delivers that surface itself.
+- Supporting auth/API/contract/state/coordination slices may be added, but they never satisfy preserved operator-facing surface coverage on their own.
 - Prefer the smallest meaningful delivery slice that either:
   - produces a first usable or admin-visible increment, or
   - cleanly unblocks another real slice.
@@ -61,7 +65,16 @@ Must not own:
 - Allow backend, frontend, and mobile slices to exist independently unless a real contract or state dependency blocks independence.
 - Capture only local prerequisites needed to begin a slice safely; do not force full cross-repo ordering in this phase.
 - Do not require every REQ id, NFR id, or evidence token to already appear in slice headings; Step 8.2 restores full ordering and traceability.
+- Preserve operator-facing surface coverage semantically (page/screen/shell/route, CLI/admin tool/job/endpoint, or equivalent wording); do not rely on one hardcoded route literal, one UI framework label, or one delivery surface vocabulary.
 - Mark assumptions as `[Inference]` when needed.
+
+## Coordination Slices
+
+- A coordination slice (`kind: coordination`) is optional and must be emitted only when at least one of the following conditions is met: shared contract semantics are materially ambiguous, multiple repos would otherwise implement incompatible interpretations, a concrete shared artifact must be frozen before safe parallel delivery, or a `cross_repo_contract_lock` signal in `technical_requirements.md` section 6 makes the drift risk explicit.
+- Absence of any coordination slice is always a valid outcome; coordination slices must never be emitted reflexively based on scope alone.
+- A coordination slice must carry both a `kind: coordination` field and a non-empty `signal_ref` field that identifies the upstream planning signal justifying the coordination work.
+- Coordination slices are distinct from feature-delivery slices in intent; a coordination slice must not serve as the sole coverage for a required missing operator-facing surface.
+- The following conditions are insufficient on their own to emit a coordination slice: multi-repo feature scope, `delta_needed: true` in `feature_contract_delta.md`, shared `comp/*` evidence overlap, or the presence of one or more planning signals.
 
 ## Final Self-Review
 Before finishing, verify that:
@@ -69,6 +82,8 @@ Before finishing, verify that:
 - each slice has explicit repo ownership and evidence,
 - local prerequisites are practical and minimal,
 - slices remain thinner and more execution-shaped than the later final plan steps,
+- required missing operator-facing surfaces remain represented by at least one explicit feature-delivery slice,
+- supporting-only scaffolding slices are not substituted for required operator-facing surface delivery,
 - frontend/mobile work was not flattened back into broad buckets just because technical requirements were consolidated,
 - output remains slice-planning focused (not full ordered plan),
 - no forbidden overreach (full ordering/full traceability enforcement) is introduced.

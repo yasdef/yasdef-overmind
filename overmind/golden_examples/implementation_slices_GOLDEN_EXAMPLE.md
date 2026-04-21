@@ -25,6 +25,8 @@ This example focuses on executable slice discovery before full plan ordering. It
   - first usable increment early
   - scaffold-aware frontend/mobile decomposition where applicable
   - minimal prerequisite capture only
+  - preserve required missing operator-facing surfaces as explicit feature-delivery slices
+  - do not substitute supporting-only scaffolding for preserved operator-facing surface delivery
 
 ## 3. Slice Candidates
 ### Slice 1: Backend query read-path completion
@@ -33,34 +35,49 @@ This example focuses on executable slice discovery before full plan ordering. It
 - objective: Complete query read service + DTO mapping so projection-backed reads are usable and ready for latency verification.
 - first_increment: Query endpoint returns projection fields for happy-path requests.
 - prerequisites: none
+- preserved_operator_surface: none
 - evidence: gap/TECH_REQ-6, gap/TECH_REQ-NFR-1, comp/backend-order-query-controller
 - [ ] Implement read service + repository wiring for projection-backed query
 - [ ] Add controller DTO mapping and error-response alignment for query path
 - [ ] Add query integration and latency-focused verification for projection-backed read responses
 
-### Slice 2: Frontend projection status mapper alignment
+### Slice 2: Frontend operator workspace shell delivery
 - repo: frontend
 - status: planned
-- objective: Align frontend adapter/state mapping to backend projection status fields.
-- first_increment: Frontend renders projection-backed status from backend payload.
+- objective: Deliver the missing protected operator workspace shell so operators can reach projection-backed order views.
+- first_increment: Operator can open the protected workspace shell entry and see projection-backed order status on first load.
 - prerequisites: Slice 1 backend payload stability
+- preserved_operator_surface: Protected operator workspace shell
 - evidence: gap/TECH_REQ-4, comp/frontend-order-projection-client
-- [ ] Update API adapter mapping for projection-backed status fields
-- [ ] Update order screen state + render path for projection-backed status
-- [ ] Add focused adapter and UI-state tests for projection field handling
+- [ ] Deliver protected operator workspace shell route/page container and initial render path
+- [ ] Wire projection-backed status mapping into the workspace shell view state
+- [ ] Add focused shell-entry and projection-state coverage for operator workflow
 
-### Slice 3: Mobile projection status mapper alignment
+### Slice 3: Frontend auth scaffolding for workspace access
+- repo: frontend
+- status: planned
+- objective: Add supporting auth/session scaffolding needed by the workspace shell delivery slice.
+- first_increment: Session and token refresh flow works for shell access.
+- prerequisites: Slice 2 operator workspace shell delivery
+- preserved_operator_surface: none
+- evidence: gap/TECH_REQ-4, comp/frontend-order-projection-client
+- [ ] Add token refresh/session middleware used by workspace shell route guards
+- [ ] Add auth-state wiring for shell access bootstrap
+- [ ] Add focused auth/session regression checks
+
+### Slice 4: Mobile projection status mapper alignment
 - repo: mobile
 - status: planned
 - objective: Align mobile mapper/view-model to backend projection status fields.
 - first_increment: Mobile screen renders projection-backed status from backend payload.
 - prerequisites: Slice 1 backend payload stability
+- preserved_operator_surface: none
 - evidence: gap/TECH_REQ-4, comp/mobile-order-projection-client
 - [ ] Update mobile mapper for projection-backed status fields
 - [ ] Update view-model/screen state for projection-backed status handling
 - [ ] Add focused mapper and view-model tests for projection fields
 
 ## 4. Handoff To Ordered Plan
-- ordering_intent: Backend slice likely precedes both client slices; client slices can proceed in parallel after backend payload stabilizes.
-- unresolved_ordering_questions: Confirm whether backend error-contract polish should be split from backend happy-path completion.
+- ordering_intent: Backend slice likely precedes operator-shell delivery; supporting auth scaffolding and mobile updates can proceed after shell delivery and payload stability.
+- unresolved_ordering_questions: Confirm whether auth scaffolding can partially run before shell slice completion without losing explicit shell delivery ownership.
 - unresolved_traceability_questions: Confirm final NFR linkage for client-state regression test depth in implementation_plan.md phase.

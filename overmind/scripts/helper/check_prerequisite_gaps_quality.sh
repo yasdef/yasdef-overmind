@@ -83,6 +83,17 @@ function is_unfilled(v) {
   return 0
 }
 
+function is_none(v) {
+  v = tolower(trim(v))
+  return (v == "none")
+}
+
+function looks_like_surface_identity(v, lower_v) {
+  lower_v = tolower(trim(v))
+  if (lower_v ~ /(route|page|screen|shell|login|sign-in|signin|workspace|entry|portal|console|ui|view|lookup|search|dashboard|form|command|cli|job|endpoint|tool|http|post |get |put |patch |delete |deep link|deeplink)/) return 1
+  return 0
+}
+
 function fail_quality(msg) {
   print "quality gate failed: " msg > "/dev/stderr"
   has_errors = 1
@@ -94,17 +105,27 @@ BEGIN {
   current_req = ""
   current_prereq = ""
   current_status = ""
+  current_surface_kind = ""
+  current_surface_identity = ""
   current_evidence = ""
   current_slice_ref = ""
   in_prereq = 0
 }
 
-function flush_prereq(    s, e, sr) {
+function flush_prereq(    s, sk, si, e, sr) {
   if (!in_prereq || current_prereq == "") return
 
   s = trim(current_status)
+  sk = trim(current_surface_kind)
+  si = trim(current_surface_identity)
   e = trim(current_evidence)
   sr = trim(current_slice_ref)
+
+  if (is_unfilled(sk)) {
+    fail_quality("prerequisite \"" current_prereq "\" in requirement " current_req " is missing surface_kind")
+  } else if (sk != "required_missing_user_reachable_surface" && sk != "present_user_reachable_surface" && sk != "transport_or_internal_execution_gap") {
+    fail_quality("prerequisite \"" current_prereq "\" in requirement " current_req " has invalid surface_kind: \"" sk "\"")
+  }
 
   if (is_unfilled(s)) {
     fail_quality("prerequisite \"" current_prereq "\" in requirement " current_req " is missing status")
@@ -127,8 +148,30 @@ function flush_prereq(    s, e, sr) {
     fail_quality("prerequisite \"" current_prereq "\" in requirement " current_req " has invalid status: \"" s "\"")
   }
 
+  if (sk == "required_missing_user_reachable_surface") {
+    if (s != "unmet" && s != "scheduled_in_slices") {
+      fail_quality("prerequisite \"" current_prereq "\" in requirement " current_req " uses required_missing_user_reachable_surface but status is not unmet/scheduled_in_slices")
+    }
+    if (is_unfilled(si) || is_none(si)) {
+      fail_quality("prerequisite \"" current_prereq "\" in requirement " current_req " (required_missing_user_reachable_surface) is missing surface_identity")
+    } else if (!looks_like_surface_identity(si)) {
+      fail_quality("prerequisite \"" current_prereq "\" in requirement " current_req " has non-operator-facing surface_identity: \"" si "\"")
+    }
+  } else if (sk == "present_user_reachable_surface") {
+    if (s != "present_in_repo") {
+      fail_quality("prerequisite \"" current_prereq "\" in requirement " current_req " uses present_user_reachable_surface but status is not present_in_repo")
+    }
+    if (!is_unfilled(si) && !is_none(si)) {
+      fail_quality("prerequisite \"" current_prereq "\" in requirement " current_req " (present_user_reachable_surface) must use surface_identity: none")
+    }
+  } else if (sk == "transport_or_internal_execution_gap") {
+    fail_quality("prerequisite \"" current_prereq "\" in requirement " current_req " is classified as transport_or_internal_execution_gap; keep transport/internal gaps out of prerequisite entries")
+  }
+
   current_prereq = ""
   current_status = ""
+  current_surface_kind = ""
+  current_surface_identity = ""
   current_evidence = ""
   current_slice_ref = ""
   in_prereq = 0
@@ -157,6 +200,22 @@ function flush_prereq(    s, e, sr) {
   line = $0
   sub(/^[[:space:]]*-[[:space:]]*status:[[:space:]]*/, "", line)
   current_status = trim(line)
+  next
+}
+
+/^[[:space:]]*-[[:space:]]*surface_kind:[[:space:]]*/ {
+  if (!in_prereq) next
+  line = $0
+  sub(/^[[:space:]]*-[[:space:]]*surface_kind:[[:space:]]*/, "", line)
+  current_surface_kind = trim(line)
+  next
+}
+
+/^[[:space:]]*-[[:space:]]*surface_identity:[[:space:]]*/ {
+  if (!in_prereq) next
+  line = $0
+  sub(/^[[:space:]]*-[[:space:]]*surface_identity:[[:space:]]*/, "", line)
+  current_surface_identity = trim(line)
   next
 }
 

@@ -96,8 +96,18 @@
 - evidence: Common contract definition records current drift on the identity contract and the frontend surface map points to apiRequest/error handling as the ownership boundary.
 
 ## 6. Cross-Repo Constraints and Planning Signals
-- constraint_1: Backend remains the source of truth for synchronous identity/account request and response fields; frontend must consume backend field names rather than preserve proposal-only aliases.
-- prep_1: Stabilize and test one backend failure contract for invalid-input, unauthorized, duplicate-account, and not-found outcomes before finalizing downstream frontend client updates.
+### Planning Signal: signal_1
+- signal_id: signal_1
+- signal_type: cross_repo_contract_lock
+- owner_repo: backend
+- consumer_repos: frontend
+- required_artifact: feature_contract_delta.md
+- must_precede: implementation_slices.md, implementation_plan.md
+- output_requirements: Lock backend-owned identity/account error fields and status semantics before frontend finalizes client mapping.
+- source_evidence: REQ-1, REQ-7, comp/globalexceptionhandler, comp/src-api-identities-ts
+
+> Empty-path example when no planning signal is needed:
+- planning_signals: none
 
 ## 7. Known Risks / Uncertainties
 - risk_1: The identity contract drift between backend runtime behavior and frontend client expectations may require explicit coordination before a shared implementation plan can be sliced cleanly.

@@ -10,9 +10,9 @@
 - last_updated: 2026-04-11
 
 ## 2. Review Guidance
-- completion_rule: Set `review_status: complete` only when every finding is terminal (`applied`, `rejected`, `postponed`) or `no_findings: true`.
+- completion_rule: Set `review_status: complete` only when every finding is terminal (`applied`, `rejected`, `postponed`) or `no_findings: true`; terminal `delivered_surface_consumption_unclear` findings require non-empty `resolution_notes`.
 - user_question_format: `Which finding numbers should I apply to implementation_plan.md? (examples: 1,3 | all | none | postpone 2 | reject 4)`
-- allowed_finding_types: step_scope_overlap, technical_gap_mix, dependency_ordering, requirement_grouping
+- allowed_finding_types: step_scope_overlap, technical_gap_mix, dependency_ordering, requirement_grouping, delivered_surface_consumption_unclear
 - allowed_severity: High, Medium, Low
 - allowed_states: added, applied, rejected, postponed
 
@@ -44,3 +44,31 @@
 - user_selection: postponed
 - plan_patch_summary: No implementation plan change in this pass.
 - resolution_notes: User chose to postpone this finding to a later review pass.
+
+### Finding 3 - New admin route has no inbound affordance
+- severity: High
+- finding_type: delivered_surface_consumption_unclear
+- state: applied
+- target_steps: Step 2.1
+- related_requirements: REQ-7
+- related_evidence: comp/frontend-admin-workspace-shell
+- summary: Step 2.1 adds `/admin/workspace` but no existing navigation entry or sibling step links operators to it.
+- rationale: Delivering the surface without an inbound path can make required operator behavior unreachable in practice.
+- recommendation: Add a sibling step that introduces explicit inbound affordance from the admin home entry point.
+- user_selection: selected
+- plan_patch_summary: Added Step 2.0 "Admin home links to workspace shell" as dependency for Step 2.1.
+- resolution_notes: User accepted finding and requested explicit inbound navigation step before workspace delivery.
+
+### Finding 4 - Public preview route intentionally isolated for controlled rollout
+- severity: Low
+- finding_type: delivered_surface_consumption_unclear
+- state: rejected
+- target_steps: Step 3.2
+- related_requirements: REQ-9
+- related_evidence: comp/frontend-preview-route
+- summary: Step 3.2 adds `/preview/v2` without a visible inbound affordance.
+- rationale: This would usually require inbound navigation work, but rollout strategy may intentionally keep route undiscoverable.
+- recommendation: Confirm operator intent; if intentional isolation is accepted, keep route isolated and document rationale.
+- user_selection: rejected
+- plan_patch_summary: No implementation plan change in this pass.
+- resolution_notes: Product owner confirmed temporary isolation is intentional until partner enablement date.

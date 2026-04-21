@@ -6,6 +6,7 @@ Read this file fully before generating output.
 - Convert implementation-slice planning output, feature requirements, feature-scoped technical requirements, and contract delta into one shared ordered implementation plan.
 - Answer one question only:
   `What is the concrete executable implementation sequence for this feature, expressed as one shared plan with one repo owner per step and grounded in the current repo state?`
+- Preserve required missing operator-facing surface delivery from upstream evidence so supporting-only work cannot replace required surface outcomes.
 - Produce deterministic output for `<TARGET_IMPLEMENTATION_PLAN_ARTIFACT>`.
 
 ## Ownership Boundaries
@@ -17,6 +18,7 @@ Owns:
 - traceability from steps to `REQ-*` / `NFR-*` ids
 - concrete step slicing from impacted components and explicit gaps
 - inclusion of already-implemented slices when they materially explain current delivery state
+- explicit retention of required missing operator-facing surface delivery through final plan ordering
 
 Must not own:
 - worker assignment or worker discovery rules
@@ -46,6 +48,7 @@ Must not own:
   - `#### Repo: <backend|frontend|mobile>`
   - `#### Depends on: <none|step ids>`
   - `#### Evidence: <gap/TECH_REQ-id, comp/component-slug, ...>`
+  - `#### Preserved Surface: <none|operator-facing surface identity>`
   - optional `#### Assigned: <worker-uuid>`
   - ordered checklist bullets
 - Omit `#### Assigned:` by default. Worker assignment is a separate later action.
@@ -68,10 +71,13 @@ Must not own:
 - Allow backend, frontend, and mobile steps to proceed in parallel unless a real contract, payload, schema, state, or prerequisite dependency blocks parallel execution.
 - Every `#### Depends on:` edge must reflect a real dependency reason, not convenience ordering.
 - Preserve useful thin slice boundaries from `<IMPLEMENTATION_SLICES_ARTIFACT>` by default.
+- When a slice preserves a required missing operator-facing surface, keep that surface explicit in at least one plan step after any reorder/split/merge transformation.
+- Supporting API/auth/contract/state/coordination work may surround preserved surfaces, but it never fulfills preserved-surface delivery by itself.
 - Reorder slices, split overloaded slices, or add prerequisite steps when needed for executable ordering or safe delivery.
 - Merge only when slices are truly coupled and the final plan records the merge rationale.
 - Never merge solely to reduce step count, simplify requirement grouping, or make traceability look tidier.
 - Do not collapse scaffold-heavy frontend/mobile work back into one broad bucket unless a hard dependency truly makes that unavoidable.
+- Preserve coverage semantically (page/screen/shell/route, CLI/admin tool/job/endpoint, or equivalent wording), not by brittle route-name literals, framework labels, or one surface vocabulary.
 
 ### Traceability And Evidence
 - Use `<REQUIREMENTS_EARS_ARTIFACT>` as the authoritative source of behavior and requirement ids.
@@ -96,6 +102,13 @@ Must not own:
 - Include prerequisite or refactoring steps when current inputs show they are needed to start safe implementation.
 - Do not restate stable contract governance already captured in `common_contract_definition.md`.
 
+## Coordination Plan Steps
+
+- A plan step derived from a coordination slice may be marked `#### Coordination: true`. This marker is optional; omitting it means the step is a normal feature-delivery step.
+- A coordination slice is only lifted into a plan step when at least one downstream implementation step cannot safely begin without the coordination artifact being resolved. The coordination step is not required merely because a coordination slice exists; absence of a coordination plan step is a valid plan outcome.
+- A plan step marked `#### Coordination: true` must not be the sole coverage for a required missing operator-facing surface identified in `prerequisite_gaps.md`. If a required surface is tracked, at least one non-coordination plan step with `#### Preserved Surface:` referencing that surface must also exist.
+- Every `#### Depends on:` edge from a downstream implementation step to a coordination plan step must reflect a real per-step dependency reason. The same coordination dependency edge must not be applied blanket to every consumer-repo step; each dependency must be justified by that specific step's need for the coordination artifact.
+
 ## Final Self-Review
 Before finishing, review the full generated plan once more and correct it if needed so that:
 - prerequisite steps appear before dependent implementation work
@@ -104,6 +117,8 @@ Before finishing, review the full generated plan once more and correct it if nee
 - repo ownership is explicit on every step
 - technical-requirements evidence is reflected in the actual step list
 - no implementation step is missing `#### Evidence:`
+- required missing operator-facing surfaces from upstream evidence still appear as explicit delivery work in at least one step each
+- supporting-only steps are not the only coverage for required missing operator-facing surfaces
 
 ## Evidence Rules
 - Prefer facts from the input artifacts.

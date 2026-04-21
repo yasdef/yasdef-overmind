@@ -215,6 +215,90 @@ function scalar_value(line) {
   sub(/^[[:space:]]*-[[:space:]]*[A-Za-z0-9_.-]+:[[:space:]]*/, "", value)
   return trim(value)
 }
+function slugify_component(name, slug) {
+  slug = tolower(trim(name))
+  gsub(/[^a-z0-9]+/, "-", slug)
+  gsub(/^-+/, "", slug)
+  gsub(/-+$/, "", slug)
+  return slug
+}
+function validate_signal_consumer_repos(raw_value, signal_id,    list, i, repo_name, count) {
+  split(raw_value, list, /,/)
+  count = 0
+  for (i in list) {
+    repo_name = lower_trim(list[i])
+    if (repo_name == "") {
+      continue
+    }
+    count++
+    if (!(repo_name in active_classes)) {
+      fail_quality("planning signal " signal_id " references repo outside active project classes in consumer_repos: " repo_name)
+    }
+  }
+  if (count < 1) {
+    fail_quality("planning signal " signal_id " must reference at least one repo in consumer_repos")
+  }
+}
+function validate_signal_source_evidence(raw_value, signal_id,    list, i, token, count, slug) {
+  split(raw_value, list, /,/)
+  count = 0
+  for (i in list) {
+    token = trim(list[i])
+    if (token == "") {
+      continue
+    }
+    count++
+    if (token ~ /^REQ-[0-9]+$/ || token ~ /^NFR-[0-9]+$/) {
+      if (!(token in valid_refs)) {
+        fail_quality("planning signal " signal_id " references unknown source_evidence token " token)
+      }
+      continue
+    }
+    if (token ~ /^comp\/[a-z0-9][a-z0-9-]*$/) {
+      slug = token
+      sub(/^comp\//, "", slug)
+      if (!(slug in component_slug_seen)) {
+        fail_quality("planning signal " signal_id " references unknown source_evidence token " token)
+      }
+      continue
+    }
+    fail_quality("planning signal " signal_id " has invalid source_evidence token " token)
+  }
+  if (count < 1) {
+    fail_quality("planning signal " signal_id " must include at least one source_evidence token")
+  }
+}
+function validate_signal_block(    normalized_type, normalized_owner) {
+  if (!in_signal_block) {
+    return
+  }
+  if (is_unfilled(current_signal_heading)) fail_quality("planning signal block heading is empty in section 6")
+  if (is_unfilled(current_signal_id)) fail_quality("planning signal " current_signal_heading " has unfilled key signal_id")
+  if (is_unfilled(current_signal_type)) fail_quality("planning signal " current_signal_heading " has unfilled key signal_type")
+  normalized_type = lower_trim(current_signal_type)
+  if (normalized_type != "cross_repo_contract_lock") {
+    fail_quality("planning signal " current_signal_id " uses unsupported signal_type: " current_signal_type)
+  }
+  if (is_unfilled(current_signal_owner_repo)) fail_quality("planning signal " current_signal_id " has unfilled key owner_repo")
+  normalized_owner = lower_trim(current_signal_owner_repo)
+  if (!(normalized_owner in active_classes)) {
+    fail_quality("planning signal " current_signal_id " uses repo outside active project classes in owner_repo: " current_signal_owner_repo)
+  }
+  if (is_unfilled(current_signal_consumer_repos)) fail_quality("planning signal " current_signal_id " has unfilled key consumer_repos")
+  if (is_unfilled(current_signal_required_artifact)) fail_quality("planning signal " current_signal_id " has unfilled key required_artifact")
+  if (is_unfilled(current_signal_must_precede)) fail_quality("planning signal " current_signal_id " has unfilled key must_precede")
+  if (is_unfilled(current_signal_output_requirements)) fail_quality("planning signal " current_signal_id " has unfilled key output_requirements")
+  if (is_unfilled(current_signal_source_evidence)) fail_quality("planning signal " current_signal_id " has unfilled key source_evidence")
+  if (current_signal_id in signal_id_seen) {
+    fail_quality("duplicate planning signal id in section 6: " current_signal_id)
+  } else {
+    signal_id_seen[current_signal_id] = 1
+  }
+  validate_signal_consumer_repos(current_signal_consumer_repos, current_signal_id)
+  validate_signal_source_evidence(current_signal_source_evidence, current_signal_id)
+  signal_block_count++
+  in_signal_block = 0
+}
 function validate_repo_block() {
   if (!in_repo_block) {
     return
@@ -278,7 +362,7 @@ function validate_component_requirement_refs(raw_value, repo_name, component_nam
     fail_quality("component " component_name " in repo " repo_name " must reference at least one REQ-* or NFR-* id")
   }
 }
-function validate_component_block(    normalized_repo, normalized_kind) {
+function validate_component_block(    normalized_repo, normalized_kind, component_slug) {
   if (!in_component_block) {
     return
   }
@@ -299,6 +383,10 @@ function validate_component_block(    normalized_repo, normalized_kind) {
   if (is_unfilled(current_component_dependency)) fail_quality("component " current_component_name " has unfilled key dependency_notes")
   if (is_unfilled(current_component_evidence)) fail_quality("component " current_component_name " has unfilled key evidence")
   validate_component_requirement_refs(current_component_refs, normalized_repo, current_component_name)
+  component_slug = slugify_component(current_component_name)
+  if (component_slug != "") {
+    component_slug_seen[component_slug] = 1
+  }
   component_seen[normalized_repo]++
   component_block_count++
   in_component_block = 0
@@ -337,11 +425,14 @@ BEGIN {
   in_repo_block = 0
   in_requirement_block = 0
   in_component_block = 0
+  in_signal_block = 0
   repo_block_count = 0
   requirement_block_count = 0
   component_block_count = 0
-  constraint_count = 0
-  prep_count = 0
+  signal_block_count = 0
+  empty_marker_count = 0
+  legacy_section6_count = 0
+  section6_entry_count = 0
   risk_count = 0
   current_requirement_transport_layer = ""
   current_requirement_user_reachable = ""
@@ -356,6 +447,7 @@ BEGIN {
   validate_repo_block()
   validate_requirement_block()
   validate_component_block()
+  validate_signal_block()
 
   heading = trim($0)
   section = ""
@@ -387,6 +479,7 @@ BEGIN {
   validate_repo_block()
   validate_requirement_block()
   validate_component_block()
+  validate_signal_block()
   in_repo_block = 1
   current_repo_name = parse_heading_value($0)
   current_repo_class = ""
@@ -401,6 +494,7 @@ BEGIN {
   validate_repo_block()
   validate_requirement_block()
   validate_component_block()
+  validate_signal_block()
   in_requirement_block = 1
   current_requirement_ref = parse_heading_value($0)
   current_requirement_summary = ""
@@ -417,6 +511,7 @@ BEGIN {
   validate_repo_block()
   validate_requirement_block()
   validate_component_block()
+  validate_signal_block()
   in_component_block = 1
   current_component_name = parse_heading_value($0)
   current_component_repo = ""
@@ -428,6 +523,27 @@ BEGIN {
   current_component_gap = ""
   current_component_dependency = ""
   current_component_evidence = ""
+  next
+}
+/^### Planning Signal:[[:space:]]+/ {
+  validate_repo_block()
+  validate_requirement_block()
+  validate_component_block()
+  validate_signal_block()
+  if (section != "6") {
+    fail_quality("planning signal block is only allowed in section 6")
+  }
+  section6_entry_count++
+  in_signal_block = 1
+  current_signal_heading = parse_heading_value($0)
+  current_signal_id = ""
+  current_signal_type = ""
+  current_signal_owner_repo = ""
+  current_signal_consumer_repos = ""
+  current_signal_required_artifact = ""
+  current_signal_must_precede = ""
+  current_signal_output_requirements = ""
+  current_signal_source_evidence = ""
   next
 }
 /^[[:space:]]*-[[:space:]]*[A-Za-z0-9_.-]+:[[:space:]]*/ {
@@ -478,8 +594,27 @@ BEGIN {
     else if (key == "dependency_notes") current_component_dependency = value
     else if (key == "evidence") current_component_evidence = value
   } else if (section == "6") {
-    if (key ~ /^constraint_[0-9]+$/ && !is_unfilled(value)) constraint_count++
-    else if (key ~ /^prep_[0-9]+$/ && !is_unfilled(value)) prep_count++
+    section6_entry_count++
+    if (in_signal_block) {
+      if (key == "signal_id") current_signal_id = value
+      else if (key == "signal_type") current_signal_type = value
+      else if (key == "owner_repo") current_signal_owner_repo = value
+      else if (key == "consumer_repos") current_signal_consumer_repos = value
+      else if (key == "required_artifact") current_signal_required_artifact = value
+      else if (key == "must_precede") current_signal_must_precede = value
+      else if (key == "output_requirements") current_signal_output_requirements = value
+      else if (key == "source_evidence") current_signal_source_evidence = value
+      else fail_quality("unsupported key in planning signal block: " key)
+    } else if (key == "planning_signals") {
+      if (value != "none") {
+        fail_quality("section 6 empty marker must be exactly: - planning_signals: none")
+      }
+      empty_marker_count++
+    } else if (key ~ /^constraint_[0-9]+$/ || key ~ /^prep_[0-9]+$/) {
+      legacy_section6_count++
+    } else {
+      fail_quality("unsupported section 6 entry: " key)
+    }
   } else if (section == "7") {
     if (key ~ /^risk_[0-9]+$/ && !is_unfilled(value)) risk_count++
   }
@@ -489,6 +624,7 @@ END {
   validate_repo_block()
   validate_requirement_block()
   validate_component_block()
+  validate_signal_block()
 
   if (has_unfilled) fail_quality("artifact still contains [UNFILLED] placeholders")
   if (!saw_section_1) fail_quality("missing section 1. Document Meta")
@@ -516,8 +652,11 @@ END {
   if (repo_block_count < 1) fail_quality("section 3 must contain at least one repository block")
   if (requirement_block_count < 1) fail_quality("section 4 must contain at least one requirement block")
   if (component_block_count < 1) fail_quality("section 5 must contain at least one component block")
-  if (constraint_count < 1) fail_quality("section 6 must contain at least one explicit constraint_N entry")
-  if (prep_count < 1) fail_quality("section 6 must contain at least one explicit prep_N entry")
+  if (legacy_section6_count > 0) fail_quality("section 6 uses retired loose-entry format (constraint_* / prep_*); use typed planning-signal blocks or - planning_signals: none")
+  if (empty_marker_count > 1) fail_quality("section 6 empty marker appears more than once")
+  if (empty_marker_count > 0 && signal_block_count > 0) fail_quality("section 6 cannot mix typed planning-signal blocks with - planning_signals: none")
+  if (section6_entry_count < 1) fail_quality("section 6 must contain typed planning-signal entries or the empty marker line")
+  if (empty_marker_count < 1 && signal_block_count < 1) fail_quality("section 6 must contain at least one typed planning-signal block or - planning_signals: none")
   if (risk_count < 1) fail_quality("section 7 must contain at least one explicit risk_N entry")
 
   for (repo_name in active_classes) {

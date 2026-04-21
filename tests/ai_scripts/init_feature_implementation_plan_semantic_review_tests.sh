@@ -3,6 +3,7 @@ set -euo pipefail
 
 SOURCE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 SCRIPT_SRC="$SOURCE_ROOT/overmind/scripts/feature_implementation_plan_semantic_review.sh"
+HELPER_SRC="$SOURCE_ROOT/overmind/scripts/helper/check_implementation_plan_semantic_review_quality.sh"
 RULE_SRC="$SOURCE_ROOT/overmind/rules/implementation_plan_semantic_review_rule.md"
 TEMPLATE_SRC="$SOURCE_ROOT/overmind/templates/implementation_plan_semantic_review_TEMPLATE.md"
 GOLDEN_EXAMPLE_SRC="$SOURCE_ROOT/overmind/golden_examples/implementation_plan_semantic_review_GOLDEN_EXAMPLE.md"
@@ -61,6 +62,7 @@ setup_workspace_layout() {
   local repo_dir="$1"
   mkdir -p \
     "$repo_dir/asdlc/.commands" \
+    "$repo_dir/asdlc/.helper" \
     "$repo_dir/asdlc/.rules" \
     "$repo_dir/asdlc/.templates" \
     "$repo_dir/asdlc/.golden_examples" \
@@ -68,15 +70,31 @@ setup_workspace_layout() {
     "$repo_dir/asdlc/projects/p1/feature-a"
 
   cp "$SCRIPT_SRC" "$repo_dir/asdlc/.commands/feature_implementation_plan_semantic_review.sh"
+  cp "$HELPER_SRC" "$repo_dir/asdlc/.helper/check_implementation_plan_semantic_review_quality.sh"
   cp "$RULE_SRC" "$repo_dir/asdlc/.rules/implementation_plan_semantic_review_rule.md"
   cp "$TEMPLATE_SRC" "$repo_dir/asdlc/.templates/implementation_plan_semantic_review_TEMPLATE.md"
   cp "$GOLDEN_EXAMPLE_SRC" "$repo_dir/asdlc/.golden_examples/implementation_plan_semantic_review_GOLDEN_EXAMPLE.md"
   chmod +x "$repo_dir/asdlc/.commands/feature_implementation_plan_semantic_review.sh"
+  chmod +x "$repo_dir/asdlc/.helper/check_implementation_plan_semantic_review_quality.sh"
 
   cat >"$repo_dir/asdlc/asdlc_metadata.yaml" <<'OUT'
 meta:
   description: "test"
 projects:
+OUT
+
+  mkdir -p "$repo_dir/asdlc/projects/p1"
+  cat >"$repo_dir/asdlc/projects/p1/init_progress_definition.yaml" <<'OUT'
+meta_info:
+  project_id: "p1"
+  project_type_code: "B"
+  project_type_label: "Existing project with partial context"
+  project_classes:
+    - backend
+    - frontend
+steps:
+  - step_number: "0"
+    step_name: "placeholder"
 OUT
 }
 
@@ -176,6 +194,39 @@ OUT
 - evidence: src/components/DenialMessage.tsx
 - slice_ref:
 OUT
+
+  cat >"$repo_dir/asdlc/$feature_path/project_surface_struct_resp_map_backend.md" <<'OUT'
+# Backend Surface Map
+
+## Section 4
+- user_reachable_surface: POST /api/admin/workspace
+OUT
+
+  cat >"$repo_dir/asdlc/$feature_path/project_surface_struct_resp_map_frontend.md" <<'OUT'
+# Frontend Surface Map
+
+## Section 4
+- user_reachable_surface: /admin/home
+OUT
+}
+
+seed_surface_maps() {
+  local repo_dir="$1"
+  local feature_path="${2:-projects/p1/feature-a}"
+
+  cat >"$repo_dir/asdlc/$feature_path/project_surface_struct_resp_map_backend.md" <<'OUT'
+# Backend Surface Map
+
+## Section 4
+- user_reachable_surface: POST /api/admin/workspace
+OUT
+
+  cat >"$repo_dir/asdlc/$feature_path/project_surface_struct_resp_map_frontend.md" <<'OUT'
+# Frontend Surface Map
+
+## Section 4
+- user_reachable_surface: /admin/home
+OUT
 }
 
 setup_codex_stub() {
@@ -188,6 +239,7 @@ set -euo pipefail
 capture_dir="${TEST_CAPTURE_DIR:?TEST_CAPTURE_DIR must be set}"
 target_plan="${TARGET_PLAN_FILE:-projects/p1/feature-a/implementation_plan.md}"
 target_review="${TARGET_REVIEW_FILE:-projects/p1/feature-a/implementation_plan_semantic_review.md}"
+review_variant="${STUB_REVIEW_VARIANT:-missing-inbound}"
 
 printf '%s\n' "$@" >"$capture_dir/codex_args.txt"
 printf '%s' "${!#}" >"$capture_dir/codex_prompt.txt"
@@ -225,7 +277,9 @@ cat >"$target_plan" <<'PLAN'
 - [ ] Review step implementation
 PLAN
 
-cat >"$target_review" <<'REVIEW'
+case "$review_variant" in
+  sibling-covered)
+    cat >"$target_review" <<'REVIEW'
 # Implementation Plan Semantic Review
 
 ## 1. Document Meta
@@ -240,25 +294,123 @@ cat >"$target_review" <<'REVIEW'
 ## 2. Review Guidance
 - completion_rule: Set review_status complete only when every finding is terminal (applied, rejected, postponed) or no_findings true.
 - user_question_format: Which finding numbers should I apply to implementation_plan.md? (examples: 1,3 | all | none | postpone 2 | reject 4)
-- allowed_finding_types: step_scope_overlap, technical_gap_mix, dependency_ordering, requirement_grouping
+- allowed_finding_types: step_scope_overlap, technical_gap_mix, dependency_ordering, requirement_grouping, delivered_surface_consumption_unclear
 - allowed_severity: High, Medium, Low
 - allowed_states: added, applied, rejected, postponed
 
 ## 3. Findings Ledger
-### Finding 1 - Split client alignment into two steps
-- severity: Medium
-- finding_type: step_scope_overlap
+- no_findings: true
+REVIEW
+    ;;
+  invalid-empty-resolution-notes)
+    cat >"$target_review" <<'REVIEW'
+# Implementation Plan Semantic Review
+
+## 1. Document Meta
+- feature_id: FEAT-SEM-001
+- feature_title: workspace-active-guard
+- source_implementation_plan: projects/p1/feature-a/implementation_plan.md
+- source_requirements_ears: projects/p1/feature-a/requirements_ears.md
+- source_technical_requirements: projects/p1/feature-a/technical_requirements.md
+- review_status: complete
+- last_updated: 2026-04-11
+
+## 2. Review Guidance
+- completion_rule: Set review_status complete only when every finding is terminal (applied, rejected, postponed) or no_findings true.
+- user_question_format: Which finding numbers should I apply to implementation_plan.md? (examples: 1,3 | all | none | postpone 2 | reject 4)
+- allowed_finding_types: step_scope_overlap, technical_gap_mix, dependency_ordering, requirement_grouping, delivered_surface_consumption_unclear
+- allowed_severity: High, Medium, Low
+- allowed_states: added, applied, rejected, postponed
+
+## 3. Findings Ledger
+### Finding 1 - New admin route has no inbound affordance
+- severity: High
+- finding_type: delivered_surface_consumption_unclear
 - state: applied
 - target_steps: Step 1.2
-- related_requirements: REQ-1, REQ-2
+- related_requirements: REQ-1
 - related_evidence: gap/TECH_REQ-2, comp/frontend-workspace-client
-- summary: One client step combined ACTIVE-state logic and denial messaging.
-- rationale: Independent slices improve sequencing and review.
-- recommendation: Split client step into ACTIVE-state alignment and denial messaging.
+- summary: Step 1.2 adds /admin/workspace with no inbound affordance.
+- rationale: Route exists but operators cannot reach it from known entry points.
+- recommendation: Add sibling plan step for inbound affordance.
 - user_selection: selected
-- plan_patch_summary: Split Step 1.2 into Step 1.2 and Step 1.3.
-- resolution_notes: User selected finding 1 and plan was updated.
+- plan_patch_summary: Added inbound affordance step before Step 1.2.
+- resolution_notes:
 REVIEW
+    ;;
+  invalid-missing-requirement-link)
+    cat >"$target_review" <<'REVIEW'
+# Implementation Plan Semantic Review
+
+## 1. Document Meta
+- feature_id: FEAT-SEM-001
+- feature_title: workspace-active-guard
+- source_implementation_plan: projects/p1/feature-a/implementation_plan.md
+- source_requirements_ears: projects/p1/feature-a/requirements_ears.md
+- source_technical_requirements: projects/p1/feature-a/technical_requirements.md
+- review_status: complete
+- last_updated: 2026-04-11
+
+## 2. Review Guidance
+- completion_rule: Set review_status complete only when every finding is terminal (applied, rejected, postponed) or no_findings true.
+- user_question_format: Which finding numbers should I apply to implementation_plan.md? (examples: 1,3 | all | none | postpone 2 | reject 4)
+- allowed_finding_types: step_scope_overlap, technical_gap_mix, dependency_ordering, requirement_grouping, delivered_surface_consumption_unclear
+- allowed_severity: High, Medium, Low
+- allowed_states: added, applied, rejected, postponed
+
+## 3. Findings Ledger
+### Finding 1 - New admin route has no inbound affordance
+- severity: High
+- finding_type: delivered_surface_consumption_unclear
+- state: applied
+- target_steps: Step 1.2
+- related_requirements: none
+- related_evidence: gap/TECH_REQ-2, comp/frontend-workspace-client
+- summary: Step 1.2 adds /admin/workspace with no inbound affordance.
+- rationale: Route exists but operators cannot reach it from known entry points.
+- recommendation: Add sibling plan step for inbound affordance.
+- user_selection: selected
+- plan_patch_summary: Added inbound affordance step before Step 1.2.
+- resolution_notes: User accepted this finding and requested explicit inbound navigation.
+REVIEW
+    ;;
+  *)
+    cat >"$target_review" <<'REVIEW'
+# Implementation Plan Semantic Review
+
+## 1. Document Meta
+- feature_id: FEAT-SEM-001
+- feature_title: workspace-active-guard
+- source_implementation_plan: projects/p1/feature-a/implementation_plan.md
+- source_requirements_ears: projects/p1/feature-a/requirements_ears.md
+- source_technical_requirements: projects/p1/feature-a/technical_requirements.md
+- review_status: complete
+- last_updated: 2026-04-11
+
+## 2. Review Guidance
+- completion_rule: Set review_status complete only when every finding is terminal (applied, rejected, postponed) or no_findings true.
+- user_question_format: Which finding numbers should I apply to implementation_plan.md? (examples: 1,3 | all | none | postpone 2 | reject 4)
+- allowed_finding_types: step_scope_overlap, technical_gap_mix, dependency_ordering, requirement_grouping, delivered_surface_consumption_unclear
+- allowed_severity: High, Medium, Low
+- allowed_states: added, applied, rejected, postponed
+
+## 3. Findings Ledger
+### Finding 1 - New admin route has no inbound affordance
+- severity: High
+- finding_type: delivered_surface_consumption_unclear
+- state: applied
+- target_steps: Step 1.2
+- related_requirements: REQ-1
+- related_evidence: gap/TECH_REQ-2, comp/frontend-workspace-client
+- summary: Step 1.2 adds /admin/workspace with no inbound affordance.
+- rationale: Route exists but operators cannot reach it from known entry points.
+- recommendation: Add sibling plan step for inbound affordance.
+- user_selection: selected
+- plan_patch_summary: Added inbound affordance step before Step 1.2.
+- resolution_notes: User accepted this finding and requested explicit inbound navigation.
+REVIEW
+    ;;
+esac
 OUT
   chmod +x "$repo_dir/bin/codex"
 }
@@ -393,7 +545,7 @@ test_runs_codex_and_commits_plan_and_review_outputs() {
   assert_contains "$codex_prompt" "prerequisite_gaps.md"
   assert_contains "$codex_prompt" "Update only projects/p1/feature-a/implementation_plan.md and projects/p1/feature-a/implementation_plan_semantic_review.md."
   assert_contains "$codex_prompt" "Which finding numbers should I apply to implementation_plan.md?"
-  assert_not_contains "$codex_prompt" "check_implementation_plan_semantic_review_quality.sh"
+  assert_contains "$codex_prompt" ".helper/check_implementation_plan_semantic_review_quality.sh projects/p1/feature-a/implementation_plan_semantic_review.md"
 
   assert_equal "$requirements_before" "$(cat "$repo_dir/asdlc/projects/p1/feature-a/requirements_ears.md")"
   assert_equal "$technical_before" "$(cat "$repo_dir/asdlc/projects/p1/feature-a/technical_requirements.md")"
@@ -440,11 +592,143 @@ test_runs_with_absolute_feature_path() {
   assert_not_contains "$codex_prompt" "Mutable plan target: projects/p1/feature-a/implementation_plan.md"
 }
 
+test_missing_inbound_surface_emits_delivered_surface_finding() {
+  local repo_dir="$TMP_ROOT/repo-missing-inbound-finding"
+  local capture_dir="$TMP_ROOT/capture-missing-inbound-finding"
+  mkdir -p "$repo_dir" "$capture_dir"
+  setup_git_workspace "$repo_dir"
+  setup_codex_stub "$repo_dir"
+
+  (
+    cd "$repo_dir/asdlc" &&
+    PATH="$repo_dir/bin:$PATH" TEST_CAPTURE_DIR="$capture_dir" STUB_REVIEW_VARIANT="missing-inbound" \
+      .commands/feature_implementation_plan_semantic_review.sh --feature_path "projects/p1/feature-a"
+  ) >/dev/null
+
+  local review_artifact
+  review_artifact="$(cat "$repo_dir/asdlc/projects/p1/feature-a/implementation_plan_semantic_review.md")"
+  assert_contains "$review_artifact" "finding_type: delivered_surface_consumption_unclear"
+  assert_contains "$review_artifact" "summary: Step 1.2 adds /admin/workspace with no inbound affordance."
+}
+
+test_sibling_inbound_surface_has_no_delivered_surface_finding() {
+  local repo_dir="$TMP_ROOT/repo-sibling-inbound-covered"
+  local capture_dir="$TMP_ROOT/capture-sibling-inbound-covered"
+  mkdir -p "$repo_dir" "$capture_dir"
+  setup_git_workspace "$repo_dir"
+  setup_codex_stub "$repo_dir"
+
+  (
+    cd "$repo_dir/asdlc" &&
+    PATH="$repo_dir/bin:$PATH" TEST_CAPTURE_DIR="$capture_dir" STUB_REVIEW_VARIANT="sibling-covered" \
+      .commands/feature_implementation_plan_semantic_review.sh --feature_path "projects/p1/feature-a"
+  ) >/dev/null
+
+  local review_artifact
+  review_artifact="$(cat "$repo_dir/asdlc/projects/p1/feature-a/implementation_plan_semantic_review.md")"
+  assert_contains "$review_artifact" "- no_findings: true"
+  assert_not_contains "$review_artifact" "finding_type: delivered_surface_consumption_unclear"
+}
+
+test_prompt_includes_surface_maps_when_present() {
+  local repo_dir="$TMP_ROOT/repo-surface-map-prompt"
+  local capture_dir="$TMP_ROOT/capture-surface-map-prompt"
+  mkdir -p "$repo_dir" "$capture_dir"
+  setup_git_workspace "$repo_dir"
+  setup_codex_stub "$repo_dir"
+  seed_surface_maps "$repo_dir"
+
+  (
+    cd "$repo_dir/asdlc" &&
+    PATH="$repo_dir/bin:$PATH" TEST_CAPTURE_DIR="$capture_dir" STUB_REVIEW_VARIANT="sibling-covered" \
+      .commands/feature_implementation_plan_semantic_review.sh --feature_path "projects/p1/feature-a"
+  ) >/dev/null
+
+  local codex_prompt
+  codex_prompt="$(cat "$capture_dir/codex_prompt.txt")"
+  assert_contains "$codex_prompt" "Read-only applicable surface-map artifacts:"
+  assert_contains "$codex_prompt" "projects/p1/feature-a/project_surface_struct_resp_map_backend.md"
+  assert_contains "$codex_prompt" "projects/p1/feature-a/project_surface_struct_resp_map_frontend.md"
+}
+
+test_fails_when_active_surface_map_missing() {
+  local repo_dir="$TMP_ROOT/repo-missing-active-map"
+  local capture_dir="$TMP_ROOT/capture-missing-active-map"
+  mkdir -p "$repo_dir" "$capture_dir"
+  setup_git_workspace "$repo_dir"
+  setup_codex_stub "$repo_dir"
+  rm -f "$repo_dir/asdlc/projects/p1/feature-a/project_surface_struct_resp_map_frontend.md"
+
+  local status=0
+  local out=""
+  set +e
+  out="$(
+    cd "$repo_dir/asdlc" &&
+    PATH="$repo_dir/bin:$PATH" TEST_CAPTURE_DIR="$capture_dir" \
+      .commands/feature_implementation_plan_semantic_review.sh --feature_path "projects/p1/feature-a" 2>&1
+  )"
+  status=$?
+  set -e
+
+  assert_nonzero_status "$status"
+  assert_contains "$out" "Required surface-map artifacts not found for active repo classes: frontend"
+}
+
+test_terminal_delivered_surface_finding_requires_resolution_notes() {
+  local repo_dir="$TMP_ROOT/repo-missing-resolution-notes"
+  local capture_dir="$TMP_ROOT/capture-missing-resolution-notes"
+  mkdir -p "$repo_dir" "$capture_dir"
+  setup_git_workspace "$repo_dir"
+  setup_codex_stub "$repo_dir"
+
+  local status=0
+  local out=""
+  set +e
+  out="$(
+    cd "$repo_dir/asdlc" &&
+    PATH="$repo_dir/bin:$PATH" TEST_CAPTURE_DIR="$capture_dir" STUB_REVIEW_VARIANT="invalid-empty-resolution-notes" \
+      .commands/feature_implementation_plan_semantic_review.sh --feature_path "projects/p1/feature-a" 2>&1
+  )"
+  status=$?
+  set -e
+
+  assert_nonzero_status "$status"
+  assert_contains "$out" "quality gate failed: finding block 1 (delivered_surface_consumption_unclear) has terminal state with empty resolution_notes"
+}
+
+test_delivered_surface_finding_requires_requirement_link() {
+  local repo_dir="$TMP_ROOT/repo-missing-requirement-link"
+  local capture_dir="$TMP_ROOT/capture-missing-requirement-link"
+  mkdir -p "$repo_dir" "$capture_dir"
+  setup_git_workspace "$repo_dir"
+  setup_codex_stub "$repo_dir"
+
+  local status=0
+  local out=""
+  set +e
+  out="$(
+    cd "$repo_dir/asdlc" &&
+    PATH="$repo_dir/bin:$PATH" TEST_CAPTURE_DIR="$capture_dir" STUB_REVIEW_VARIANT="invalid-missing-requirement-link" \
+      .commands/feature_implementation_plan_semantic_review.sh --feature_path "projects/p1/feature-a" 2>&1
+  )"
+  status=$?
+  set -e
+
+  assert_nonzero_status "$status"
+  assert_contains "$out" "must reference at least one REQ-* or NFR-* id in related_requirements"
+}
+
 test_requires_feature_path_argument
 test_requires_staged_command_location
 test_fails_when_required_file_is_missing
 test_fails_when_model_phase_missing
 test_runs_codex_and_commits_plan_and_review_outputs
 test_runs_with_absolute_feature_path
+test_missing_inbound_surface_emits_delivered_surface_finding
+test_sibling_inbound_surface_has_no_delivered_surface_finding
+test_prompt_includes_surface_maps_when_present
+test_fails_when_active_surface_map_missing
+test_terminal_delivered_surface_finding_requires_resolution_notes
+test_delivered_surface_finding_requires_requirement_link
 
 echo "All implementation plan semantic review initializer tests passed."

@@ -80,11 +80,15 @@ write_valid_prerequisite_gaps() {
 
 #### Prerequisite: Telegram identity endpoint
 - status: present_in_repo
+- surface_kind: present_user_reachable_surface
+- surface_identity: none
 - evidence: POST /api/v1/telegram/identify
 - slice_ref: none
 
 #### Prerequisite: Frontend registration route
 - status: scheduled_in_slices
+- surface_kind: required_missing_user_reachable_surface
+- surface_identity: Operator Telegram registration page
 - evidence: Slice slice-3 adds /telegram/register page
 - slice_ref: slice-3
 
@@ -159,6 +163,8 @@ test_fails_when_entry_has_unmet_status() {
 
 #### Prerequisite: Account creation endpoint
 - status: unmet
+- surface_kind: required_missing_user_reachable_surface
+- surface_identity: Operator account creation page
 - evidence:
 - slice_ref: none
 OUT
@@ -192,6 +198,8 @@ test_fails_when_present_in_repo_missing_evidence() {
 
 #### Prerequisite: Telegram endpoint
 - status: present_in_repo
+- surface_kind: present_user_reachable_surface
+- surface_identity: none
 - evidence:
 - slice_ref: none
 OUT
@@ -224,6 +232,8 @@ test_fails_when_scheduled_in_slices_missing_slice_ref() {
 
 #### Prerequisite: Frontend route
 - status: scheduled_in_slices
+- surface_kind: required_missing_user_reachable_surface
+- surface_identity: Operator Telegram registration route
 - evidence: Slice slice-3 adds /telegram/register
 - slice_ref: none
 OUT
@@ -256,6 +266,8 @@ test_fails_when_slice_ref_has_invalid_format() {
 
 #### Prerequisite: Frontend route
 - status: scheduled_in_slices
+- surface_kind: required_missing_user_reachable_surface
+- surface_identity: Operator Telegram registration route
 - evidence: Slice adds /telegram/register
 - slice_ref: -bad-start
 OUT
@@ -269,6 +281,138 @@ OUT
 
   assert_equal "1" "$status"
   assert_contains "$out" "does not match required format"
+}
+
+test_passes_when_required_missing_surface_identity_is_stable_after_scheduling() {
+  local repo_dir="$TMP_ROOT/repo-stable-surface-identity"
+  mkdir -p "$repo_dir/projects/p1/feature-a"
+  setup_repo_with_helper "$repo_dir"
+
+  cat >"$repo_dir/projects/p1/feature-a/prerequisite_gaps.md" <<'OUT'
+# Prerequisite Gaps
+
+## 2. Prerequisite Trace
+
+### Requirement: REQ-5
+- requirement_summary: Operator sign-in is required before protected workflow access.
+- prerequisites: see entries below
+
+#### Prerequisite: Operator sign-in entry route
+- status: scheduled_in_slices
+- surface_kind: required_missing_user_reachable_surface
+- surface_identity: Operator sign-in page
+- evidence: Slice slice-2 schedules the same Operator sign-in page that was previously tracked as unmet in earlier prerequisite-gaps runs.
+- slice_ref: slice-2
+OUT
+
+  local result
+  result="$(run_helper "$repo_dir" "projects/p1/feature-a/prerequisite_gaps.md")"
+  local status
+  status="$(printf '%s\n' "$result" | head -n1)"
+  local out
+  out="$(printf '%s\n' "$result" | tail -n +2)"
+
+  assert_equal "0" "$status"
+  assert_contains "$out" "quality gate passed"
+}
+
+test_fails_when_required_missing_surface_identity_is_missing_after_scheduling() {
+  local repo_dir="$TMP_ROOT/repo-missing-surface-identity"
+  mkdir -p "$repo_dir/projects/p1/feature-a"
+  setup_repo_with_helper "$repo_dir"
+
+  cat >"$repo_dir/projects/p1/feature-a/prerequisite_gaps.md" <<'OUT'
+# Prerequisite Gaps
+
+## 2. Prerequisite Trace
+
+### Requirement: REQ-5
+- requirement_summary: Operator sign-in is required before protected workflow access.
+- prerequisites: see entries below
+
+#### Prerequisite: Operator sign-in entry route
+- status: scheduled_in_slices
+- surface_kind: required_missing_user_reachable_surface
+- surface_identity: none
+- evidence: Slice slice-2 adds /admin/login.
+- slice_ref: slice-2
+OUT
+
+  local result
+  result="$(run_helper "$repo_dir" "projects/p1/feature-a/prerequisite_gaps.md")"
+  local status
+  status="$(printf '%s\n' "$result" | head -n1)"
+  local out
+  out="$(printf '%s\n' "$result" | tail -n +2)"
+
+  assert_equal "1" "$status"
+  assert_contains "$out" "missing surface_identity"
+}
+
+test_fails_when_transport_or_internal_gap_is_classified_as_preserved_surface() {
+  local repo_dir="$TMP_ROOT/repo-transport-gap-classified"
+  mkdir -p "$repo_dir/projects/p1/feature-a"
+  setup_repo_with_helper "$repo_dir"
+
+  cat >"$repo_dir/projects/p1/feature-a/prerequisite_gaps.md" <<'OUT'
+# Prerequisite Gaps
+
+## 2. Prerequisite Trace
+
+### Requirement: REQ-8
+- requirement_summary: Internal projection rebuild state transitions remain deterministic.
+- prerequisites: see entries below
+
+#### Prerequisite: Projection rebuild repository synchronization
+- status: present_in_repo
+- surface_kind: transport_or_internal_execution_gap
+- surface_identity: none
+- evidence: Internal repository transition path exists.
+- slice_ref: none
+OUT
+
+  local result
+  result="$(run_helper "$repo_dir" "projects/p1/feature-a/prerequisite_gaps.md")"
+  local status
+  status="$(printf '%s\n' "$result" | head -n1)"
+  local out
+  out="$(printf '%s\n' "$result" | tail -n +2)"
+
+  assert_equal "1" "$status"
+  assert_contains "$out" "transport_or_internal_execution_gap"
+}
+
+test_passes_when_required_missing_cli_command_surface_identity_is_used() {
+  local repo_dir="$TMP_ROOT/repo-cli-surface-identity"
+  mkdir -p "$repo_dir/projects/p1/feature-a"
+  setup_repo_with_helper "$repo_dir"
+
+  cat >"$repo_dir/projects/p1/feature-a/prerequisite_gaps.md" <<'OUT'
+# Prerequisite Gaps
+
+## 2. Prerequisite Trace
+
+### Requirement: REQ-9
+- requirement_summary: Operators can run a reconciliation command from the admin terminal.
+- prerequisites: see entries below
+
+#### Prerequisite: Reconciliation CLI command
+- status: scheduled_in_slices
+- surface_kind: required_missing_user_reachable_surface
+- surface_identity: Operator reconciliation CLI command
+- evidence: Slice slice-7 schedules the reconciliation admin terminal command.
+- slice_ref: slice-7
+OUT
+
+  local result
+  result="$(run_helper "$repo_dir" "projects/p1/feature-a/prerequisite_gaps.md")"
+  local status
+  status="$(printf '%s\n' "$result" | head -n1)"
+  local out
+  out="$(printf '%s\n' "$result" | tail -n +2)"
+
+  assert_equal "0" "$status"
+  assert_contains "$out" "quality gate passed"
 }
 
 test_fails_when_input_file_is_missing() {
@@ -398,6 +542,8 @@ test_passes_when_url_present_in_user_reachable_surface() {
 
 #### Prerequisite: Identity endpoint
 - status: present_in_repo
+- surface_kind: present_user_reachable_surface
+- surface_identity: none
 - evidence: POST /api/v1/telegram/identify
 - slice_ref: none
 
@@ -422,6 +568,10 @@ test_fails_when_entry_has_unmet_status
 test_fails_when_present_in_repo_missing_evidence
 test_fails_when_scheduled_in_slices_missing_slice_ref
 test_fails_when_slice_ref_has_invalid_format
+test_passes_when_required_missing_surface_identity_is_stable_after_scheduling
+test_fails_when_required_missing_surface_identity_is_missing_after_scheduling
+test_fails_when_transport_or_internal_gap_is_classified_as_preserved_surface
+test_passes_when_required_missing_cli_command_surface_identity_is_used
 test_fails_when_input_file_is_missing
 test_fails_when_literal_url_absent_from_both_sources
 test_fails_when_backend_scheduled_job_absent_from_both_sources

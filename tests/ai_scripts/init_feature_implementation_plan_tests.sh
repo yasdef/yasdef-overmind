@@ -383,18 +383,20 @@ cat >"$target_file" <<'DOC'
 #### Repo: backend
 #### Depends on: none
 #### Evidence: gap/TECH_REQ-6, comp/backend-projection-persistence
+#### Preserved Surface: none
 - [x] Plan and discuss the step
 - [x] Add projection table changeSet and repository mappings
 - [x] Implement projection rebuild service path and integration coverage
 - [x] Review step implementation
 
-### Step 1.2 Frontend order projection client alignment [REQ-4] [REQ-6]
+### Step 1.2 Frontend operator entry surface alignment [REQ-4] [REQ-6]
 #### Repo: frontend
 #### Depends on: 1.1
 #### Evidence: gap/TECH_REQ-4, comp/frontend-order-projection-client
+#### Preserved Surface: Admin sign-in screen
 - [ ] Plan and discuss the step
-- [ ] Update order API client mapping for projection fields added by backend
-- [ ] Update order creation screen state and rendering for projection-backed status
+- [ ] Deliver admin sign-in screen route and entry form surface
+- [ ] Update order API client mapping for projection fields used after sign-in
 - [ ] Add component and adapter tests for projection field handling
 - [ ] Review step implementation
 
@@ -402,6 +404,7 @@ cat >"$target_file" <<'DOC'
 #### Repo: mobile
 #### Depends on: 1.1
 #### Evidence: gap/TECH_REQ-4, comp/mobile-order-projection-client
+#### Preserved Surface: Operator account search screen
 - [ ] Plan and discuss the step
 - [ ] Update mobile order API mapper for projection fields added by backend
 - [ ] Update mobile order screen state and rendering for projection-backed status
@@ -547,11 +550,14 @@ test_generates_plan_and_builds_expected_prompt() {
   local generated_plan=""
   generated_plan="$(cat "$repo_dir/asdlc/projects/p1/feature-a/implementation_plan.md")"
   assert_contains "$generated_plan" "### Step 1.1 Order projection persistence foundation [REQ-6] [REQ-7]"
-  assert_contains "$generated_plan" "### Step 1.2 Frontend order projection client alignment [REQ-4] [REQ-6]"
+  assert_contains "$generated_plan" "### Step 1.2 Frontend operator entry surface alignment [REQ-4] [REQ-6]"
   assert_contains "$generated_plan" "### Step 1.3 Mobile order projection client alignment [REQ-4] [REQ-6]"
   assert_contains "$generated_plan" "#### Evidence: gap/TECH_REQ-6, comp/backend-projection-persistence"
   assert_contains "$generated_plan" "#### Evidence: gap/TECH_REQ-4, comp/frontend-order-projection-client"
   assert_contains "$generated_plan" "#### Evidence: gap/TECH_REQ-4, comp/mobile-order-projection-client"
+  assert_contains "$generated_plan" "#### Preserved Surface: none"
+  assert_contains "$generated_plan" "#### Preserved Surface: Admin sign-in screen"
+  assert_contains "$generated_plan" "#### Preserved Surface: Operator account search screen"
   assert_equal "$requirements_before" "$(cat "$repo_dir/asdlc/projects/p1/feature-a/requirements_ears.md")"
   assert_equal "$technical_requirements_before" "$(cat "$repo_dir/asdlc/projects/p1/feature-a/technical_requirements.md")"
   assert_equal "$delta_before" "$(cat "$repo_dir/asdlc/projects/p1/feature-a/feature_contract_delta.md")"

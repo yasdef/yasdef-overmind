@@ -5,6 +5,7 @@ Read this file fully before generating output.
 ## Purpose
 - Derive a deterministic list of externally-invocable prerequisites per EARS requirement and record whether each is already present in the repository or scheduled in `implementation_slices.md`.
 - Gate Step 8.3 on zero `unmet` entries: every missing prerequisite must be promoted into `implementation_slices.md` before the plan can start.
+- Keep required missing operator-facing surfaces explicitly identifiable for downstream preservation checks, and keep them distinguishable from transport-only/internal execution gaps.
 - Produce deterministic output for `<TARGET_PREREQUISITE_GAPS_ARTIFACT>`.
 
 ## Ownership Boundaries
@@ -12,6 +13,8 @@ Owns:
 - per-EARS-requirement trace of externally-invocable prerequisites
 - status classification per prerequisite: `present_in_repo`, `scheduled_in_slices`, or `unmet`
 - evidence linking each prerequisite to a `user_reachable_surface` entry or a slice identifier
+- stable `surface_identity` naming for required missing operator-facing surfaces (`user_reachable_surface`)
+- explicit `surface_kind` classification used by downstream slice/plan preservation checks
 
 Must not own:
 - internal service-to-service dependency tracking (belongs to CRP-098 `gap/TECH_REQ-*` and `comp/*` tokens)
@@ -40,6 +43,18 @@ Allowed values: `present_in_repo`, `scheduled_in_slices`, `unmet`
 - `scheduled_in_slices`: no matching `user_reachable_surface` exists, but the prerequisite is covered by a slice in `implementation_slices.md`. The `slice_ref` field must be populated.
 - `unmet`: the prerequisite is neither present in the repo nor scheduled in slices. Any `unmet` entry must be resolved by adding a slice to `implementation_slices.md` before Step 8.3.
 
+### `surface_kind`
+Allowed values: `required_missing_user_reachable_surface`, `present_user_reachable_surface`, `transport_or_internal_execution_gap`
+- `required_missing_user_reachable_surface`: use when the prerequisite is required by EARS behavior and the operator-facing surface is currently missing (`unmet` or `scheduled_in_slices`).
+- `present_user_reachable_surface`: use when the operator-facing prerequisite is already present in repository state (`present_in_repo`).
+- `transport_or_internal_execution_gap`: never use for an emitted prerequisite entry; transport/internal concerns must stay outside prerequisite entries and be represented as `prerequisites: none` for that requirement block.
+
+### `surface_identity`
+- Stable operator-facing surface identity (for example `Operator login page`, `Admin workspace shell`, `Admin entry route`, `Operator account lookup page`, `Operator sync CLI command`, `Reconciliation admin tool`, `Account export endpoint`).
+- Required when `surface_kind: required_missing_user_reachable_surface`.
+- Must remain unchanged when the entry transitions from `status: unmet` to `status: scheduled_in_slices`.
+- Must be `none` when `surface_kind` is not `required_missing_user_reachable_surface`.
+
 ### `evidence`
 - For `present_in_repo`: the exact `user_reachable_surface` token (e.g., `POST /api/v1/orders`, `/checkout/summary`) that confirms the prerequisite. Must not be left blank.
 - For `scheduled_in_slices`: the slice description or a brief rationale describing why this slice covers the prerequisite. Must not be left blank.
@@ -59,6 +74,10 @@ Allowed values: `present_in_repo`, `scheduled_in_slices`, `unmet`
   1. Check `user_reachable_surface` entries in `technical_requirements.md` for a match. If found, status is `present_in_repo`.
   2. If not present in repo, check `implementation_slices.md` for a slice that covers this entry point. If found, status is `scheduled_in_slices`.
   3. If neither, status is `unmet`.
+- Set `surface_kind` and `surface_identity` deterministically:
+  - required missing operator-facing prerequisite: `surface_kind: required_missing_user_reachable_surface`, stable non-empty `surface_identity`
+  - already present operator-facing prerequisite: `surface_kind: present_user_reachable_surface`, `surface_identity: none`
+  - never emit transport/internal-only concerns as prerequisite entries
 
 ## Gate Condition
 - `prerequisite_gaps.md` is valid only when zero `unmet` entries remain.
