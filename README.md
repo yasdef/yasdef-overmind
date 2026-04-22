@@ -38,12 +38,15 @@ you can manualy run scripts for different steps after asdlc folder init, check
 
 ## Release-notes
 
-V-0.0.1 (current)
+V-0.0.1
 - inint mode to setup asdlc folder in file system with all necessary scripts, rules etc
 - add projects, add repos to project, scan repos for project metainfo
 - add workers to project (types: backend|frontend|mobile|infra)
 - add new feature flow end 2 end from story to requirement_ears and inplementation_plan
 - assign workers to implementation plan
+
+V-0.0.2 (current)
+- planning flow significantly improved
 
 
 ## Scripts
