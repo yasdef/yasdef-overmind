@@ -1,143 +1,98 @@
 ## ADDED Requirements
 
-### Requirement: Per-class stack blueprint templates
-Overmind SHALL provide stack blueprint templates for backend, frontend, and mobile project classes at `overmind/templates/project_stack_blueprint_be_TEMPLATE.md`, `overmind/templates/project_stack_blueprint_fe_TEMPLATE.md`, and `overmind/templates/project_stack_blueprint_mobile_TEMPLATE.md`.
+### Requirement: Per-class stack-family blueprint templates
+Overmind SHALL provide minimal stack-family blueprint templates for backend, frontend, and mobile project classes at `overmind/templates/project_stack_blueprint_be_TEMPLATE.md`, `overmind/templates/project_stack_blueprint_fe_TEMPLATE.md`, and `overmind/templates/project_stack_blueprint_mobile_TEMPLATE.md`.
 
 #### Scenario: Templates exist for all supported classes
-- **WHEN** the project stack blueprint contract is installed
+- **WHEN** the stack-family blueprint contract is installed
 - **THEN** backend, frontend, and mobile blueprint template files exist under `overmind/templates/`
 
 #### Scenario: Templates are class-specific
-- **WHEN** a practitioner opens a stack blueprint template
-- **THEN** the template identifies the target class and contains only sections applicable to that class taxonomy
+- **WHEN** a practitioner opens a stack-family blueprint template
+- **THEN** the template identifies the target class and contains only stack-family fields applicable to that class
 
-### Requirement: Templates define structure only
-Stack blueprint templates SHALL define section layout, required headings, required field names, and placeholders/comments only. Templates SHALL NOT contain project-specific values, default stack choices, workflow state, approval state, or behavioral rules.
+### Requirement: Templates define minimal early-init structure only
+Stack-family blueprint templates SHALL define section layout, required headings, required field names, and placeholders/comments only. Templates SHALL NOT contain concrete repo paths, package roots, folder paths, archetypes, path strategies, constraints, baseline user-reachable surfaces, workflow state, approval state, source metadata, or behavioral rules.
 
-#### Scenario: Template contains placeholders not project values
-- **WHEN** a practitioner opens a stack blueprint template
-- **THEN** project-specific fields such as repo name, service name, planned repo path, package/root, stack choices, and baseline tokens are placeholders rather than concrete project values
+#### Scenario: Template does not ask for unknowable project structure
+- **WHEN** a practitioner opens a stack-family blueprint template
+- **THEN** the template does not require planned repo paths, folder paths, layer bindings, archetypes, or baseline user-reachable tokens
 
 #### Scenario: Template does not encode workflow state
-- **WHEN** a practitioner opens a stack blueprint template
+- **WHEN** a practitioner opens a stack-family blueprint template
 - **THEN** the template does not include proposal source, approval status, or other authoring-flow state fields
 
 #### Scenario: Template does not define behavior rules
-- **WHEN** a practitioner opens a stack blueprint template
+- **WHEN** a practitioner opens a stack-family blueprint template
 - **THEN** behavioral constraints are not embedded in the template and remain owned by `project_stack_blueprint_rule.md`
 
 ### Requirement: Blueprint sections are fixed
-Each stack blueprint template SHALL define exactly four required top-level sections: `## 1. Meta`, `## 2. Stack Choices`, `## 3. Layer Bindings`, and `## 4. Baseline User-Reachable Inventory`.
+Each stack-family blueprint template SHALL define exactly two required top-level sections: `## 1. Meta` and `## 2. Approved Stack Family`.
 
 #### Scenario: Required sections are present
-- **WHEN** a stack blueprint is authored from a template
-- **THEN** it contains all four required top-level sections in order
+- **WHEN** a stack-family blueprint is authored from a template
+- **THEN** it contains both required top-level sections in order
 
-#### Scenario: Parallel behavioral sections are not introduced
-- **WHEN** a stack blueprint describes structural conventions
-- **THEN** it does not add feature work, implementation slices, implementation-plan tasks, or API contract schema governance sections
+#### Scenario: Structural evidence sections are not introduced
+- **WHEN** a stack-family blueprint records an early-init stack choice
+- **THEN** it does not add layer bindings, baseline user-reachable inventory, feature work, implementation slices, implementation-plan tasks, or API contract schema governance sections
 
-### Requirement: Meta section captures durable artifact identity
-The blueprint meta section SHALL include class, repo name, service name, planned repo path, class package/root metadata, and last updated date. Backend blueprints SHALL include a backend package root field such as `group_id`; frontend and mobile blueprints SHALL include a package/root field such as `group_id_or_package_root`.
+### Requirement: Meta section captures class identity
+The blueprint meta section SHALL include class and last updated date. Valid class values are `backend`, `frontend`, and `mobile`.
 
-#### Scenario: Backend meta identifies package root
-- **WHEN** a backend blueprint is authored
-- **THEN** `## 1. Meta` contains `class: backend`, repo/service identity, planned repo path, `group_id`, and last updated date
+#### Scenario: Backend meta identifies class
+- **WHEN** a backend stack-family blueprint is authored
+- **THEN** `## 1. Meta` contains `class: backend` and `last_updated`
 
-#### Scenario: Frontend meta identifies source root
-- **WHEN** a frontend blueprint is authored
-- **THEN** `## 1. Meta` contains `class: frontend`, repo/service identity, planned repo path, `group_id_or_package_root`, and last updated date
+#### Scenario: Frontend meta identifies class
+- **WHEN** a frontend stack-family blueprint is authored
+- **THEN** `## 1. Meta` contains `class: frontend` and `last_updated`
 
-#### Scenario: Mobile meta identifies source root
-- **WHEN** a mobile blueprint is authored
-- **THEN** `## 1. Meta` contains `class: mobile`, repo/service identity, planned repo path, `group_id_or_package_root`, and last updated date
-
-#### Scenario: Planned repo path is not treated as scanned evidence
-- **WHEN** a type `A` blueprint records `planned_repo_path`
-- **THEN** the value identifies the intended repository location without implying that a repository was scanned
+#### Scenario: Mobile meta identifies class
+- **WHEN** a mobile stack-family blueprint is authored
+- **THEN** `## 1. Meta` contains `class: mobile` and `last_updated`
 
 #### Scenario: Last updated is date shaped
 - **WHEN** a blueprint is authored or revised
 - **THEN** `last_updated` is recorded in `YYYY-MM-DD` format
 
-### Requirement: Stack choices describe stable project conventions
-The stack choices section SHALL capture stable class-level stack choices needed by later planning phases, including runtime/framework, build or packaging tool, data or state approach, integration approach, HTTP client approach, auth model, observability where applicable, health endpoint where applicable, deployment target, and test stack. A category with no applicable technology SHALL use literal `none` rather than prose omission.
+### Requirement: Approved stack family records one high-level choice
+The approved stack-family section SHALL capture exactly the high-level stack family approved for the class. It SHALL NOT require detailed stack categories, repository layout, path conventions, baseline routes/screens/jobs, or implementation details.
 
-#### Scenario: Backend stack choices are populated
-- **WHEN** a backend blueprint is complete
-- **THEN** `## 2. Stack Choices` contains populated backend stack categories such as language/runtime, framework, build tool, datastore, migrations, messaging, HTTP clients, auth, observability, health endpoint, deployment, and test stack
+#### Scenario: Backend stack family is recorded
+- **WHEN** a backend stack-family blueprint is complete
+- **THEN** `## 2. Approved Stack Family` contains a populated backend stack-family choice such as `java-spring-boot` or `nodejs`
 
-#### Scenario: Frontend stack choices are populated
-- **WHEN** a frontend blueprint is complete
-- **THEN** `## 2. Stack Choices` contains populated frontend stack categories such as framework, router, state/data, HTTP client, styling, auth client, environment validation, deployment, and test stack
+#### Scenario: Frontend stack family is recorded
+- **WHEN** a frontend stack-family blueprint is complete
+- **THEN** `## 2. Approved Stack Family` contains a populated frontend stack-family choice such as `react` or `angular`
 
-#### Scenario: Mobile stack choices are populated
-- **WHEN** a mobile blueprint is complete
-- **THEN** `## 2. Stack Choices` contains populated mobile stack categories such as framework, navigation, state/data, HTTP client, auth client, device integration approach, distribution target, and test stack
+#### Scenario: Mobile stack family is recorded
+- **WHEN** a mobile stack-family blueprint is complete
+- **THEN** `## 2. Approved Stack Family` contains a populated mobile stack-family choice such as `native-android-ios` or `flutter`
 
-### Requirement: Layer bindings match the surface-map taxonomy
-The layer bindings section SHALL contain one block for every standard layer expected by the matching per-class surface-map template. Each layer block SHALL include `folder_paths`, `archetypes`, and `user_reachable_pattern`, using literal `none` when a layer has no operator-reachable pattern.
+### Requirement: Blueprint rule keeps artifacts at early-init precision
+The stack blueprint rule SHALL state that stack-family blueprints describe only the approved high-level stack family for one active class. The rule SHALL forbid path strategies, layer bindings, baseline surfaces, implementation slices, implementation-plan tasks, and API contract schemas in blueprint content.
 
-#### Scenario: Backend layer bindings match backend surface map
-- **WHEN** a backend blueprint is complete
-- **THEN** `## 3. Layer Bindings` contains backend API, service, domain, persistence, integration, runtime/ops, and test layer blocks
-
-#### Scenario: Frontend layer bindings match frontend surface map
-- **WHEN** a frontend blueprint is complete
-- **THEN** `## 3. Layer Bindings` contains UI composition, component, state/data, API integration, UX behavior, platform/runtime, and test layer blocks
-
-#### Scenario: Mobile layer bindings include mobile-specific surfaces
-- **WHEN** a mobile blueprint is complete
-- **THEN** `## 3. Layer Bindings` contains the shared frontend/mobile layer blocks and mobile-specific native/device and local/offline/sync layer blocks
-
-### Requirement: Baseline user-reachable inventory is token-based
-The baseline user-reachable inventory SHALL contain concrete operator-invocable tokens or literal `none`. Valid tokens include route paths, HTTP method plus path, CLI command names, scheduled job identifiers, mobile screen names, or deep links. Prose descriptions SHALL NOT be used.
-
-#### Scenario: Inventory with existing baseline tokens
-- **WHEN** a project has planned baseline operator-reachable entries
-- **THEN** `## 4. Baseline User-Reachable Inventory` lists each entry as a concrete token
-
-#### Scenario: Inventory with no baseline tokens
-- **WHEN** a project has no planned baseline operator-reachable entries
-- **THEN** `## 4. Baseline User-Reachable Inventory` contains literal `none`
-
-#### Scenario: Prose inventory is invalid by contract
-- **WHEN** a blueprint attempts to list `the admin login page` as a baseline inventory entry
-- **THEN** the entry violates the stack blueprint artifact contract
-
-### Requirement: Blueprint rule keeps artifacts structural
-The stack blueprint rule SHALL state that blueprints describe stable project-level structural conventions only. The rule SHALL forbid feature-specific surfaces, implementation slices, implementation-plan tasks, and API contract schemas in blueprint content.
-
-#### Scenario: Feature-specific route is excluded
-- **WHEN** a future feature introduces a new route or endpoint
-- **THEN** that feature-specific surface is not added to the baseline blueprint inventory by this contract
+#### Scenario: Baseline route is excluded
+- **WHEN** a future project needs a login route, health endpoint, screen, job, or command
+- **THEN** that user-reachable surface is not recorded in this early-init stack-family blueprint
 
 #### Scenario: Contract schemas remain outside the blueprint
 - **WHEN** a project needs shared request or response schemas
-- **THEN** those schemas remain owned by `common_contract_definition.md`, not the stack blueprint
+- **THEN** those schemas remain owned by `common_contract_definition.md`, not the stack-family blueprint
 
-### Requirement: Blueprint rule keeps artifacts concise and current
-The stack blueprint rule SHALL state that blueprints remain concise project-level structural references and SHALL be updated when stable stack conventions change. The rule SHALL require `last_updated` to reflect the latest structural blueprint revision.
-
-#### Scenario: Blueprint stays concise
-- **WHEN** a blueprint is authored
-- **THEN** it contains stack choices, layer bindings, and baseline user-reachable inventory without expanding into detailed implementation planning
-
-#### Scenario: Stack change updates blueprint
-- **WHEN** a stable stack convention changes, such as adding Kafka after project init
-- **THEN** the blueprint is updated and `last_updated` reflects the revision
-
-### Requirement: Golden examples demonstrate valid blueprint shape
-Overmind SHALL provide golden examples for backend, frontend, and mobile stack blueprints that demonstrate the valid four-section structure, class-appropriate stack choices, layer bindings, required metadata, and token-based baseline inventory.
+### Requirement: Golden examples demonstrate valid minimal blueprint shape
+Overmind SHALL provide golden examples for backend, frontend, and mobile stack-family blueprints that demonstrate the valid two-section structure, required metadata, and approved stack-family choice.
 
 #### Scenario: Backend golden example demonstrates backend contract
-- **WHEN** a practitioner reviews the backend stack blueprint golden example
-- **THEN** the example shows a complete valid backend blueprint
+- **WHEN** a practitioner reviews the backend stack-family blueprint golden example
+- **THEN** the example shows a complete valid backend stack-family blueprint
 
 #### Scenario: Frontend golden example demonstrates frontend contract
-- **WHEN** a practitioner reviews the frontend stack blueprint golden example
-- **THEN** the example shows a complete valid frontend blueprint
+- **WHEN** a practitioner reviews the frontend stack-family blueprint golden example
+- **THEN** the example shows a complete valid frontend stack-family blueprint
 
 #### Scenario: Mobile golden example demonstrates mobile contract
-- **WHEN** a practitioner reviews the mobile stack blueprint golden example
-- **THEN** the example shows a complete valid mobile blueprint
+- **WHEN** a practitioner reviews the mobile stack-family blueprint golden example
+- **THEN** the example shows a complete valid mobile stack-family blueprint

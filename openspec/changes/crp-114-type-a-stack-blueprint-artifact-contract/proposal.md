@@ -1,31 +1,28 @@
 ## Why
 
-Project type `A` represents a brand-new project with no repository to scan, but later planning phases still need stable per-class structural evidence. Before any init orchestration can create or consume that evidence, Overmind needs a deterministic stack blueprint artifact contract and quality gate.
+Project type `A` starts before a repository exists. At that point the user can usually identify active classes such as backend and frontend, but cannot honestly provide concrete repository structure, folder paths, archetypes, baseline routes, screens, jobs, or other surface-map evidence.
+
+Overmind still needs a small durable artifact that records the approved stack family choice per active class before later init phases proceed. CRP-114 defines that minimal artifact contract only. It must not pretend to be a repo-scan substitute.
 
 ## What Changes
 
-- Add per-class stack blueprint templates for backend, frontend, and mobile.
-- Keep templates structure-only: headings, required field names, and placeholders; concrete stack choices and project-specific values belong in final artifacts or golden examples, not templates.
-- Define the required blueprint sections:
-  - `§1 Meta` with class, repo/service identity, planned repo path, package/root metadata, and update date.
-  - `§2 Stack Choices` with runtime/framework/build/datastore/messaging/observability/deployment/test-stack choices appropriate to the class.
-  - `§3 Layer Bindings` aligned to the existing surface-map layer taxonomy, including folder paths, archetypes, and user-reachable pattern or `none`.
-  - `§4 Baseline User-Reachable Inventory` with machine-parseable baseline tokens or literal `none`.
-- Add a concise blueprint rule that defines blueprint scope and boundaries: structural conventions only, no feature work, no implementation plan, and no contract schema governance.
-- Add a structural quality helper that validates required metadata, populated stack categories, expected layer blocks, and parseable baseline user-reachable tokens.
-- Add golden examples showing valid backend, frontend, and mobile blueprint shape.
-- Add focused tests for valid blueprints, missing required metadata, missing layer blocks, invalid user-reachable tokens, and valid `none` inventory.
+- Add per-class stack-family blueprint templates for backend, frontend, and mobile.
+- Keep templates structure-only: class metadata, last updated date, and one approved high-level stack family choice.
+- Define a concise rule that keeps this artifact limited to approved stack-family selection.
+- Add a structural quality helper that validates only required fields, supported class values, date shape, and populated stack-family choice.
+- Add golden examples showing valid backend, frontend, and mobile stack-family blueprint shape.
+- Add focused tests for valid artifacts, missing metadata, unsupported class values, missing stack-family choice, invalid date shape, and unfilled placeholders.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `overmind-stack-blueprint-artifact-contract`: Overmind SHALL define a stable per-class project stack blueprint artifact contract for backend, frontend, and mobile classes.
-- `overmind-stack-blueprint-quality-gate`: Overmind SHALL validate stack blueprints for structural completeness, expected layer blocks, and parseable baseline user-reachable inventory.
+- `overmind-stack-blueprint-artifact-contract`: Overmind SHALL define a minimal per-class project stack-family blueprint artifact contract for backend, frontend, and mobile classes.
+- `overmind-stack-blueprint-quality-gate`: Overmind SHALL validate stack-family blueprints for structural completeness without requiring repository paths, layer bindings, archetypes, or baseline user-reachable inventory.
 
 ### Modified Capabilities
 
-(none — no existing specs)
+(none - no existing specs)
 
 ## Impact
 

@@ -1,6 +1,6 @@
 ## ADDED Requirements
 
-### Requirement: Type A init includes stack blueprint step
+### Requirement: Type A init includes stack-family blueprint step
 Overmind SHALL add project-init Step `1.1` for project type `A` after Step `1` records project type/classes and before Step `2` creates `common_contract_definition.md`.
 
 #### Scenario: Step 1.1 is present for type A
@@ -11,8 +11,8 @@ Overmind SHALL add project-init Step `1.1` for project type `A` after Step `1` r
 - **WHEN** init progress is generated for a project with `project_type_code: B` or `project_type_code: C`
 - **THEN** Step `1.1` does not block progress to Step `2`
 
-### Requirement: Type A requires one blueprint per active class
-For project type `A`, Step `1.1` SHALL require exactly one final `project_stack_blueprint_<class>.md` artifact at the project root for each active class in `project_classes`.
+### Requirement: Type A requires one stack-family blueprint per active class
+For project type `A`, Step `1.1` SHALL require exactly one final minimal `project_stack_blueprint_<class>.md` artifact at the project root for each active class in `project_classes`.
 
 #### Scenario: Backend active requires backend blueprint
 - **WHEN** a type `A` project has `backend` in `project_classes`
@@ -27,7 +27,7 @@ For project type `A`, Step `1.1` SHALL require exactly one final `project_stack_
 - **THEN** Step `1.1` requires `project_stack_blueprint_mobile.md`
 
 ### Requirement: Step 1.1 runs quality validation
-Step `1.1` SHALL run the CRP-114 stack blueprint quality helper for every required active-class blueprint before the step is considered complete.
+Step `1.1` SHALL run the CRP-114 stack-family blueprint quality helper for every required active-class blueprint before the step is considered complete.
 
 #### Scenario: Valid required blueprints complete step
 - **WHEN** every required active-class blueprint exists and passes `check_project_stack_blueprint_quality.sh`
@@ -40,6 +40,17 @@ Step `1.1` SHALL run the CRP-114 stack blueprint quality helper for every requir
 #### Scenario: Missing required blueprint blocks step
 - **WHEN** a required active-class blueprint is missing
 - **THEN** Step `1.1` remains incomplete
+
+### Requirement: Step 1.1 does not require structural detail
+Step `1.1` SHALL NOT require the user, MCP guidance, or fallback model proposal to provide constraints, baseline surfaces, path convention strategy, folder paths, package roots, layer bindings, or archetypes.
+
+#### Scenario: User only provides classes
+- **WHEN** a type `A` project starts with active project classes and no stack details
+- **THEN** Step `1.1` can still propose stack-family options for approval
+
+#### Scenario: Blueprint remains minimal
+- **WHEN** Step `1.1` writes a final blueprint
+- **THEN** the blueprint contains the approved stack-family choice without structural evidence fields
 
 ### Requirement: Type B and C behavior remains unchanged
 Project types `B` and `C` SHALL continue to rely on repository scan evidence and SHALL NOT require project stack blueprints to proceed through init.

@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Project setup supports optional stack guidance sources
-Project setup SHALL support optional per-class stack guidance source metadata for project type `A`. The metadata SHALL be optional and SHALL NOT be required for project setup completion.
+Project setup SHALL support optional per-class stack guidance source metadata for project type `A`. The metadata SHALL be optional and SHALL NOT be required for project setup completion. Guidance sources are used only to propose high-level stack-family choices.
 
 #### Scenario: Startup records backend guidance source
 - **WHEN** the user provides a backend stack guidance source during type `A` project setup
@@ -31,11 +31,11 @@ The absence of stack guidance source metadata, or the unavailability of a config
 
 #### Scenario: Missing metadata triggers fallback path
 - **WHEN** Step `1.1` runs for a class with no stack guidance source metadata
-- **THEN** the authoring flow uses bounded fallback proposals
+- **THEN** the authoring flow uses bounded high-level stack-family fallback proposals
 
 #### Scenario: Unavailable source triggers fallback path
 - **WHEN** Step `1.1` runs for a class with configured guidance metadata but the source is unavailable
-- **THEN** the authoring flow reports the unavailable source and uses bounded fallback proposals
+- **THEN** the authoring flow reports the unavailable source and uses bounded high-level stack-family fallback proposals
 
 ### Requirement: Guidance metadata is not stored in blueprint templates
 Stack guidance source metadata SHALL NOT be part of the CRP-114 blueprint template contract. Any proposal-source tracking SHALL belong to the Step `1.1` authoring flow.
