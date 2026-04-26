@@ -7,6 +7,9 @@ RULE_SRC="$SOURCE_ROOT/overmind/rules/common_contract_definition_rule.md"
 TEMPLATE_SRC="$SOURCE_ROOT/overmind/templates/common_contract_definition_TEMPLATE.md"
 GOLDEN_SRC="$SOURCE_ROOT/overmind/golden_examples/common_contract_definition_GOLDEN_EXAMPLE.md"
 
+STACK_BLUEPRINT_BE_GOLDEN_SRC="$SOURCE_ROOT/overmind/golden_examples/project_stack_blueprint_be_GOLDEN_EXAMPLE.md"
+STACK_BLUEPRINT_FE_GOLDEN_SRC="$SOURCE_ROOT/overmind/golden_examples/project_stack_blueprint_fe_GOLDEN_EXAMPLE.md"
+
 TMP_ROOT="$(mktemp -d)"
 trap 'rm -rf "$TMP_ROOT"' EXIT
 
@@ -123,6 +126,10 @@ target_file="${TARGET_COMMON_CONTRACT_FILE:?TARGET_COMMON_CONTRACT_FILE must be 
 printf '%s\n' "$@" >"$capture_dir/codex_args.txt"
 printf '%s' "${!#}" >"$capture_dir/codex_prompt.txt"
 
+if [[ -n "${MUTATE_STACK_BLUEPRINT_PATH:-}" ]]; then
+  echo "mutated" >>"$MUTATE_STACK_BLUEPRINT_PATH"
+fi
+
 mkdir -p "$(dirname "$target_file")"
 cat >"$target_file" <<'DOC'
 # Common Contract Definition
@@ -198,8 +205,15 @@ steps: []
 EOF2
 }
 
-test_fails_fast_for_project_type_a() {
-  local workspace="$TMP_ROOT/workspace-project-type-a"
+write_valid_stack_blueprints() {
+  local project_dir="$1"
+
+  cp "$STACK_BLUEPRINT_BE_GOLDEN_SRC" "$project_dir/project_stack_blueprint_backend.md"
+  cp "$STACK_BLUEPRINT_FE_GOLDEN_SRC" "$project_dir/project_stack_blueprint_frontend.md"
+}
+
+test_type_a_requires_stack_blueprints_before_model() {
+  local workspace="$TMP_ROOT/workspace-project-type-a-missing-blueprints"
   local asdlc_root="$workspace/asdlc"
   local project_dir="$asdlc_root/projects/sample-project"
   mkdir -p "$project_dir"
@@ -216,7 +230,7 @@ test_fails_fast_for_project_type_a() {
   set -e
 
   assert_nonzero_status "$status"
-  assert_contains "$out" "project type A is not supported yet: MCP extraction for common contract definition is unavailable"
+  assert_contains "$out" "Required type A stack blueprint is missing before Step 2"
 }
 
 test_fails_fast_when_run_from_repo_path() {
@@ -462,16 +476,87 @@ test_runs_codex_with_project_scoped_output_and_repo_context() {
   assert_contains "$codex_prompt" "Repository root: $asdlc_root"
 }
 
+test_type_a_runs_with_read_only_stack_blueprint_context() {
+  local workspace="$TMP_ROOT/workspace-type-a-success"
+  local asdlc_root="$workspace/asdlc"
+  local project_dir="$asdlc_root/projects/sample-project"
+  local capture_dir="$TMP_ROOT/capture-type-a-success"
+  mkdir -p "$project_dir" "$capture_dir"
+  setup_staged_workspace "$asdlc_root"
+  setup_staged_models_file "$asdlc_root"
+  write_staged_quality_gate_stub "$asdlc_root"
+  setup_codex_stub "$asdlc_root"
+  write_project_definition "$project_dir" "deferred" "" "deferred" "" "A"
+  write_valid_stack_blueprints "$project_dir"
+  git -C "$asdlc_root" add "projects/sample-project/init_progress_definition.yaml" "projects/sample-project/project_stack_blueprint_backend.md" "projects/sample-project/project_stack_blueprint_frontend.md"
+  git -C "$asdlc_root" commit -qm "seed type a project"
+  git -C "$asdlc_root" checkout -q -b "feature/common-contract-type-a"
+
+  local out=""
+  out="$({
+    cd "$TMP_ROOT" &&
+    PATH="$asdlc_root/bin:$PATH" TEST_CAPTURE_DIR="$capture_dir" \
+      TARGET_COMMON_CONTRACT_FILE="$project_dir/common_contract_definition.md" \
+      "$asdlc_root/.commands/init_common_contract_definition.sh" --path "$project_dir"
+  })"
+
+  assert_contains "$out" "Updated $project_dir/common_contract_definition.md"
+  assert_file_exists "$project_dir/common_contract_definition.md"
+
+  local codex_prompt=""
+  codex_prompt="$(cat "$capture_dir/codex_prompt.txt")"
+  assert_contains "$codex_prompt" "Project type code: A"
+  assert_contains "$codex_prompt" "Project type A stack-family blueprints are read-only project context only"
+  assert_contains "$codex_prompt" "- backend: $project_dir/project_stack_blueprint_backend.md"
+  assert_contains "$codex_prompt" "- frontend: $project_dir/project_stack_blueprint_frontend.md"
+  assert_contains "$codex_prompt" "Do not treat stack blueprints as API contract schemas"
+  assert_contains "$codex_prompt" "Do not modify stack blueprint files."
+}
+
+test_type_a_fails_if_model_modifies_read_only_blueprint() {
+  local workspace="$TMP_ROOT/workspace-type-a-mutates-blueprint"
+  local asdlc_root="$workspace/asdlc"
+  local project_dir="$asdlc_root/projects/sample-project"
+  local capture_dir="$TMP_ROOT/capture-type-a-mutates-blueprint"
+  mkdir -p "$project_dir" "$capture_dir"
+  setup_staged_workspace "$asdlc_root"
+  setup_staged_models_file "$asdlc_root"
+  write_staged_quality_gate_stub "$asdlc_root"
+  setup_codex_stub "$asdlc_root"
+  write_project_definition "$project_dir" "deferred" "" "deferred" "" "A"
+  write_valid_stack_blueprints "$project_dir"
+  git -C "$asdlc_root" add "projects/sample-project/init_progress_definition.yaml" "projects/sample-project/project_stack_blueprint_backend.md" "projects/sample-project/project_stack_blueprint_frontend.md"
+  git -C "$asdlc_root" commit -qm "seed type a project"
+
+  local status=0
+  local out=""
+  set +e
+  out="$({
+    cd "$TMP_ROOT" &&
+    PATH="$asdlc_root/bin:$PATH" TEST_CAPTURE_DIR="$capture_dir" \
+      TARGET_COMMON_CONTRACT_FILE="$project_dir/common_contract_definition.md" \
+      MUTATE_STACK_BLUEPRINT_PATH="$project_dir/project_stack_blueprint_backend.md" \
+      "$asdlc_root/.commands/init_common_contract_definition.sh" --path "$project_dir"
+  } 2>&1)"
+  status=$?
+  set -e
+
+  assert_nonzero_status "$status"
+  assert_contains "$out" "Step 2 modified read-only stack blueprint"
+}
+
 test_fails_fast_when_run_from_repo_path
 test_fails_when_path_argument_is_missing
 test_fails_when_path_is_outside_asdlc_projects
 test_fails_when_definition_file_is_missing
 test_fails_when_no_usable_repository_paths_exist
-test_fails_fast_for_project_type_a
+test_type_a_requires_stack_blueprints_before_model
 test_fails_when_ready_repo_path_is_invalid
 test_fails_when_path_points_to_projects_parent
 test_fails_when_path_points_to_project_subfolder
 test_fails_when_path_points_to_other_asdlc_workspace_project
 test_runs_codex_with_project_scoped_output_and_repo_context
+test_type_a_runs_with_read_only_stack_blueprint_context
+test_type_a_fails_if_model_modifies_read_only_blueprint
 
 echo "All common contract definition initializer tests passed."

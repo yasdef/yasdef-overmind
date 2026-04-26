@@ -16,3 +16,4 @@ implementation_plan_semantic_review | codex | gpt-5.4 | --config | model_reasoni
 user_br_clarification | codex | gpt-5.4 | --config | model_reasoning_effort='medium'
 repo_analyse | codex | gpt-5.4 | --config | model_reasoning_effort='high'
 common_contract_definition | codex | gpt-5.4 | --config | model_reasoning_effort='high'
+project_stack_blueprint | codex | gpt-5.4 | --config | model_reasoning_effort='medium'

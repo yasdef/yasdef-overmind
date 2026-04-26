@@ -22,6 +22,41 @@ steps:
       - condition: "overmind/init_progress_definition.yaml exists as the repo-level ASDLC metadata source of truth."
       - condition: "project_type_code, project_type_label, project_classes, and class_repo_paths for active project classes are persisted in overmind/init_progress_definition.yaml."
 
+  - step_number: 1.1
+    phase_name: "init"
+    step_name: "Define Project Stack Blueprints For Active Classes"
+    input_required:
+      - type: "document"
+        value: "init_progress_definition.yaml"
+      - type: "user_input"
+        value: "approved stack blueprint conventions for each active type A stack class"
+    finished_only_if_artefacts_present:
+      - file: "project_stack_blueprint_backend.md"
+        required_if:
+          meta_info:
+            project_type_code:
+              equals: "A"
+            project_classes:
+              any_of: ["backend"]
+      - file: "project_stack_blueprint_frontend.md"
+        required_if:
+          meta_info:
+            project_type_code:
+              equals: "A"
+            project_classes:
+              any_of: ["frontend"]
+      - file: "project_stack_blueprint_mobile.md"
+        required_if:
+          meta_info:
+            project_type_code:
+              equals: "A"
+            project_classes:
+              any_of: ["mobile"]
+    finished_only_if_conditions_meet:
+      - condition: "For project type A, every active backend/frontend/mobile class has exactly one approved project_stack_blueprint_<class>.md at the project root."
+      - condition: "For project types B and C, this step is not required and does not block Step 2."
+      - condition: "Step 1.1 captures stable stack choices, layer folder conventions, and component archetypes without capturing feature-specific implementation work."
+
   - step_number: 2
     phase_name: "init"
     step_name: "Create Cross-Repository Contract Definition For This Project"
@@ -34,7 +69,8 @@ steps:
     finished_only_if_conditions_meet:
       - condition: "For project types B and C, active BE/FE/Mobile lines provide req/resp contract evidence to the Product Owner using the configured repo paths."
       - condition: "For project types B and C, class-specific contract inventory artifacts may be prepared as supporting evidence before reconciliation."
-      - condition: "For project type A, contract guidance is sourced from MCP."
+      - condition: "For project type A, common_contract_definition.md uses approved per-class project_stack_blueprint_<class>.md as read-only project context only, not as contract schema content, repository scan evidence, or Step 7 surface-map evidence."
+      - condition: "For project type A, Step 2 cannot proceed until Step 1.1 has produced every required active-class project_stack_blueprint_<class>.md and each one passes .helper/check_project_stack_blueprint_quality.sh."
       - condition: "common_contract_definition.md reconciles applicable cross-project contract overlaps, mismatches, and shared definitions."
       - condition: "When only one source is applicable by project class/type, common_contract_definition.md explicitly documents the single-source basis."
 

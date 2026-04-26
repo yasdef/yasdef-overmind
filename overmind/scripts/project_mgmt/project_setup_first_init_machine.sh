@@ -4,6 +4,7 @@ set -euo pipefail
 ADD_NEW_PROJECT_SCRIPT="overmind/scripts/project_mgmt/project_setup_add_new_project.sh"
 UPDATE_PROJECT_SCRIPT="overmind/scripts/project_mgmt/project_setup_update_project.sh"
 INIT_PROGRESS_SCANNER_SCRIPT="overmind/scripts/project_mgmt/init_progress_scanner.sh"
+INIT_PROJECT_STACK_BLUEPRINTS_SCRIPT="overmind/scripts/init_project_stack_blueprints.sh"
 INIT_COMMON_CONTRACT_DEFINITION_SCRIPT="overmind/scripts/init_common_contract_definition.sh"
 FEATURE_BR_SCAFFOLD_SCRIPT="overmind/scripts/feature_br_scaffold.sh"
 PROJECT_ADD_FEATURE_E2E_SCRIPT="overmind/scripts/project_mgmt/project_add_feature_e2e.sh"
@@ -52,6 +53,7 @@ STAGED_RULE_FILES=(
   "implementation_slices_rule.md"
   "implementation_plan_rule.md"
   "implementation_plan_semantic_review_rule.md"
+  "project_stack_blueprint_rule.md"
   "requirements_ears_review_rule.md"
   "repo_br_scan_rule.md"
   "feature_repo_surface_and_exec_context_rule.md"
@@ -68,6 +70,9 @@ STAGED_TEMPLATE_FILES=(
   "implementation_plan_TEMPLATE.md"
   "implementation_plan_semantic_review_TEMPLATE.md"
   "missing_br_data_TEMPLATE.md"
+  "project_stack_blueprint_be_TEMPLATE.md"
+  "project_stack_blueprint_fe_TEMPLATE.md"
+  "project_stack_blueprint_mobile_TEMPLATE.md"
   "project_surface_struct_resp_map_be_TEMPLATE.md"
   "project_surface_struct_resp_map_fe_TEMPLATE.md"
   "requirements_ears_review_TEMPLATE.md"
@@ -83,6 +88,9 @@ STAGED_GOLDEN_EXAMPLE_FILES=(
   "implementation_plan_GOLDEN_EXAMPLE.md"
   "implementation_plan_semantic_review_GOLDEN_EXAMPLE.md"
   "missing_br_data_GOLDEN_EXAMPLE.md"
+  "project_stack_blueprint_be_GOLDEN_EXAMPLE.md"
+  "project_stack_blueprint_fe_GOLDEN_EXAMPLE.md"
+  "project_stack_blueprint_mobile_GOLDEN_EXAMPLE.md"
   "project_surface_struct_resp_map_be_GOLDEN_EXAMPLE.md"
   "project_surface_struct_resp_map_fe_GOLDEN_EXAMPLE.md"
   "requirements_ears_review_GOLDEN_EXAMPLE.md"
@@ -99,6 +107,7 @@ STAGED_HELPER_FILES=(
   "check_prerequisite_gaps_quality.sh"
   "check_implementation_plan_quality.sh"
   "check_implementation_plan_semantic_review_quality.sh"
+  "check_project_stack_blueprint_quality.sh"
   "check_feature_repo_surface_and_exec_context_be_quality.sh"
   "check_feature_repo_surface_and_exec_context_fe_quality.sh"
   "check_requirements_ears_review_quality.sh"
@@ -467,6 +476,7 @@ stage_commands() {
   stage_command_script "$repo_root" "$ADD_NEW_PROJECT_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
   stage_command_script "$repo_root" "$UPDATE_PROJECT_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
   stage_command_script "$repo_root" "$INIT_PROGRESS_SCANNER_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
+  stage_command_script "$repo_root" "$INIT_PROJECT_STACK_BLUEPRINTS_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
   stage_command_script "$repo_root" "$INIT_COMMON_CONTRACT_DEFINITION_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
   stage_command_script "$repo_root" "$REGISTER_WORKER_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
   stage_command_script "$repo_root" "$FEATURE_BR_SCAFFOLD_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
@@ -531,7 +541,10 @@ Path conventions:
 \`\`\`bash
 .commands/project_setup_update_project.sh
 \`\`\`
-3. Generate the common contract definition for the project:
+3. Generate the common contract definition for the project. For type A projects, approve stack-family blueprints first:
+\`\`\`bash
+.commands/init_project_stack_blueprints.sh --path projects/<project-id>
+\`\`\`
 \`\`\`bash
 .commands/init_common_contract_definition.sh --path projects/<project-id>
 \`\`\`

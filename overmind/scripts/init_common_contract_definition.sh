@@ -18,14 +18,13 @@ MODEL_MODEL=""
 MODEL_ARGS=()
 REPO_PATHS=()
 REPO_CONTEXT_LINES=()
+ACTIVE_STACK_CLASSES=()
+STACK_BLUEPRINT_PATHS=()
+STACK_BLUEPRINT_CONTEXT_LINES=()
+STACK_BLUEPRINT_SNAPSHOTS=()
 
 die() {
   echo "ERROR: $*" >&2
-  exit 1
-}
-
-fail_project_type_a_not_supported() {
-  echo "project type A is not supported yet: MCP extraction for common contract definition is unavailable" >&2
   exit 1
 }
 
@@ -167,7 +166,9 @@ validate_project_folder_contract() {
   [[ -f "$definition_path" ]] || die "Project path must point to a project-level folder containing init_progress_definition.yaml: $PROJECT_ROOT"
   project_type_code="$(extract_meta_scalar "$definition_path" "project_type_code" 2>/dev/null || true)"
   if [[ "$project_type_code" == "A" ]]; then
-    fail_project_type_a_not_supported
+    collect_stack_blueprint_paths "$definition_path"
+    validate_stack_blueprints
+    return 0
   fi
   collect_usable_repo_paths "$definition_path"
 }
@@ -376,6 +377,146 @@ collect_usable_repo_paths() {
   fi
 }
 
+extract_project_classes() {
+  local definition_path="$1"
+
+  awk '
+function trim(v) {
+  sub(/^[[:space:]]+/, "", v)
+  sub(/[[:space:]]+$/, "", v)
+  return v
+}
+function strip_quotes(v) {
+  v = trim(v)
+  if ((v ~ /^".*"$/) || (v ~ /^'\''.*'\''$/)) {
+    v = substr(v, 2, length(v) - 2)
+  }
+  return trim(v)
+}
+BEGIN {
+  in_meta = 0
+  in_classes = 0
+}
+/^meta_info:[[:space:]]*$/ {
+  in_meta = 1
+  next
+}
+/^steps:[[:space:]]*$/ {
+  if (in_meta == 1) {
+    exit 0
+  }
+}
+{
+  if (in_meta == 0) {
+    next
+  }
+  if ($0 ~ /^[[:space:]]{2}project_classes:[[:space:]]*\[[^]]*\][[:space:]]*$/) {
+    line = $0
+    sub(/^[[:space:]]{2}project_classes:[[:space:]]*\[/, "", line)
+    sub(/\][[:space:]]*$/, "", line)
+    count = split(line, parts, ",")
+    for (i = 1; i <= count; i++) {
+      value = strip_quotes(parts[i])
+      if (value != "") print value
+    }
+    exit 0
+  }
+  if ($0 ~ /^[[:space:]]{2}project_classes:[[:space:]]*$/) {
+    in_classes = 1
+    next
+  }
+  if (in_classes == 1) {
+    if ($0 ~ /^[[:space:]]{4}-[[:space:]]*/) {
+      line = $0
+      sub(/^[[:space:]]{4}-[[:space:]]*/, "", line)
+      value = strip_quotes(line)
+      if (value != "") print value
+      next
+    }
+    in_classes = 0
+  }
+}
+' "$definition_path"
+}
+
+collect_stack_blueprint_paths() {
+  local definition_path="$1"
+  local class_name=""
+  local blueprint_path=""
+
+  ACTIVE_STACK_CLASSES=()
+  STACK_BLUEPRINT_PATHS=()
+  STACK_BLUEPRINT_CONTEXT_LINES=()
+
+  while IFS= read -r class_name; do
+    class_name="$(strip_quotes "$class_name")"
+    [[ -n "$class_name" ]] || continue
+    case "$class_name" in
+    backend|frontend|mobile)
+      if array_contains "$class_name" "${ACTIVE_STACK_CLASSES[@]-}"; then
+        continue
+      fi
+      blueprint_path="$PROJECT_ROOT/project_stack_blueprint_${class_name}.md"
+      ACTIVE_STACK_CLASSES+=("$class_name")
+      STACK_BLUEPRINT_PATHS+=("$blueprint_path")
+      STACK_BLUEPRINT_CONTEXT_LINES+=("- $class_name: $blueprint_path")
+      ;;
+    *)
+      ;;
+    esac
+  done < <(extract_project_classes "$definition_path")
+}
+
+validate_stack_blueprints() {
+  local blueprint_path=""
+
+  if [[ ${#STACK_BLUEPRINT_PATHS[@]} -eq 0 ]]; then
+    die "No active backend/frontend/mobile classes found for type A stack blueprint context."
+  fi
+
+  for blueprint_path in "${STACK_BLUEPRINT_PATHS[@]}"; do
+    [[ -f "$blueprint_path" ]] || die "Required type A stack blueprint is missing before Step 2: $blueprint_path"
+  done
+}
+
+snapshot_stack_blueprints() {
+  local blueprint_path=""
+  local snapshot_path=""
+
+  STACK_BLUEPRINT_SNAPSHOTS=()
+  for blueprint_path in "${STACK_BLUEPRINT_PATHS[@]}"; do
+    if ! snapshot_path="$(mktemp)"; then
+      die "Failed to create stack blueprint snapshot."
+    fi
+    if ! cp "$blueprint_path" "$snapshot_path"; then
+      rm -f "$snapshot_path"
+      die "Failed to snapshot stack blueprint: $blueprint_path"
+    fi
+    STACK_BLUEPRINT_SNAPSHOTS+=("$snapshot_path")
+  done
+}
+
+verify_stack_blueprints_unchanged() {
+  local index=0
+  local blueprint_path=""
+  local snapshot_path=""
+
+  for blueprint_path in "${STACK_BLUEPRINT_PATHS[@]}"; do
+    snapshot_path="${STACK_BLUEPRINT_SNAPSHOTS[$index]}"
+    if ! cmp -s "$snapshot_path" "$blueprint_path"; then
+      die "Step 2 modified read-only stack blueprint: $blueprint_path"
+    fi
+    index=$((index + 1))
+  done
+}
+
+cleanup_stack_blueprint_snapshots() {
+  local snapshot_path=""
+  for snapshot_path in "${STACK_BLUEPRINT_SNAPSHOTS[@]-}"; do
+    [[ -n "$snapshot_path" && -f "$snapshot_path" ]] && rm -f "$snapshot_path"
+  done
+}
+
 load_model_config() {
   local models_path="$1"
   local phase="$2"
@@ -429,13 +570,40 @@ render_repo_context_lines() {
   done
 }
 
+render_stack_blueprint_context_lines() {
+  local line=""
+  for line in "${STACK_BLUEPRINT_CONTEXT_LINES[@]}"; do
+    printf '%s\n' "$line"
+  done
+}
+
 build_prompt() {
   local repo_root="$1"
   local project_id="$2"
   local project_definition_path="$3"
   local target_artifact_path="$4"
+  local project_type_code="$5"
   local quality_command=""
   printf -v quality_command "%q %q" "$QUALITY_GATE_HELPER" "$target_artifact_path"
+
+  local source_context=""
+  if [[ "$project_type_code" == "A" ]]; then
+    source_context=$(cat <<EOF_A
+- Project type A stack-family blueprints are read-only project context only:
+$(render_stack_blueprint_context_lines)
+- Use the approved stack-family choices only as high-level project context.
+- Do not treat stack blueprints as API contract schemas, shared request/response definitions, repository scan evidence, or Step 7 surface-map evidence.
+- Do not modify stack blueprint files.
+EOF_A
+)
+  else
+    source_context=$(cat <<EOF_BC
+- Use repository paths from $project_definition_path key \`meta_info.class_repo_paths\` as the only authoritative repositories for this run.
+- Authoritative repository paths to analyze:
+$(render_repo_context_lines)
+EOF_BC
+)
+  fi
 
   cat <<EOF2
 Create a cross-project common contract definition artifact for this ASDLC project.
@@ -446,7 +614,6 @@ Hard constraints:
 - Use $COMMON_CONTRACT_TEMPLATE_FILE as output structure contract.
 - Use $COMMON_CONTRACT_GOLDEN_EXAMPLE_FILE as style contract.
 - Update only $target_artifact_path.
-- Use repository paths from $project_definition_path key \`meta_info.class_repo_paths\` as the only authoritative repositories for this run.
 - For each shared contract, reconcile overlaps/mismatches and assign a clear source of truth.
 - Keep repository evidence summary concise but concrete.
 - Do not duplicate repository-structure or project-tech baseline artifacts.
@@ -462,6 +629,7 @@ Context:
 - Repository root: $repo_root
 - ASDLC project root: $PROJECT_ROOT
 - Project id: $project_id
+- Project type code: $project_type_code
 - Project definition file: $project_definition_path
 - Target common contract definition artifact: $target_artifact_path
 - Rule file: $RULE_FILE
@@ -469,8 +637,7 @@ Context:
 - Golden example file: $COMMON_CONTRACT_GOLDEN_EXAMPLE_FILE
 - Quality gate helper: $QUALITY_GATE_HELPER
 - Quality gate command: $quality_command
-- Authoritative repository paths to analyze:
-$(render_repo_context_lines)
+$source_context
 EOF2
 }
 
@@ -506,7 +673,10 @@ commit_generated_artifact() {
 
 main() {
   require_command awk
+  require_command cmp
+  require_command cp
   require_command git
+  require_command mktemp
   parse_args "$@"
 
   local repo_root=""
@@ -515,12 +685,14 @@ main() {
   local prompt_arg=""
   local project_id=""
   local target_artifact_path=""
+  local project_type_code=""
 
   resolve_runtime_root
   repo_root="$RUNTIME_ROOT"
   resolve_project_root "$PROJECT_PATH_INPUT" "$repo_root"
   project_definition_path="$PROJECT_ROOT/$PROJECT_DEFINITION_FILE"
   validate_project_folder_contract "$project_definition_path"
+  project_type_code="$(extract_meta_scalar "$project_definition_path" "project_type_code" 2>/dev/null || true)"
 
   ensure_required_files "$repo_root"
 
@@ -538,7 +710,12 @@ main() {
   fi
   require_command "$MODEL_CMD"
 
-  prompt_arg="$(build_prompt "$repo_root" "$project_id" "$project_definition_path" "$target_artifact_path")"
+  if [[ "$project_type_code" == "A" ]]; then
+    snapshot_stack_blueprints
+    trap cleanup_stack_blueprint_snapshots EXIT
+  fi
+
+  prompt_arg="$(build_prompt "$repo_root" "$project_id" "$project_definition_path" "$target_artifact_path" "$project_type_code")"
 
   local cmd=("$MODEL_CMD" -m "$MODEL_MODEL")
   if [[ ${#MODEL_ARGS[@]} -gt 0 ]]; then
@@ -553,6 +730,12 @@ main() {
 
   if [[ ! -f "$target_artifact_path" ]]; then
     die "Model run did not produce required file: $target_artifact_path"
+  fi
+
+  if [[ "$project_type_code" == "A" ]]; then
+    verify_stack_blueprints_unchanged
+    cleanup_stack_blueprint_snapshots
+    trap - EXIT
   fi
 
   commit_generated_artifact "$repo_root" "$project_id" "$target_artifact_path"

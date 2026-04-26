@@ -25,6 +25,7 @@ Must not own:
 ## Authoritative Inputs and Outputs
 - Authoritative repository set comes from project metadata in `<PROJECT_INIT_DEFINITION_FILE>`, key `meta_info.class_repo_paths`, filtered to usable repository paths by the init script.
 - Use available repository evidence as primary source (API specs, DTO/schema definitions, events, integration adapters, tests, and docs near contract boundaries).
+- For project type `A`, approved stack-family blueprints may be provided as read-only high-level project context only.
 - Output target is `<TARGET_COMMON_CONTRACT_DEFINITION_ARTIFACT>`.
 - Do not create or modify unrelated files.
 
@@ -51,9 +52,17 @@ Must not own:
 
 ## Evidence Rules
 - Prefer repository-proven claims.
+- For project type `A`, use stack-family blueprint context only to understand broad technology family; do not copy it as contract schema content.
 - Do not invent contract surfaces, statuses, ownership, or compatibility rules without repository evidence.
 - If evidence is incomplete, keep uncertainty explicit in section 5.
 - Keep prose concise and contract-centric.
+
+## Type A Stack Blueprint Context
+- For project type `A`, one approved `project_stack_blueprint_<class>.md` per active class is available as input — produced and quality-gated by Step `1.1`.
+- Treat `project_stack_blueprint_<class>.md` files as read-only.
+- Do not modify stack blueprint files.
+- Do not treat stack-family blueprints as API contract schemas, shared request/response definitions, repository scan evidence, or Step `7` surface-map evidence.
+- Stable shared contract definitions remain owned by `common_contract_definition.md`.
 
 ## Runtime Path Binding Rules
 - Treat runtime bindings in prompt context as authoritative for this invocation.

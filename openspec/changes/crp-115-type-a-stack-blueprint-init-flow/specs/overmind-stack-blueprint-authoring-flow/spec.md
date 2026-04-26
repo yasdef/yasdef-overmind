@@ -16,7 +16,7 @@ The stack-family blueprint authoring command SHALL read `init_progress_definitio
 - **THEN** it exits without requiring or writing stack blueprints
 
 ### Requirement: Authoring flow uses configured guidance when available
-For each active type `A` class, the authoring flow SHALL check configured stack guidance source metadata before proposing stack choices. When guidance is available, it SHALL extract high-level stack-family options from that source for user review.
+For each active type `A` class, the authoring flow SHALL check configured stack guidance source metadata before proposing stack choices. When guidance is available, it SHALL extract stack choices, layer conventions, component archetypes, and baseline user-reachable tokens from that source for user review.
 
 #### Scenario: Configured guidance source is used
 - **WHEN** a backend stack guidance source is configured and available
@@ -42,22 +42,22 @@ When no guidance source is configured or the configured source is unavailable, t
 - **THEN** the authoring flow presents native Android Kotlin and iOS Swift as the default mobile proposal and Flutter/Dart as the main alternative
 
 ### Requirement: Authoring flow requires user approval before final write
-The authoring flow SHALL NOT write final `project_stack_blueprint_<class>.md` artifacts until the user explicitly approves one stack-family choice for that class or provides an override.
+The authoring flow SHALL NOT write final `project_stack_blueprint_<class>.md` artifacts until the user explicitly approves one complete Gap 5 blueprint for that class or provides an override.
 
 #### Scenario: No final write before approval
-- **WHEN** the user has not approved a stack-family choice for a class
+- **WHEN** the user has not approved a complete Gap 5 blueprint for a class
 - **THEN** the authoring flow does not write the final stack blueprint for that class
 
 #### Scenario: Final write after approval
-- **WHEN** the user approves a stack-family choice for a class
+- **WHEN** the user approves a complete Gap 5 blueprint for a class
 - **THEN** the authoring flow writes `project_stack_blueprint_<class>.md`
 
 #### Scenario: User override is accepted before approval
-- **WHEN** the user rejects a proposed stack family and provides an override
+- **WHEN** the user rejects a proposed blueprint and provides an override
 - **THEN** the authoring flow revises the proposed blueprint before asking for final approval
 
-### Requirement: Authoring flow writes only minimal stack-family artifacts
-Final blueprints written by the authoring flow SHALL conform to the CRP-114 minimal stack-family blueprint artifact contract and SHALL pass `check_project_stack_blueprint_quality.sh`.
+### Requirement: Authoring flow writes Gap 5 stack blueprint artifacts
+Final blueprints written by the authoring flow SHALL conform to the CRP-114 Gap 5 stack blueprint artifact contract and SHALL pass `check_project_stack_blueprint_quality.sh`.
 
 #### Scenario: Valid final blueprint passes quality helper
 - **WHEN** the authoring flow writes a final blueprint
@@ -67,9 +67,9 @@ Final blueprints written by the authoring flow SHALL conform to the CRP-114 mini
 - **WHEN** a generated final blueprint fails the CRP-114 quality helper
 - **THEN** the authoring flow reports the failure and does not mark Step `1.1` complete
 
-#### Scenario: Structural details are excluded
+#### Scenario: Feature-specific details are excluded
 - **WHEN** the authoring flow writes a final blueprint
-- **THEN** it does not include constraints, baseline surfaces, path convention strategy, folder paths, package roots, layer bindings, or archetypes
+- **THEN** it includes stable planned repo identity, folder paths, package roots, layer bindings, archetypes, and baseline tokens, but not feature-specific work or API contract schema governance
 
 ### Requirement: Authoring flow can revise existing blueprints
 The authoring flow SHALL support updating an existing type `A` stack-family blueprint when the approved stack family changes. Revisions SHALL use the same user-approval and CRP-114 quality-validation path as initial blueprint creation.

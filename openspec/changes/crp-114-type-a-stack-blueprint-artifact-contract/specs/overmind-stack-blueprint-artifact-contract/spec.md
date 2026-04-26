@@ -1,98 +1,72 @@
 ## ADDED Requirements
 
-### Requirement: Per-class stack-family blueprint templates
-Overmind SHALL provide minimal stack-family blueprint templates for backend, frontend, and mobile project classes at `overmind/templates/project_stack_blueprint_be_TEMPLATE.md`, `overmind/templates/project_stack_blueprint_fe_TEMPLATE.md`, and `overmind/templates/project_stack_blueprint_mobile_TEMPLATE.md`.
+### Requirement: Templates define Gap 5 project stack blueprints
+Overmind SHALL provide project stack blueprint templates for backend, frontend, and mobile project classes at `overmind/templates/project_stack_blueprint_be_TEMPLATE.md`, `overmind/templates/project_stack_blueprint_fe_TEMPLATE.md`, and `overmind/templates/project_stack_blueprint_mobile_TEMPLATE.md`. Templates SHALL define structure only.
 
-#### Scenario: Templates exist for all supported classes
-- **WHEN** the stack-family blueprint contract is installed
-- **THEN** backend, frontend, and mobile blueprint template files exist under `overmind/templates/`
+#### Scenario: Backend template exists
+- **WHEN** the Overmind templates are staged
+- **THEN** `project_stack_blueprint_be_TEMPLATE.md` is available for backend type `A` projects
 
-#### Scenario: Templates are class-specific
-- **WHEN** a practitioner opens a stack-family blueprint template
-- **THEN** the template identifies the target class and contains only stack-family fields applicable to that class
+#### Scenario: Frontend template exists
+- **WHEN** the Overmind templates are staged
+- **THEN** `project_stack_blueprint_fe_TEMPLATE.md` is available for frontend type `A` projects
 
-### Requirement: Templates define minimal early-init structure only
-Stack-family blueprint templates SHALL define section layout, required headings, required field names, and placeholders/comments only. Templates SHALL NOT contain concrete repo paths, package roots, folder paths, archetypes, path strategies, constraints, baseline user-reachable surfaces, workflow state, approval state, source metadata, or behavioral rules.
+#### Scenario: Mobile template exists
+- **WHEN** the Overmind templates are staged
+- **THEN** `project_stack_blueprint_mobile_TEMPLATE.md` is available for mobile type `A` projects
 
-#### Scenario: Template does not ask for unknowable project structure
-- **WHEN** a practitioner opens a stack-family blueprint template
-- **THEN** the template does not require planned repo paths, folder paths, layer bindings, archetypes, or baseline user-reachable tokens
+### Requirement: Blueprint templates use three required sections
+Each project stack blueprint template SHALL define exactly three required top-level sections: `## 1. Meta`, `## 2. Stack Choices`, and `## 3. Layer Bindings`.
 
-#### Scenario: Template does not encode workflow state
-- **WHEN** a practitioner opens a stack-family blueprint template
-- **THEN** the template does not include proposal source, approval status, or other authoring-flow state fields
+#### Scenario: Three-section shape is present
+- **WHEN** a template is inspected
+- **THEN** the template contains the three required Gap 5 sections
+- **AND** it does not contain workflow-state, proposal-source, or approval-state fields
 
-#### Scenario: Template does not define behavior rules
-- **WHEN** a practitioner opens a stack-family blueprint template
-- **THEN** behavioral constraints are not embedded in the template and remain owned by `project_stack_blueprint_rule.md`
+### Requirement: Blueprint meta captures planned project identity
+Section `## 1. Meta` SHALL include `class`, `repo_name`, `service_name`, `planned_repo_path`, a class-appropriate package/root field, and `last_updated`.
 
-### Requirement: Blueprint sections are fixed
-Each stack-family blueprint template SHALL define exactly two required top-level sections: `## 1. Meta` and `## 2. Approved Stack Family`.
+#### Scenario: Backend meta uses group id
+- **WHEN** the backend template is inspected
+- **THEN** Section 1 includes `group_id`
 
-#### Scenario: Required sections are present
-- **WHEN** a stack-family blueprint is authored from a template
-- **THEN** it contains both required top-level sections in order
+#### Scenario: Frontend and mobile meta use package root
+- **WHEN** frontend or mobile templates are inspected
+- **THEN** Section 1 includes `group_id_or_package_root`
 
-#### Scenario: Structural evidence sections are not introduced
-- **WHEN** a stack-family blueprint records an early-init stack choice
-- **THEN** it does not add layer bindings, baseline user-reachable inventory, feature work, implementation slices, implementation-plan tasks, or API contract schema governance sections
+### Requirement: Blueprint stack choices are class-specific
+Section `## 2. Stack Choices` SHALL include class-specific runtime/framework, data, observability, deployment, and test stack fields sufficient for Gap 5 blueprint authoring.
 
-### Requirement: Meta section captures class identity
-The blueprint meta section SHALL include class and last updated date. Valid class values are `backend`, `frontend`, and `mobile`.
+#### Scenario: Backend stack choices are present
+- **WHEN** the backend template is inspected
+- **THEN** Section 2 includes backend stack categories such as language, framework, datastore, messaging, observability, deployment, and test stack
 
-#### Scenario: Backend meta identifies class
-- **WHEN** a backend stack-family blueprint is authored
-- **THEN** `## 1. Meta` contains `class: backend` and `last_updated`
+#### Scenario: Frontend stack choices are present
+- **WHEN** the frontend template is inspected
+- **THEN** Section 2 includes frontend stack categories such as framework, router, state, API integration, deployment, and test stack
 
-#### Scenario: Frontend meta identifies class
-- **WHEN** a frontend stack-family blueprint is authored
-- **THEN** `## 1. Meta` contains `class: frontend` and `last_updated`
+#### Scenario: Mobile stack choices are present
+- **WHEN** the mobile template is inspected
+- **THEN** Section 2 includes mobile stack categories such as platforms, UI, navigation, state, API, local storage, distribution, and test stack
 
-#### Scenario: Mobile meta identifies class
-- **WHEN** a mobile stack-family blueprint is authored
-- **THEN** `## 1. Meta` contains `class: mobile` and `last_updated`
+### Requirement: Blueprint layer bindings match surface-map layers
+Section `## 3. Layer Bindings` SHALL include one block per standard surface-map layer for the class. Each layer block SHALL include `folder_paths`, `archetypes`, and `user_reachable_pattern`; backend Integration SHALL also include `topics_convention`.
 
-#### Scenario: Last updated is date shaped
-- **WHEN** a blueprint is authored or revised
-- **THEN** `last_updated` is recorded in `YYYY-MM-DD` format
+#### Scenario: Backend layer bindings are complete
+- **WHEN** the backend template is inspected
+- **THEN** Section 3 includes backend layers 3.1 through 3.7
 
-### Requirement: Approved stack family records one high-level choice
-The approved stack-family section SHALL capture exactly the high-level stack family approved for the class. It SHALL NOT require detailed stack categories, repository layout, path conventions, baseline routes/screens/jobs, or implementation details.
+#### Scenario: Frontend layer bindings are complete
+- **WHEN** the frontend template is inspected
+- **THEN** Section 3 includes frontend layers 3.1 through 3.7
 
-#### Scenario: Backend stack family is recorded
-- **WHEN** a backend stack-family blueprint is complete
-- **THEN** `## 2. Approved Stack Family` contains a populated backend stack-family choice such as `java-spring-boot` or `nodejs`
+#### Scenario: Mobile layer bindings are complete
+- **WHEN** the mobile template is inspected
+- **THEN** Section 3 includes mobile layers 3.1 through 3.9
 
-#### Scenario: Frontend stack family is recorded
-- **WHEN** a frontend stack-family blueprint is complete
-- **THEN** `## 2. Approved Stack Family` contains a populated frontend stack-family choice such as `react` or `angular`
+### Requirement: Rule keeps blueprint in Gap 5 lane
+The project stack blueprint rule SHALL allow stable stack choices, layer conventions, and component archetypes, and SHALL forbid workflow state, proposal-source metadata, approval-state metadata, feature-specific implementation work, implementation slices, implementation-plan tasks, and API contract schema governance.
 
-#### Scenario: Mobile stack family is recorded
-- **WHEN** a mobile stack-family blueprint is complete
-- **THEN** `## 2. Approved Stack Family` contains a populated mobile stack-family choice such as `native-android-ios` or `flutter`
-
-### Requirement: Blueprint rule keeps artifacts at early-init precision
-The stack blueprint rule SHALL state that stack-family blueprints describe only the approved high-level stack family for one active class. The rule SHALL forbid path strategies, layer bindings, baseline surfaces, implementation slices, implementation-plan tasks, and API contract schemas in blueprint content.
-
-#### Scenario: Baseline route is excluded
-- **WHEN** a future project needs a login route, health endpoint, screen, job, or command
-- **THEN** that user-reachable surface is not recorded in this early-init stack-family blueprint
-
-#### Scenario: Contract schemas remain outside the blueprint
-- **WHEN** a project needs shared request or response schemas
-- **THEN** those schemas remain owned by `common_contract_definition.md`, not the stack-family blueprint
-
-### Requirement: Golden examples demonstrate valid minimal blueprint shape
-Overmind SHALL provide golden examples for backend, frontend, and mobile stack-family blueprints that demonstrate the valid two-section structure, required metadata, and approved stack-family choice.
-
-#### Scenario: Backend golden example demonstrates backend contract
-- **WHEN** a practitioner reviews the backend stack-family blueprint golden example
-- **THEN** the example shows a complete valid backend stack-family blueprint
-
-#### Scenario: Frontend golden example demonstrates frontend contract
-- **WHEN** a practitioner reviews the frontend stack-family blueprint golden example
-- **THEN** the example shows a complete valid frontend stack-family blueprint
-
-#### Scenario: Mobile golden example demonstrates mobile contract
-- **WHEN** a practitioner reviews the mobile stack-family blueprint golden example
-- **THEN** the example shows a complete valid mobile stack-family blueprint
+#### Scenario: Contract governance remains elsewhere
+- **WHEN** shared request/response definitions are needed
+- **THEN** they remain owned by `common_contract_definition.md`, not by the stack blueprint

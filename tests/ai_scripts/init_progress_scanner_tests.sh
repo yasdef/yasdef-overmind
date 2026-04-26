@@ -45,9 +45,14 @@ assert_file_exists() {
 
 setup_asdlc_with_scanner() {
   local asdlc_root="$1"
-  mkdir -p "$asdlc_root/.commands" "$asdlc_root/projects"
+  mkdir -p "$asdlc_root/.commands" "$asdlc_root/.helper" "$asdlc_root/projects"
   cp "$SCANNER_SRC" "$asdlc_root/.commands/init_progress_scanner.sh"
   chmod +x "$asdlc_root/.commands/init_progress_scanner.sh"
+  cat >"$asdlc_root/asdlc_metadata.yaml" <<'EOF_META'
+meta:
+  description: "scanner test"
+projects:
+EOF_META
 }
 
 test_scanner_renders_grouped_sections_and_persists_step_state() {
@@ -374,6 +379,103 @@ EOF_DEF
   assert_contains "$out" "- [x] 4 Conditional artifacts"
 }
 
+test_scanner_applies_required_if_project_type() {
+  local asdlc_root="$TMP_ROOT/asdlc-required-if-type"
+  setup_asdlc_with_scanner "$asdlc_root"
+
+  local project_dir="$asdlc_root/projects/project-type-a"
+  local feature_dir="$project_dir/feature-a"
+  mkdir -p "$feature_dir"
+
+  cat >"$project_dir/init_progress_definition.yaml" <<'EOF_DEF'
+meta_info:
+  project_type_code: "A"
+  project_classes:
+    - backend
+    - frontend
+
+steps:
+  - step_number: 1
+    step_name: "Metadata"
+    finished_only_if_artefacts_present:
+      - file: "init_progress_definition.yaml"
+  - step_number: 1.1
+    step_name: "Define Project Stack Blueprints For Active Classes"
+    finished_only_if_artefacts_present:
+      - file: "project_stack_blueprint_backend.md"
+        required_if:
+          meta_info:
+            project_type_code:
+              equals: "A"
+            project_classes:
+              any_of: ["backend"]
+      - file: "project_stack_blueprint_frontend.md"
+        required_if:
+          meta_info:
+            project_type_code:
+              equals: "A"
+            project_classes:
+              any_of: ["frontend"]
+  - step_number: 2
+    step_name: "Common Contract"
+    finished_only_if_artefacts_present:
+      - file: "common_contract_definition.md"
+EOF_DEF
+
+  touch "$project_dir/project_stack_blueprint_backend.md"
+
+  local out_missing_frontend=""
+  out_missing_frontend="$($asdlc_root/.commands/init_progress_scanner.sh --path "$feature_dir")"
+  assert_contains "$out_missing_frontend" "- [x] 1 Metadata"
+  assert_contains "$out_missing_frontend" "- [ ] 1.1 Define Project Stack Blueprints For Active Classes"
+  assert_contains "$out_missing_frontend" "next step: 1.1 (Define Project Stack Blueprints For Active Classes)"
+
+  touch "$project_dir/project_stack_blueprint_frontend.md"
+
+  local out_valid=""
+  out_valid="$($asdlc_root/.commands/init_progress_scanner.sh --path "$feature_dir")"
+  assert_contains "$out_valid" "- [x] 1.1 Define Project Stack Blueprints For Active Classes"
+  assert_contains "$out_valid" "next step: 2 (Common Contract)"
+}
+
+test_scanner_does_not_require_type_a_stack_blueprints_for_type_b_or_c() {
+  local asdlc_root="$TMP_ROOT/asdlc-required-if-type-bc"
+  setup_asdlc_with_scanner "$asdlc_root"
+
+  local project_dir="$asdlc_root/projects/project-type-b"
+  local feature_dir="$project_dir/feature-a"
+  mkdir -p "$feature_dir"
+
+  cat >"$project_dir/init_progress_definition.yaml" <<'EOF_DEF'
+meta_info:
+  project_type_code: "B"
+  project_classes:
+    - backend
+
+steps:
+  - step_number: 1.1
+    step_name: "Define Project Stack Blueprints For Active Classes"
+    finished_only_if_artefacts_present:
+      - file: "project_stack_blueprint_backend.md"
+        required_if:
+          meta_info:
+            project_type_code:
+              equals: "A"
+            project_classes:
+              any_of: ["backend"]
+  - step_number: 2
+    step_name: "Common Contract"
+    finished_only_if_artefacts_present:
+      - file: "common_contract_definition.md"
+EOF_DEF
+
+  local out=""
+  out="$($asdlc_root/.commands/init_progress_scanner.sh --path "$feature_dir")"
+  assert_contains "$out" "- [x] 1.1 Define Project Stack Blueprints For Active Classes"
+  assert_contains "$out" "- [ ] 2 Common Contract"
+  assert_contains "$out" "next step: 2 (Common Contract)"
+}
+
 test_scanner_fails_on_malformed_required_if() {
   local asdlc_root="$TMP_ROOT/asdlc-malformed-required-if"
   setup_asdlc_with_scanner "$asdlc_root"
@@ -653,6 +755,8 @@ test_scanner_infers_project_root_from_selected_feature_folder
 test_scanner_checks_init_phase_artifacts_from_project_root_even_with_product_special_folder
 test_scanner_evaluates_project_root_and_selected_feature_only
 test_scanner_applies_required_if_project_classes
+test_scanner_applies_required_if_project_type
+test_scanner_does_not_require_type_a_stack_blueprints_for_type_b_or_c
 test_scanner_fails_on_malformed_required_if
 test_scanner_reports_split_required_steps_4_1_then_4_2
 test_scanner_does_not_block_on_incomplete_optional_step

@@ -1,6 +1,6 @@
 ## Why
 
-After the minimal stack-family blueprint artifact contract exists, type `A` projects need a concrete project-init path that chooses one approved high-level stack family per active class. At this early point the user may only know that the project has backend, frontend, and/or mobile classes, so the flow must not require concrete repository structure.
+After the Gap 5 project stack blueprint artifact contract exists, type `A` projects need a concrete project-init path that chooses one approved stack choices and baseline conventions per active class. At this early point the user may only know that the project has backend, frontend, and/or mobile classes, so the flow must not require concrete repository structure.
 
 ## What Changes
 
@@ -19,7 +19,7 @@ After the minimal stack-family blueprint artifact contract exists, type `A` proj
 
 ### New Capabilities
 
-- `overmind-type-a-stack-blueprint-init-flow`: Project type `A` init SHALL create one approved stack-family blueprint per active project class before project-level contract definition proceeds.
+- `overmind-type-a-stack-blueprint-init-flow`: Project type `A` init SHALL create one approved Gap 5 stack blueprint per active project class before project-level contract definition proceeds.
 - `overmind-stack-guidance-source-metadata`: Project setup SHALL support optional per-class stack guidance source metadata for type `A` projects without making MCP availability mandatory.
 - `overmind-stack-blueprint-authoring-flow`: Stack-family blueprint authoring SHALL use configured guidance when available, fall back to bounded model proposals when absent, and require user approval before writing final artifacts.
 - `overmind-type-a-contract-definition-blueprint-context`: Step `2` SHALL treat approved type `A` stack-family blueprints as read-only project context and SHALL NOT treat them as contract schema definitions or Step `7` structural evidence.
@@ -33,9 +33,8 @@ After the minimal stack-family blueprint artifact contract exists, type `A` proj
 - Depends on `crp-114-type-a-stack-blueprint-artifact-contract`.
 - `overmind/templates/init_progress_definition_TEMPLATE.yaml`
 - `overmind/scripts/init_project_stack_blueprints.sh`
-- `overmind/rules/project_stack_blueprint_authoring_rule.md`
+
 - `overmind/scripts/project_mgmt/project_setup_add_new_project.sh`
-- `overmind/scripts/project_mgmt/project_setup_update_project.sh`
 - `overmind/scripts/init_common_contract_definition.sh`
 - `tests/ai_scripts/project_setup_asdlc_tests.sh`
 - `tests/ai_scripts/init_project_stack_blueprints_tests.sh`

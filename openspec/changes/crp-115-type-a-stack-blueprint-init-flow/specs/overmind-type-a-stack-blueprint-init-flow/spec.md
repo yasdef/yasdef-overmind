@@ -12,7 +12,7 @@ Overmind SHALL add project-init Step `1.1` for project type `A` after Step `1` r
 - **THEN** Step `1.1` does not block progress to Step `2`
 
 ### Requirement: Type A requires one stack-family blueprint per active class
-For project type `A`, Step `1.1` SHALL require exactly one final minimal `project_stack_blueprint_<class>.md` artifact at the project root for each active class in `project_classes`.
+For project type `A`, Step `1.1` SHALL require exactly one final Gap 5 `project_stack_blueprint_<class>.md` artifact at the project root for each active class in `project_classes`.
 
 #### Scenario: Backend active requires backend blueprint
 - **WHEN** a type `A` project has `backend` in `project_classes`
@@ -41,16 +41,16 @@ Step `1.1` SHALL run the CRP-114 stack-family blueprint quality helper for every
 - **WHEN** a required active-class blueprint is missing
 - **THEN** Step `1.1` remains incomplete
 
-### Requirement: Step 1.1 does not require structural detail
-Step `1.1` SHALL NOT require the user, MCP guidance, or fallback model proposal to provide constraints, baseline surfaces, path convention strategy, folder paths, package roots, layer bindings, or archetypes.
+### Requirement: Step 1.1 captures stable blueprint conventions
+Step `1.1` SHALL capture stable stack choices, planned repo identity, package roots, layer bindings, archetypes, and baseline user-reachable inventory without requiring feature-specific implementation work.
 
-#### Scenario: User only provides classes
+#### Scenario: User provides only classes at startup
 - **WHEN** a type `A` project starts with active project classes and no stack details
-- **THEN** Step `1.1` can still propose stack-family options for approval
+- **THEN** Step `1.1` can propose stack-family options and baseline conventions for approval
 
-#### Scenario: Blueprint remains minimal
+#### Scenario: Blueprint follows Gap 5 structure
 - **WHEN** Step `1.1` writes a final blueprint
-- **THEN** the blueprint contains the approved stack-family choice without structural evidence fields
+- **THEN** the blueprint contains approved Gap 5 stack choices, layer bindings, and baseline inventory without workflow-state or approval fields
 
 ### Requirement: Type B and C behavior remains unchanged
 Project types `B` and `C` SHALL continue to rely on repository scan evidence and SHALL NOT require project stack blueprints to proceed through init.

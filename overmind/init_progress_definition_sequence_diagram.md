@@ -19,6 +19,14 @@ sequenceDiagram
     Note over PO,FE: Phase: init
     PO->>PO: 1. Init ASDLC metadata → init_progress_definition.yaml
 
+    alt Type A
+      PO->>KB: 1.1 Request stack-family guidance per active class
+      KB-->>PO: Stack-family options or unavailable
+      PO->>PO: 1.1 Approve stack-family blueprints → project_stack_blueprint_<class>.md
+    else Type B/C
+      PO->>PO: 1.1 skipped
+    end
+
     alt Type B/C
       par
         PO->>BE: 2.1 Request BE contract evidence
@@ -28,8 +36,7 @@ sequenceDiagram
         FE-->>PO: FE/MB contract evidence
       end
     else Type A
-      PO->>KB: 2.1 Request MCP contract best practices
-      KB-->>PO: MCP guidance
+      PO->>PO: 2.1 Read approved stack blueprints as context
     end
 
     PO->>PO: 2.3 Common Contracts Definition → common_contract_definition.md

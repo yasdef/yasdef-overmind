@@ -8,7 +8,9 @@ FEATURE_PATH=""
 FEATURE_INPUT_PATH=""
 PROJECT_DEFINITION_FILE="init_progress_definition.yaml"
 PROJECT_OUTPUT_FILE="step_state.md"
+PROJECT_TYPE_CODE=""
 PROJECT_CLASSES=()
+SCANNER_ASDLC_ROOT=""
 
 TMP_OUTPUT_FILE=""
 
@@ -429,6 +431,65 @@ BEGIN {
   done <<<"$parsed"
 }
 
+load_project_type_code() {
+  local definition_path="$1"
+  local parsed=""
+
+  PROJECT_TYPE_CODE=""
+  [[ -f "$definition_path" ]] || return 1
+
+  if ! parsed="$(
+    awk '
+function trim(v) {
+  sub(/^[[:space:]]+/, "", v)
+  sub(/[[:space:]]+$/, "", v)
+  return v
+}
+function strip_quotes(v) {
+  v = trim(v)
+  if ((v ~ /^".*"$/) || (v ~ /^'\''.*'\''$/)) {
+    v = substr(v, 2, length(v) - 2)
+  }
+  return trim(v)
+}
+BEGIN {
+  in_meta = 0
+  found = 0
+}
+/^meta_info:[[:space:]]*$/ {
+  in_meta = 1
+  next
+}
+/^steps:[[:space:]]*$/ {
+  if (in_meta == 1) {
+    exit 1
+  }
+}
+{
+  if (in_meta == 0) {
+    next
+  }
+
+  line = $0
+  if (line !~ /^[[:space:]]{2}project_type_code:[[:space:]]*/) {
+    next
+  }
+  sub(/^[[:space:]]{2}project_type_code:[[:space:]]*/, "", line)
+  print strip_quotes(line)
+  found = 1
+  exit 0
+}
+END {
+  exit(found ? 0 : 1)
+}
+' "$definition_path"
+  )"; then
+    return 1
+  fi
+
+  PROJECT_TYPE_CODE="$(strip_quotes "$parsed")"
+}
+
 matches_any_of() {
   local any_of_serialized="$1"
   local required_class=""
@@ -460,6 +521,20 @@ matches_any_of() {
   return 1
 }
 
+matches_project_type_code() {
+  local expected_code="$1"
+
+  expected_code="$(strip_quotes "$expected_code")"
+  [[ -n "$expected_code" ]] || return 2
+  [[ -n "$PROJECT_TYPE_CODE" ]] || return 2
+
+  if [[ "$PROJECT_TYPE_CODE" == "$expected_code" ]]; then
+    return 0
+  fi
+
+  return 1
+}
+
 parse_definition_records() {
   local definition_path="$1"
 
@@ -482,17 +557,18 @@ function flush_artifact() {
       print "ERROR: Artifact entry for step " current_step " has incomplete check_key_value fields." > "/dev/stderr"
       exit 2
     }
-    if (pending_required_if_declared == 1 && pending_required_any_of == "") {
+    if (pending_required_if_declared == 1 && pending_required_any_of == "" && pending_required_project_type_equals == "") {
       print "ERROR: Artifact entry for step " current_step " has incomplete required_if fields." > "/dev/stderr"
       exit 2
     }
-    print "ART" DELIM current_step_index DELIM current_step DELIM pending_file DELIM pending_special DELIM pending_key DELIM pending_equals DELIM pending_section DELIM pending_required_any_of
+    print "ART" DELIM current_step_index DELIM current_step DELIM pending_file DELIM pending_special DELIM pending_key DELIM pending_equals DELIM pending_section DELIM pending_required_any_of DELIM pending_required_project_type_equals
     pending_file = ""
     pending_special = ""
     pending_key = ""
     pending_equals = ""
     pending_section = ""
     pending_required_any_of = ""
+    pending_required_project_type_equals = ""
     pending_check_declared = 0
     pending_required_if_declared = 0
     in_check_key_value = 0
@@ -547,6 +623,8 @@ BEGIN {
   pending_equals = ""
   pending_section = ""
   pending_required_any_of = ""
+  pending_required_project_type_equals = ""
+  pending_quality_gate = ""
   pending_check_declared = 0
   pending_required_if_declared = 0
 }
@@ -647,6 +725,7 @@ BEGIN {
     pending_equals = ""
     pending_section = ""
     pending_required_any_of = ""
+    pending_required_project_type_equals = ""
     pending_check_declared = 0
     pending_required_if_declared = 0
     in_check_key_value = 0
@@ -710,13 +789,20 @@ BEGIN {
     append_required_any_of(line)
     next
   }
+
+  if (in_required_if == 1 && $0 ~ /^[[:space:]]*equals:[[:space:]]*/) {
+    line = $0
+    sub(/^[[:space:]]*equals:[[:space:]]*/, "", line)
+    pending_required_project_type_equals = unquote(line)
+    next
+  }
 }
 END {
   flush_artifact()
   validate_current_step()
 
   if (saw_steps == 0 || saw_step_entry == 0) {
-    print "ERROR: Missing or invalid '\''steps'\'' list in " FILENAME "." > "/dev/stderr"
+    print "ERROR: Missing or invalid steps list in " FILENAME "." > "/dev/stderr"
     exit 2
   }
 }
@@ -739,6 +825,7 @@ render_checklist() {
   local -a artifact_check_equals=()
   local -a artifact_check_sections=()
   local -a artifact_required_any_of=()
+  local -a artifact_required_project_type_equals=()
   local record_type=""
   local record_step_index=""
   local record_step_id=""
@@ -749,6 +836,8 @@ render_checklist() {
   local record_value_e=""
   local record_value_f=""
   local record_value_g=""
+  local record_value_h=""
+  local record_value_i=""
   local artifact_index=""
   local parsed_records=""
 
@@ -756,7 +845,7 @@ render_checklist() {
     die "Failed to parse project definition: $definition_path"
   fi
 
-  while IFS=$'\037' read -r record_type record_step_index record_step_id record_value_a record_value_b record_value_c record_value_d record_value_e record_value_f record_value_g; do
+  while IFS=$'\037' read -r record_type record_step_index record_step_id record_value_a record_value_b record_value_c record_value_d record_value_e record_value_f record_value_g record_value_h record_value_i; do
     if [[ "$record_type" == "STEP" ]]; then
       step_ids[$record_step_index]="$record_step_id"
       step_names[$record_step_index]="$record_value_a"
@@ -772,6 +861,7 @@ render_checklist() {
       artifact_check_equals+=("$record_value_d")
       artifact_check_sections+=("$record_value_e")
       artifact_required_any_of+=("$record_value_f")
+      artifact_required_project_type_equals+=("$record_value_g")
       if [[ -n "${step_artifact_indexes[$record_step_index]:-}" ]]; then
         step_artifact_indexes[$record_step_index]+=" $artifact_index"
       else
@@ -794,7 +884,7 @@ render_checklist() {
 
   local i j step_id step_name step_phase complete_marker step_complete step_optional
   local artifact_indexes artifact_file artifact_special artifact_folder artifact_path
-  local artifact_check_key artifact_check_equals artifact_check_section artifact_required_csv
+  local artifact_check_key artifact_check_equals artifact_check_section artifact_required_csv artifact_required_project_type
   local artifact_required=1
 
   for ((i = 0; i < ${#step_ids[@]}; i++)); do
@@ -814,10 +904,25 @@ render_checklist() {
         artifact_file="${artifact_files[$j]}"
         artifact_special="${artifact_specials[$j]}"
         artifact_required_csv="${artifact_required_any_of[$j]}"
+        artifact_required_project_type="${artifact_required_project_type_equals[$j]}"
         artifact_required=1
+        if [[ -n "$artifact_required_project_type" ]]; then
+          if matches_project_type_code "$artifact_required_project_type"; then
+            artifact_required=1
+          else
+            case "$?" in
+            1)
+              artifact_required=0
+              ;;
+            *)
+              die "Invalid project_type_code required_if condition for step $step_id artifact '$artifact_file'."
+              ;;
+            esac
+          fi
+        fi
         if [[ -n "$artifact_required_csv" ]]; then
           if matches_any_of "$artifact_required_csv"; then
-            artifact_required=1
+            :
           else
             case "$?" in
             1)
@@ -891,7 +996,7 @@ render_checklist() {
   if [[ "$all_required_complete" -eq 1 ]]; then
     echo "next step: none"
   else
-    echo "next step: $next_step_id ($next_step_name)"
+    printf 'next step: %s (%s)\n' "$next_step_id" "$next_step_name"
   fi
 }
 
@@ -909,6 +1014,7 @@ main() {
   local output_path=""
 
   projects_root="$(resolve_projects_root)"
+  SCANNER_ASDLC_ROOT="$(dirname "$projects_root")"
   feature_root="$(resolve_feature_root "$FEATURE_INPUT_PATH" "$projects_root")"
   project_root="$(infer_project_root_from_feature_root "$feature_root" "$projects_root")"
 
@@ -930,6 +1036,7 @@ main() {
 
   [[ -f "$definition_path" ]] || die "Definition file not found: $definition_path"
 
+  load_project_type_code "$definition_path" || PROJECT_TYPE_CODE=""
   load_project_classes "$definition_path" || die "Failed to read meta_info.project_classes from $definition_path."
 
   mkdir -p "$(dirname "$output_path")"
