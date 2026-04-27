@@ -16,9 +16,18 @@ This repository contains the standalone Overmind project. The original extractio
 2. run `overmind/scripts/project_mgmt/project_setup_first_init_machine.sh` to establish and set up the asdlc folder for future project work - you need to provide the place where exactly the asdlc folder will exist in your system,
 after this script finishes, the staged ASDLC commands live under your generated `asdlc/` workspace; later updates can be pulled from this repo and re-applied by running the same setup script again
 3. in asdlc folder run `.commands/project_setup_add_new_project.sh` to create a new project. On this step you may provide paths to project repos, for example backend and frontend (if they exist), if it's a completely new project we need a reference to best-practice MCP (this functionality is not supported yet). You can always add or change this info later in projects/<project_id>/init_progress_definition.yaml (see meta_info part)
-4. when project is created, if it includes repos, you can collect info about common contracts, for this run script `.commands/init_common_contract_definition.sh --path projects/<project-id>`
+4. finish required project-level init before feature work:
+   - Type A projects: Step `1` -> Step `1.1` -> Step `2` -> Step `3` (start feature).
+   - Type B/C projects: Step `1` -> Step `2` -> Step `3` (start feature).
+   - Step `1`: create `init_progress_definition.yaml` with project type, classes, and repo/path metadata.
+   - Step `1.1`: for type A only, approve stack blueprints with `.commands/init_project_stack_blueprints.sh --path projects/<project-id>`.
+   - Step `2`: create project-level `common_contract_definition.md` with `.commands/init_common_contract_definition.sh --path projects/<project-id>`.
+   - Step `3`: start feature planning with `.commands/project_add_feature_e2e.sh --path projects/<project-id>`.
+   - `project_add_feature_e2e.sh` (see p.5 below) uses the scanner to block feature progression when an earlier project step is incomplete. For a brand-new feature, it may create the Step `3` feature scaffold before reporting the missing earlier step.
 project is created in a new branch so make sure you've merged it to your main/master before you proceed
+
 --- here we finished on project level and go to feature level ---
+
 5. to create a feature end-to-end run orchestrator `.commands/project_add_feature_e2e.sh --path projects/<project-id>` and it will guide you through the process, on some step you would need to save story or epic as a source within feature folder in .txt or .md file
 6. when you are finished - please-please take a look at requirements_ears.md and implementation_plan.md yourself. It's the most critical part of future implementation and we don't have to rely on AI here completely. If you need to change or fix something - just run your usual agent, point it to the files and ask it to make changes.
 --- here we finished with feature planning, but who will work it out? ---
