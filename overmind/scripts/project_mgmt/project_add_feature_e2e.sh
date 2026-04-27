@@ -3,6 +3,7 @@ set -euo pipefail
 
 SCRIPT_BASENAME="$(basename "${BASH_SOURCE[0]}")"
 STATE_FILE_NAME=".project_add_feature_e2e_state.env"
+FIRST_SUPPORTED_STEP="3"
 TARGET_PATH_INPUT=""
 RESUME_STEP_INPUT=""
 RUNTIME_ROOT=""
@@ -61,6 +62,80 @@ array_contains() {
     fi
   done
   return 1
+}
+
+is_dotted_numeric_step() {
+  [[ "$1" =~ ^[0-9]+(\.[0-9]+)*$ ]]
+}
+
+compare_dotted_steps() {
+  local left="$1"
+  local right="$2"
+  local old_ifs="$IFS"
+  local -a left_parts=()
+  local -a right_parts=()
+  local max_parts=0
+  local idx=0
+  local left_value=0
+  local right_value=0
+
+  is_dotted_numeric_step "$left" || return 2
+  is_dotted_numeric_step "$right" || return 2
+
+  IFS='.'
+  read -r -a left_parts <<<"$left"
+  read -r -a right_parts <<<"$right"
+  IFS="$old_ifs"
+
+  max_parts="${#left_parts[@]}"
+  if (( ${#right_parts[@]} > max_parts )); then
+    max_parts="${#right_parts[@]}"
+  fi
+
+  for ((idx = 0; idx < max_parts; idx++)); do
+    left_value=$((10#${left_parts[$idx]:-0}))
+    right_value=$((10#${right_parts[$idx]:-0}))
+    if (( left_value < right_value )); then
+      printf '%s' "-1"
+      return 0
+    fi
+    if (( left_value > right_value )); then
+      printf '%s' "1"
+      return 0
+    fi
+  done
+
+  printf '%s' "0"
+}
+
+step_is_before_first_supported_step() {
+  local step_id="$1"
+  local comparison=""
+
+  comparison="$(compare_dotted_steps "$step_id" "$FIRST_SUPPORTED_STEP")" || return 1
+  [[ "$comparison" == "-1" ]]
+}
+
+fail_project_prerequisite_step() {
+  local scanner_step_number="$1"
+  local scanner_step_name="$2"
+
+  echo "Project init is incomplete: scanner returned step $scanner_step_number ($scanner_step_name)." >&2
+  echo "$SCRIPT_BASENAME starts at feature step $FIRST_SUPPORTED_STEP and cannot continue until earlier project steps are complete." >&2
+  case "$scanner_step_number" in
+    1.1)
+      echo "Run:" >&2
+      echo "  .commands/init_project_stack_blueprints.sh --path $PROJECT_PATH" >&2
+      ;;
+    2)
+      echo "Run:" >&2
+      echo "  .commands/init_common_contract_definition.sh --path $PROJECT_PATH" >&2
+      ;;
+    *)
+      echo "Complete scanner-reported project step $scanner_step_number before rerunning $SCRIPT_BASENAME." >&2
+      ;;
+  esac
+  exit 1
 }
 
 normalize_input_path() {
@@ -1131,8 +1206,17 @@ main() {
 
   local scanner_step_info=""
   local start_phase=""
+  local scanner_number=""
+  local scanner_name=""
 
   scanner_step_info="$(run_scanner_and_get_next_step "$RUNTIME_ROOT")"
+  if [[ "$scanner_step_info" != "none" ]]; then
+    scanner_number="${scanner_step_info%%|*}"
+    scanner_name="${scanner_step_info#*|}"
+    if step_is_before_first_supported_step "$scanner_number"; then
+      fail_project_prerequisite_step "$scanner_number" "$scanner_name"
+    fi
+  fi
 
   if [[ -n "$requested_phase" ]]; then
     start_phase="$requested_phase"
@@ -1141,9 +1225,6 @@ main() {
       echo "Execution finished: scanner reports no remaining required steps."
       exit 0
     fi
-
-    local scanner_number="${scanner_step_info%%|*}"
-    local scanner_name="${scanner_step_info#*|}"
 
     if ! start_phase="$(map_scanner_step_to_phase "$scanner_number" "$scanner_name")"; then
       die "Unable to map scanner next step '$scanner_number ($scanner_name)' to orchestrator phase."

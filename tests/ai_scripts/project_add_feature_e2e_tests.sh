@@ -414,6 +414,7 @@ test_split_4_1_and_4_2_execute_in_order_with_messages() {
   assert_contains "$out" "Phase 4.1 (BR Enrichment Part 1) script 2/2"
   assert_contains "$out" "Phase 4.2 (BR Enrichment Part 2) script 1/2"
   assert_contains "$out" "Phase 4.2 (BR Enrichment Part 2) script 2/2"
+  assert_not_contains "$out" "Project init is incomplete"
   assert_contains "$out" "Execution stopped: user denied phase progression at 5."
 
   local expected_log
@@ -453,6 +454,133 @@ test_default_resume_uses_scanner_next_step() {
   assert_contains "$log_content" "init_progress_scanner.sh --path projects/project-a/feature-alpha"
   assert_contains "$log_content" "feature_implementation_plan.sh --feature_path projects/project-a/feature-alpha"
   assert_not_contains "$log_content" "feature_br_scaffold.sh --path projects/project-a"
+}
+
+test_scanner_step_1_1_fails_with_stack_blueprint_guidance() {
+  local asdlc_root="$TMP_ROOT/asdlc-step-1-1-prereq"
+  local log_file="$TMP_ROOT/asdlc-step-1-1-prereq.log"
+  mkdir -p "$asdlc_root"
+  setup_workspace "$asdlc_root"
+
+  mkdir -p "$asdlc_root/projects/project-a/feature-alpha"
+  printf 'feature_path=projects/project-a/feature-alpha\n' >"$asdlc_root/projects/project-a/.project_add_feature_e2e_state.env"
+
+  local status=0
+  local out=""
+  set +e
+  out="$(
+    cd "$asdlc_root" &&
+    {
+      printf '2\n'
+      printf '1\n'
+    } | TEST_LOG_FILE="$log_file" TEST_SCANNER_NEXT_LINE="next step: 1.1 (Define Project Stack Blueprints For Active Classes)" \
+      .commands/project_add_feature_e2e.sh --path projects/project-a 2>&1
+  )"
+  status=$?
+  set -e
+
+  assert_nonzero_status "$status"
+  assert_contains "$out" "Project init is incomplete: scanner returned step 1.1 (Define Project Stack Blueprints For Active Classes)."
+  assert_contains "$out" "project_add_feature_e2e.sh starts at feature step 3"
+  assert_contains "$out" ".commands/init_project_stack_blueprints.sh --path projects/project-a"
+  assert_not_contains "$out" "Unable to map scanner next step"
+
+  local log_content
+  log_content="$(read_log "$log_file")"
+  assert_contains "$log_content" "init_progress_scanner.sh --path projects/project-a/feature-alpha"
+  assert_not_contains "$log_content" "feature_scan_repo_for_br.sh --feature_path projects/project-a/feature-alpha"
+}
+
+test_scanner_step_2_fails_with_common_contract_guidance() {
+  local asdlc_root="$TMP_ROOT/asdlc-step-2-prereq"
+  local log_file="$TMP_ROOT/asdlc-step-2-prereq.log"
+  mkdir -p "$asdlc_root"
+  setup_workspace "$asdlc_root"
+
+  mkdir -p "$asdlc_root/projects/project-a/feature-alpha"
+  printf 'feature_path=projects/project-a/feature-alpha\n' >"$asdlc_root/projects/project-a/.project_add_feature_e2e_state.env"
+
+  local status=0
+  local out=""
+  set +e
+  out="$(
+    cd "$asdlc_root" &&
+    {
+      printf '2\n'
+      printf '1\n'
+    } | TEST_LOG_FILE="$log_file" TEST_SCANNER_NEXT_LINE="next step: 2 (Create Cross-Repository Contract Definition For This Project)" \
+      .commands/project_add_feature_e2e.sh --path projects/project-a 2>&1
+  )"
+  status=$?
+  set -e
+
+  assert_nonzero_status "$status"
+  assert_contains "$out" "Project init is incomplete: scanner returned step 2 (Create Cross-Repository Contract Definition For This Project)."
+  assert_contains "$out" ".commands/init_common_contract_definition.sh --path projects/project-a"
+  assert_not_contains "$out" "Unable to map scanner next step"
+
+  local log_content
+  log_content="$(read_log "$log_file")"
+  assert_contains "$log_content" "init_progress_scanner.sh --path projects/project-a/feature-alpha"
+  assert_not_contains "$log_content" "feature_scan_repo_for_br.sh --feature_path projects/project-a/feature-alpha"
+}
+
+test_future_pre_feature_scanner_step_fails_with_generic_guidance() {
+  local asdlc_root="$TMP_ROOT/asdlc-step-2-10-prereq"
+  local log_file="$TMP_ROOT/asdlc-step-2-10-prereq.log"
+  mkdir -p "$asdlc_root"
+  setup_workspace "$asdlc_root"
+
+  mkdir -p "$asdlc_root/projects/project-a/feature-alpha"
+  printf 'feature_path=projects/project-a/feature-alpha\n' >"$asdlc_root/projects/project-a/.project_add_feature_e2e_state.env"
+
+  local status=0
+  local out=""
+  set +e
+  out="$(
+    cd "$asdlc_root" &&
+    {
+      printf '2\n'
+      printf '1\n'
+    } | TEST_LOG_FILE="$log_file" TEST_SCANNER_NEXT_LINE="next step: 2.10 (Future Project Prerequisite)" \
+      .commands/project_add_feature_e2e.sh --path projects/project-a 2>&1
+  )"
+  status=$?
+  set -e
+
+  assert_nonzero_status "$status"
+  assert_contains "$out" "Project init is incomplete: scanner returned step 2.10 (Future Project Prerequisite)."
+  assert_contains "$out" "Complete scanner-reported project step 2.10 before rerunning project_add_feature_e2e.sh."
+  assert_not_contains "$out" ".commands/init_common_contract_definition.sh"
+  assert_not_contains "$out" "Unable to map scanner next step"
+}
+
+test_unknown_later_scanner_step_keeps_unmapped_error() {
+  local asdlc_root="$TMP_ROOT/asdlc-step-9-unmapped"
+  local log_file="$TMP_ROOT/asdlc-step-9-unmapped.log"
+  mkdir -p "$asdlc_root"
+  setup_workspace "$asdlc_root"
+
+  mkdir -p "$asdlc_root/projects/project-a/feature-alpha"
+  printf 'feature_path=projects/project-a/feature-alpha\n' >"$asdlc_root/projects/project-a/.project_add_feature_e2e_state.env"
+
+  local status=0
+  local out=""
+  set +e
+  out="$(
+    cd "$asdlc_root" &&
+    {
+      printf '2\n'
+      printf '1\n'
+    } | TEST_LOG_FILE="$log_file" TEST_SCANNER_NEXT_LINE="next step: 9.1 (Unknown Future Feature Step)" \
+      .commands/project_add_feature_e2e.sh --path projects/project-a 2>&1
+  )"
+  status=$?
+  set -e
+
+  assert_nonzero_status "$status"
+  assert_contains "$out" "Unable to map scanner next step '9.1 (Unknown Future Feature Step)' to orchestrator phase."
+  assert_not_contains "$out" "Project init is incomplete"
 }
 
 test_resume_override_starts_from_requested_phase() {
@@ -807,6 +935,10 @@ test_scaffold_path_capture_accepts_prefixed_created_line
 test_scaffold_path_capture_falls_back_to_updated_line
 test_split_4_1_and_4_2_execute_in_order_with_messages
 test_default_resume_uses_scanner_next_step
+test_scanner_step_1_1_fails_with_stack_blueprint_guidance
+test_scanner_step_2_fails_with_common_contract_guidance
+test_future_pre_feature_scanner_step_fails_with_generic_guidance
+test_unknown_later_scanner_step_keeps_unmapped_error
 test_resume_override_starts_from_requested_phase
 test_decline_optional_step_skips_to_next_required_step
 test_phase7_repo_loop_tracks_completed_classes_until_option_three
