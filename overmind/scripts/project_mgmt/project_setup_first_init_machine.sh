@@ -115,6 +115,7 @@ STAGED_HELPER_FILES=(
   "check_task_to_br_quality.sh"
 )
 STAGED_SETUP_FILES=(
+  "external_sources.yaml"
   "models.md"
 )
 

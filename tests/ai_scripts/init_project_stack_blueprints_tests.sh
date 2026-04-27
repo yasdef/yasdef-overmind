@@ -6,6 +6,7 @@ SCRIPT_SRC="$SOURCE_ROOT/overmind/scripts/init_project_stack_blueprints.sh"
 BLUEPRINT_RULE_SRC="$SOURCE_ROOT/overmind/rules/project_stack_blueprint_rule.md"
 HELPER_SRC="$SOURCE_ROOT/overmind/scripts/helper/check_project_stack_blueprint_quality.sh"
 MODEL_SRC="$SOURCE_ROOT/overmind/setup/models.md"
+EXTERNAL_SOURCES_SRC="$SOURCE_ROOT/overmind/setup/external_sources.yaml"
 
 TMP_ROOT="$(mktemp -d)"
 trap 'rm -rf "$TMP_ROOT"' EXIT
@@ -72,6 +73,7 @@ setup_staged_workspace() {
   cp "$BLUEPRINT_RULE_SRC" "$asdlc_root/.rules/project_stack_blueprint_rule.md"
   cp "$HELPER_SRC" "$asdlc_root/.helper/check_project_stack_blueprint_quality.sh"
   cp "$MODEL_SRC" "$asdlc_root/.setup/models.md"
+  cp "$EXTERNAL_SOURCES_SRC" "$asdlc_root/.setup/external_sources.yaml"
   cp "$SOURCE_ROOT/overmind/templates/project_stack_blueprint_be_TEMPLATE.md" "$asdlc_root/.templates/project_stack_blueprint_be_TEMPLATE.md"
   cp "$SOURCE_ROOT/overmind/templates/project_stack_blueprint_fe_TEMPLATE.md" "$asdlc_root/.templates/project_stack_blueprint_fe_TEMPLATE.md"
   cp "$SOURCE_ROOT/overmind/templates/project_stack_blueprint_mobile_TEMPLATE.md" "$asdlc_root/.templates/project_stack_blueprint_mobile_TEMPLATE.md"
@@ -447,7 +449,6 @@ test_prompt_includes_external_sources_context() {
   write_project_definition "$project_dir" "A"
   setup_codex_stub "$asdlc_root" "valid"
 
-  # without external_sources.yaml — should report absent
   TEST_CAPTURE_DIR="$capture_dir" TEST_CODEX_MODE="valid" PATH="$asdlc_root/bin:$PATH" \
     TARGET_BACKEND_BLUEPRINT="$project_dir/project_stack_blueprint_backend.md" \
     TARGET_FRONTEND_BLUEPRINT="$project_dir/project_stack_blueprint_frontend.md" \
@@ -455,22 +456,27 @@ test_prompt_includes_external_sources_context() {
 
   local prompt=""
   prompt="$(cat "$capture_dir/codex_prompt.txt")"
-  assert_contains "$prompt" "external_sources.yaml (absent"
+  assert_contains "$prompt" "external_sources.yaml (present)"
   assert_contains "$prompt" "project_stack_blueprint_rule.md"
   assert_contains "$prompt" "Project stack blueprint phase is finished"
+}
 
-  # with external_sources.yaml — should report present
-  cp "$SOURCE_ROOT/overmind/setup/external_sources.yaml" "$asdlc_root/.setup/external_sources.yaml"
-  git -C "$asdlc_root" add ".setup/external_sources.yaml"
-  git -C "$asdlc_root" commit -qm "add external sources"
+test_missing_external_sources_file_fails_fast() {
+  local asdlc_root="$TMP_ROOT/asdlc-missing-external-sources"
+  local project_dir="$asdlc_root/projects/sample-project"
+  setup_staged_workspace "$asdlc_root"
+  write_project_definition "$project_dir" "A"
+  rm -f "$asdlc_root/.setup/external_sources.yaml"
 
-  TEST_CAPTURE_DIR="$capture_dir" TEST_CODEX_MODE="valid" PATH="$asdlc_root/bin:$PATH" \
-    TARGET_BACKEND_BLUEPRINT="$project_dir/project_stack_blueprint_backend.md" \
-    TARGET_FRONTEND_BLUEPRINT="$project_dir/project_stack_blueprint_frontend.md" \
-    "$asdlc_root/.commands/init_project_stack_blueprints.sh" --path "$project_dir" >/dev/null
+  local status=0
+  local out=""
+  set +e
+  out="$("$asdlc_root/.commands/init_project_stack_blueprints.sh" --path "$project_dir" 2>&1)"
+  status=$?
+  set -e
 
-  prompt="$(cat "$capture_dir/codex_prompt.txt")"
-  assert_contains "$prompt" "external_sources.yaml (present)"
+  assert_nonzero_status "$status"
+  assert_contains "$out" "Required file not found: .setup/external_sources.yaml"
 }
 
 test_no_final_write_before_approval_keeps_blueprint_missing() {
@@ -548,6 +554,7 @@ test_final_blueprint_contains_gap5_structure_without_authoring_state() {
 
 test_noops_for_type_b_and_c
 test_prompt_includes_external_sources_context
+test_missing_external_sources_file_fails_fast
 test_no_final_write_before_approval_keeps_blueprint_missing
 test_revision_uses_same_validation_and_commits
 test_final_blueprint_contains_gap5_structure_without_authoring_state

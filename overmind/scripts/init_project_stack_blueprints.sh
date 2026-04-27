@@ -141,6 +141,7 @@ ensure_required_files() {
     "$MODELS_FILE"
     "$BLUEPRINT_RULE_FILE"
     "$QUALITY_GATE_HELPER"
+    "$EXTERNAL_SOURCES_FILE"
     ".templates/project_stack_blueprint_be_TEMPLATE.md"
     ".templates/project_stack_blueprint_fe_TEMPLATE.md"
     ".templates/project_stack_blueprint_mobile_TEMPLATE.md"
