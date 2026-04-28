@@ -385,60 +385,69 @@ Sizing guidance: a roughly two-page blueprint (stack + per-layer folder conventi
 - Do not silently choose a default stack because MCP guidance is missing; defaults are proposals that require user approval.
 - Do not make MCP availability mandatory. A type `A` project must still be able to proceed through explicit user-approved fallback choices.
 
-## Gap 6 - Step 7 cannot consume a stack blueprint as substitute evidence for project type `A`
+## Gap 6 - Step 7 cannot consume a stack blueprint as fallback evidence for unmaterialized layers in project type `A`
 
 ### 1. Gap
 
-Even when the blueprint from Gap 5 exists, step 7 still refuses to run for type `A`, and its rule forbids generating "pseudo-content". Two concrete obstructions remain:
-
-- `overmind/scripts/feature_repo_surface_and_exec_context.sh` hard-fails on `project_type_code=A` before it looks at any input.
-- `overmind/rules/feature_repo_surface_and_exec_context_rule.md` treats repository evidence as the only acceptable source, so the model has no authorised way to cite blueprint sections in Section 4 `evidence:` fields or to populate `main_repo_paths` from a planned path.
-
-Without these changes, the blueprint is inert: it exists but cannot flow into the surface-map artefact downstream planning consumes.
+- `overmind/scripts/feature_repo_surface_and_exec_context.sh` hard-fails on `project_type_code=A` before reading any input.
+- `overmind/rules/feature_repo_surface_and_exec_context_rule.md` rejects all non-repo evidence; blueprint citations and placeholder rows for surfaces unknown to both sources have no legal home.
+- Effect: type `A` is blocked entirely; type `A` F2+ cannot mix repo and blueprint; touched surfaces unknown to both sources cannot be carried forward.
 
 ### 2. How to fix
 
-Teach step 7 to accept the stack blueprint as substitute structural evidence when `project_type_code=A`:
-
-- the script binds the per-class blueprint path into the model prompt instead of a repo scan path,
-- the rule authorises blueprint section ids as legitimate `evidence:` citations for type `A` only,
-- the quality helper continues to validate structural completeness only. It already accepts `project_type_code=A` in meta and checks only non-emptiness for evidence and paths, so no gate loosening is needed — only rule clarification.
-
-For types `B` and `C`, nothing changes.
+Per-row resolution at step 7: real repo evidence → blueprint `(planned)` path → literal `<to be defined during implementation>` placeholder. Repo scan runs whenever the planned path is scannable. Blueprint binds as fallback when `project_type_code=A`. Quality helper unchanged.
 
 ### 3. Concrete implementation steps
 
-1. Update `overmind/scripts/feature_repo_surface_and_exec_context.sh`:
+1. `overmind/scripts/feature_repo_surface_and_exec_context.sh`:
    - remove the `fail_mcp_not_supported_for_project_a` branch,
-   - when `project_type_code=A`, require `project_stack_blueprint_<class>.md` to exist at the project root for every active class, and treat its absence as a hard error,
-   - pass the blueprint path into `build_prompt` as an explicit context line (for example, `Stack blueprint source:`), replacing `Selected repository to scan:` when type is `A`,
-   - keep all read-only snapshot and commit logic unchanged so existing type `B` and `C` behaviour is untouched.
-2. Update `overmind/rules/feature_repo_surface_and_exec_context_rule.md`:
-   - replace the "project type `A` is unsupported" paragraph with explicit type-`A` guidance,
-   - specify that `main_repo_paths` and `analyzed_repo_paths` carry the blueprint's `planned_repo_path` marked `(planned)`,
-   - specify that `key_components`, `transport_layer`, and `user_reachable_surface` in Section 3 are drawn verbatim from blueprint §3 layer bindings and §4 baseline tokens,
-   - specify that Section 4 `repo_paths` are drawn from blueprint §3 `folder_paths` for layers the feature touches,
-   - specify that Section 4 `evidence` must cite at least one concrete blueprint section id (for example, `project_stack_blueprint_backend.md §3.1`) plus the applicable `feature_contract_delta.md` item id; prose-only evidence remains invalid,
-   - specify that Section 4 `user_reachable_surface` is the union of `feature_contract_delta.md` tokens (new) and blueprint §4 tokens (reused).
-3. Update `overmind/templates/init_progress_definition_TEMPLATE.yaml` step 7 `finished_only_if_conditions_meet` so the type-`A` guidance matches the new source of truth:
-   - replace the condition "For project type A, best-practice repository execution context is requested from MCP and handled separately per active repo class..." with wording that names the per-class stack blueprint as the source,
-   - replace the condition "Sources used to prepare these documents follow project type rules: C from code analysis, B from code analysis or knowledge base, A from knowledge base only." with wording that states type `A` sources the per-class stack blueprint plus the standard feature inputs,
-   - keep type `B` and `C` wording unchanged.
-4. Update `overmind/golden_examples/project_surface_struct_resp_map_be_GOLDEN_EXAMPLE.md` and `overmind/golden_examples/project_surface_struct_resp_map_fe_GOLDEN_EXAMPLE.md` with a second, clearly-labelled type `A` example showing blueprint citations in `evidence:` and `(planned)`-tagged paths, so the style contract covers both modes.
-5. Do not modify `overmind/scripts/helper/check_feature_repo_surface_and_exec_context_be_quality.sh` or `..._fe_quality.sh`. They already accept `project_type_code=A` in meta and check only non-emptiness for evidence and paths.
-6. Add tests covering:
-   - type `A` step 7 with a valid blueprint produces a surface map that passes the existing quality gate,
-   - type `A` step 7 with a missing blueprint fails fast in the command, before any model invocation,
-   - every Section 4 `evidence:` line in a type `A` surface map cites at least one blueprint section id,
-   - type `B` and `C` runs remain unchanged by the new code paths.
+   - run repo scan whenever `class_repo_paths[<class>].path` is scannable, regardless of `project_type_code`,
+   - for `project_type_code=A`: require `project_stack_blueprint_<class>.md` at project root (hard error if missing); bind it as `Stack blueprint source:` in `build_prompt`,
+   - both context lines may co-exist; precedence is per-row,
+   - read-only snapshot and commit logic unchanged.
+
+2. `overmind/rules/feature_repo_surface_and_exec_context_rule.md`:
+   - replace the "project type `A` is unsupported" paragraph with the per-row resolution chain from §2,
+   - `meta.analyzed_repo_paths`: real paths when scannable; otherwise blueprint §1 `planned_repo_path` tagged `(planned)`,
+   - §3: enumerate only layers materialized in repo or anticipated by blueprint §3; omit layers absent from both; never invent a §3 entry for a touched surface,
+   - §4 `repo_paths`: real path → blueprint §3.x `folder_paths` (`(planned)` tagged) → placeholder,
+   - §4 `evidence`: real repo path → blueprint section id (e.g., `project_stack_blueprint_backend.md §3.1`) → delta item id alone; always plus `feature_contract_delta.md <item id>`. Prose-only invalid,
+   - §4 `transport_layer`: repo-observed archetype → blueprint §3.x archetype → placeholder,
+   - §4 `user_reachable_surface`: union of `feature_contract_delta.md` tokens, repo-scanned reused tokens, and blueprint §4 reused tokens (whichever apply).
+
+3. `overmind/templates/init_progress_definition_TEMPLATE.yaml` step 7 `finished_only_if_conditions_meet`:
+   - replace "For project type A, best-practice repository execution context is requested from MCP..." with: type `A` binds the per-class stack blueprint as fallback evidence; repo scan remains primary when code is materialized,
+   - replace "Sources used to prepare these documents follow project type rules..." with: type `A` resolves evidence per row (repo when scannable, blueprint for unmaterialized layers, placeholder when neither describes the surface) plus the standard feature inputs,
+   - type `B`/`C` wording unchanged.
+
+4. `overmind/golden_examples/project_surface_struct_resp_map_be_GOLDEN_EXAMPLE.md` and `..._fe_GOLDEN_EXAMPLE.md` — add three type-`A` examples:
+   - F1: every row from blueprint, paths `(planned)`, evidence cites blueprint section ids,
+   - F2+ partial-repo: mix of real-path and `(planned)`-path rows with matching evidence,
+   - placeholder: at least one §4 row with `<to be defined during implementation>` in `repo_paths` and `transport_layer`, delta-only evidence.
+
+5. Quality helpers unchanged: `overmind/scripts/helper/check_feature_repo_surface_and_exec_context_be_quality.sh` and `..._fe_quality.sh` already enforce only structural non-emptiness; the literal placeholder satisfies it.
+
+6. Tests:
+   - F1 (no scannable repo): blueprint-only surface map passes quality gate,
+   - F2+ partial repo: mixed-evidence surface map passes; each row's evidence matches its source,
+   - missing `project_stack_blueprint_<class>.md` with `project_type_code=A`: script fails before model invocation,
+   - touched surface unknown to both sources: §4 row with placeholder fields + delta-only evidence, no synthesized §3 entry, passes quality gate,
+   - type `B` and `C` runs unchanged.
 
 ### 4. Risks / what NOT to do
 
-- Do not allow type `A` runs to invent component names, folder paths, or user-reachable tokens that are not present in the blueprint or in `feature_contract_delta.md`.
-- Do not let blueprint citations become a loophole that lets types `B` and `C` skip the repo scan.
-- Do not expand blueprint consumption into downstream steps (8, 8.1, 8.2, 8.3). They keep consuming the surface map exactly as they do today; the blueprint is only an input to step 7.
-- Do not confuse `(planned)`-tagged paths with real paths in prerequisite-gap tracing; that phase must keep requiring `user_reachable_surface` tokens, not filesystem paths.
-- Do not require the blueprint to enumerate every possible future component. It only needs archetypes rich enough to instantiate the standard layers.
+- Do not bypass repo scan once the planned path is scannable; repo wins for materialized layers.
+- Do not mix repo and blueprint evidence within a single row; one source per row.
+- Do not invent §3 entries; §3 stays bound to evidence-backed layers, §4 carries unknown surfaces with placeholders.
+- Do not let blueprint citations become a loophole for types `B`/`C` to skip repo scan.
+- Do not expand blueprint consumption into steps 8 / 8.1 / 8.2 / 8.3 — input only to step 7.
+- Do not confuse `(planned)` paths or placeholders with real paths in step 8.2 prerequisite tracing; that phase keeps tracing tokens, not filesystem paths.
+
+## Gap 7 - Surface rows with `<to be defined during implementation>` could be enriched from MCP knowledgebase when one is available
+
+**Placeholder — details to be defined during implementation.**
+
+When step 7 produces a surface-map row that falls through to the literal `<to be defined during implementation>` placeholder (no repo evidence, no blueprint coverage), the pipeline currently leaves that row technically incomplete. If an MCP knowledgebase is configured and reachable for the active project, it may already hold enough context about the intended surface (stack archetype, folder conventions, transport shape) to resolve the placeholder at generation time rather than deferring it to the worker design phase. The idea is to attempt an MCP-backed lookup for each placeholder row before writing it as `<to be defined during implementation>`, fill what the knowledgebase can confirm, and fall back to the placeholder only when the MCP query returns nothing useful.
 
 ## Recommended implementation order
 
@@ -519,8 +528,10 @@ The rebuild direction is correct only if all of the following are true:
 - project type `A` startup can record optional per-class stack guidance sources, but absence of MCP guidance does not block blueprint creation,
 - type `A` stack blueprints are created only after user-approved stack choices are recorded,
 - project type `A` can complete init only when a stack blueprint exists for each active class,
-- step 7 runs successfully for type `A` using the blueprint as substitute evidence,
-- every Section 4 `evidence:` line in a type `A` surface map cites at least one blueprint section id,
+- step 7 runs successfully for type `A` F1 (no scannable repo) using the blueprint as fallback evidence for every row,
+- step 7 runs successfully for type `A` F2+ with a partially-materialized repo, drawing materialized rows from repo and unmaterialized ones from blueprint,
+- a touched surface whose shape matches no `user_reachable_pattern` in either source still produces a valid §4 row with placeholder `repo_paths` and `transport_layer` and delta-only evidence,
+- §3 only enumerates layers described by repo scan or blueprint; layers absent from both are not invented,
 - type `B` and `C` runs remain untouched by the type `A` changes.
 
 ## Out of scope for this brief
@@ -750,32 +761,32 @@ Reference filled example for the mobile blueprint shape. Templates should preser
 - deeplink:app/login
 ```
 
-## Appendix D — Field-by-field mapping of blueprint into surface map (Gap 6 reference)
+## Appendix D — Field-by-field mapping into surface map (Gap 6 reference)
 
-This table is the wiring contract the rule update in Gap 6 step 2 must encode. For type `A` runs, every surface-map field on the left has a named source on the right; nothing is invented.
+This table is the wiring contract the rule update in Gap 6 step 2 must encode. Each surface-map field has a resolution chain: take the strongest source available and fall through to the next when absent. For type `A` the chain extends into the blueprint; for types `B` and `C` it stops at the repo. When no source describes a touched surface, the row carries the literal placeholder `<to be defined during implementation>` and delta-only evidence — the surface stays in scope, technical depth is deferred to the worker design phase.
 
-| Surface-map field | Fed from |
+| Surface-map field | Resolution chain |
 |---|---|
-| `meta.repo_name`, `service_name` | blueprint §1 |
-| `meta.analyzed_repo_paths` | blueprint §1 `planned_repo_path`, tagged `(planned)` |
-| `meta.project_type_code` | `init_progress_definition.yaml` (`A`) |
+| `meta.repo_name`, `service_name` | repo scan when scannable → blueprint §1 |
+| `meta.analyzed_repo_paths` | real scanned paths when scannable → blueprint §1 `planned_repo_path` tagged `(planned)` |
+| `meta.project_type_code` | `init_progress_definition.yaml` |
 | `meta.project_classes` | prompt-bound target class |
 | `meta.feature_id`, `feature_title` | feature folder name + `requirements_ears.md` header |
-| `meta.source_inputs_used` | init yaml + `requirements_ears.md` + `feature_contract_delta.md` + blueprint path |
+| `meta.source_inputs_used` | init yaml + `requirements_ears.md` + `feature_contract_delta.md` + repo path (when scanned) + blueprint path (type `A`) |
 | `meta.last_updated` | run date (`YYYY-MM-DD`) |
 | `feature_scope.feature_summary` | `requirements_ears.md` overview |
 | `feature_scope.in_scope_feature_delta` | `feature_contract_delta.md` §2 + §3 |
 | `feature_scope.out_of_scope_notes` | `requirements_ears.md` out-of-scope + `feature_contract_delta.md` §2 |
-| `§3.x responsibility_summary` | generic per-layer wording from surface-map template (no blueprint input needed) |
-| `§3.x main_repo_paths` | blueprint §3.x `folder_paths` (with `{group}` expanded from §1) |
-| `§3.x key_components` | blueprint §3.x `archetypes` |
-| `§3.x transport_layer` | same archetypes rendered as transport tokens |
-| `§3.x user_reachable_surface` | blueprint §3.x `user_reachable_pattern` concretised against blueprint §4 tokens; `none` otherwise |
+| `§3.x responsibility_summary` | generic per-layer wording from surface-map template |
+| `§3.x main_repo_paths` | repo scan → blueprint §3.x `folder_paths` (with `{group}` expanded from §1) — layer omitted from §3 when neither source describes it |
+| `§3.x key_components` | repo scan → blueprint §3.x `archetypes` — omitted when absent from both |
+| `§3.x transport_layer` | repo scan → blueprint §3.x archetypes rendered as transport tokens — omitted when absent from both |
+| `§3.x user_reachable_surface` | repo scan → blueprint §3.x `user_reachable_pattern` concretised against blueprint §4 tokens; `none` when neither describes it |
 | `§4.y surface_summary` | generic per-surface wording from surface-map template |
-| `§4.y applicability` | `feature_contract_delta.md` impact analysis (`applicable` or `not_applicable`) |
-| `§4.y repo_paths` | blueprint §3.x `folder_paths` for layers the feature touches |
+| `§4.y applicability` | `feature_contract_delta.md` impact analysis |
+| `§4.y repo_paths` | real scanned paths → blueprint §3.x `folder_paths` (with `(planned)` tag) → literal `<to be defined during implementation>` |
 | `§4.y why_feature_touches_it` | `feature_contract_delta.md` item `change_scope` + `requirements_ears.md` acceptance criteria |
 | `§4.y expected_changes` | `feature_contract_delta.md` item `change_scope` + `compatibility_impact` |
-| `§4.y evidence` | citation string, e.g. `project_stack_blueprint_backend.md §3.1 + feature_contract_delta.md Delta 1` |
-| `§4.y transport_layer` | blueprint §3.x `archetypes` for the touched layer |
-| `§4.y user_reachable_surface` | union of `feature_contract_delta.md` new tokens and blueprint §4 reused tokens; `none` if the surface is internal |
+| `§4.y evidence` | strongest available source + `feature_contract_delta.md <item id>`: real repo path → blueprint section id (e.g., `project_stack_blueprint_backend.md §3.1`) → delta-only when neither source describes the surface |
+| `§4.y transport_layer` | repo-observed archetype → blueprint §3.x archetype → literal `<to be defined during implementation>` |
+| `§4.y user_reachable_surface` | union of `feature_contract_delta.md` new tokens + repo-scanned reused tokens + blueprint §4 reused tokens (whichever apply); `none` if internal |
