@@ -23,12 +23,18 @@ For project type `A`, Step `7` SHALL produce the applicable `project_surface_str
 - **THEN** Step `7` fails before model invocation with a blocking message that names the missing blueprint
 
 ### Requirement: Step 7 prefers repo evidence over blueprint evidence for type A
-For project type `A`, Step `7` SHALL use ready scannable repository evidence as the strongest evidence source for a target class. Blueprint evidence SHALL be used only when the target class has no ready scannable repository path.
+For project type `A`, Step `7` SHALL use ready scannable repository evidence as the strongest evidence source for each surface-map row or field. When a ready scannable repository path exists for the target class, Step `7` MAY also bind the matching approved stack blueprint as planned fallback evidence for rows or fields that repository evidence does not resolve. Blueprint values SHALL NOT replace repository evidence for the same row or field.
 
 #### Scenario: Type A repo evidence wins for materialized repo
 - **WHEN** a type `A` project has a target class with `class_repo_paths.<class>.state` equal to `ready` and the configured path resolves to a directory
 - **THEN** Step `7` uses the repository scan path for that target class
-- **AND** Step `7` does not use the stack blueprint as the primary structural evidence source for that invocation
+- **AND** Step `7` does not use stack blueprint values for rows or fields already resolved by repository evidence
+
+#### Scenario: Type A partial repo uses blueprint for unresolved rows
+- **WHEN** a type `A` project has a target class with a ready scannable repository path and an approved matching stack blueprint
+- **AND** a feature touches one surface that repository evidence resolves and another surface that only the blueprint describes
+- **THEN** the generated surface map uses repository evidence for the materialized surface
+- **AND** it may use planned blueprint evidence for the unmaterialized surface
 
 #### Scenario: Type A mixed project selects evidence per class
 - **WHEN** a type `A` project has backend with a ready repo path and frontend without a ready repo path but with an approved frontend blueprint
@@ -43,7 +49,7 @@ For project type `A`, every relevant Section `3` layer block and Section `4` tou
 - **THEN** the generated row uses that repo evidence instead of a blueprint fallback for the same field
 
 #### Scenario: Row uses blueprint evidence when repo evidence is absent
-- **WHEN** no repository evidence is available for a type `A` target class and the approved blueprint identifies a layer folder, archetype, or user-reachable pattern for a row
+- **WHEN** no repository evidence is available for a type `A` row or field and the approved blueprint identifies a layer folder, archetype, or user-reachable pattern for that row or field
 - **THEN** the generated row may cite that blueprint value as planned structural evidence
 
 #### Scenario: Row uses placeholder when evidence is absent
