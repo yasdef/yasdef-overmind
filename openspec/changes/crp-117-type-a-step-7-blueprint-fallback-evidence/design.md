@@ -26,29 +26,38 @@ Step `7` must become the only consumer that converts type `A` blueprint conventi
 
 ## Decisions
 
-### Decision 1: Replace the type A hard stop with a target selection path
+### Decision 1: Replace the type A hard stop with blueprint-required, repo-optional target collection
 
-`feature_repo_surface_and_exec_context.sh` should stop calling the current type `A` failure path before target selection. Instead, it should build candidate target classes from active backend/frontend/mobile classes.
+`feature_repo_surface_and_exec_context.sh` should stop calling the current type `A` failure path. Instead, for each active backend/frontend/mobile class it should:
 
-For each type `A` target class, the script checks whether a ready repo path is present and scannable. If yes, that path is selected as repo evidence, and the matching `projects/<project-id>/project_stack_blueprint_<class>.md` may also be bound as planned fallback evidence for rows or fields that repo scan does not resolve. If no ready repo path exists, the script requires the matching blueprint before model invocation.
+1. Require `projects/<project-id>/project_stack_blueprint_<class>.md` at the project root — hard error if missing. This requirement is unconditional: it applies whether or not a ready repo path also exists.
+2. Additionally bind the repo path when `class_repo_paths[<class>].path` is configured and resolves to a scannable directory. Both the blueprint and the repo path may co-exist in the prompt; per-field precedence is resolved by the model following the rule.
 
 Alternative considered: keep type `A` blocked until MCP extraction is added. That keeps the pipeline blocked even though the project now has approved structural blueprint evidence.
 
 ### Decision 2: Treat blueprint evidence as planned structural evidence only
 
-For type `A`, the prompt should bind the approved stack blueprint as read-only planned structural evidence when it is needed as the primary evidence source or as fallback for unresolved rows in a partial repo. The prompt should not call it repository scan evidence and should not authorize direct blueprint reads in later steps.
+For type `A`, the prompt always binds the approved stack blueprint as read-only planned structural evidence. The prompt must not call blueprint-derived values repository scan evidence and must not authorize direct blueprint reads in later steps.
 
 Alternative considered: copy blueprint content directly into the generated surface map without model interpretation. That would bypass feature-scoped filtering from `requirements_ears.md` and `feature_contract_delta.md`.
 
-### Decision 3: Preserve repo-first precedence
+### Decision 3: Preserve repo-first precedence per field
 
-If a type `A` class has a ready repo path that resolves to a directory, Step `7` should use the same repository scan evidence path used by type `B` and `C`. The blueprint remains available only as fallback for rows or fields not resolved by repo evidence.
+If a type `A` class has a ready repo path that resolves to a directory, Step `7` binds it alongside the blueprint. In the model output, repo evidence wins per field over blueprint evidence for the same §4 block. One source per field — no mixing within a single row.
 
 Alternative considered: always prefer blueprints for type `A`. That would ignore stronger real code evidence after the repository is created.
 
-### Decision 4: Make row-level fallback explicit in rules and prompt
+### Decision 4: Make per-field fallback explicit in the rule, with §3 omission vs §4 placeholder distinction
 
-The rule and prompt should require model output to explain whether each relevant section `3` layer block and section `4` touched surface block is grounded in repo evidence, blueprint evidence, or the placeholder. When neither repo nor blueprint evidence can identify a concrete path/component/token for a row, the model must use the literal `<to be defined during implementation>` instead of inventing a name.
+The rule should encode field-level resolution chains for §4 touched surface blocks and a separate omission rule for §3 layer blocks:
+
+- **§3 layers**: enumerate only layers materialized in the repo or anticipated by the blueprint. Omit layers absent from both sources entirely — do not create a §3 entry with a placeholder.
+- **§4 `repo_paths`**: real repo path → blueprint `folder_paths` tagged `(planned)` → `<to be defined during implementation>`.
+- **§4 `transport_layer`**: repo-observed archetype → blueprint archetype → `<to be defined during implementation>`.
+- **§4 `evidence`**: real repo path → blueprint section id (e.g. `project_stack_blueprint_backend.md §3.1`) → delta item id alone; always combined with `feature_contract_delta.md <item id>`.
+- **§4 `user_reachable_surface`**: union of contract delta tokens, repo-scanned tokens, and blueprint tokens — no placeholder here.
+
+The literal `<to be defined during implementation>` appears only in `repo_paths` and `transport_layer` when a touched surface is unknown to both sources. The model must not invent concrete names for these fields.
 
 Alternative considered: use `none` for unknown planned rows. `none` already means no applicable value; it should not mean "unknown but expected during implementation."
 

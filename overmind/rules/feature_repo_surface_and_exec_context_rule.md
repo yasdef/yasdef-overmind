@@ -42,7 +42,13 @@ Must not own:
 
 ## Project Type Branching
 - If project type is `B` or `C`: produce the surface map from repository evidence plus feature inputs.
-- If project type is `A`: this stage is unsupported for now; do not generate pseudo-content.
+- If project type is `A`: the prompt provides an approved stack blueprint as planned structural evidence and optionally a ready repository path when the class repo is scannable. Apply the following rules per section:
+  - **§3 layer blocks**: enumerate only layers materialized in the repo or anticipated in the blueprint §3 section. Omit layers absent from both sources entirely — do not create a §3 entry with placeholder values.
+  - **§4 `repo_paths`**: real repo path → blueprint §3.x `folder_paths` tagged `(planned)` → `<to be defined during implementation>`.
+  - **§4 `transport_layer`**: repo-observed archetype → blueprint §3.x archetype → `<to be defined during implementation>`.
+  - **§4 `evidence`**: real repo path → blueprint section id (e.g. `project_stack_blueprint_backend.md §3.1`) → delta item id alone; always combined with `feature_contract_delta.md <item id>`. Prose-only evidence is invalid.
+  - **§4 `user_reachable_surface`**: union of `feature_contract_delta.md` tokens, repo-scanned tokens, and blueprint §4 tokens that apply. Use `none` when no applicable entry exists. Do not use `<to be defined during implementation>` here.
+  - One source per field within a §4 block. Do not mix repo and blueprint evidence within the same field.
 
 ## Output Format Baseline
 - Use the prompt-provided template as the structure contract.
@@ -53,7 +59,9 @@ Must not own:
 
 ## Evidence Rules
 - Use only repository-proven evidence plus declared feature input artifacts.
-- Do not invent layers, module boundaries, or touched surfaces without evidence.
+- For project type `A`: blueprint-derived paths and archetypes are planned structural evidence only. Tag blueprint-derived values as `(planned)`. Do not present them as already existing repository code.
+- Blueprint evidence (`project_stack_blueprint_<class>.md`) is consumed by Step `7` only for project type `A`. Do not bind or reference stack blueprints for project types `B` or `C`.
+- Do not invent layers, module boundaries, or touched surfaces without evidence from repo or blueprint.
 - Keep feature scope narrow to this feature delta.
 - Explain each layer or touched surface in concise plain language.
 - Do not duplicate details that belong in other artifacts.

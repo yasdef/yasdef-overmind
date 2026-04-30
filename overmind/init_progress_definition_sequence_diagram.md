@@ -81,13 +81,9 @@ sequenceDiagram
         end
       else Type A
         par
-          BE->>KB: 7. Request BE best practices
-          KB-->>BE: BE best-practice guidance
-          BE->>BE: 7. BE surface map (MCP)<br/>in: requirements_ears.md + feature_contract_delta.md + MCP<br/>→ project_surface_struct_resp_map_backend.md
+          BE->>BE: 7. BE surface map<br/>in: init_progress_definition.yaml + requirements_ears.md + feature_contract_delta.md<br/>+ repo evidence (if ready repo path) + project_stack_blueprint_backend.md (planned fallback)<br/>→ project_surface_struct_resp_map_backend.md
         and
-          FE->>KB: 7. Request FE/MB best practices
-          KB-->>FE: FE/MB best-practice guidance
-          FE->>FE: 7. FE/MB surface map (MCP)<br/>in: same + MCP<br/>→ project_surface_struct_resp_map_frontend/mobile.md
+          FE->>FE: 7. FE/MB surface map<br/>in: same + repo evidence (if ready repo path) + project_stack_blueprint_frontend/mobile.md (planned fallback)<br/>→ project_surface_struct_resp_map_frontend/mobile.md
         end
       end
 

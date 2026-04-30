@@ -34,6 +34,7 @@ TARGET_GOLDEN_EXAMPLE_FILE=""
 TARGET_QUALITY_GATE_HELPER=""
 TARGET_TRACK_LABEL=""
 TARGET_PROJECT_CLASSES_VALUE=""
+TARGET_BLUEPRINT_FILE=""
 
 die() {
   echo "ERROR: $*" >&2
@@ -45,10 +46,6 @@ fail_project_type_undefined() {
   exit 1
 }
 
-fail_mcp_not_supported_for_project_a() {
-  echo "project type A is not supported yet: MCP extraction is unavailable" >&2
-  exit 1
-}
 
 require_command() {
   local command_name="$1"
@@ -608,13 +605,21 @@ select_target_repo() {
   if [[ ${#READY_REPO_CLASSES[@]} -eq 1 ]]; then
     TARGET_REPO_CLASS="${READY_REPO_CLASSES[0]}"
     TARGET_REPO_PATH="${READY_REPO_PATHS[0]}"
-    echo "Only one ready repository available for analysis: $TARGET_REPO_CLASS -> $TARGET_REPO_PATH" >&2
+    if [[ -n "$TARGET_REPO_PATH" ]]; then
+      echo "Only one ready repository available for analysis: $TARGET_REPO_CLASS -> $TARGET_REPO_PATH" >&2
+    else
+      echo "Only one ready repository available for analysis: $TARGET_REPO_CLASS" >&2
+    fi
     return 0
   fi
 
   echo "Ready repositories available for analysis:" >&2
   for idx in "${!READY_REPO_CLASSES[@]}"; do
-    echo "  $((idx + 1)). ${READY_REPO_CLASSES[$idx]} -> ${READY_REPO_PATHS[$idx]}" >&2
+    if [[ -n "${READY_REPO_PATHS[$idx]}" ]]; then
+      echo "  $((idx + 1)). ${READY_REPO_CLASSES[$idx]} -> ${READY_REPO_PATHS[$idx]}" >&2
+    else
+      echo "  $((idx + 1)). ${READY_REPO_CLASSES[$idx]}" >&2
+    fi
   done
 
   while true; do
@@ -645,6 +650,56 @@ select_target_repo() {
 
     echo "Invalid selection: $selection" >&2
   done
+}
+
+collect_type_a_targets() {
+  local definition_path="$1"
+  local runtime_root="$2"
+  local active_class=""
+  local entry=""
+  local state=""
+  local repo_path=""
+  local normalized_state=""
+  local normalized_path=""
+  local resolved_path=""
+  local class_repo_path=""
+  local blueprint_rel=""
+
+  READY_REPO_CLASSES=()
+  READY_REPO_PATHS=()
+
+  for active_class in "${PROJECT_CLASSES[@]}"; do
+    case "$active_class" in
+      backend|frontend|mobile) ;;
+      *) continue ;;
+    esac
+
+    blueprint_rel="$PROJECT_ROOT/project_stack_blueprint_${active_class}.md"
+    if [[ ! -f "$runtime_root/$blueprint_rel" ]]; then
+      die "Missing required blueprint for type A class $active_class: $blueprint_rel"
+    fi
+
+    class_repo_path=""
+    if entry="$(find_class_repo_entry "$definition_path" "$active_class" 2>/dev/null)"; then
+      IFS='|' read -r state repo_path <<<"$entry"
+      normalized_state="$(printf '%s' "$(trim_value "$state")" | tr '[:upper:]' '[:lower:]')"
+      if [[ "$normalized_state" == "ready" ]]; then
+        normalized_path="$(strip_quotes "$repo_path")"
+        if [[ -n "$normalized_path" && -d "$normalized_path" ]]; then
+          if resolved_path="$(cd "$normalized_path" && pwd -P 2>/dev/null)"; then
+            class_repo_path="$resolved_path"
+          fi
+        fi
+      fi
+    fi
+
+    READY_REPO_CLASSES+=("$active_class")
+    READY_REPO_PATHS+=("$class_repo_path")
+  done
+
+  if [[ ${#READY_REPO_CLASSES[@]} -eq 0 ]]; then
+    die "No active backend, frontend, or mobile classes found for type A project."
+  fi
 }
 
 configure_target_bindings() {
@@ -680,7 +735,11 @@ configure_target_bindings() {
 }
 
 render_selected_repo_context_line() {
-  printf '%s\n' "- $TARGET_REPO_CLASS: $TARGET_REPO_PATH"
+  if [[ -n "$TARGET_REPO_PATH" ]]; then
+    printf '%s\n' "- $TARGET_REPO_CLASS: $TARGET_REPO_PATH"
+  else
+    printf '%s\n' "- $TARGET_REPO_CLASS: (no ready repository; blueprint evidence is primary planned structural evidence)"
+  fi
 }
 
 load_model_config() {
@@ -744,10 +803,20 @@ build_prompt() {
   local repo_context_line=""
   local failure_line=""
   local success_line=""
+  local type_a_read_only_input=""
+  local type_a_blueprint_context=""
 
   repo_context_line="$(render_selected_repo_context_line)"
   failure_line="$(failure_line_for_target)"
   success_line="$(success_line_for_target)"
+
+  if [[ "$project_type_code" == "A" ]]; then
+    local rel_blueprint="${TARGET_BLUEPRINT_FILE#"$runtime_root/"}"
+    type_a_read_only_input="
+  - $rel_blueprint (type A stack blueprint; planned structural evidence; per-field resolution chain in $RULE_FILE)"
+    type_a_blueprint_context="
+- Type A stack blueprint (planned structural evidence): $rel_blueprint"
+  fi
 
   cat <<EOF
 Create repo execution-context artifact for the selected repository class for this feature.
@@ -760,7 +829,7 @@ Hard constraints:
 - Read these as input only and do not modify them:
   - $PROJECT_DEFINITION_FILE
   - $REQUIREMENTS_EARS_FILE
-  - $FEATURE_CONTRACT_DELTA_FILE
+  - $FEATURE_CONTRACT_DELTA_FILE${type_a_read_only_input}
 - Update only: $PROJECT_SURFACE_MAP_FILE
 - Use only the selected repository path listed below as scan scope.
 - Before finishing, ensure output can pass this quality gate command: $quality_command
@@ -788,7 +857,7 @@ Context:
 - Requirements source: $REQUIREMENTS_EARS_FILE
 - Feature contract delta source: $FEATURE_CONTRACT_DELTA_FILE
 - Selected repository to scan:
-$repo_context_line
+$repo_context_line${type_a_blueprint_context}
 - Target repo surface map artifact: $PROJECT_SURFACE_MAP_FILE
 - Rule file: $RULE_FILE
 - Template file: $TARGET_TEMPLATE_FILE
@@ -860,15 +929,18 @@ main() {
   project_type_code="$(resolve_project_type_code "$definition_path")"
   resolve_project_classes "$definition_path"
 
-  if [[ "$project_type_code" == "A" ]]; then
-    fail_mcp_not_supported_for_project_a
-  fi
-  if [[ "$project_type_code" != "B" && "$project_type_code" != "C" ]]; then
+  if [[ "$project_type_code" != "A" && "$project_type_code" != "B" && "$project_type_code" != "C" ]]; then
     fail_project_type_undefined
   fi
 
-  collect_ready_repo_targets "$definition_path"
-  select_target_repo
+  if [[ "$project_type_code" == "A" ]]; then
+    collect_type_a_targets "$definition_path" "$runtime_root"
+    select_target_repo
+    TARGET_BLUEPRINT_FILE="$runtime_root/$PROJECT_ROOT/project_stack_blueprint_${TARGET_REPO_CLASS}.md"
+  else
+    collect_ready_repo_targets "$definition_path"
+    select_target_repo
+  fi
   configure_target_bindings
   ensure_target_support_files "$runtime_root"
 

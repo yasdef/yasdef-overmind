@@ -467,6 +467,351 @@ test_prompt_references_rule_file() {
   assert_contains "$codex_prompt" "feature_repo_surface_and_exec_context_rule.md"
 }
 
+setup_git_workspace_type_a() {
+  local repo_dir="$1"
+  setup_workspace_layout "$repo_dir"
+  setup_models_file "$repo_dir"
+  write_quality_gate_stub "$repo_dir"
+  seed_feature_sources "$repo_dir"
+
+  (
+    cd "$repo_dir/asdlc"
+    git init -q
+    git config user.name "Test User"
+    git config user.email "test@example.com"
+    echo "seed" >README.md
+    git add .
+    git commit -qm "seed"
+  )
+}
+
+seed_type_a_frontend_only_no_repo() {
+  local repo_dir="$1"
+  cat >"$repo_dir/asdlc/projects/p1/init_progress_definition.yaml" <<'EOF_DEF'
+meta_info:
+  project_id: "p1"
+  project_classes:
+    - frontend
+  project_type_code: "A"
+  project_type_label: "New project"
+  class_repo_paths:
+    frontend:
+      state: "deferred"
+      path: ""
+steps: []
+EOF_DEF
+}
+
+seed_type_a_mobile_only_no_repo() {
+  local repo_dir="$1"
+  cat >"$repo_dir/asdlc/projects/p1/init_progress_definition.yaml" <<'EOF_DEF'
+meta_info:
+  project_id: "p1"
+  project_classes:
+    - mobile
+  project_type_code: "A"
+  project_type_label: "New project"
+  class_repo_paths:
+    mobile:
+      state: "deferred"
+      path: ""
+steps: []
+EOF_DEF
+}
+
+seed_type_a_be_and_fe_mixed() {
+  local repo_dir="$1"
+  local backend_repo_path="$2"
+  cat >"$repo_dir/asdlc/projects/p1/init_progress_definition.yaml" <<EOF_DEF
+meta_info:
+  project_id: "p1"
+  project_classes:
+    - backend
+    - frontend
+  project_type_code: "A"
+  project_type_label: "New project"
+  class_repo_paths:
+    backend:
+      state: "ready"
+      path: "$backend_repo_path"
+    frontend:
+      state: "deferred"
+      path: ""
+steps: []
+EOF_DEF
+}
+
+seed_frontend_blueprint() {
+  local repo_dir="$1"
+  mkdir -p "$repo_dir/asdlc/projects/p1"
+  cat >"$repo_dir/asdlc/projects/p1/project_stack_blueprint_frontend.md" <<'OUT'
+# Frontend Stack Blueprint
+
+## Layer Conventions
+- ui: pages under src/features/
+- components: reusable under src/components/
+- state: hooks under src/state/
+OUT
+}
+
+seed_mobile_blueprint() {
+  local repo_dir="$1"
+  mkdir -p "$repo_dir/asdlc/projects/p1"
+  cat >"$repo_dir/asdlc/projects/p1/project_stack_blueprint_mobile.md" <<'OUT'
+# Mobile Stack Blueprint
+
+## Layer Conventions
+- screens: screen components under src/screens/
+- viewmodels: view models under src/viewmodels/
+OUT
+}
+
+seed_backend_blueprint_fe() {
+  local repo_dir="$1"
+  mkdir -p "$repo_dir/asdlc/projects/p1"
+  cat >"$repo_dir/asdlc/projects/p1/project_stack_blueprint_backend.md" <<'OUT'
+# Backend Stack Blueprint
+
+## Layer Conventions
+- api: controllers under src/api/
+OUT
+}
+
+setup_codex_stub_for_frontend() {
+  local repo_dir="$1"
+  mkdir -p "$repo_dir/bin"
+  cat >"$repo_dir/bin/codex" <<'OUT'
+#!/usr/bin/env bash
+set -euo pipefail
+
+capture_dir="${TEST_CAPTURE_DIR:?TEST_CAPTURE_DIR must be set}"
+surface_file="${TARGET_SURFACE_FILE:-projects/p1/feature-a/project_surface_struct_resp_map_frontend.md}"
+
+printf '%s\n' "$@" >"$capture_dir/codex_args.txt"
+printf '%s' "${!#}" >"$capture_dir/codex_prompt.txt"
+
+mkdir -p "$(dirname "$surface_file")"
+cat >"$surface_file" <<'DOC'
+# Client Repo Surface Context
+
+## 1. Document Meta
+- repo_name: client-repo
+DOC
+OUT
+  chmod +x "$repo_dir/bin/codex"
+}
+
+setup_codex_stub_for_mobile() {
+  local repo_dir="$1"
+  mkdir -p "$repo_dir/bin"
+  cat >"$repo_dir/bin/codex" <<'OUT'
+#!/usr/bin/env bash
+set -euo pipefail
+
+capture_dir="${TEST_CAPTURE_DIR:?TEST_CAPTURE_DIR must be set}"
+surface_file="${TARGET_SURFACE_FILE:-projects/p1/feature-a/project_surface_struct_resp_map_mobile.md}"
+
+printf '%s\n' "$@" >"$capture_dir/codex_args.txt"
+printf '%s' "${!#}" >"$capture_dir/codex_prompt.txt"
+
+mkdir -p "$(dirname "$surface_file")"
+cat >"$surface_file" <<'DOC'
+# Client Repo Surface Context
+
+## 1. Document Meta
+- repo_name: mobile-repo
+DOC
+OUT
+  chmod +x "$repo_dir/bin/codex"
+}
+
+test_type_a_frontend_blueprint_only_invokes_model() {
+  local repo_dir="$TMP_ROOT/repo-fe-type-a-fe-blueprint"
+  local capture_dir="$TMP_ROOT/capture-fe-type-a-fe-blueprint"
+  mkdir -p "$repo_dir" "$capture_dir"
+  setup_git_workspace_type_a "$repo_dir"
+  seed_type_a_frontend_only_no_repo "$repo_dir"
+  seed_frontend_blueprint "$repo_dir"
+  setup_codex_stub_for_frontend "$repo_dir"
+
+  local out=""
+  out="$(
+    cd "$repo_dir/asdlc" &&
+    PATH="$repo_dir/bin:$PATH" TEST_CAPTURE_DIR="$capture_dir" \
+      .commands/feature_repo_surface_and_exec_context.sh --feature_path "projects/p1/feature-a"
+  )"
+
+  assert_contains "$out" "Updated projects/p1/feature-a/project_surface_struct_resp_map_frontend.md"
+  assert_file_exists "$repo_dir/asdlc/projects/p1/feature-a/project_surface_struct_resp_map_frontend.md"
+
+  local codex_prompt
+  codex_prompt="$(cat "$capture_dir/codex_prompt.txt")"
+  assert_contains "$codex_prompt" "planned structural evidence"
+  assert_contains "$codex_prompt" "project_stack_blueprint_frontend.md"
+}
+
+test_type_a_mobile_blueprint_only_invokes_model() {
+  local repo_dir="$TMP_ROOT/repo-fe-type-a-mobile-blueprint"
+  local capture_dir="$TMP_ROOT/capture-fe-type-a-mobile-blueprint"
+  mkdir -p "$repo_dir" "$capture_dir"
+  setup_git_workspace_type_a "$repo_dir"
+  seed_type_a_mobile_only_no_repo "$repo_dir"
+  seed_mobile_blueprint "$repo_dir"
+  setup_codex_stub_for_mobile "$repo_dir"
+
+  local out=""
+  out="$(
+    cd "$repo_dir/asdlc" &&
+    PATH="$repo_dir/bin:$PATH" TEST_CAPTURE_DIR="$capture_dir" \
+    TARGET_SURFACE_FILE="projects/p1/feature-a/project_surface_struct_resp_map_mobile.md" \
+      .commands/feature_repo_surface_and_exec_context.sh --feature_path "projects/p1/feature-a"
+  )"
+
+  assert_contains "$out" "Updated projects/p1/feature-a/project_surface_struct_resp_map_mobile.md"
+  assert_file_exists "$repo_dir/asdlc/projects/p1/feature-a/project_surface_struct_resp_map_mobile.md"
+
+  local codex_prompt
+  codex_prompt="$(cat "$capture_dir/codex_prompt.txt")"
+  assert_contains "$codex_prompt" "planned structural evidence"
+  assert_contains "$codex_prompt" "project_stack_blueprint_mobile.md"
+}
+
+test_type_a_mixed_be_repo_fe_blueprint() {
+  local repo_dir="$TMP_ROOT/repo-fe-type-a-mixed"
+  local capture_dir_be="$TMP_ROOT/capture-fe-type-a-mixed-be"
+  local capture_dir_fe="$TMP_ROOT/capture-fe-type-a-mixed-fe"
+  local backend_repo="$TMP_ROOT/backend-repo-type-a-mixed"
+  mkdir -p "$repo_dir" "$capture_dir_be" "$capture_dir_fe" "$backend_repo/src"
+  setup_git_workspace_type_a "$repo_dir"
+  seed_type_a_be_and_fe_mixed "$repo_dir" "$backend_repo"
+  seed_frontend_blueprint "$repo_dir"
+  seed_backend_blueprint_fe "$repo_dir"
+
+  local backend_repo_resolved
+  backend_repo_resolved="$(cd "$backend_repo" && pwd -P)"
+
+  local be_template_src="$SOURCE_ROOT/overmind/templates/project_surface_struct_resp_map_be_TEMPLATE.md"
+  local be_golden_src="$SOURCE_ROOT/overmind/golden_examples/project_surface_struct_resp_map_be_GOLDEN_EXAMPLE.md"
+  local be_helper_src="$SOURCE_ROOT/overmind/scripts/.helper/check_feature_repo_surface_and_exec_context_be_quality.sh"
+
+  cp "$be_template_src" "$repo_dir/asdlc/.templates/project_surface_struct_resp_map_be_TEMPLATE.md"
+  cp "$be_golden_src" "$repo_dir/asdlc/.golden_examples/project_surface_struct_resp_map_be_GOLDEN_EXAMPLE.md"
+  mkdir -p "$repo_dir/asdlc/.helper"
+  cat >"$repo_dir/asdlc/.helper/check_feature_repo_surface_and_exec_context_be_quality.sh" <<'OUT'
+#!/usr/bin/env bash
+echo "quality gate passed"
+OUT
+  chmod +x "$repo_dir/asdlc/.helper/check_feature_repo_surface_and_exec_context_be_quality.sh"
+
+  mkdir -p "$repo_dir/bin"
+  cat >"$repo_dir/bin/codex" <<'OUT'
+#!/usr/bin/env bash
+set -euo pipefail
+capture_dir="${TEST_CAPTURE_DIR:?TEST_CAPTURE_DIR must be set}"
+surface_file="${TARGET_SURFACE_FILE:-projects/p1/feature-a/project_surface_struct_resp_map_backend.md}"
+printf '%s\n' "$@" >"$capture_dir/codex_args.txt"
+printf '%s' "${!#}" >"$capture_dir/codex_prompt.txt"
+mkdir -p "$(dirname "$surface_file")"
+cat >"$surface_file" <<'DOC'
+# Surface Map
+
+## 1. Document Meta
+- repo_name: test-repo
+DOC
+OUT
+  chmod +x "$repo_dir/bin/codex"
+
+  local out_be=""
+  out_be="$(
+    cd "$repo_dir/asdlc" &&
+    PATH="$repo_dir/bin:$PATH" TEST_CAPTURE_DIR="$capture_dir_be" \
+      .commands/feature_repo_surface_and_exec_context.sh --feature_path "projects/p1/feature-a" <<<"backend"
+  )"
+
+  assert_contains "$out_be" "Updated projects/p1/feature-a/project_surface_struct_resp_map_backend.md"
+  local prompt_be
+  prompt_be="$(cat "$capture_dir_be/codex_prompt.txt")"
+  assert_contains "$prompt_be" "- backend: $backend_repo_resolved"
+  assert_contains "$prompt_be" "planned structural evidence"
+  assert_contains "$prompt_be" "project_stack_blueprint_backend.md"
+
+  cat >"$repo_dir/bin/codex" <<'OUT'
+#!/usr/bin/env bash
+set -euo pipefail
+capture_dir="${TEST_CAPTURE_DIR:?TEST_CAPTURE_DIR must be set}"
+surface_file="${TARGET_SURFACE_FILE:-projects/p1/feature-a/project_surface_struct_resp_map_frontend.md}"
+printf '%s\n' "$@" >"$capture_dir/codex_args.txt"
+printf '%s' "${!#}" >"$capture_dir/codex_prompt.txt"
+mkdir -p "$(dirname "$surface_file")"
+cat >"$surface_file" <<'DOC'
+# Surface Map
+
+## 1. Document Meta
+- repo_name: test-repo
+DOC
+OUT
+
+  local out_fe=""
+  out_fe="$(
+    cd "$repo_dir/asdlc" &&
+    PATH="$repo_dir/bin:$PATH" TEST_CAPTURE_DIR="$capture_dir_fe" \
+      .commands/feature_repo_surface_and_exec_context.sh --feature_path "projects/p1/feature-a" <<<"frontend"
+  )"
+
+  assert_contains "$out_fe" "Updated projects/p1/feature-a/project_surface_struct_resp_map_frontend.md"
+  local prompt_fe
+  prompt_fe="$(cat "$capture_dir_fe/codex_prompt.txt")"
+  assert_contains "$prompt_fe" "planned structural evidence"
+  assert_contains "$prompt_fe" "project_stack_blueprint_frontend.md"
+  assert_contains "$prompt_fe" "(no ready repository"
+  assert_not_contains "$prompt_fe" "- frontend: $backend_repo_resolved"
+}
+
+test_type_a_fe_prompt_assertions() {
+  local repo_dir="$TMP_ROOT/repo-fe-type-a-fe-prompt"
+  local capture_dir="$TMP_ROOT/capture-fe-type-a-fe-prompt"
+  mkdir -p "$repo_dir" "$capture_dir"
+  setup_git_workspace_type_a "$repo_dir"
+  seed_type_a_frontend_only_no_repo "$repo_dir"
+  seed_frontend_blueprint "$repo_dir"
+  setup_codex_stub_for_frontend "$repo_dir"
+
+  (
+    cd "$repo_dir/asdlc" &&
+    PATH="$repo_dir/bin:$PATH" TEST_CAPTURE_DIR="$capture_dir" \
+      .commands/feature_repo_surface_and_exec_context.sh --feature_path "projects/p1/feature-a" >/dev/null
+  )
+
+  local codex_prompt
+  codex_prompt="$(cat "$capture_dir/codex_prompt.txt")"
+  assert_contains "$codex_prompt" "planned structural evidence"
+  assert_contains "$codex_prompt" "project_stack_blueprint_frontend.md"
+}
+
+test_type_b_fe_does_not_bind_stack_blueprint() {
+  local repo_dir="$TMP_ROOT/repo-fe-type-b-no-blueprint"
+  local capture_dir="$TMP_ROOT/capture-fe-type-b-no-blueprint"
+  local fe_repo="$TMP_ROOT/fe-repo-type-b-no-blueprint"
+  local mobile_repo="$TMP_ROOT/mobile-repo-type-b-no-blueprint"
+  mkdir -p "$repo_dir" "$capture_dir" "$fe_repo/src" "$mobile_repo/src"
+  setup_git_workspace "$repo_dir" "$fe_repo" "$mobile_repo"
+  seed_frontend_blueprint "$repo_dir"
+  seed_mobile_blueprint "$repo_dir"
+  setup_codex_stub "$repo_dir"
+
+  (
+    cd "$repo_dir/asdlc" &&
+    PATH="$repo_dir/bin:$PATH" TEST_CAPTURE_DIR="$capture_dir" \
+      .commands/feature_repo_surface_and_exec_context.sh --feature_path "projects/p1/feature-a" <<<"frontend" >/dev/null
+  )
+
+  local codex_prompt
+  codex_prompt="$(cat "$capture_dir/codex_prompt.txt")"
+  assert_not_contains "$codex_prompt" "planned structural evidence"
+  assert_not_contains "$codex_prompt" "project_stack_blueprint_frontend.md"
+  assert_not_contains "$codex_prompt" "blueprint fallback"
+}
+
 test_requires_feature_path_argument
 test_requires_staged_command_location
 test_fails_when_model_phase_missing
@@ -476,5 +821,10 @@ test_does_not_run_quality_helper_directly
 test_skips_empty_commit_when_output_is_unchanged
 test_runs_with_absolute_feature_path
 test_prompt_references_rule_file
+test_type_a_frontend_blueprint_only_invokes_model
+test_type_a_mobile_blueprint_only_invokes_model
+test_type_a_mixed_be_repo_fe_blueprint
+test_type_a_fe_prompt_assertions
+test_type_b_fe_does_not_bind_stack_blueprint
 
 echo "All frontend/mobile repo-surface/execution-context initializer tests passed."

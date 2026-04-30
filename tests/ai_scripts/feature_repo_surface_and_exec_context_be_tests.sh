@@ -447,6 +447,190 @@ test_prompt_references_rule_file() {
   assert_contains "$codex_prompt" "feature_repo_surface_and_exec_context_rule.md"
 }
 
+seed_type_a_project_definition_no_repo() {
+  local repo_dir="$1"
+  cat >"$repo_dir/asdlc/projects/p1/init_progress_definition.yaml" <<'EOF_DEF'
+meta_info:
+  project_id: "p1"
+  project_classes:
+    - backend
+  project_type_code: "A"
+  project_type_label: "New project"
+  class_repo_paths:
+    backend:
+      state: "deferred"
+      path: ""
+steps: []
+EOF_DEF
+}
+
+seed_type_a_project_definition_with_repo() {
+  local repo_dir="$1"
+  local backend_repo_path="$2"
+  cat >"$repo_dir/asdlc/projects/p1/init_progress_definition.yaml" <<EOF_DEF
+meta_info:
+  project_id: "p1"
+  project_classes:
+    - backend
+  project_type_code: "A"
+  project_type_label: "New project"
+  class_repo_paths:
+    backend:
+      state: "ready"
+      path: "$backend_repo_path"
+steps: []
+EOF_DEF
+}
+
+seed_backend_blueprint() {
+  local repo_dir="$1"
+  mkdir -p "$repo_dir/asdlc/projects/p1"
+  cat >"$repo_dir/asdlc/projects/p1/project_stack_blueprint_backend.md" <<'OUT'
+# Backend Stack Blueprint
+
+## Layer Conventions
+- api: controllers under src/api/
+- service: orchestration under src/service/
+- domain: domain models under src/domain/
+OUT
+}
+
+test_type_a_blueprint_only_invokes_model_and_writes_backend_surface_map() {
+  local repo_dir="$TMP_ROOT/repo-be-type-a-blueprint-only"
+  local capture_dir="$TMP_ROOT/capture-be-type-a-blueprint-only"
+  local backend_repo="$TMP_ROOT/backend-repo-type-a-blueprint-only"
+  mkdir -p "$repo_dir" "$capture_dir" "$backend_repo"
+  setup_workspace_layout "$repo_dir"
+  setup_models_file "$repo_dir"
+  write_quality_gate_stub "$repo_dir"
+  seed_type_a_project_definition_no_repo "$repo_dir"
+  seed_feature_sources "$repo_dir"
+  seed_backend_blueprint "$repo_dir"
+  setup_codex_stub "$repo_dir"
+
+  (
+    cd "$repo_dir/asdlc"
+    git init -q
+    git config user.name "Test User"
+    git config user.email "test@example.com"
+    echo "seed" >README.md
+    git add .
+    git commit -qm "seed"
+  )
+
+  local out=""
+  out="$(
+    cd "$repo_dir/asdlc" &&
+    PATH="$repo_dir/bin:$PATH" TEST_CAPTURE_DIR="$capture_dir" \
+      .commands/feature_repo_surface_and_exec_context.sh --feature_path "projects/p1/feature-a"
+  )"
+
+  assert_contains "$out" "Updated projects/p1/feature-a/project_surface_struct_resp_map_backend.md"
+  assert_file_exists "$repo_dir/asdlc/projects/p1/feature-a/project_surface_struct_resp_map_backend.md"
+
+  local codex_prompt
+  codex_prompt="$(cat "$capture_dir/codex_prompt.txt")"
+  assert_contains "$codex_prompt" "planned structural evidence"
+  assert_contains "$codex_prompt" "project_stack_blueprint_backend.md"
+}
+
+test_type_a_partial_repo_uses_both_evidence_sources() {
+  local repo_dir="$TMP_ROOT/repo-be-type-a-partial-repo"
+  local capture_dir="$TMP_ROOT/capture-be-type-a-partial-repo"
+  local backend_repo="$TMP_ROOT/backend-repo-type-a-partial-repo"
+  mkdir -p "$repo_dir" "$capture_dir" "$backend_repo/src/api"
+  setup_workspace_layout "$repo_dir"
+  setup_models_file "$repo_dir"
+  write_quality_gate_stub "$repo_dir"
+  seed_type_a_project_definition_with_repo "$repo_dir" "$backend_repo"
+  seed_feature_sources "$repo_dir"
+  seed_backend_blueprint "$repo_dir"
+  setup_codex_stub "$repo_dir"
+
+  (
+    cd "$repo_dir/asdlc"
+    git init -q
+    git config user.name "Test User"
+    git config user.email "test@example.com"
+    echo "seed" >README.md
+    git add .
+    git commit -qm "seed"
+  )
+
+  local backend_repo_resolved
+  backend_repo_resolved="$(cd "$backend_repo" && pwd -P)"
+
+  local out=""
+  out="$(
+    cd "$repo_dir/asdlc" &&
+    PATH="$repo_dir/bin:$PATH" TEST_CAPTURE_DIR="$capture_dir" \
+      .commands/feature_repo_surface_and_exec_context.sh --feature_path "projects/p1/feature-a"
+  )"
+
+  assert_contains "$out" "Updated projects/p1/feature-a/project_surface_struct_resp_map_backend.md"
+  assert_file_exists "$repo_dir/asdlc/projects/p1/feature-a/project_surface_struct_resp_map_backend.md"
+
+  local codex_prompt
+  codex_prompt="$(cat "$capture_dir/codex_prompt.txt")"
+  assert_contains "$codex_prompt" "- backend: $backend_repo_resolved"
+  assert_contains "$codex_prompt" "planned structural evidence"
+  assert_contains "$codex_prompt" "project_stack_blueprint_backend.md"
+}
+
+test_type_a_fails_without_repo_or_blueprint() {
+  local repo_dir="$TMP_ROOT/repo-be-type-a-no-evidence"
+  local backend_repo="$TMP_ROOT/backend-repo-type-a-no-evidence"
+  mkdir -p "$repo_dir" "$backend_repo"
+  setup_workspace_layout "$repo_dir"
+  setup_models_file "$repo_dir"
+  write_quality_gate_stub "$repo_dir"
+  seed_type_a_project_definition_no_repo "$repo_dir"
+  seed_feature_sources "$repo_dir"
+
+  (
+    cd "$repo_dir/asdlc"
+    git init -q
+    git config user.name "Test User"
+    git config user.email "test@example.com"
+    echo "seed" >README.md
+    git add .
+    git commit -qm "seed"
+  )
+
+  local status=0
+  local out=""
+  set +e
+  out="$(cd "$repo_dir/asdlc" && .commands/feature_repo_surface_and_exec_context.sh --feature_path "projects/p1/feature-a" 2>&1)"
+  status=$?
+  set -e
+
+  assert_nonzero_status "$status"
+  assert_contains "$out" "Missing required blueprint"
+  assert_contains "$out" "project_stack_blueprint_backend.md"
+}
+
+test_type_b_does_not_bind_stack_blueprint() {
+  local repo_dir="$TMP_ROOT/repo-be-type-b-no-blueprint"
+  local capture_dir="$TMP_ROOT/capture-be-type-b-no-blueprint"
+  local backend_repo="$TMP_ROOT/backend-repo-type-b-no-blueprint"
+  mkdir -p "$repo_dir" "$capture_dir" "$backend_repo/src"
+  setup_git_workspace "$repo_dir" "$backend_repo"
+  seed_backend_blueprint "$repo_dir"
+  setup_codex_stub "$repo_dir"
+
+  (
+    cd "$repo_dir/asdlc" &&
+    PATH="$repo_dir/bin:$PATH" TEST_CAPTURE_DIR="$capture_dir" \
+      .commands/feature_repo_surface_and_exec_context.sh --feature_path "projects/p1/feature-a" >/dev/null
+  )
+
+  local codex_prompt
+  codex_prompt="$(cat "$capture_dir/codex_prompt.txt")"
+  assert_not_contains "$codex_prompt" "planned structural evidence"
+  assert_not_contains "$codex_prompt" "project_stack_blueprint_backend.md"
+  assert_not_contains "$codex_prompt" "blueprint fallback"
+}
+
 test_requires_feature_path_argument
 test_requires_staged_command_location
 test_fails_when_model_phase_missing
@@ -456,5 +640,9 @@ test_runs_codex_and_commits_only_target_files
 test_skips_empty_commit_when_output_is_unchanged
 test_runs_with_absolute_feature_path
 test_prompt_references_rule_file
+test_type_a_blueprint_only_invokes_model_and_writes_backend_surface_map
+test_type_a_partial_repo_uses_both_evidence_sources
+test_type_a_fails_without_repo_or_blueprint
+test_type_b_does_not_bind_stack_blueprint
 
 echo "All backend repo-surface/execution-context initializer tests passed."

@@ -221,10 +221,12 @@ steps:
       - condition: "Backend analysis produces project_surface_struct_resp_map_backend.md when backend class is active."
       - condition: "Frontend analysis produces project_surface_struct_resp_map_frontend.md when frontend class is active."
       - condition: "Mobile analysis produces project_surface_struct_resp_map_mobile.md when mobile class is active."
-      - condition: "For project type A, best-practice repository execution context is requested from MCP and handled separately per active repo class, producing the same per-class artifact names."
+      - condition: "For project type A, each active backend/frontend/mobile class resolves surface-map rows from repo evidence first when a ready class repo path is available, from approved project_stack_blueprint_<class>.md as planned structural evidence when repo evidence does not resolve the row, and from the literal placeholder <to be defined during implementation> when neither source resolves the row."
+      - condition: "For project type A, the approved project_stack_blueprint_<class>.md is required before model invocation when no ready class repo path is available."
+      - condition: "For project type A, blueprint evidence is labeled as planned structural evidence only and must not be presented as repository-proven code evidence."
       - condition: "project_surface_struct_resp_map_backend.md, project_surface_struct_resp_map_frontend.md, and project_surface_struct_resp_map_mobile.md capture feature-scoped repo context for their respective classes, grounded in project-level repo metadata."
       - condition: "These artifacts do not redefine stable cross-project contract governance already captured in common_contract_definition.md."
-      - condition: "Sources used to prepare these documents follow project type rules: C from code analysis, B from code analysis or knowledge base, A from knowledge base only."
+      - condition: "Sources used to prepare these documents follow project type rules: C from code analysis, B from code analysis or knowledge base, A from repo evidence when available then approved stack blueprint as planned structural evidence then placeholder when neither source resolves."
       - condition: "Every Section 3 layer block and every Section 4 surface block in each surface map artifact carries both a transport_layer subfield and a user_reachable_surface subfield. Neither subfield may be blank or omitted; use none when one side has no applicable entry."
 
   - step_number: 8
