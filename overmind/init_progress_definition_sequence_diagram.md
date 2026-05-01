@@ -87,6 +87,12 @@ sequenceDiagram
         end
       end
 
+      opt 7.1 Optional MCP placeholder enrichment
+        PO->>KB: 7.1 Query KB for candidate replacements for <to be defined during implementation> placeholders
+        KB-->>PO: Proposed values with evidence (or unavailable)
+        PO->>PO: 7.1 Confirm proposed replacements → update project_surface_struct_resp_map_<class>.md in place
+      end
+
       alt Type B/C
         PO->>PO: 8. Technical requirements<br/>in: surface_map_*.md + requirements_ears.md + common_contract_definition.md<br/>→ technical_requirements.md
       else Type A

@@ -22,8 +22,8 @@ PHASE7_COMPLETED_REPO_CLASSES=()
 PHASE7_PENDING_REPO_CLASSES=()
 PHASE_EXECUTION_FAILED_RC=40
 
-PHASE_IDS=("3" "4.1" "4.2" "5" "5.1" "6" "7" "8.1" "8.2" "8.3" "8.4")
-PHASE_OPTIONAL=("false" "false" "false" "false" "true" "false" "false" "false" "false" "false" "true")
+PHASE_IDS=("3" "4.1" "4.2" "5" "5.1" "6" "7" "7.1" "8.1" "8.2" "8.3" "8.4")
+PHASE_OPTIONAL=("false" "false" "false" "false" "true" "false" "false" "true" "false" "false" "false" "true")
 
 
 die() {
@@ -503,6 +503,7 @@ phase_label() {
     5.1) printf '%s' "Optional EARS Review" ;;
     6) printf '%s' "Feature Contract Delta" ;;
     7) printf '%s' "Repo Surface and Technical Requirements" ;;
+    7.1) printf '%s' "Optional MCP Placeholder Enrichment" ;;
     8.1) printf '%s' "Implementation Slices" ;;
     8.2) printf '%s' "Prerequisite Gap Trace" ;;
     8.3) printf '%s' "Implementation Plan" ;;
@@ -543,6 +544,9 @@ phase_scripts() {
       ;;
     7)
       printf '%s\n' "feature_repo_surface_and_exec_context.sh" "feature_technical_requirements.sh"
+      ;;
+    7.1)
+      printf '%s\n' "feature_surface_map_mcp_placeholder_enrichment.sh"
       ;;
     8.1)
       printf '%s\n' "feature_implementation_slices.sh"
@@ -968,6 +972,7 @@ map_scanner_step_to_phase() {
     *"define feature contract delta"*) printf '%s' "6"; return 0 ;;
     *"analyze repos and prepare repo execution context"*) printf '%s' "7"; return 0 ;;
     *"create feature-scoped technical requirements"*) printf '%s' "7"; return 0 ;;
+    *"mcp placeholder enrichment"*) printf '%s' "7.1"; return 0 ;;
     *"create implementation slice planning artifact"*) printf '%s' "8.1"; return 0 ;;
     *"run prerequisite gap trace"*) printf '%s' "8.2"; return 0 ;;
     *"create shared repository implementation plan"*) printf '%s' "8.3"; return 0 ;;
@@ -983,6 +988,7 @@ map_scanner_step_to_phase() {
     5.1) printf '%s' "5.1" ;;
     6) printf '%s' "6" ;;
     7) printf '%s' "7" ;;
+    7.1) printf '%s' "7.1" ;;
     8) printf '%s' "7" ;;
     8.1) printf '%s' "8.1" ;;
     8.2) printf '%s' "8.2" ;;
@@ -1006,6 +1012,7 @@ map_resume_to_phase() {
     5.1|ears-review|4.1-optional) printf '%s' "5.1" ;;
     6|5|contract-delta) printf '%s' "6" ;;
     7|8|6|repo-surface|technical-requirements) printf '%s' "7" ;;
+    7.1|mcp-placeholder-enrichment) printf '%s' "7.1" ;;
     8.1|implementation-slices) printf '%s' "8.1" ;;
     8.2|prerequisite-gap-trace|prerequisite-gaps) printf '%s' "8.2" ;;
     8.3|implementation-plan) printf '%s' "8.3" ;;

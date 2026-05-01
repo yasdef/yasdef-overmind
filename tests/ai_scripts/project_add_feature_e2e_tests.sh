@@ -271,6 +271,7 @@ OUT
   write_feature_script_stub "$asdlc_root/.commands/feature_contract_delta.sh"
   write_repo_surface_script_stub "$asdlc_root/.commands/feature_repo_surface_and_exec_context.sh"
   write_feature_script_stub "$asdlc_root/.commands/feature_technical_requirements.sh"
+  write_feature_script_stub "$asdlc_root/.commands/feature_surface_map_mcp_placeholder_enrichment.sh"
   write_feature_script_stub "$asdlc_root/.commands/feature_implementation_slices.sh"
   write_feature_script_stub "$asdlc_root/.commands/feature_implementation_plan.sh"
   write_feature_script_stub "$asdlc_root/.commands/feature_implementation_plan_semantic_review.sh"
@@ -929,6 +930,71 @@ test_completed_cached_feature_prints_friendly_new_feature_message() {
   assert_contains "$out" "Saved feature_path: projects/project-a/feature-zeta"
 }
 
+test_optional_step_7_1_can_be_declined_without_blocking_later_required_phases() {
+  local asdlc_root="$TMP_ROOT/asdlc-7-1-optional"
+  local log_file="$TMP_ROOT/asdlc-7-1-optional.log"
+  mkdir -p "$asdlc_root"
+  setup_workspace "$asdlc_root"
+
+  mkdir -p "$asdlc_root/projects/project-a/feature-alpha"
+  printf 'feature_path=projects/project-a/feature-alpha\n' \
+    >"$asdlc_root/projects/project-a/.project_add_feature_e2e_state.env"
+
+  local out=""
+  out="$(
+    cd "$asdlc_root" &&
+    {
+      printf '2\n'    # continue existing feature
+      printf '1\n'    # select feature 1
+      printf 'n\n'    # decline optional step 7.1
+      printf 'n\n'    # decline step 8.1
+    } | TEST_LOG_FILE="$log_file" \
+      TEST_SCANNER_NEXT_LINE="next step: 7.1 ((optional) MCP placeholder enrichment)" \
+      .commands/project_add_feature_e2e.sh --path projects/project-a 2>&1
+  )"
+
+  assert_contains "$out" "Optional phase declined at 7.1; skipping."
+  assert_contains "$out" "Execution stopped: user denied phase progression at 8.1."
+
+  local log_content
+  log_content="$(read_log "$log_file")"
+  # Enrichment script must NOT have run
+  assert_not_contains "$log_content" "feature_surface_map_mcp_placeholder_enrichment.sh"
+  # Step 8.1 confirmation was reached, proving 7.1 did not block progression
+  assert_not_contains "$log_content" "feature_implementation_slices.sh"
+}
+
+test_optional_step_7_1_runs_when_accepted_then_continues_to_next_required_phase() {
+  local asdlc_root="$TMP_ROOT/asdlc-7-1-accepted"
+  local log_file="$TMP_ROOT/asdlc-7-1-accepted.log"
+  mkdir -p "$asdlc_root"
+  setup_workspace "$asdlc_root"
+
+  mkdir -p "$asdlc_root/projects/project-a/feature-alpha"
+  printf 'feature_path=projects/project-a/feature-alpha\n' \
+    >"$asdlc_root/projects/project-a/.project_add_feature_e2e_state.env"
+
+  local out=""
+  out="$(
+    cd "$asdlc_root" &&
+    {
+      printf '2\n'    # continue existing feature
+      printf '1\n'    # select feature 1
+      printf 'y\n'    # accept optional step 7.1
+      printf 'n\n'    # decline step 8.1
+    } | TEST_LOG_FILE="$log_file" \
+      TEST_SCANNER_NEXT_LINE="next step: 7.1 ((optional) MCP placeholder enrichment)" \
+      .commands/project_add_feature_e2e.sh --path projects/project-a 2>&1
+  )"
+
+  local log_content
+  log_content="$(read_log "$log_file")"
+  # Enrichment script ran
+  assert_contains "$log_content" "feature_surface_map_mcp_placeholder_enrichment.sh"
+  # Step 8.1 confirmation was reached after step 7.1 ran
+  assert_contains "$out" "Phase 8.1 (Implementation Slices)"
+}
+
 test_requires_path_argument
 test_scaffold_first_run_persists_feature_path_and_calls_scanner
 test_scaffold_path_capture_accepts_prefixed_created_line
@@ -949,5 +1015,7 @@ test_continue_flow_lists_only_unfinished_features_and_uses_selected_target
 test_new_feature_choice_runs_scaffold_even_when_unfinished_features_exist
 test_stale_saved_feature_path_cache_is_ignored
 test_completed_cached_feature_prints_friendly_new_feature_message
+test_optional_step_7_1_can_be_declined_without_blocking_later_required_phases
+test_optional_step_7_1_runs_when_accepted_then_continues_to_next_required_phase
 
 echo "All project_add_feature_e2e tests passed."

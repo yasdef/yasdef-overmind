@@ -10,6 +10,7 @@
 - analyzed_repo_paths: [UNFILLED]
 - source_inputs_used: [UNFILLED]
 - last_updated: [UNFILLED]
+- was_enriched_with_mcp: false
 
 ## 2. Feature Scope
 - feature_summary: [UNFILLED]

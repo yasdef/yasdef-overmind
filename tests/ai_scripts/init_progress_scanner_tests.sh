@@ -746,6 +746,81 @@ EOF_REVIEW
   assert_contains "$out_with_review" "next step: none"
 }
 
+test_scanner_optional_step_7_1_does_not_block_step_8() {
+  local asdlc_root="$TMP_ROOT/asdlc-step-7-1-nonblocking"
+  setup_asdlc_with_scanner "$asdlc_root"
+
+  local project_dir="$asdlc_root/projects/project-7-1-nonblocking"
+  local feature_dir="$project_dir/features/feat-a"
+  mkdir -p "$feature_dir"
+
+  cat >"$project_dir/init_progress_definition.yaml" <<'EOF_DEF'
+meta_info:
+  project_classes:
+    - backend
+
+steps:
+  - step_number: 7
+    phase_name: "feature"
+    step_name: "Analyze Repos And Prepare Repo Execution Context"
+    finished_only_if_artefacts_present:
+      - file: "project_surface_struct_resp_map_backend.md"
+        special_folder: "/product"
+        required_if:
+          meta_info:
+            project_classes:
+              any_of: ["backend"]
+  - step_number: 7.1
+    phase_name: "feature"
+    step_name: "(optional) MCP placeholder enrichment"
+    optional: true
+    finished_only_if_artefacts_present:
+      - file: "project_surface_struct_resp_map_backend.md"
+        special_folder: "/product"
+        required_if:
+          meta_info:
+            project_classes:
+              any_of: ["backend"]
+        check_key_value:
+          key: "was_enriched_with_mcp"
+          equals: "true"
+          section: "## 1. Document Meta"
+    finished_only_if_conditions_meet:
+      - condition: "Step 7.1 is optional and non-blocking."
+  - step_number: 8
+    phase_name: "feature"
+    step_name: "Create Feature-Scoped Technical Requirements"
+    finished_only_if_artefacts_present:
+      - file: "technical_requirements.md"
+        special_folder: "/product"
+EOF_DEF
+
+  # Step 7 done; surface map has flag = false (not yet enriched)
+  printf '## 1. Document Meta\n- was_enriched_with_mcp: false\n\n# backend map\n' \
+    >"$feature_dir/project_surface_struct_resp_map_backend.md"
+  # Step 8 artifact missing
+
+  local out
+  out="$($asdlc_root/.commands/init_progress_scanner.sh --path "$feature_dir")"
+
+  # Step 7 complete (artifact present, no key check on step 7)
+  assert_contains "$out" "- [x] 7 Analyze Repos And Prepare Repo Execution Context"
+  # Step 7.1 incomplete (flag is false) but optional → does not block step 8
+  assert_contains "$out" "- [ ] 7.1 (optional) MCP placeholder enrichment"
+  # Step 8 is next (step 7.1 is optional, skipped in next-step chain)
+  assert_contains "$out" "- [ ] 8 Create Feature-Scoped Technical Requirements"
+  assert_contains "$out" "next step: 8 (Create Feature-Scoped Technical Requirements)"
+
+  # Now simulate step 7.1 completed: flip flag to true
+  printf '## 1. Document Meta\n- was_enriched_with_mcp: true\n\n# backend map\n' \
+    >"$feature_dir/project_surface_struct_resp_map_backend.md"
+
+  local out2
+  out2="$($asdlc_root/.commands/init_progress_scanner.sh --path "$feature_dir")"
+
+  assert_contains "$out2" "- [x] 7.1 (optional) MCP placeholder enrichment"
+}
+
 test_scanner_renders_grouped_sections_and_persists_step_state
 test_scanner_uses_deterministic_feature_heading_fallback_when_title_missing
 test_scanner_rejects_missing_path_argument
@@ -762,5 +837,6 @@ test_scanner_reports_split_required_steps_4_1_then_4_2
 test_scanner_does_not_block_on_incomplete_optional_step
 test_scanner_detects_step_8_2_prerequisite_gaps
 test_scanner_handles_optional_step_8_4_semantic_review_without_blocking_later_required_steps
+test_scanner_optional_step_7_1_does_not_block_step_8
 
 echo "All init progress scanner tests passed."

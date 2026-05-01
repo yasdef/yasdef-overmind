@@ -229,6 +229,54 @@ steps:
       - condition: "Sources used to prepare these documents follow project type rules: C from code analysis, B from code analysis or knowledge base, A from repo evidence when available then approved stack blueprint as planned structural evidence then placeholder when neither source resolves."
       - condition: "Every Section 3 layer block and every Section 4 surface block in each surface map artifact carries both a transport_layer subfield and a user_reachable_surface subfield. Neither subfield may be blank or omitted; use none when one side has no applicable entry."
 
+  - step_number: 7.1
+    phase_name: "feature"
+    step_name: "(optional) MCP placeholder enrichment"
+    optional: true
+    input_required:
+      - type: "document"
+        value: "project_surface_struct_resp_map_backend.md"
+      - type: "document"
+        value: "project_surface_struct_resp_map_frontend.md"
+      - type: "document"
+        value: "project_surface_struct_resp_map_mobile.md"
+    finished_only_if_artefacts_present:
+      - file: "project_surface_struct_resp_map_backend.md"
+        special_folder: "/product"
+        required_if:
+          meta_info:
+            project_classes:
+              any_of: ["backend"]
+        check_key_value:
+          key: "was_enriched_with_mcp"
+          equals: "true"
+          section: "## 1. Document Meta"
+      - file: "project_surface_struct_resp_map_frontend.md"
+        special_folder: "/product"
+        required_if:
+          meta_info:
+            project_classes:
+              any_of: ["frontend"]
+        check_key_value:
+          key: "was_enriched_with_mcp"
+          equals: "true"
+          section: "## 1. Document Meta"
+      - file: "project_surface_struct_resp_map_mobile.md"
+        special_folder: "/product"
+        required_if:
+          meta_info:
+            project_classes:
+              any_of: ["mobile"]
+        check_key_value:
+          key: "was_enriched_with_mcp"
+          equals: "true"
+          section: "## 1. Document Meta"
+    finished_only_if_conditions_meet:
+      - condition: "Step 7.1 is optional. When run, it inspects existing surface-map artifacts for literal <to be defined during implementation> placeholders and, when a reachable knowledge-base MCP source is configured, proposes confirmed replacements for user approval."
+      - condition: "Step 7.1 does not produce a new audit artifact. Its output is an in-place update of the relevant surface-map artifact only for user-confirmed replacements."
+      - condition: "Step 8 may proceed when Step 7 is complete, whether Step 7.1 is skipped, no-ops, fails to find useful MCP data, or the user rejects proposed replacements."
+      - condition: "Step 7.1 is considered complete when was_enriched_with_mcp is true in the Document Meta of each active class surface map."
+
   - step_number: 8
     phase_name: "feature"
     step_name: "Create Feature-Scoped Technical Requirements"
