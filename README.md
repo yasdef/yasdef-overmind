@@ -111,6 +111,9 @@ V-0.0.2 (current)
   - `project_surface_struct_resp_map_frontend.md`
   - `project_surface_struct_resp_map_mobile.md`
 
+- `overmind/scripts/feature_surface_map_mcp_placeholder_enrichment.sh`
+  Staged command (`<asdlc>/.commands/feature_surface_map_mcp_placeholder_enrichment.sh --feature_path <.../feature-folder>`) that optionally runs Step `7.1`, finds unresolved surface-map placeholders, asks a configured knowledge-base MCP source for candidate replacements, applies only user-confirmed replacements, and commits changed surface maps.
+
 - `overmind/scripts/feature_technical_requirements.sh`
   Staged command (`<asdlc>/.commands/feature_technical_requirements.sh --feature_path <.../feature-folder>`) that generates one shared `technical_requirements.md` for the feature from `requirements_ears.md`, `common_contract_definition.md`, and targeted evidence selected via the per-class surface maps.
 

@@ -239,6 +239,31 @@ in_sources == 1 {
   done <<<"$raw_names"
 }
 
+ensure_external_sources_file() {
+  local runtime_root="$1"
+
+  if [[ ! -f "$runtime_root/$EXTERNAL_SOURCES_FILE" ]]; then
+    die "Required file not found: $EXTERNAL_SOURCES_FILE"
+  fi
+}
+
+ensure_model_runtime_files() {
+  local runtime_root="$1"
+  local required_paths=(
+    "$MODELS_FILE"
+    "$RULE_FILE"
+    "$BACKEND_QUALITY_GATE_HELPER"
+    "$FRONTEND_MOBILE_QUALITY_GATE_HELPER"
+  )
+  local relative_path=""
+
+  for relative_path in "${required_paths[@]}"; do
+    if [[ ! -f "$runtime_root/$relative_path" ]]; then
+      die "Required file not found: $relative_path"
+    fi
+  done
+}
+
 load_model_config() {
   local models_path="$1"
   local phase="$2"
@@ -361,6 +386,28 @@ ensure_file_unchanged() {
   fi
 }
 
+commit_changed_maps_if_needed() {
+  local runtime_root="$1"
+  shift
+  local changed_maps=("$@")
+
+  if [[ ${#changed_maps[@]} -eq 0 ]]; then
+    return 0
+  fi
+
+  if ! git -C "$runtime_root" add -- "${changed_maps[@]}"; then
+    die "Failed to stage enriched surface-map artifacts."
+  fi
+
+  if git -C "$runtime_root" diff --cached --quiet -- "${changed_maps[@]}"; then
+    return 0
+  fi
+
+  if ! git -C "$runtime_root" commit -m "Enrich surface-map placeholders with MCP" -- "${changed_maps[@]}" >/dev/null 2>&1; then
+    die "Failed to commit enriched surface-map artifacts."
+  fi
+}
+
 main() {
   require_command git
   require_command awk
@@ -391,6 +438,7 @@ main() {
   fi
 
   sources_path="$runtime_root/$EXTERNAL_SOURCES_FILE"
+  ensure_external_sources_file "$runtime_root"
   collect_eligible_kb_sources "$sources_path"
 
   if [[ ${#ELIGIBLE_SOURCE_NAMES[@]} -eq 0 ]]; then
@@ -398,6 +446,7 @@ main() {
     exit 0
   fi
 
+  ensure_model_runtime_files "$runtime_root"
   models_path="$runtime_root/$MODELS_FILE"
   load_model_config "$models_path" "$MODEL_PHASE"
   if [[ "$MODEL_CMD" != "codex" ]]; then
@@ -434,6 +483,7 @@ main() {
     "${cmd[@]}"
   )
 
+  local changed_maps=()
   for idx in "${!MAPS_WITH_PLACEHOLDERS[@]}"; do
     local map_path="$runtime_root/${MAPS_WITH_PLACEHOLDERS[$idx]}"
     if ! cmp -s "$maps_snapshot_dir/$idx" "$map_path"; then
@@ -441,6 +491,7 @@ main() {
       tmp_flagged="$(mktemp)"
       sed 's/was_enriched_with_mcp: false/was_enriched_with_mcp: true/' "$map_path" >"$tmp_flagged"
       mv "$tmp_flagged" "$map_path"
+      changed_maps+=("${MAPS_WITH_PLACEHOLDERS[$idx]}")
     fi
   done
 
@@ -449,6 +500,12 @@ main() {
     ensure_file_unchanged "$before_definition" "$runtime_root/$PROJECT_DEFINITION_FILE" "$PROJECT_DEFINITION_FILE"
   fi
 
+  if [[ ${#changed_maps[@]} -gt 0 ]]; then
+    commit_changed_maps_if_needed "$runtime_root" "${changed_maps[@]}"
+    for idx in "${!changed_maps[@]}"; do
+      echo "Updated ${changed_maps[$idx]}"
+    done
+  fi
   echo "Step 7.1: MCP placeholder enrichment complete."
 }
 

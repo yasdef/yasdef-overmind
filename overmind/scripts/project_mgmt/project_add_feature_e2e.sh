@@ -37,7 +37,7 @@ Usage: project_add_feature_e2e.sh --path <project-folder-path> [--resume <step>]
 
 Options:
   --path <project-folder-path>  ASDLC project folder (for example: projects/<project-id>)
-  --resume <step>               Optional step override (for example: 3, 4.1, 4.2, 5, 5.1, 6, 7, 8.1, 8.2 (prerequisite gap trace), 8.3 (implementation plan), 8.4 (optional semantic review))
+  --resume <step>               Optional step override (for example: 3, 4.1, 4.2, 5, 5.1, 6, 7, 7.1 (optional MCP placeholder enrichment), 8.1, 8.2 (prerequisite gap trace), 8.3 (implementation plan), 8.4 (optional semantic review))
 USAGE
 }
 

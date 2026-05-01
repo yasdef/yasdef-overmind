@@ -275,6 +275,7 @@ assert_support_assets_match_repo_sources() {
 assert_feature_requirements_and_plan_commands_use_staged_runtime_assets() {
   local asdlc_root="$1"
   local technical_requirements_cmd_path="$asdlc_root/.commands/feature_technical_requirements.sh"
+  local mcp_placeholder_enrichment_cmd_path="$asdlc_root/.commands/feature_surface_map_mcp_placeholder_enrichment.sh"
   local implementation_slices_cmd_path="$asdlc_root/.commands/feature_implementation_slices.sh"
   local prerequisite_gaps_cmd_path="$asdlc_root/.commands/feature_prerequisite_gaps.sh"
   local implementation_plan_cmd_path="$asdlc_root/.commands/feature_implementation_plan.sh"
@@ -286,6 +287,12 @@ assert_feature_requirements_and_plan_commands_use_staged_runtime_assets() {
   assert_contains "$(cat "$technical_requirements_cmd_path")" 'TECHNICAL_REQUIREMENTS_TEMPLATE_FILE=".templates/technical_requirements_TEMPLATE.md"'
   assert_contains "$(cat "$technical_requirements_cmd_path")" 'TECHNICAL_REQUIREMENTS_GOLDEN_EXAMPLE_FILE=".golden_examples/technical_requirements_GOLDEN_EXAMPLE.md"'
   assert_contains "$(cat "$technical_requirements_cmd_path")" 'QUALITY_GATE_HELPER=".helper/check_feature_technical_requirements_quality.sh"'
+
+  assert_contains "$(cat "$mcp_placeholder_enrichment_cmd_path")" 'EXTERNAL_SOURCES_FILE=".setup/external_sources.yaml"'
+  assert_contains "$(cat "$mcp_placeholder_enrichment_cmd_path")" 'MODELS_FILE=".setup/models.md"'
+  assert_contains "$(cat "$mcp_placeholder_enrichment_cmd_path")" 'RULE_FILE=".rules/feature_surface_map_mcp_placeholder_enrichment_rule.md"'
+  assert_contains "$(cat "$mcp_placeholder_enrichment_cmd_path")" 'BACKEND_QUALITY_GATE_HELPER=".helper/check_feature_repo_surface_and_exec_context_be_quality.sh"'
+  assert_contains "$(cat "$mcp_placeholder_enrichment_cmd_path")" 'FRONTEND_MOBILE_QUALITY_GATE_HELPER=".helper/check_feature_repo_surface_and_exec_context_fe_quality.sh"'
 
   assert_contains "$(cat "$implementation_slices_cmd_path")" 'MODELS_FILE=".setup/models.md"'
   assert_contains "$(cat "$implementation_slices_cmd_path")" 'RULE_FILE=".rules/implementation_slices_rule.md"'
@@ -595,6 +602,8 @@ test_first_init_machine_bootstraps_asdlc_workspace_with_local_template() {
   assert_contains "$quickrun" ".commands/feature_requirements_ears_review.sh --feature_path projects/<project-id>/<feature-folder>"
   assert_contains "$quickrun" ".commands/feature_contract_delta.sh --feature_path projects/<project-id>/<feature-folder>"
   assert_contains "$quickrun" ".commands/feature_repo_surface_and_exec_context.sh --feature_path projects/<project-id>/<feature-folder>"
+  assert_contains "$quickrun" "Optionally enrich unresolved surface-map placeholders from configured knowledge-base MCP sources (Step 7.1):"
+  assert_contains "$quickrun" ".commands/feature_surface_map_mcp_placeholder_enrichment.sh --feature_path projects/<project-id>/<feature-folder>"
   assert_contains "$quickrun" ".commands/feature_technical_requirements.sh --feature_path projects/<project-id>/<feature-folder>"
   assert_contains "$quickrun" ".commands/feature_implementation_slices.sh --feature_path projects/<project-id>/<feature-folder>"
   assert_contains "$quickrun" ".commands/feature_implementation_plan.sh --feature_path projects/<project-id>/<feature-folder>"
@@ -679,6 +688,7 @@ test_first_init_machine_update_mode_repairs_missing_commands_without_overwriting
   local feature_requirements_ears_review_cmd_path="$asdlc_root/.commands/feature_requirements_ears_review.sh"
   local feature_contract_delta_cmd_path="$asdlc_root/.commands/feature_contract_delta.sh"
   local repo_surface_context_cmd_path="$asdlc_root/.commands/feature_repo_surface_and_exec_context.sh"
+  local mcp_placeholder_enrichment_cmd_path="$asdlc_root/.commands/feature_surface_map_mcp_placeholder_enrichment.sh"
   local feature_technical_requirements_cmd_path="$asdlc_root/.commands/feature_technical_requirements.sh"
   local feature_implementation_slices_cmd_path="$asdlc_root/.commands/feature_implementation_slices.sh"
   local repository_implementation_plan_cmd_path="$asdlc_root/.commands/feature_implementation_plan.sh"
@@ -725,6 +735,7 @@ test_first_init_machine_update_mode_repairs_missing_commands_without_overwriting
     "$feature_requirements_ears_review_cmd_path" \
     "$feature_contract_delta_cmd_path" \
     "$repo_surface_context_cmd_path" \
+    "$mcp_placeholder_enrichment_cmd_path" \
     "$feature_technical_requirements_cmd_path" \
     "$feature_implementation_slices_cmd_path" \
     "$repository_implementation_plan_cmd_path" \
@@ -753,6 +764,7 @@ test_first_init_machine_update_mode_repairs_missing_commands_without_overwriting
   assert_contains "$out" "Update mode added file: $feature_requirements_ears_review_cmd_path"
   assert_contains "$out" "Update mode added file: $feature_contract_delta_cmd_path"
   assert_contains "$out" "Update mode added file: $repo_surface_context_cmd_path"
+  assert_contains "$out" "Update mode added file: $mcp_placeholder_enrichment_cmd_path"
   assert_contains "$out" "Update mode added file: $feature_technical_requirements_cmd_path"
   assert_contains "$out" "Update mode added file: $feature_implementation_slices_cmd_path"
   assert_contains "$out" "Update mode added file: $repository_implementation_plan_cmd_path"
@@ -775,6 +787,7 @@ test_first_init_machine_update_mode_repairs_missing_commands_without_overwriting
   assert_file_exists "$feature_requirements_ears_review_cmd_path"
   assert_file_exists "$feature_contract_delta_cmd_path"
   assert_file_exists "$repo_surface_context_cmd_path"
+  assert_file_exists "$mcp_placeholder_enrichment_cmd_path"
   assert_file_exists "$feature_technical_requirements_cmd_path"
   assert_file_exists "$feature_implementation_slices_cmd_path"
   assert_file_exists "$repository_implementation_plan_cmd_path"
@@ -795,6 +808,7 @@ test_first_init_machine_update_mode_repairs_missing_commands_without_overwriting
   assert_file_executable "$feature_requirements_ears_review_cmd_path"
   assert_file_executable "$feature_contract_delta_cmd_path"
   assert_file_executable "$repo_surface_context_cmd_path"
+  assert_file_executable "$mcp_placeholder_enrichment_cmd_path"
   assert_file_executable "$feature_technical_requirements_cmd_path"
   assert_file_executable "$feature_implementation_slices_cmd_path"
   assert_file_executable "$repository_implementation_plan_cmd_path"
@@ -869,6 +883,8 @@ OUT
   assert_contains "$quickrun" ".commands/project_register_worker.sh --path projects/<project-id>"
   assert_contains "$quickrun" "projects/<project-id>/workers.yaml"
   assert_contains "$quickrun" ".commands/feature_requirements_ears_review.sh --feature_path projects/<project-id>/<feature-folder>"
+  assert_contains "$quickrun" "Optionally enrich unresolved surface-map placeholders from configured knowledge-base MCP sources (Step 7.1):"
+  assert_contains "$quickrun" ".commands/feature_surface_map_mcp_placeholder_enrichment.sh --feature_path projects/<project-id>/<feature-folder>"
   assert_contains "$quickrun" ".commands/feature_technical_requirements.sh --feature_path projects/<project-id>/<feature-folder>"
   assert_contains "$quickrun" ".commands/feature_implementation_slices.sh --feature_path projects/<project-id>/<feature-folder>"
   assert_contains "$quickrun" ".commands/feature_implementation_plan.sh --feature_path projects/<project-id>/<feature-folder>"
@@ -912,6 +928,7 @@ test_first_init_machine_update_mode_recreates_commands_directory_when_missing() 
   assert_contains "$out" "Update mode added file: $asdlc_root/.commands/feature_requirements_ears_review.sh"
   assert_contains "$out" "Update mode added file: $asdlc_root/.commands/feature_contract_delta.sh"
   assert_contains "$out" "Update mode added file: $asdlc_root/.commands/feature_repo_surface_and_exec_context.sh"
+  assert_contains "$out" "Update mode added file: $asdlc_root/.commands/feature_surface_map_mcp_placeholder_enrichment.sh"
   assert_contains "$out" "Update mode added file: $asdlc_root/.commands/feature_technical_requirements.sh"
   assert_contains "$out" "Update mode added file: $asdlc_root/.commands/feature_implementation_slices.sh"
   assert_contains "$out" "Update mode added file: $asdlc_root/.commands/feature_implementation_plan.sh"
@@ -934,6 +951,7 @@ test_first_init_machine_update_mode_recreates_commands_directory_when_missing() 
   assert_file_exists "$asdlc_root/.commands/feature_requirements_ears_review.sh"
   assert_file_exists "$asdlc_root/.commands/feature_contract_delta.sh"
   assert_file_exists "$asdlc_root/.commands/feature_repo_surface_and_exec_context.sh"
+  assert_file_exists "$asdlc_root/.commands/feature_surface_map_mcp_placeholder_enrichment.sh"
   assert_file_exists "$asdlc_root/.commands/feature_technical_requirements.sh"
   assert_file_exists "$asdlc_root/.commands/feature_implementation_slices.sh"
   assert_file_exists "$asdlc_root/.commands/feature_implementation_plan.sh"
@@ -954,6 +972,7 @@ test_first_init_machine_update_mode_recreates_commands_directory_when_missing() 
   assert_file_executable "$asdlc_root/.commands/feature_requirements_ears_review.sh"
   assert_file_executable "$asdlc_root/.commands/feature_contract_delta.sh"
   assert_file_executable "$asdlc_root/.commands/feature_repo_surface_and_exec_context.sh"
+  assert_file_executable "$asdlc_root/.commands/feature_surface_map_mcp_placeholder_enrichment.sh"
   assert_file_executable "$asdlc_root/.commands/feature_technical_requirements.sh"
   assert_file_executable "$asdlc_root/.commands/feature_implementation_slices.sh"
   assert_file_executable "$asdlc_root/.commands/feature_implementation_plan.sh"

@@ -614,23 +614,27 @@ Resume examples:
 \`\`\`bash
 .commands/feature_repo_surface_and_exec_context.sh --feature_path projects/<project-id>/<feature-folder>
 \`\`\`
-3. Create feature technical requirements:
+3. Optionally enrich unresolved surface-map placeholders from configured knowledge-base MCP sources (Step 7.1):
+\`\`\`bash
+.commands/feature_surface_map_mcp_placeholder_enrichment.sh --feature_path projects/<project-id>/<feature-folder>
+\`\`\`
+4. Create feature technical requirements:
 \`\`\`bash
 .commands/feature_technical_requirements.sh --feature_path projects/<project-id>/<feature-folder>
 \`\`\`
-4. Create implementation slices (Step 8.1):
+5. Create implementation slices (Step 8.1):
 \`\`\`bash
 .commands/feature_implementation_slices.sh --feature_path projects/<project-id>/<feature-folder>
 \`\`\`
-5. Create the shared implementation plan (Step 8.2):
+6. Create the shared implementation plan (Step 8.2):
 \`\`\`bash
 .commands/feature_implementation_plan.sh --feature_path projects/<project-id>/<feature-folder>
 \`\`\`
-6. Optionally run implementation-plan semantic review (Step 8.3):
+7. Optionally run implementation-plan semantic review (Step 8.3):
 \`\`\`bash
 .commands/feature_implementation_plan_semantic_review.sh --feature_path projects/<project-id>/<feature-folder>
 \`\`\`
-7. Assign workers to implementation-plan steps:
+8. Assign workers to implementation-plan steps:
 \`\`\`bash
 .commands/feature_assing_workers.sh --feature_path projects/<project-id>/<feature-folder>
 \`\`\`

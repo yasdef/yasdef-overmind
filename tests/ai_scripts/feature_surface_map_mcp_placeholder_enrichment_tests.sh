@@ -56,6 +56,14 @@ assert_file_exists() {
   fi
 }
 
+assert_file_not_exists() {
+  local path="$1"
+  if [[ -e "$path" ]]; then
+    echo "Assertion failed: expected file to not exist: $path" >&2
+    exit 1
+  fi
+}
+
 assert_file_content_unchanged() {
   local original_content="$1"
   local file_path="$2"
@@ -399,6 +407,44 @@ test_user_confirmation_applies_placeholder_replacement() {
   assert_contains "$updated_content" "REST"
 }
 
+test_confirmed_enrichment_commits_changed_surface_map() {
+  local asdlc_root="$TMP_ROOT/user-confirm-commit"
+  setup_asdlc_workspace "$asdlc_root"
+
+  local feature_dir="$asdlc_root/projects/project-a/feature-confirm-commit"
+  mkdir -p "$feature_dir"
+
+  printf '# Backend map\ntransport_layer: <to be defined during implementation>\n' \
+    >"$feature_dir/project_surface_struct_resp_map_backend.md"
+
+  write_external_sources_yaml "$asdlc_root/.setup/external_sources.yaml" \
+    "tech-standards-kb|stack_knowledge_base"
+
+  local prompt_capture="$TMP_ROOT/user-confirm-commit-prompt.txt"
+  local map_abs="$asdlc_root/projects/project-a/feature-confirm-commit/project_surface_struct_resp_map_backend.md"
+  write_codex_modifying_stub "$asdlc_root/.commands/codex" "$map_abs" "REST" "$prompt_capture"
+
+  local before_head=""
+  before_head="$(git -C "$asdlc_root" rev-parse HEAD)"
+
+  local out=""
+  out="$(cd "$asdlc_root" && PATH="$asdlc_root/.commands:$PATH" \
+    .commands/feature_surface_map_mcp_placeholder_enrichment.sh \
+    --feature_path projects/project-a/feature-confirm-commit 2>&1)"
+
+  local after_head=""
+  after_head="$(git -C "$asdlc_root" rev-parse HEAD)"
+
+  if [[ "$before_head" == "$after_head" ]]; then
+    echo "Assertion failed: expected changed map to be committed" >&2
+    exit 1
+  fi
+  assert_equal "Enrich surface-map placeholders with MCP" "$(git -C "$asdlc_root" log -1 --pretty=%s)"
+  assert_contains "$(git -C "$asdlc_root" show --name-only --pretty=format: HEAD)" \
+    "projects/project-a/feature-confirm-commit/project_surface_struct_resp_map_backend.md"
+  assert_contains "$out" "Updated projects/project-a/feature-confirm-commit/project_surface_struct_resp_map_backend.md"
+}
+
 test_backend_quality_helper_referenced_in_prompt_for_backend_map() {
   local asdlc_root="$TMP_ROOT/quality-be"
   setup_asdlc_workspace "$asdlc_root"
@@ -540,6 +586,115 @@ test_rejected_enrichment_leaves_was_enriched_with_mcp_flag_false() {
   assert_contains "$flag_value" "was_enriched_with_mcp: false"
 }
 
+test_missing_external_sources_file_fails_when_placeholders_exist() {
+  local asdlc_root="$TMP_ROOT/missing-external-sources"
+  setup_asdlc_workspace "$asdlc_root"
+
+  local feature_dir="$asdlc_root/projects/project-a/feature-missing-sources"
+  mkdir -p "$feature_dir"
+
+  printf '# Backend map\ntransport_layer: <to be defined during implementation>\n' \
+    >"$feature_dir/project_surface_struct_resp_map_backend.md"
+  rm -f "$asdlc_root/.setup/external_sources.yaml"
+
+  local status=0
+  local out=""
+  set +e
+  out="$(cd "$asdlc_root" && .commands/feature_surface_map_mcp_placeholder_enrichment.sh \
+    --feature_path projects/project-a/feature-missing-sources 2>&1)"
+  status=$?
+  set -e
+
+  assert_nonzero_status "$status"
+  assert_contains "$out" "Required file not found: .setup/external_sources.yaml"
+}
+
+test_missing_runtime_rule_fails_before_model_invocation() {
+  local asdlc_root="$TMP_ROOT/missing-rule"
+  setup_asdlc_workspace "$asdlc_root"
+
+  local feature_dir="$asdlc_root/projects/project-a/feature-missing-rule"
+  mkdir -p "$feature_dir"
+
+  printf '# Backend map\ntransport_layer: <to be defined during implementation>\n' \
+    >"$feature_dir/project_surface_struct_resp_map_backend.md"
+
+  write_external_sources_yaml "$asdlc_root/.setup/external_sources.yaml" \
+    "tech-standards-kb|stack_knowledge_base"
+  rm -f "$asdlc_root/.rules/feature_surface_map_mcp_placeholder_enrichment_rule.md"
+
+  local prompt_capture="$TMP_ROOT/missing-rule-prompt.txt"
+  write_codex_logging_stub "$asdlc_root/.commands/codex" "$prompt_capture"
+
+  local status=0
+  local out=""
+  set +e
+  out="$(cd "$asdlc_root" && PATH="$asdlc_root/.commands:$PATH" \
+    .commands/feature_surface_map_mcp_placeholder_enrichment.sh \
+    --feature_path projects/project-a/feature-missing-rule 2>&1)"
+  status=$?
+  set -e
+
+  assert_nonzero_status "$status"
+  assert_contains "$out" "Required file not found: .rules/feature_surface_map_mcp_placeholder_enrichment_rule.md"
+  assert_file_not_exists "$prompt_capture"
+}
+
+test_copied_command_outside_staged_path_fails() {
+  local asdlc_root="$TMP_ROOT/copied-command"
+  setup_asdlc_workspace "$asdlc_root"
+
+  mkdir -p "$asdlc_root/not-commands"
+  cp "$SCRIPT_SRC" "$asdlc_root/not-commands/feature_surface_map_mcp_placeholder_enrichment.sh"
+  chmod +x "$asdlc_root/not-commands/feature_surface_map_mcp_placeholder_enrichment.sh"
+
+  local status=0
+  local out=""
+  set +e
+  out="$(cd "$asdlc_root" && not-commands/feature_surface_map_mcp_placeholder_enrichment.sh \
+    --feature_path projects/project-a/feature-copied 2>&1)"
+  status=$?
+  set -e
+
+  assert_nonzero_status "$status"
+  assert_contains "$out" "Run this command from ASDLC staged path: <asdlc>/.commands/feature_surface_map_mcp_placeholder_enrichment.sh"
+}
+
+test_quality_helper_is_not_executed_by_orchestrator() {
+  local asdlc_root="$TMP_ROOT/helper-not-executed"
+  setup_asdlc_workspace "$asdlc_root"
+
+  local feature_dir="$asdlc_root/projects/project-a/feature-helper-not-executed"
+  mkdir -p "$feature_dir"
+
+  printf '# Backend map\ntransport_layer: <to be defined during implementation>\n' \
+    >"$feature_dir/project_surface_struct_resp_map_backend.md"
+
+  write_external_sources_yaml "$asdlc_root/.setup/external_sources.yaml" \
+    "tech-standards-kb|stack_knowledge_base"
+
+  local helper_marker="$TMP_ROOT/helper-not-executed.marker"
+  cat >"$asdlc_root/.helper/check_feature_repo_surface_and_exec_context_be_quality.sh" <<EOF
+#!/usr/bin/env bash
+touch "$helper_marker"
+exit 99
+EOF
+  chmod +x "$asdlc_root/.helper/check_feature_repo_surface_and_exec_context_be_quality.sh"
+
+  local prompt_capture="$TMP_ROOT/helper-not-executed-prompt.txt"
+  write_codex_logging_stub "$asdlc_root/.commands/codex" "$prompt_capture"
+
+  local out=""
+  out="$(cd "$asdlc_root" && PATH="$asdlc_root/.commands:$PATH" \
+    .commands/feature_surface_map_mcp_placeholder_enrichment.sh \
+    --feature_path projects/project-a/feature-helper-not-executed 2>&1)"
+
+  assert_file_exists "$prompt_capture"
+  assert_contains "$(cat "$prompt_capture")" ".helper/check_feature_repo_surface_and_exec_context_be_quality.sh"
+  assert_file_not_exists "$helper_marker"
+  assert_contains "$out" "MCP placeholder enrichment complete"
+}
+
 test_requires_feature_path_argument() {
   local asdlc_root="$TMP_ROOT/missing-arg"
   setup_asdlc_workspace "$asdlc_root"
@@ -583,6 +738,9 @@ echo "  PASS: user rejection leaves maps unchanged"
 test_user_confirmation_applies_placeholder_replacement
 echo "  PASS: user confirmation applies placeholder replacement"
 
+test_confirmed_enrichment_commits_changed_surface_map
+echo "  PASS: confirmed enrichment commits changed surface map"
+
 test_backend_quality_helper_referenced_in_prompt_for_backend_map
 echo "  PASS: backend quality helper referenced in prompt for backend map"
 
@@ -600,5 +758,17 @@ echo "  PASS: confirmed enrichment flips was_enriched_with_mcp to true"
 
 test_rejected_enrichment_leaves_was_enriched_with_mcp_flag_false
 echo "  PASS: rejected enrichment leaves was_enriched_with_mcp as false"
+
+test_missing_external_sources_file_fails_when_placeholders_exist
+echo "  PASS: missing external sources file fails when placeholders exist"
+
+test_missing_runtime_rule_fails_before_model_invocation
+echo "  PASS: missing runtime rule fails before model invocation"
+
+test_copied_command_outside_staged_path_fails
+echo "  PASS: copied command outside staged path fails"
+
+test_quality_helper_is_not_executed_by_orchestrator
+echo "  PASS: quality helper is not executed by orchestrator"
 
 echo "All tests passed."
