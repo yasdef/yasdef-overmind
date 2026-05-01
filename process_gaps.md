@@ -449,6 +449,80 @@ Per-row resolution at step 7: real repo evidence → blueprint `(planned)` path 
 
 When step 7 produces a surface-map row that falls through to the literal `<to be defined during implementation>` placeholder (no repo evidence, no blueprint coverage), the pipeline currently leaves that row technically incomplete. If an MCP knowledgebase is configured and reachable for the active project, it may already hold enough context about the intended surface (stack archetype, folder conventions, transport shape) to resolve the placeholder at generation time rather than deferring it to the worker design phase. The idea is to attempt an MCP-backed lookup for each placeholder row before writing it as `<to be defined during implementation>`, fill what the knowledgebase can confirm, and fall back to the placeholder only when the MCP query returns nothing useful.
 
+## Gap 8 - Cross-class transport/contract approach is not anchored at project init for type `A`
+
+### 1. Gap
+
+For project type `A` projects with multiple active classes, the pipeline never explicitly captures how those classes communicate (REST + OpenAPI, GraphQL, gRPC, Thrift, tRPC, etc.).
+
+- Step 1.1 (`Define Project Stack Blueprints For Active Classes`) captures per-class stack, folder conventions, and archetypes, but not the cross-class transport/contract approach.
+- Step 2 (`Create Cross-Repository Contract Definition For This Project`) for type `A` reads blueprints as read-only context only, so when blueprints carry no contract-shape intent, `common_contract_definition.md` is structurally thin for greenfield type `A`.
+- Step 6 (`Define Feature Contract Delta`) deltas against that thin baseline, which weakens the delta.
+- Step 7 still demands `transport_layer` per surface row, so the missing decision surfaces late as `<to be defined during implementation>` placeholders instead of as a planned project-level decision.
+
+The cross-class transport/contract approach is a stable project-level decision, not a feature-scoped one — it belongs at init time and should be either stated up front or explicitly deferred with a tracked obligation.
+
+### 2. How to fix
+
+Extend step 1.1 to attempt deriving the cross-class transport/contract approach from blueprint stack choices and (when configured) MCP guidance, write it into the backend blueprint when derivable, and write a tracked placeholder when not. Carry the placeholder through step 2 unchanged. Enforce resolution at step 6 for type `A` whenever the placeholder is still present.
+
+Ownership rule: the **backend** class blueprint is the sole holder of the cross-class transport/contract approach section. Frontend and mobile blueprints do not carry this section. When a project has multiple active backend classes (e.g., two backend services sharing a Thrift contract), every active backend blueprint carries the section independently. The rule is a no-op for projects with no active backend class.
+
+The placeholder is the literal sentinel `<to be defined during first feature implementation plan>`, distinct from the step 7 sentinel `<to be defined during implementation>` so the two obligations remain separately trackable.
+
+### 3. Concrete implementation steps
+
+1. Extend `overmind/templates/project_stack_blueprint_be_TEMPLATE.md` (Gap 5 artefact) with a new required section `§5 Cross-Class Transport/Contract Approach` carrying these fields:
+   - `applies_to_classes` — list of consumer class names (`frontend`, `mobile`, `backend`); literal `none` when this backend has no cross-class consumer in this project,
+   - `transport_protocol` — e.g., `REST`, `gRPC`, `GraphQL`, `Thrift`, `tRPC`, or the literal placeholder,
+   - `schema_format` — e.g., `OpenAPI 3.1`, `protobuf`, `GraphQL SDL`, `Thrift IDL`, or the literal placeholder,
+   - `source_of_truth_repo` — backend repo that owns the contract artefact, or the literal placeholder,
+   - `derivation_source` — one of `mcp`, `blueprint_stack_inference`, `placeholder`, `feature_contract_delta`,
+   - `user_approved` — boolean.
+2. Do not modify `project_stack_blueprint_fe_TEMPLATE.md` or `project_stack_blueprint_mobile_TEMPLATE.md`. Presence of §5 in either is invalid.
+3. Update the step 1.1 model rule (Gap 5 step 5) so that, for every active backend blueprint:
+   - first attempt MCP-backed derivation when `stack_guidance_sources[backend]` is configured and reachable,
+   - otherwise attempt inference from the approved §2 stack choices,
+   - when either source yields a confident proposal, present it for user approval and record `derivation_source` accordingly,
+   - when neither source yields a confident proposal, write the literal placeholder, set `derivation_source: placeholder` and `user_approved: false`; placeholder writes do not require approval,
+   - never auto-fill concrete §5 values without explicit user approval.
+4. Extend `overmind/scripts/helper/check_project_stack_blueprint_quality.sh` (Gap 5 artefact) to validate §5 structurally:
+   - section present in every backend blueprint, absent from frontend and mobile blueprints,
+   - all §5 fields present and non-empty,
+   - `transport_protocol`, `schema_format`, and `source_of_truth_repo` are either all concrete values or all the literal placeholder; mixed states are invalid.
+5. Add a step 1.1 condition to `overmind/templates/init_progress_definition_TEMPLATE.yaml`: for project type `A`, every active backend blueprint has a §5 section that is either fully populated and `user_approved: true`, or fully placeholdered.
+6. Add step 2 conditions in the same template, type `A` only:
+   - `common_contract_definition.md` reflects each active backend blueprint's §5 verbatim (concrete values or placeholder),
+   - placeholder carry-through does not block step 2,
+   - `common_contract_definition.md` records which backend owns which contract approach when multiple backends are active.
+7. Add step 6 conditions in the same template, type `A` only: when `common_contract_definition.md` carries the §5 placeholder for any backend at the time step 6 runs, `feature_contract_delta.md` must include a `cross_class_contract_resolution` block with one terminal state:
+   - `resolved` — records concrete `transport_protocol`, `schema_format`, `source_of_truth_repo` per backend; requires explicit user approval,
+   - `deferred` — records explicit user deferral and reason; placeholder persists and the same enforcement re-fires on the next feature.
+8. Extend `overmind/templates/feature_contract_delta_TEMPLATE.md` with the `cross_class_contract_resolution` block schema. The block is required only when the step 6 trigger condition above fires.
+9. Extend `overmind/scripts/helper/check_feature_contract_delta_quality.sh` to validate the `cross_class_contract_resolution` block when present and to fail when the trigger fires but the block is missing.
+10. When `feature_contract_delta.md` records `resolved`, write the concrete values back into each affected backend blueprint §5 in place, set `derivation_source: feature_contract_delta` and `user_approved: true`, and update `last_updated`. Do not overwrite an existing user-approved §5 without fresh user approval.
+11. Update Appendix A (backend blueprint reference) to include a §5 example showing both the populated and placeholdered shapes.
+12. Add tests covering:
+   - type `A` BE+FE, MCP confident proposal: backend §5 populated, frontend has no §5, step 1.1 quality passes,
+   - type `A` BE+FE, no MCP, stack inference confident: same outcome via `derivation_source: blueprint_stack_inference`,
+   - type `A` BE+FE, no MCP, no confident inference: backend §5 placeholdered, step 1.1 + step 2 pass, step 6 enforcement requires the resolution block,
+   - type `A` first feature `resolved`: `feature_contract_delta.md` records concrete values, backend §5 updated with `derivation_source: feature_contract_delta`,
+   - type `A` first feature `deferred`: placeholder persists, next feature step 6 re-fires the enforcement,
+   - type `A` multi-backend: every active backend blueprint independently carries §5,
+   - type `A` no active backend: no §5 anywhere, no enforcement,
+   - type `B` and type `C`: unchanged, no §5 expected.
+
+### 4. Risks / what NOT to do
+
+- Do not add §5 to frontend or mobile blueprints. Backend is the sole holder; consumers do not duplicate.
+- Do not block step 1.1, step 2, or the step 6 `deferred` path when the placeholder is in use; the placeholder is a tracked obligation, not a hard gate.
+- Do not auto-fill concrete §5 values from MCP or stack inference without explicit user approval. Placeholder writes do not require approval.
+- Do not reuse the step 7 `<to be defined during implementation>` sentinel for §5. The two obligations must remain separately trackable.
+- Do not let §5 grow into per-endpoint contract content. It carries protocol, schema format, and owner only; per-endpoint contract shape stays in `common_contract_definition.md` and `feature_contract_delta.md`.
+- Do not silently overwrite a user-approved §5 when a later feature attempts to redefine it. Overwrites require fresh user approval and an updated approval trail.
+- Do not treat absence of MCP guidance as a reason to omit §5 entirely. The placeholder path is the fallback, not omission.
+- Do not let the obligation lapse after the first feature; enforcement re-fires on every subsequent feature until terminal state `resolved` is reached.
+
 ## Recommended implementation order
 
 ### Step 1 - Implement Gap 1 first
@@ -514,6 +588,17 @@ Expected result:
 
 - type `A` features can generate a surface map from the blueprint, unblocking steps 8 through 8.3.
 
+### Step 7 - Implement Gap 8 (after Gap 5)
+
+Why after Gap 5:
+
+- the cross-class transport/contract approach lives as §5 of the backend blueprint, so the blueprint artefact and its quality helper must exist first,
+- independent of Gap 6; can land before, after, or in parallel with Gap 6.
+
+Expected result:
+
+- type `A` projects anchor the cross-class transport/contract approach at init when derivable, and otherwise carry a tracked placeholder that step 6 enforces on each feature until resolved.
+
 ## Acceptance criteria for the rebuild direction
 
 The rebuild direction is correct only if all of the following are true:
@@ -532,7 +617,9 @@ The rebuild direction is correct only if all of the following are true:
 - step 7 runs successfully for type `A` F2+ with a partially-materialized repo, drawing materialized rows from repo and unmaterialized ones from blueprint,
 - a touched surface whose shape matches no `user_reachable_pattern` in either source still produces a valid §4 row with placeholder `repo_paths` and `transport_layer` and delta-only evidence,
 - §3 only enumerates layers described by repo scan or blueprint; layers absent from both are not invented,
-- type `B` and `C` runs remain untouched by the type `A` changes.
+- type `B` and `C` runs remain untouched by the type `A` changes,
+- for type `A`, every active backend blueprint carries a §5 cross-class transport/contract approach section that is either fully populated and user-approved or fully placeholdered, and frontend/mobile blueprints never carry §5,
+- for type `A`, when `common_contract_definition.md` carries the §5 placeholder, step 6 enforces a `cross_class_contract_resolution` block (`resolved` or `deferred`) on every feature until terminal `resolved` is reached.
 
 ## Out of scope for this brief
 
