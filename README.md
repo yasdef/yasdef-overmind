@@ -176,3 +176,11 @@ Project worker data lives in:
 - Run scripts from inside a git repository.
 - Quality helper scripts live under `overmind/scripts/helper/`.
 - Script tests are in `tests/ai_scripts/`.
+- example of external_sources configuraqtion for knowledge base MCP
+```
+sources:
+  - name: yasdef-knowledge-kb
+    type: stack_knowledge_base
+    description: Approved stack blueprints, architecture references, and
+  project bootstrap conventions
+```
