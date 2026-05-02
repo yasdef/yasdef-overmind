@@ -7,11 +7,11 @@ This CRP covers the integration slice of Gap 8: it wires the §5 derivation flow
 ## What Changes
 
 - Apply every change in this CRP only when the project has at least one in-project cross-class peer for the backend (another active backend, an active frontend, or an active mobile class). Projects with no active backend, or exactly one active backend and no other active class, are a no-op for the §5 derivation, mirror, and delta flow.
-- Extend the Step `1.1` blueprint authoring flow so that, for every active backend blueprint when §5 applies:
-  - first attempt MCP-backed derivation when `stack_guidance_sources[backend]` is configured and reachable;
-  - otherwise attempt inference from the approved §2 stack choices;
-  - when either source yields a confident proposal, present it for user approval and write `transport_protocol` + `schema_format` with `user_approved: true`;
-  - when neither source yields a confident proposal, write the literal placeholder for both fields with `user_approved: false`; placeholder writes do not require approval;
+- Extend the existing Step `1.1` MCP-query / user-approval harness (already used to author §2 stack choices, §3 layer bindings, and §4 baseline tokens via `.setup/external_sources.yaml` `stack_knowledge_base`) so that, for every active backend blueprint when §5 applies:
+  - first attempt MCP-backed derivation by querying the configured `stack_knowledge_base` source via the existing harness;
+  - otherwise attempt §5-specific inference from the approved §2 stack choices (e.g., Spring Boot → REST + OpenAPI 3.1, gRPC framework → gRPC + protobuf);
+  - when either source yields a confident proposal, present it for user approval through the existing approval flow and write `transport_protocol` + `schema_format` with `user_approved: true`;
+  - when neither source yields a confident proposal, or the user declines a confident proposal, write the literal placeholder for both fields with `user_approved: false`; placeholder writes do not require approval;
   - never auto-fill concrete §5 values without explicit user approval.
 - Update `project_stack_blueprint_rule.md` with the derivation/approval narrative for §5 (MCP → stack inference → placeholder), keeping the structural §5 contract (defined in the companion CRP) unchanged.
 - Add Step `2` conditions, type `A` only and only when §5 applies, to `init_progress_definition_TEMPLATE.yaml`:
@@ -27,7 +27,7 @@ This CRP covers the integration slice of Gap 8: it wires the §5 derivation flow
 
 ### New Capabilities
 
-- `overmind-cross-class-transport-derivation-flow`: When the project has at least one in-project cross-class peer for the backend, Step `1.1` SHALL derive backend §5 values from configured per-backend MCP guidance when available, otherwise from approved §2 stack choices, present any confident proposal for user approval, and write the literal placeholder when no source is confident — never auto-filling concrete values without approval. The flow SHALL be a no-op when no such peer exists.
+- `overmind-cross-class-transport-derivation-flow`: When the project has at least one in-project cross-class peer for the backend, Step `1.1` SHALL derive backend §5 values by reusing the existing MCP-query / user-approval harness — querying the configured `stack_knowledge_base` MCP source from `.setup/external_sources.yaml` first, otherwise inferring from approved §2 stack choices — present any confident proposal for user approval, and write the literal placeholder when no source is confident or the user declines, never auto-filling concrete values without approval. The flow SHALL be a no-op when no such peer exists.
 - `overmind-cross-class-transport-contract-mirror`: When §5 applies, Step `2` SHALL reflect each active backend blueprint's §5 verbatim into `common_contract_definition.md` (concrete values or placeholder), labeling per-backend ownership when multiple backends are active, and SHALL NOT block on placeholder carry-through. The mirror SHALL be a no-op when no in-project cross-class peer exists.
 - `overmind-cross-class-transport-feature-delta-mirror`: When §5 applies, Step `6` SHALL mirror the current per-backend `transport_protocol` and `schema_format` from `common_contract_definition.md` into `feature_contract_delta.md` (concrete values or placeholder), permit the feature to record concrete values directly when it defines or refines them, and SHALL NOT introduce a resolution state machine or enforcement check. The mirror SHALL be a no-op when no in-project cross-class peer exists.
 

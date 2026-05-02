@@ -8,6 +8,7 @@
 
 ## Artifact Content
 - Include the three required sections from the template: Meta, Stack Choices, and Layer Bindings.
+- Backend blueprints additionally include §5 Cross-Class Transport/Contract Approach when the backend has an in-project peer class (another backend, frontend, or mobile). Either populate concretely with `user_approved: true`, or use the literal `<to be defined during first feature implementation plan>` for both fields with `user_approved: false`.
 - Use `backend`, `frontend`, or `mobile` as the class value.
 - Record `last_updated` in `YYYY-MM-DD` format.
 - Record planned repo identity fields in Meta, tagged as planned where no repository exists yet.
@@ -44,6 +45,8 @@
 - Shared contract definitions remain owned by `common_contract_definition.md`.
 - Do not expand the blueprint into a prescriptive implementation plan.
 - Planned repo identity, package roots, folder conventions, layer bindings, and component archetypes are required; do not omit them.
+- Do not place §5 in frontend or mobile blueprints; backend is the sole holder.
+- Do not let §5 carry per-endpoint contract content; it carries protocol and schema format only.
 
 ## Completion Gate
 - After writing each final blueprint, run:

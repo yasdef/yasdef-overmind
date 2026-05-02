@@ -62,3 +62,7 @@
 - archetypes: UnitTest, IntegrationTest, ContractTest, SecurityFilterTest
 - user_reachable_pattern: none
 
+## 5. Cross-Class Transport/Contract Approach
+- transport_protocol: REST
+- schema_format: OpenAPI 3.1
+- user_approved: true

@@ -49,12 +49,51 @@ resolve_target_path() {
   printf '%s/%s\n' "$workspace_root" "$target_input"
 }
 
+detect_peer_presence() {
+  local target_path="$1"
+  local target_dir=""
+  local target_basename=""
+  local backend_count=0
+  local frontend_count=0
+  local mobile_count=0
+  local sibling=""
+
+  target_dir="$(dirname "$target_path")"
+  target_basename="$(basename "$target_path")"
+
+  shopt -s nullglob
+  for sibling in "$target_dir"/project_stack_blueprint_*.md; do
+    case "$(basename "$sibling")" in
+    project_stack_blueprint_backend.md) backend_count=$((backend_count + 1)) ;;
+    project_stack_blueprint_frontend.md) frontend_count=$((frontend_count + 1)) ;;
+    project_stack_blueprint_mobile.md) mobile_count=$((mobile_count + 1)) ;;
+    esac
+  done
+  shopt -u nullglob
+
+  case "$target_basename" in
+  project_stack_blueprint_backend.md)
+    if (( frontend_count > 0 || mobile_count > 0 || backend_count > 1 )); then
+      printf '1\n'
+    else
+      printf '0\n'
+    fi
+    ;;
+  *)
+    printf '0\n'
+    ;;
+  esac
+}
+
 validate_content() {
   local target_path="$1"
+  local peer_exists=""
   local status=0
 
+  peer_exists="$(detect_peer_presence "$target_path")"
+
   set +e
-  awk '
+  awk -v peer_exists="$peer_exists" '
 function trim(v) {
   sub(/^[[:space:]]+/, "", v)
   sub(/[[:space:]]+$/, "", v)
@@ -85,6 +124,7 @@ function parse_kv(line, key, value, colon_index) {
   if (section == "1") meta[key] = value
   else if (section == "2") stack[key] = value
   else if (section == "3" && current_layer != "") layer[current_layer SUBSEP key] = value
+  else if (section == "5") cross_class[key] = value
   return 1
 }
 function require_key(map_name, key, label) {
@@ -111,9 +151,21 @@ BEGIN {
   saw_section_1 = 0
   saw_section_2 = 0
   saw_section_3 = 0
+  saw_section_5 = 0
+  in_comment = 0
+  cross_class_placeholder = "<to be defined during first feature implementation plan>"
 }
 {
-  if (toupper($0) ~ /\[UNFILLED\]/) has_unfilled = 1
+  line_text = $0
+  if (in_comment) {
+    if (line_text ~ /-->/) in_comment = 0
+    next
+  }
+  if (line_text ~ /<!--/) {
+    if (line_text !~ /-->/) in_comment = 1
+    next
+  }
+  if (toupper(line_text) ~ /\[UNFILLED\]/) has_unfilled = 1
 }
 /^##[[:space:]]+/ {
   heading = trim($0)
@@ -126,6 +178,8 @@ BEGIN {
     section = "2"; saw_section_2 = 1
   } else if (heading ~ /^##[[:space:]]+3\.[[:space:]]+Layer[[:space:]]+Bindings[[:space:]]*$/) {
     section = "3"; saw_section_3 = 1
+  } else if (heading ~ /^##[[:space:]]+5\.[[:space:]]+Cross-Class[[:space:]]+Transport\/Contract[[:space:]]+Approach[[:space:]]*$/) {
+    section = "5"; saw_section_5 = 1
   } else {
     fail_quality("unexpected top-level section: " heading)
   }
@@ -147,7 +201,8 @@ END {
   if (!saw_section_1) fail_quality("missing section: ## 1. Meta")
   if (!saw_section_2) fail_quality("missing section: ## 2. Stack Choices")
   if (!saw_section_3) fail_quality("missing section: ## 3. Layer Bindings")
-  if (section_count != 3) fail_quality("expected exactly three top-level sections")
+  expected_sections = 3 + (saw_section_5 ? 1 : 0)
+  if (section_count != expected_sections) fail_quality("unexpected number of top-level sections")
 
   require_key("meta", "class", "meta key")
   require_key("meta", "repo_name", "meta key")
@@ -195,6 +250,31 @@ END {
   }
   for (layer_name in seen_layers) {
     if (!(layer_name in required_layers)) fail_quality("unexpected layer block: " layer_name)
+  }
+
+  if (class == "backend") {
+    if (peer_exists == "1") {
+      if (!saw_section_5) fail_quality("missing section: ## 5. Cross-Class Transport/Contract Approach (required when in-project cross-class peer exists)")
+    }
+    if (saw_section_5) {
+      if (!("transport_protocol" in cross_class) || cross_class["transport_protocol"] == "") fail_quality("missing or empty §5 field: transport_protocol")
+      if (!("schema_format" in cross_class) || cross_class["schema_format"] == "") fail_quality("missing or empty §5 field: schema_format")
+      if (!("user_approved" in cross_class) || cross_class["user_approved"] == "") fail_quality("missing or empty §5 field: user_approved")
+
+      transport_is_placeholder = (cross_class["transport_protocol"] == cross_class_placeholder)
+      schema_is_placeholder = (cross_class["schema_format"] == cross_class_placeholder)
+      if (transport_is_placeholder != schema_is_placeholder) {
+        fail_quality("§5 mixed state: transport_protocol and schema_format must both be concrete or both be the literal placeholder")
+      }
+      if (cross_class["user_approved"] == "true" && (transport_is_placeholder || schema_is_placeholder)) {
+        fail_quality("§5 user_approved=true is invalid when transport_protocol or schema_format carries the placeholder")
+      }
+      if (cross_class["user_approved"] != "true" && cross_class["user_approved"] != "false") {
+        fail_quality("§5 user_approved must be 'true' or 'false' (got: " cross_class["user_approved"] ")")
+      }
+    }
+  } else if (saw_section_5) {
+    fail_quality("§5 Cross-Class Transport/Contract Approach is forbidden in " class " blueprint (backend is the sole holder)")
   }
 
   if (has_errors) exit 1

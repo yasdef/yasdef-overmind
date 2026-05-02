@@ -56,6 +56,8 @@ steps:
       - condition: "For project type A, every active backend/frontend/mobile class has exactly one approved project_stack_blueprint_<class>.md at the project root."
       - condition: "For project types B and C, this step is not required and does not block Step 2."
       - condition: "Step 1.1 captures stable stack choices, layer folder conventions, and component archetypes without capturing feature-specific implementation work."
+      - condition: "For project type A, every active backend blueprint with an in-project peer class (another backend, frontend, or mobile) includes a valid §5 Cross-Class Transport/Contract Approach as defined by the template and helper."
+      - condition: "§5 is a no-op when no in-project peer exists (lone backend or no backend) and for project types B and C."
 
   - step_number: 2
     phase_name: "init"

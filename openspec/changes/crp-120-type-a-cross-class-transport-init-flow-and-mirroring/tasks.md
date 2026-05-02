@@ -4,15 +4,16 @@
 - [ ] 1.2 Use the same predicate from Step `1.1` derivation, Step `2` mirror, and Step `6` mirror so the trigger is evaluated consistently
 - [ ] 1.3 Confirm the predicate is a no-op for project types `B` and `C`
 
-## 2. Step `1.1` §5 Derivation Flow
+## 2. Step `1.1` §5 Derivation Flow (reuses existing MCP/approval harness)
 
-- [ ] 2.1 Extend `overmind/scripts/init_project_stack_blueprints.sh` to invoke §5 derivation per active backend blueprint when the trigger predicate is true
-- [ ] 2.2 Implement source order: query configured `stack_guidance_sources[backend]` MCP first; if absent, unreachable, or non-confident, infer from approved §2 stack choices; if neither is confident, write the placeholder pair
-- [ ] 2.3 Present any confident proposal (MCP or stack inference) for explicit user approval before writing concrete `transport_protocol`, `schema_format`, and `user_approved: true`
-- [ ] 2.4 Treat user decline as a fall-through to the placeholder pair without retrying the same source
-- [ ] 2.5 Write the placeholder pair (`<to be defined during first feature implementation plan>` for both fields, `user_approved: false`) without prompting for approval
-- [ ] 2.6 Update `overmind/rules/project_stack_blueprint_rule.md` with the §5 derivation/approval narrative (MCP → stack inference → placeholder, approval required for concrete writes only)
-- [ ] 2.7 Confirm the structural §5 contract from CRP-119 is unchanged
+- [ ] 2.1 Extend `overmind/scripts/init_project_stack_blueprints.sh` to invoke §5 derivation per active backend blueprint when the trigger predicate is true, reusing the existing MCP-query / user-approval harness already used for §2 stack choices, §3 layer bindings, and §4 baseline tokens
+- [ ] 2.2 Reuse the existing `stack_knowledge_base` MCP-query path: read `.setup/external_sources.yaml` for a `type: stack_knowledge_base` entry and query it for a transport/schema proposal first; do not introduce a parallel MCP-query mechanism
+- [ ] 2.3 Add the §5-specific stack-inference fallback (NEW): when no reachable `stack_knowledge_base` source yields a confident proposal, derive a transport/schema proposal from the approved §2 stack choices on the same blueprint (e.g., Spring Boot → REST + OpenAPI 3.1; gRPC service framework → gRPC + protobuf)
+- [ ] 2.4 Reuse the existing user-approval flow: present any confident proposal (MCP or stack-inference) through the same approval mechanism used for §2/§3/§4, recording proposal source and approval state in command output as today
+- [ ] 2.5 Add the §5-specific placeholder write path (NEW): when neither source yields a confident proposal, or the user declines a confident proposal, write `<to be defined during first feature implementation plan>` for both `transport_protocol` and `schema_format` with `user_approved: false`, without prompting for approval; do not retry the declined source
+- [ ] 2.6 Confirm: never auto-fill concrete §5 values without explicit user approval through the existing approval flow
+- [ ] 2.7 Extend `overmind/rules/project_stack_blueprint_rule.md` with the §5 derivation/approval narrative (MCP → §5-specific stack inference → placeholder, approval required for concrete writes only, decline falls through to placeholder)
+- [ ] 2.8 Confirm the structural §5 contract from CRP-119 is unchanged
 
 ## 3. Step `2` `common_contract_definition.md` Mirror
 

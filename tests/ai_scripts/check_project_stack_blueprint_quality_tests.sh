@@ -58,6 +58,36 @@ copy_golden() {
   esac
 }
 
+CROSS_CLASS_PLACEHOLDER='<to be defined during first feature implementation plan>'
+
+strip_section_5() {
+  local target_path="$1"
+  perl -0pi -e 's/\n## 5\. Cross-Class Transport\/Contract Approach\n(?:[^\n]*\n)+//s' "$target_path"
+}
+
+append_section_5() {
+  local target_path="$1"
+  local transport="$2"
+  local schema="$3"
+  local approved="$4"
+  strip_section_5 "$target_path"
+  cat >>"$target_path" <<EOF
+
+## 5. Cross-Class Transport/Contract Approach
+- transport_protocol: $transport
+- schema_format: $schema
+- user_approved: $approved
+EOF
+}
+
+append_section_5_populated() {
+  append_section_5 "$1" "REST" "OpenAPI 3.1" "true"
+}
+
+append_section_5_placeholdered() {
+  append_section_5 "$1" "$CROSS_CLASS_PLACEHOLDER" "$CROSS_CLASS_PLACEHOLDER" "false"
+}
+
 run_helper() {
   local repo_dir="$1"
   local target_arg="$2"
@@ -197,6 +227,128 @@ test_fails_when_unfilled_placeholder_remains() {
   assert_helper_status "$(run_helper "$repo_dir" "project_stack_blueprint_backend.md")" "1" "artifact still contains [UNFILLED] placeholders"
 }
 
+test_passes_with_section_5_populated_when_peer_exists() {
+  local repo_dir="$TMP_ROOT/repo-s5-populated"
+  mkdir -p "$repo_dir"
+  setup_repo_with_helper "$repo_dir"
+  copy_golden backend "$repo_dir/project_stack_blueprint_backend.md"
+  copy_golden frontend "$repo_dir/project_stack_blueprint_frontend.md"
+  append_section_5_populated "$repo_dir/project_stack_blueprint_backend.md"
+
+  assert_helper_status "$(run_helper "$repo_dir" "project_stack_blueprint_backend.md")" "0" "quality gate passed"
+}
+
+test_passes_with_section_5_placeholdered_when_peer_exists() {
+  local repo_dir="$TMP_ROOT/repo-s5-placeholdered"
+  mkdir -p "$repo_dir"
+  setup_repo_with_helper "$repo_dir"
+  copy_golden backend "$repo_dir/project_stack_blueprint_backend.md"
+  copy_golden frontend "$repo_dir/project_stack_blueprint_frontend.md"
+  append_section_5_placeholdered "$repo_dir/project_stack_blueprint_backend.md"
+
+  assert_helper_status "$(run_helper "$repo_dir" "project_stack_blueprint_backend.md")" "0" "quality gate passed"
+}
+
+test_fails_when_section_5_missing_with_peer() {
+  local repo_dir="$TMP_ROOT/repo-s5-missing"
+  mkdir -p "$repo_dir"
+  setup_repo_with_helper "$repo_dir"
+  copy_golden backend "$repo_dir/project_stack_blueprint_backend.md"
+  copy_golden frontend "$repo_dir/project_stack_blueprint_frontend.md"
+  strip_section_5 "$repo_dir/project_stack_blueprint_backend.md"
+
+  assert_helper_status "$(run_helper "$repo_dir" "project_stack_blueprint_backend.md")" "1" "missing section: ## 5. Cross-Class Transport/Contract Approach"
+}
+
+test_fails_when_frontend_carries_section_5() {
+  local repo_dir="$TMP_ROOT/repo-fe-with-s5"
+  mkdir -p "$repo_dir"
+  setup_repo_with_helper "$repo_dir"
+  copy_golden frontend "$repo_dir/project_stack_blueprint_frontend.md"
+  append_section_5_populated "$repo_dir/project_stack_blueprint_frontend.md"
+
+  assert_helper_status "$(run_helper "$repo_dir" "project_stack_blueprint_frontend.md")" "1" "forbidden in frontend blueprint"
+}
+
+test_fails_when_mobile_carries_section_5() {
+  local repo_dir="$TMP_ROOT/repo-mobile-with-s5"
+  mkdir -p "$repo_dir"
+  setup_repo_with_helper "$repo_dir"
+  copy_golden mobile "$repo_dir/project_stack_blueprint_mobile.md"
+  append_section_5_populated "$repo_dir/project_stack_blueprint_mobile.md"
+
+  assert_helper_status "$(run_helper "$repo_dir" "project_stack_blueprint_mobile.md")" "1" "forbidden in mobile blueprint"
+}
+
+test_fails_when_section_5_concrete_protocol_with_placeholder_schema() {
+  local repo_dir="$TMP_ROOT/repo-s5-mixed-1"
+  mkdir -p "$repo_dir"
+  setup_repo_with_helper "$repo_dir"
+  copy_golden backend "$repo_dir/project_stack_blueprint_backend.md"
+  copy_golden frontend "$repo_dir/project_stack_blueprint_frontend.md"
+  append_section_5 "$repo_dir/project_stack_blueprint_backend.md" "REST" "$CROSS_CLASS_PLACEHOLDER" "false"
+
+  assert_helper_status "$(run_helper "$repo_dir" "project_stack_blueprint_backend.md")" "1" "§5 mixed state"
+}
+
+test_fails_when_section_5_placeholder_protocol_with_concrete_schema() {
+  local repo_dir="$TMP_ROOT/repo-s5-mixed-2"
+  mkdir -p "$repo_dir"
+  setup_repo_with_helper "$repo_dir"
+  copy_golden backend "$repo_dir/project_stack_blueprint_backend.md"
+  copy_golden frontend "$repo_dir/project_stack_blueprint_frontend.md"
+  append_section_5 "$repo_dir/project_stack_blueprint_backend.md" "$CROSS_CLASS_PLACEHOLDER" "OpenAPI 3.1" "false"
+
+  assert_helper_status "$(run_helper "$repo_dir" "project_stack_blueprint_backend.md")" "1" "§5 mixed state"
+}
+
+test_fails_when_section_5_user_approved_true_with_placeholder() {
+  local repo_dir="$TMP_ROOT/repo-s5-bad-approval"
+  mkdir -p "$repo_dir"
+  setup_repo_with_helper "$repo_dir"
+  copy_golden backend "$repo_dir/project_stack_blueprint_backend.md"
+  copy_golden frontend "$repo_dir/project_stack_blueprint_frontend.md"
+  append_section_5 "$repo_dir/project_stack_blueprint_backend.md" "$CROSS_CLASS_PLACEHOLDER" "$CROSS_CLASS_PLACEHOLDER" "true"
+
+  assert_helper_status "$(run_helper "$repo_dir" "project_stack_blueprint_backend.md")" "1" "user_approved=true is invalid when transport_protocol or schema_format carries the placeholder"
+}
+
+test_passes_with_backend_and_two_peers() {
+  local repo_dir="$TMP_ROOT/repo-be-fe-mobile"
+  mkdir -p "$repo_dir"
+  setup_repo_with_helper "$repo_dir"
+  copy_golden backend "$repo_dir/project_stack_blueprint_backend.md"
+  copy_golden frontend "$repo_dir/project_stack_blueprint_frontend.md"
+  copy_golden mobile "$repo_dir/project_stack_blueprint_mobile.md"
+  append_section_5_populated "$repo_dir/project_stack_blueprint_backend.md"
+
+  assert_helper_status "$(run_helper "$repo_dir" "project_stack_blueprint_backend.md")" "0" "quality gate passed"
+  assert_helper_status "$(run_helper "$repo_dir" "project_stack_blueprint_frontend.md")" "0" "quality gate passed"
+  assert_helper_status "$(run_helper "$repo_dir" "project_stack_blueprint_mobile.md")" "0" "quality gate passed"
+}
+
+test_passes_when_no_active_backend() {
+  local repo_dir="$TMP_ROOT/repo-no-backend"
+  mkdir -p "$repo_dir"
+  setup_repo_with_helper "$repo_dir"
+  # FE + Mobile only; no §5 anywhere
+  copy_golden frontend "$repo_dir/project_stack_blueprint_frontend.md"
+  copy_golden mobile "$repo_dir/project_stack_blueprint_mobile.md"
+
+  assert_helper_status "$(run_helper "$repo_dir" "project_stack_blueprint_frontend.md")" "0" "quality gate passed"
+  assert_helper_status "$(run_helper "$repo_dir" "project_stack_blueprint_mobile.md")" "0" "quality gate passed"
+}
+
+test_passes_with_lone_backend_no_other_class() {
+  local repo_dir="$TMP_ROOT/repo-lone-backend"
+  mkdir -p "$repo_dir"
+  setup_repo_with_helper "$repo_dir"
+  # Only backend, no peer → §5 not required
+  copy_golden backend "$repo_dir/project_stack_blueprint_backend.md"
+
+  assert_helper_status "$(run_helper "$repo_dir" "project_stack_blueprint_backend.md")" "0" "quality gate passed"
+}
+
 test_passes_with_valid_backend_blueprint
 test_passes_with_valid_frontend_blueprint
 test_passes_with_valid_mobile_blueprint
@@ -208,5 +360,16 @@ test_fails_when_layer_block_missing
 test_fails_when_layer_key_missing
 test_fails_when_last_updated_date_shape_is_invalid
 test_fails_when_unfilled_placeholder_remains
+test_passes_with_section_5_populated_when_peer_exists
+test_passes_with_section_5_placeholdered_when_peer_exists
+test_fails_when_section_5_missing_with_peer
+test_fails_when_frontend_carries_section_5
+test_fails_when_mobile_carries_section_5
+test_fails_when_section_5_concrete_protocol_with_placeholder_schema
+test_fails_when_section_5_placeholder_protocol_with_concrete_schema
+test_fails_when_section_5_user_approved_true_with_placeholder
+test_passes_with_backend_and_two_peers
+test_passes_when_no_active_backend
+test_passes_with_lone_backend_no_other_class
 
 echo "All project stack blueprint quality helper tests passed."

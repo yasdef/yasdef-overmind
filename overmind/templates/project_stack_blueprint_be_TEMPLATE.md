@@ -62,3 +62,7 @@
 - archetypes: [UNFILLED]
 - user_reachable_pattern: [UNFILLED]
 
+## 5. Cross-Class Transport/Contract Approach
+- transport_protocol: [UNFILLED]
+- schema_format: [UNFILLED]
+- user_approved: [UNFILLED]

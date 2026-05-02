@@ -29,19 +29,19 @@ For project type `A`, Step `1.1` SHALL run the §5 derivation flow on each activ
 - **WHEN** a type `A` project has no active backend class
 - **THEN** Step `1.1` does not run the §5 derivation flow on any blueprint
 
-### Requirement: §5 derivation order is MCP then stack inference then placeholder
+### Requirement: §5 derivation order is MCP then stack inference then placeholder, reusing the existing harness
 
-For each in-scope backend blueprint, Step `1.1` SHALL try sources in order: configured per-backend MCP guidance first, then inference from approved §2 stack choices, then the literal placeholder pair.
+For each in-scope backend blueprint, Step `1.1` SHALL reuse the existing MCP-query / user-approval harness already used to author §2/§3/§4 and try sources in order: the configured `stack_knowledge_base` MCP source from `.setup/external_sources.yaml` first, then §5-specific inference from approved §2 stack choices, then the literal placeholder pair.
 
 #### Scenario: MCP-confident proposal is presented
 
-- **WHEN** `stack_guidance_sources[backend]` is configured and reachable and yields a confident transport/schema proposal
-- **THEN** Step `1.1` presents that proposal for user approval
+- **WHEN** `.setup/external_sources.yaml` declares a `stack_knowledge_base` source that is reachable and yields a confident transport/schema proposal
+- **THEN** Step `1.1` presents that proposal for user approval through the existing approval flow
 
 #### Scenario: Stack inference fallback is used when MCP is absent
 
-- **WHEN** `stack_guidance_sources[backend]` is not configured or not reachable, and approved §2 stack choices yield a confident transport/schema proposal
-- **THEN** Step `1.1` presents the inferred proposal for user approval
+- **WHEN** `.setup/external_sources.yaml` declares no reachable `stack_knowledge_base` source, and §5-specific inference from approved §2 stack choices yields a confident transport/schema proposal
+- **THEN** Step `1.1` presents the inferred proposal for user approval through the existing approval flow
 
 #### Scenario: Placeholder pair written when neither source is confident
 

@@ -38,15 +38,19 @@ Because §5 itself is a no-op when there is no in-project cross-class peer for t
 
 Alternatives considered: per-step independent triggers (rejected — three places to drift); a separate "§5 enabled" flag in init metadata (rejected — derivable from active classes already known to the pipeline).
 
-### Decision 2: Derivation order is MCP → stack inference → placeholder
+### Decision 2: Derivation order is MCP → stack inference → placeholder, reusing the existing harness
+
+The Step `1.1` blueprint authoring flow already implements MCP-query + bounded-fallback + user-approval for §2 stack choices, §3 layer bindings, and §4 baseline tokens. The §5 derivation reuses that harness rather than introducing parallel logic.
 
 For each active backend blueprint with §5 in scope:
 
-1. If `stack_guidance_sources[backend]` is configured and reachable, query MCP for a transport/schema proposal.
-2. Otherwise, infer from the approved §2 stack choices (e.g., Spring Boot → REST + OpenAPI 3.1 as a confident default; gRPC service framework → gRPC + protobuf).
-3. If neither yields a confident proposal, write the placeholder pair with `user_approved: false`.
+1. Query the existing MCP harness against the `stack_knowledge_base` source declared in `.setup/external_sources.yaml` for a transport/schema proposal. (Reuses existing infrastructure.)
+2. Otherwise, run §5-specific inference from the approved §2 stack choices (e.g., Spring Boot → REST + OpenAPI 3.1; gRPC service framework → gRPC + protobuf). (New for §5 — earlier sections fall back to a bounded family menu, not §2-derived inference.)
+3. If neither yields a confident proposal, or the user declines, write the placeholder pair with `user_approved: false`. (New for §5 — earlier sections have no placeholdered escape hatch.)
 
-A "confident proposal" is one the flow is willing to surface to the user for approval. The flow never auto-fills concrete values without approval; it either obtains approval or falls through to the placeholder.
+A "confident proposal" is one the flow is willing to surface to the user for approval. The flow never auto-fills concrete values without approval; it either obtains approval through the existing approval flow or falls through to the placeholder.
+
+What's net-new on top of the existing harness: (a) the §5-specific stack-inference fallback, (b) the placeholder write path with `user_approved: false`, (c) user-decline → placeholder fall-through (instead of looping or blocking).
 
 ### Decision 3: Approval is required for concrete writes, not for placeholder writes
 
