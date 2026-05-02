@@ -80,3 +80,14 @@
 ## 6. Common Planning Signals
 - prep_1: Reconcile `payment.created` consumer mappings (`state` -> `status`) before feature-level implementation planning.
 - prep_2: Introduce shared contract tests for payment status transitions and create-payment idempotency response fields.
+
+## 7. Cross-Class Transport/Contract Approach Mirror
+### Backend: payments-api
+- transport_protocol: REST
+- schema_format: OpenAPI 3.1
+- user_approved: true
+
+### Backend: ledger-service
+- transport_protocol: <to be defined during first feature implementation plan>
+- schema_format: <to be defined during first feature implementation plan>
+- user_approved: false

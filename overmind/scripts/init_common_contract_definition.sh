@@ -10,6 +10,7 @@ COMMON_CONTRACT_GOLDEN_EXAMPLE_FILE=".golden_examples/common_contract_definition
 MODELS_FILE=".setup/models.md"
 RULE_FILE=".rules/common_contract_definition_rule.md"
 QUALITY_GATE_HELPER=".helper/check_common_contract_definition_quality.sh"
+CROSS_CLASS_PEER_TRIGGER_HELPER=".helper/check_cross_class_peer_trigger.sh"
 MODEL_PHASE="common_contract_definition"
 RUNTIME_ROOT=""
 
@@ -107,6 +108,7 @@ ensure_required_files() {
     "$COMMON_CONTRACT_TEMPLATE_FILE"
     "$COMMON_CONTRACT_GOLDEN_EXAMPLE_FILE"
     "$QUALITY_GATE_HELPER"
+    "$CROSS_CLASS_PEER_TRIGGER_HELPER"
   )
   local relative_path=""
 
@@ -637,6 +639,7 @@ Context:
 - Golden example file: $COMMON_CONTRACT_GOLDEN_EXAMPLE_FILE
 - Quality gate helper: $QUALITY_GATE_HELPER
 - Quality gate command: $quality_command
+- Cross-class peer trigger helper command: $CROSS_CLASS_PEER_TRIGGER_HELPER $project_definition_path
 $source_context
 EOF2
 }

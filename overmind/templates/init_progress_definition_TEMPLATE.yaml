@@ -75,6 +75,9 @@ steps:
       - condition: "For project type A, Step 2 cannot proceed until Step 1.1 has produced every required active-class project_stack_blueprint_<class>.md and each one passes .helper/check_project_stack_blueprint_quality.sh."
       - condition: "common_contract_definition.md reconciles applicable cross-project contract overlaps, mismatches, and shared definitions."
       - condition: "When only one source is applicable by project class/type, common_contract_definition.md explicitly documents the single-source basis."
+      - condition: "For project type A, when at least one in-project cross-class peer exists for the backend (another active backend, an active frontend, or an active mobile class), common_contract_definition.md reflects each active backend blueprint's §5 verbatim; concrete values mirror as concrete values, the literal placeholder mirrors as the placeholder, and per-backend ownership is recorded by service_name or repo_name when more than one active backend exists."
+      - condition: "For project type A, placeholder carry-through in §5 does not block Step 2."
+      - condition: "For project type A with no in-project cross-class peer (lone backend or no active backend) and for project types B and C, Step 2 writes no §5 mirror entries to common_contract_definition.md."
 
   - step_number: 3
     phase_name: "feature"
@@ -188,6 +191,9 @@ steps:
       - condition: "For project types B and C, the Product Owner provides the same feature_contract_delta.md artifact to active BE/FE/Mobile lines before step 7 starts."
       - condition: "feature_contract_delta.md focuses on feature-level contract deltas and does not redefine stable cross-project contract types, ownership, or source-of-truth rules already captured in common_contract_definition.md."
       - condition: "When no shared contract change is needed, feature_contract_delta.md explicitly records that no contract delta is required for this feature."
+      - condition: "For project type A, when at least one in-project cross-class peer exists for the backend (another active backend, an active frontend, or an active mobile class), feature_contract_delta.md mirrors the current per-backend transport_protocol and schema_format from common_contract_definition.md; the feature may record concrete values directly when it defines or refines those values, regardless of whether common_contract_definition.md still carries the placeholder or different concrete values for that backend."
+      - condition: "Step 6 introduces no resolution state machine, terminal-state check, required block, or quality-gate enforcement for §5; the per-backend fields either carry concrete values or carry the literal placeholder."
+      - condition: "For project type A with no in-project cross-class peer (lone backend or no active backend) and for project types B and C, Step 6 writes no §5 fields in feature_contract_delta.md."
 
   - step_number: 7
     phase_name: "feature"

@@ -64,6 +64,12 @@ Must not own:
 - Do not treat stack-family blueprints as API contract schemas, shared request/response definitions, repository scan evidence, or Step `7` surface-map evidence.
 - Stable shared contract definitions remain owned by `common_contract_definition.md`.
 
+## §7 Cross-Class Transport/Contract Approach Mirror
+- Determine whether §7 applies by running the runtime-bound cross-class peer trigger helper (see prompt context). It exits 0 and prints `cross_class_peer_trigger: active` when the §7 mirror applies, or `cross_class_peer_trigger: inactive` when it is a no-op. Omit the `## 7. Cross-Class Transport/Contract Approach Mirror` section entirely on `inactive`.
+- When active, write one `### Backend: <identity>` block per active backend, mirroring `transport_protocol` and `schema_format` from each backend blueprint §5 verbatim. Carry concrete values verbatim and the literal `<to be defined during first feature implementation plan>` placeholder verbatim. Do not collapse, normalize, or reject mismatched values across backends.
+- Label each block with `service_name` or `repo_name` from blueprint §1, even when only one active backend exists.
+- §5 placeholder carry-through never blocks Step 2; the mirror is informational and is not gated on concrete values.
+
 ## Runtime Path Binding Rules
 - Treat runtime bindings in prompt context as authoritative for this invocation.
 - Write only to `<TARGET_COMMON_CONTRACT_DEFINITION_ARTIFACT>`.

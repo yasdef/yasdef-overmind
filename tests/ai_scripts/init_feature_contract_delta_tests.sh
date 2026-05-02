@@ -6,6 +6,7 @@ SCRIPT_SRC="$SOURCE_ROOT/overmind/scripts/feature_contract_delta.sh"
 RULE_SRC="$SOURCE_ROOT/overmind/rules/feature_contract_delta_rule.md"
 TEMPLATE_SRC="$SOURCE_ROOT/overmind/templates/feature_contract_delta_TEMPLATE.md"
 GOLDEN_EXAMPLE_SRC="$SOURCE_ROOT/overmind/golden_examples/feature_contract_delta_GOLDEN_EXAMPLE.md"
+PEER_TRIGGER_HELPER_SRC="$SOURCE_ROOT/overmind/scripts/helper/check_cross_class_peer_trigger.sh"
 
 TMP_ROOT="$(mktemp -d)"
 trap 'rm -rf "$TMP_ROOT"' EXIT
@@ -80,7 +81,8 @@ setup_workspace_layout() {
   cp "$RULE_SRC" "$repo_dir/asdlc/.rules/feature_contract_delta_rule.md"
   cp "$TEMPLATE_SRC" "$repo_dir/asdlc/.templates/feature_contract_delta_TEMPLATE.md"
   cp "$GOLDEN_EXAMPLE_SRC" "$repo_dir/asdlc/.golden_examples/feature_contract_delta_GOLDEN_EXAMPLE.md"
-  chmod +x "$repo_dir/asdlc/.commands/feature_contract_delta.sh"
+  cp "$PEER_TRIGGER_HELPER_SRC" "$repo_dir/asdlc/.helper/check_cross_class_peer_trigger.sh"
+  chmod +x "$repo_dir/asdlc/.commands/feature_contract_delta.sh" "$repo_dir/asdlc/.helper/check_cross_class_peer_trigger.sh"
 
   cat >"$repo_dir/asdlc/asdlc_metadata.yaml" <<'OUT'
 meta:
@@ -490,6 +492,40 @@ test_supports_absolute_feature_path() {
   assert_not_contains "$codex_prompt" "Target artifact: projects/p1/feature-a/feature_contract_delta.md"
 }
 
+test_prompt_binds_cross_class_peer_trigger_helper() {
+  local repo_dir="$TMP_ROOT/repo-peer-trigger-bound"
+  local capture_dir="$TMP_ROOT/capture-peer-trigger-bound"
+  mkdir -p "$repo_dir" "$capture_dir"
+  setup_git_workspace "$repo_dir"
+  setup_codex_stub "$repo_dir"
+
+  cd "$repo_dir/asdlc" && PATH="$repo_dir/bin:$PATH" TEST_CAPTURE_DIR="$capture_dir" \
+    .commands/feature_contract_delta.sh --feature_path "projects/p1/feature-a" >/dev/null
+
+  local prompt=""
+  prompt="$(cat "$capture_dir/codex_prompt.txt")"
+  assert_contains "$prompt" "Cross-class peer trigger helper command: .helper/check_cross_class_peer_trigger.sh projects/p1/init_progress_definition.yaml"
+  assert_not_contains "$prompt" "§5 Cross-Class Transport/Contract Approach mirror applies"
+  assert_not_contains "$prompt" "§5 Cross-Class Transport/Contract Approach mirror does not apply"
+}
+
+test_missing_cross_class_peer_trigger_helper_fails_fast() {
+  local repo_dir="$TMP_ROOT/repo-missing-peer-trigger-helper"
+  mkdir -p "$repo_dir"
+  setup_git_workspace "$repo_dir"
+  rm -f "$repo_dir/asdlc/.helper/check_cross_class_peer_trigger.sh"
+
+  local status=0
+  local out=""
+  set +e
+  out="$(cd "$repo_dir/asdlc" && .commands/feature_contract_delta.sh --feature_path "projects/p1/feature-a" 2>&1)"
+  status=$?
+  set -e
+
+  assert_nonzero_status "$status"
+  assert_contains "$out" "Required file not found: .helper/check_cross_class_peer_trigger.sh"
+}
+
 test_requires_feature_path_argument
 test_requires_staged_command_location
 test_fails_when_requirements_ears_missing
@@ -501,5 +537,7 @@ test_does_not_run_quality_helper_directly
 test_runs_codex_and_commits_only_target_output
 test_skips_empty_commit_when_output_is_unchanged
 test_supports_absolute_feature_path
+test_prompt_binds_cross_class_peer_trigger_helper
+test_missing_cross_class_peer_trigger_helper_fails_fast
 
 echo "All feature contract delta initializer tests passed."

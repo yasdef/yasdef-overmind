@@ -28,3 +28,12 @@ This example is synthetic and project-agnostic.
 ## 4. Track Handoff Signals
 - backend_handoff: implement endpoints, token issuance/validation logic, and audit event emission
 - frontend_mobile_handoff: implement request/confirm UI flow and map deterministic error payloads
+
+## 5. Cross-Class Transport/Contract Approach Mirror
+### Backend: payments-api
+- transport_protocol: REST
+- schema_format: OpenAPI 3.1
+
+### Backend: ledger-service
+- transport_protocol: <to be defined during first feature implementation plan>
+- schema_format: <to be defined during first feature implementation plan>

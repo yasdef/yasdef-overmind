@@ -5,6 +5,7 @@ SOURCE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 SCRIPT_SRC="$SOURCE_ROOT/overmind/scripts/init_project_stack_blueprints.sh"
 BLUEPRINT_RULE_SRC="$SOURCE_ROOT/overmind/rules/project_stack_blueprint_rule.md"
 HELPER_SRC="$SOURCE_ROOT/overmind/scripts/helper/check_project_stack_blueprint_quality.sh"
+PEER_TRIGGER_HELPER_SRC="$SOURCE_ROOT/overmind/scripts/helper/check_cross_class_peer_trigger.sh"
 MODEL_SRC="$SOURCE_ROOT/overmind/setup/models.md"
 EXTERNAL_SOURCES_SRC="$SOURCE_ROOT/overmind/setup/external_sources.yaml"
 
@@ -72,6 +73,7 @@ setup_staged_workspace() {
   cp "$SCRIPT_SRC" "$asdlc_root/.commands/init_project_stack_blueprints.sh"
   cp "$BLUEPRINT_RULE_SRC" "$asdlc_root/.rules/project_stack_blueprint_rule.md"
   cp "$HELPER_SRC" "$asdlc_root/.helper/check_project_stack_blueprint_quality.sh"
+  cp "$PEER_TRIGGER_HELPER_SRC" "$asdlc_root/.helper/check_cross_class_peer_trigger.sh"
   cp "$MODEL_SRC" "$asdlc_root/.setup/models.md"
   cp "$EXTERNAL_SOURCES_SRC" "$asdlc_root/.setup/external_sources.yaml"
   cp "$SOURCE_ROOT/overmind/templates/project_stack_blueprint_be_TEMPLATE.md" "$asdlc_root/.templates/project_stack_blueprint_be_TEMPLATE.md"
@@ -80,7 +82,7 @@ setup_staged_workspace() {
   cp "$SOURCE_ROOT/overmind/golden_examples/project_stack_blueprint_be_GOLDEN_EXAMPLE.md" "$asdlc_root/.golden_examples/project_stack_blueprint_be_GOLDEN_EXAMPLE.md"
   cp "$SOURCE_ROOT/overmind/golden_examples/project_stack_blueprint_fe_GOLDEN_EXAMPLE.md" "$asdlc_root/.golden_examples/project_stack_blueprint_fe_GOLDEN_EXAMPLE.md"
   cp "$SOURCE_ROOT/overmind/golden_examples/project_stack_blueprint_mobile_GOLDEN_EXAMPLE.md" "$asdlc_root/.golden_examples/project_stack_blueprint_mobile_GOLDEN_EXAMPLE.md"
-  chmod +x "$asdlc_root/.commands/init_project_stack_blueprints.sh" "$asdlc_root/.helper/check_project_stack_blueprint_quality.sh"
+  chmod +x "$asdlc_root/.commands/init_project_stack_blueprints.sh" "$asdlc_root/.helper/check_project_stack_blueprint_quality.sh" "$asdlc_root/.helper/check_cross_class_peer_trigger.sh"
 
   cat >"$asdlc_root/asdlc_metadata.yaml" <<'OUT'
 meta:
@@ -552,11 +554,51 @@ test_final_blueprint_contains_gap5_structure_without_authoring_state() {
   assert_not_contains "$blueprint_content" "proposal"
 }
 
+test_type_a_prompt_binds_cross_class_peer_trigger_helper() {
+  local asdlc_root="$TMP_ROOT/asdlc-peer-trigger-bound"
+  local project_dir="$asdlc_root/projects/sample-project"
+  local capture_dir="$TMP_ROOT/capture-peer-trigger-bound"
+  mkdir -p "$capture_dir"
+  setup_staged_workspace "$asdlc_root"
+  write_project_definition "$project_dir" "A"
+  setup_codex_stub "$asdlc_root" "valid"
+
+  TEST_CAPTURE_DIR="$capture_dir" TEST_CODEX_MODE="valid" PATH="$asdlc_root/bin:$PATH" \
+    TARGET_BACKEND_BLUEPRINT="$project_dir/project_stack_blueprint_backend.md" \
+    TARGET_FRONTEND_BLUEPRINT="$project_dir/project_stack_blueprint_frontend.md" \
+    "$asdlc_root/.commands/init_project_stack_blueprints.sh" --path "$project_dir" >/dev/null
+
+  local prompt=""
+  prompt="$(cat "$capture_dir/codex_prompt.txt")"
+  assert_contains "$prompt" "Cross-class peer trigger helper command: .helper/check_cross_class_peer_trigger.sh $project_dir/init_progress_definition.yaml"
+  assert_not_contains "$prompt" "Cross-class peer trigger for backend §5:"
+}
+
+test_missing_cross_class_peer_trigger_helper_fails_fast() {
+  local asdlc_root="$TMP_ROOT/asdlc-missing-peer-trigger-helper"
+  local project_dir="$asdlc_root/projects/sample-project"
+  setup_staged_workspace "$asdlc_root"
+  write_project_definition "$project_dir" "A"
+  rm -f "$asdlc_root/.helper/check_cross_class_peer_trigger.sh"
+
+  local status=0
+  local out=""
+  set +e
+  out="$("$asdlc_root/.commands/init_project_stack_blueprints.sh" --path "$project_dir" 2>&1)"
+  status=$?
+  set -e
+
+  assert_nonzero_status "$status"
+  assert_contains "$out" "Required file not found: .helper/check_cross_class_peer_trigger.sh"
+}
+
 test_noops_for_type_b_and_c
 test_prompt_includes_external_sources_context
 test_missing_external_sources_file_fails_fast
 test_no_final_write_before_approval_keeps_blueprint_missing
 test_revision_uses_same_validation_and_commits
 test_final_blueprint_contains_gap5_structure_without_authoring_state
+test_type_a_prompt_binds_cross_class_peer_trigger_helper
+test_missing_cross_class_peer_trigger_helper_fails_fast
 
 echo "All project stack blueprint initializer tests passed."

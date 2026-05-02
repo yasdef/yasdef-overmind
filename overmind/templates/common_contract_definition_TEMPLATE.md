@@ -49,3 +49,9 @@
 > Use one or more numbered prep entries (`prep_1`, `prep_2`, ...).
 - prep_1: [UNFILLED]
 - prep_2: [UNFILLED]
+
+## 7. Cross-Class Transport/Contract Approach Mirror
+### Backend: [UNFILLED]
+- transport_protocol: [UNFILLED]
+- schema_format: [UNFILLED]
+- user_approved: [UNFILLED]

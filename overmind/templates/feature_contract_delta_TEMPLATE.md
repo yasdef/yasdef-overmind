@@ -38,3 +38,8 @@ the stable project baseline in `common_contract_definition.md`.
 ## 4. Track Handoff Signals
 - backend_handoff: [UNFILLED]
 - frontend_mobile_handoff: [UNFILLED]
+
+## 5. Cross-Class Transport/Contract Approach Mirror
+### Backend: [UNFILLED]
+- transport_protocol: [UNFILLED]
+- schema_format: [UNFILLED]

@@ -43,6 +43,7 @@
   - `bash tests/ai_scripts/check_feature_technical_requirements_quality_tests.sh`
   - `bash tests/ai_scripts/check_implementation_slices_quality_tests.sh`
   - `bash tests/ai_scripts/check_implementation_plan_quality_tests.sh`
+  - `bash tests/ai_scripts/check_cross_class_peer_trigger_tests.sh`
 
 ## Safety And Change Constraints
 - Do not run destructive git commands unless explicitly requested.

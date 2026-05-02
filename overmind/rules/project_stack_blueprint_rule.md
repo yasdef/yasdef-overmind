@@ -8,7 +8,7 @@
 
 ## Artifact Content
 - Include the three required sections from the template: Meta, Stack Choices, and Layer Bindings.
-- Backend blueprints additionally include §5 Cross-Class Transport/Contract Approach when the backend has an in-project peer class (another backend, frontend, or mobile). Either populate concretely with `user_approved: true`, or use the literal `<to be defined during first feature implementation plan>` for both fields with `user_approved: false`.
+- Backend blueprints additionally include §5 Cross-Class Transport/Contract Approach when the backend has an in-project peer class (another backend, frontend, or mobile). Either populate concretely with `user_approved: true`, or use the literal `<to be defined during first feature implementation plan>` for both fields with `user_approved: false`. See `## §5 Cross-Class Transport/Contract Approach Derivation` below for how §5 values are derived and approved.
 - Use `backend`, `frontend`, or `mobile` as the class value.
 - Record `last_updated` in `YYYY-MM-DD` format.
 - Record planned repo identity fields in Meta, tagged as planned where no repository exists yet.
@@ -26,12 +26,23 @@
 ## Proposal Rules
 - Process each active class independently.
 - If `.setup/external_sources.yaml` contains a `stack_knowledge_base` source and that MCP server is available, extract stack choices, layer folder conventions, and component archetypes from it; tell the user which source informed the proposal.
+- Suggested order for querying the selected MCP source. For each active class:
+    - first search for `<class> blueprint`
+    - if the results are empty or not clearly relevant, search for `<class> architecture blueprint`
+    - if the results are still empty or not clearly relevant, list documents with tags that include `<class>` or `architecture` and inspect the most relevant candidates for the active class
 - If the file is absent, contains no `stack_knowledge_base` entry, or the MCP server is unavailable, use these fallback stack-family proposals, then ask the user to approve or override baseline class conventions:
   - backend: default `java-spring-boot`, alternative `nodejs`
   - frontend: default `react`, alternative `angular`
   - mobile: default `native-android-ios`, alternative `flutter`
 - Allow the user to override a proposed stack family before final approval.
 - Do not silently choose a default.
+
+## §5 Cross-Class Transport/Contract Approach Derivation
+- Determine whether §5 applies by running the runtime-bound cross-class peer trigger helper (see prompt context). It exits 0 and prints `cross_class_peer_trigger: active` when §5 applies, or `cross_class_peer_trigger: inactive` when §5 is a no-op for this project. Skip §5 entirely on `inactive`.
+- When active, §5 derivation follows the same Proposal Rules and Approval And Write Rules above, with these §5-specific extras:
+  - The fallback when the `stack_knowledge_base` source is absent, unavailable, or yields no confident proposal is §5-specific stack inference from the approved §2 stack choices on the same backend blueprint (for example: Spring Boot → REST + OpenAPI 3.1; gRPC service framework → gRPC + protobuf), not the §2/§3/§4 stack-family fallback menu.
+  - When neither MCP nor §5-specific stack inference yields a confident proposal, or the user declines a confident proposal, write the literal `<to be defined during first feature implementation plan>` for both `transport_protocol` and `schema_format` with `user_approved: false`. Placeholder writes do not require user approval. Do not retry the declined source.
+- The structural §5 contract enforced by the project stack blueprint quality helper is unchanged by this derivation.
 
 ## Approval And Write Rules
 - Do not write `project_stack_blueprint_<class>.md` until the user explicitly approves that class's stack-family choice.

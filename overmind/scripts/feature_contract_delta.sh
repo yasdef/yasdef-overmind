@@ -5,6 +5,7 @@ SCRIPT_BASENAME="$(basename "${BASH_SOURCE[0]}")"
 FEATURE_PATH_INPUT=""
 FEATURE_PATH=""
 PROJECT_ROOT=""
+PROJECT_DEFINITION_FILE="init_progress_definition.yaml"
 FEATURE_BR_FILE=""
 REQUIREMENTS_EARS_FILE=""
 COMMON_CONTRACT_DEFINITION_FILE=""
@@ -14,6 +15,7 @@ FEATURE_CONTRACT_GOLDEN_EXAMPLE_FILE=".golden_examples/feature_contract_delta_GO
 MODELS_FILE=".setup/models.md"
 RULE_FILE=".rules/feature_contract_delta_rule.md"
 QUALITY_GATE_HELPER=".helper/check_feature_contract_delta_quality.sh"
+CROSS_CLASS_PEER_TRIGGER_HELPER=".helper/check_cross_class_peer_trigger.sh"
 MODEL_PHASE="feature_contract_delta"
 
 MODEL_CMD=""
@@ -153,6 +155,7 @@ ensure_required_files() {
     "$FEATURE_CONTRACT_TEMPLATE_FILE"
     "$FEATURE_CONTRACT_GOLDEN_EXAMPLE_FILE"
     "$QUALITY_GATE_HELPER"
+    "$CROSS_CLASS_PEER_TRIGGER_HELPER"
   )
   local relative_path=""
 
@@ -279,6 +282,7 @@ build_prompt() {
   local runtime_root="$1"
   local project_type_code="$2"
   local quality_command="$QUALITY_GATE_HELPER $FEATURE_CONTRACT_DELTA_FILE"
+  local project_definition_path="$PROJECT_ROOT/$PROJECT_DEFINITION_FILE"
 
   cat <<EOF
 Define feature-level shared contract delta from EARS requirements and common contract baseline.
@@ -316,6 +320,7 @@ Context:
 - Golden example file: $FEATURE_CONTRACT_GOLDEN_EXAMPLE_FILE
 - Quality gate helper: $QUALITY_GATE_HELPER
 - Quality gate command: $quality_command
+- Cross-class peer trigger helper command: $CROSS_CLASS_PEER_TRIGGER_HELPER $project_definition_path
 EOF
 }
 

@@ -6,6 +6,7 @@ SCRIPT_SRC="$SOURCE_ROOT/overmind/scripts/init_common_contract_definition.sh"
 RULE_SRC="$SOURCE_ROOT/overmind/rules/common_contract_definition_rule.md"
 TEMPLATE_SRC="$SOURCE_ROOT/overmind/templates/common_contract_definition_TEMPLATE.md"
 GOLDEN_SRC="$SOURCE_ROOT/overmind/golden_examples/common_contract_definition_GOLDEN_EXAMPLE.md"
+PEER_TRIGGER_HELPER_SRC="$SOURCE_ROOT/overmind/scripts/helper/check_cross_class_peer_trigger.sh"
 
 STACK_BLUEPRINT_BE_GOLDEN_SRC="$SOURCE_ROOT/overmind/golden_examples/project_stack_blueprint_be_GOLDEN_EXAMPLE.md"
 STACK_BLUEPRINT_FE_GOLDEN_SRC="$SOURCE_ROOT/overmind/golden_examples/project_stack_blueprint_fe_GOLDEN_EXAMPLE.md"
@@ -71,7 +72,8 @@ setup_staged_workspace() {
   cp "$RULE_SRC" "$asdlc_root/.rules/common_contract_definition_rule.md"
   cp "$TEMPLATE_SRC" "$asdlc_root/.templates/common_contract_definition_TEMPLATE.md"
   cp "$GOLDEN_SRC" "$asdlc_root/.golden_examples/common_contract_definition_GOLDEN_EXAMPLE.md"
-  chmod +x "$asdlc_root/.commands/init_common_contract_definition.sh"
+  cp "$PEER_TRIGGER_HELPER_SRC" "$asdlc_root/.helper/check_cross_class_peer_trigger.sh"
+  chmod +x "$asdlc_root/.commands/init_common_contract_definition.sh" "$asdlc_root/.helper/check_cross_class_peer_trigger.sh"
 
   cat >"$asdlc_root/asdlc_metadata.yaml" <<'OUT'
 meta:
@@ -84,7 +86,7 @@ OUT
     git init -q
     git config user.name "Test User"
     git config user.email "test@example.com"
-    git add asdlc_metadata.yaml .commands/init_common_contract_definition.sh .rules/common_contract_definition_rule.md .templates/common_contract_definition_TEMPLATE.md .golden_examples/common_contract_definition_GOLDEN_EXAMPLE.md
+    git add asdlc_metadata.yaml .commands/init_common_contract_definition.sh .rules/common_contract_definition_rule.md .templates/common_contract_definition_TEMPLATE.md .golden_examples/common_contract_definition_GOLDEN_EXAMPLE.md .helper/check_cross_class_peer_trigger.sh
     git commit -qm "seed staged workspace"
   )
 }
@@ -545,6 +547,52 @@ test_type_a_fails_if_model_modifies_read_only_blueprint() {
   assert_contains "$out" "Step 2 modified read-only stack blueprint"
 }
 
+test_prompt_binds_cross_class_peer_trigger_helper() {
+  local workspace="$TMP_ROOT/workspace-peer-trigger-bound"
+  local asdlc_root="$workspace/asdlc"
+  local project_dir="$asdlc_root/projects/sample-project"
+  local capture_dir="$TMP_ROOT/capture-peer-trigger-bound"
+  local backend_repo="$TMP_ROOT/backend-repo-peer-bound"
+  local frontend_repo="$TMP_ROOT/frontend-repo-peer-bound"
+  mkdir -p "$project_dir" "$capture_dir" "$backend_repo" "$frontend_repo"
+  setup_staged_workspace "$asdlc_root"
+  setup_staged_models_file "$asdlc_root"
+  write_staged_quality_gate_stub "$asdlc_root"
+  setup_codex_stub "$asdlc_root"
+  write_project_definition "$project_dir" "ready" "$backend_repo" "ready" "$frontend_repo"
+
+  cd "$TMP_ROOT" && PATH="$asdlc_root/bin:$PATH" TEST_CAPTURE_DIR="$capture_dir" \
+    TARGET_COMMON_CONTRACT_FILE="$project_dir/common_contract_definition.md" \
+    "$asdlc_root/.commands/init_common_contract_definition.sh" --path "$project_dir" >/dev/null
+
+  local prompt=""
+  prompt="$(cat "$capture_dir/codex_prompt.txt")"
+  assert_contains "$prompt" "Cross-class peer trigger helper command: .helper/check_cross_class_peer_trigger.sh $project_dir/init_progress_definition.yaml"
+}
+
+test_missing_cross_class_peer_trigger_helper_fails_fast() {
+  local workspace="$TMP_ROOT/workspace-missing-peer-trigger-helper"
+  local asdlc_root="$workspace/asdlc"
+  local project_dir="$asdlc_root/projects/sample-project"
+  local backend_repo="$TMP_ROOT/backend-repo-missing-peer"
+  mkdir -p "$project_dir" "$backend_repo"
+  setup_staged_workspace "$asdlc_root"
+  setup_staged_models_file "$asdlc_root"
+  write_staged_quality_gate_stub "$asdlc_root"
+  write_project_definition "$project_dir" "ready" "$backend_repo" "deferred" ""
+  rm -f "$asdlc_root/.helper/check_cross_class_peer_trigger.sh"
+
+  local out=""
+  local status=0
+  set +e
+  out="$(cd "$TMP_ROOT" && "$asdlc_root/.commands/init_common_contract_definition.sh" --path "$project_dir" 2>&1)"
+  status=$?
+  set -e
+
+  assert_nonzero_status "$status"
+  assert_contains "$out" "Required file not found: .helper/check_cross_class_peer_trigger.sh"
+}
+
 test_fails_fast_when_run_from_repo_path
 test_fails_when_path_argument_is_missing
 test_fails_when_path_is_outside_asdlc_projects
@@ -558,5 +606,7 @@ test_fails_when_path_points_to_other_asdlc_workspace_project
 test_runs_codex_with_project_scoped_output_and_repo_context
 test_type_a_runs_with_read_only_stack_blueprint_context
 test_type_a_fails_if_model_modifies_read_only_blueprint
+test_prompt_binds_cross_class_peer_trigger_helper
+test_missing_cross_class_peer_trigger_helper_fails_fast
 
 echo "All common contract definition initializer tests passed."

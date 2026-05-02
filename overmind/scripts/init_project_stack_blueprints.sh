@@ -7,6 +7,7 @@ PROJECT_DEFINITION_FILE="init_progress_definition.yaml"
 MODELS_FILE=".setup/models.md"
 BLUEPRINT_RULE_FILE=".rules/project_stack_blueprint_rule.md"
 QUALITY_GATE_HELPER=".helper/check_project_stack_blueprint_quality.sh"
+CROSS_CLASS_PEER_TRIGGER_HELPER=".helper/check_cross_class_peer_trigger.sh"
 EXTERNAL_SOURCES_FILE=".setup/external_sources.yaml"
 MODEL_PHASE="project_stack_blueprint"
 RUNTIME_ROOT=""
@@ -141,6 +142,7 @@ ensure_required_files() {
     "$MODELS_FILE"
     "$BLUEPRINT_RULE_FILE"
     "$QUALITY_GATE_HELPER"
+    "$CROSS_CLASS_PEER_TRIGGER_HELPER"
     "$EXTERNAL_SOURCES_FILE"
     ".templates/project_stack_blueprint_be_TEMPLATE.md"
     ".templates/project_stack_blueprint_fe_TEMPLATE.md"
@@ -418,6 +420,7 @@ Context:
 - Project definition file: $project_definition_path
 - Blueprint rule file: $BLUEPRINT_RULE_FILE
 - Quality gate helper: $QUALITY_GATE_HELPER
+- Cross-class peer trigger helper command: $CROSS_CLASS_PEER_TRIGGER_HELPER $project_definition_path
 - External sources config: $EXTERNAL_SOURCES_FILE ($external_sources_status)
 - Active class outputs:
 $(render_class_context)

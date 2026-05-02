@@ -61,6 +61,12 @@ Must not own:
 - Do not invent new business behavior outside `<EARS_SOURCE_ARTIFACT>`.
 - Keep statements concise and testable.
 
+## §5 Cross-Class Transport/Contract Approach Mirror
+- Determine whether §5 applies by running the runtime-bound cross-class peer trigger helper (see prompt context). It exits 0 and prints `cross_class_peer_trigger: active` when the §5 mirror applies, or `cross_class_peer_trigger: inactive` when it is a no-op. Omit the `## 5. Cross-Class Transport/Contract Approach Mirror` section entirely on `inactive`.
+- When active, write one `### Backend: <identity>` block per active backend, mirroring the current `transport_protocol` and `schema_format` from `common_contract_definition.md` §7 verbatim by default.
+- When this feature defines or refines those values, record the concrete values directly in this section regardless of whether `common_contract_definition.md` carries the placeholder or different concrete values for that backend.
+- Do not introduce a resolution state machine, terminal-state field, required block, or quality-gate enforcement for §5; concrete values or the literal `<to be defined during first feature implementation plan>` placeholder are the only valid shapes.
+
 ## Runtime Path Binding Rules
 - Runtime bindings provided by the caller are authoritative.
 - Write only to `<FEATURE_CONTRACT_DELTA_TARGET_ARTIFACT>`.
