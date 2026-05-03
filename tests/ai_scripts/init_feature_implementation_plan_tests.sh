@@ -371,6 +371,7 @@ set -euo pipefail
 
 capture_dir="${TEST_CAPTURE_DIR:?TEST_CAPTURE_DIR must be set}"
 target_file="${TARGET_IMPLEMENTATION_PLAN_FILE:-projects/p1/feature-a/implementation_plan.md}"
+project_type_code="${TEST_PROJECT_TYPE_CODE:-B}"
 
 printf '%s\n' "$@" >"$capture_dir/codex_args.txt"
 printf '%s' "${!#}" >"$capture_dir/codex_prompt.txt"
@@ -378,6 +379,8 @@ printf '%s' "${!#}" >"$capture_dir/codex_prompt.txt"
 mkdir -p "$(dirname "$target_file")"
 cat >"$target_file" <<'DOC'
 # Implementation Plan - Golden Example
+
+- project_type_code: PROJECT_TYPE_CODE_PLACEHOLDER
 
 ### Step 1.1 Order projection persistence foundation [REQ-6] [REQ-7]
 #### Repo: backend
@@ -411,6 +414,8 @@ cat >"$target_file" <<'DOC'
 - [ ] Add mobile view-model and screen tests for projection field handling
 - [ ] Review step implementation
 DOC
+sed -i.bak "s/PROJECT_TYPE_CODE_PLACEHOLDER/$project_type_code/g" "$target_file"
+rm -f "$target_file.bak"
 OUT
   chmod +x "$repo_dir/bin/codex"
 }
@@ -593,9 +598,50 @@ test_generates_plan_and_builds_expected_prompt() {
   assert_not_contains "$committed_files" "projects/p1/feature-a/implementation_slices.md"
 }
 
+test_type_a_generates_plan() {
+  local repo_dir="$TMP_ROOT/repo-type-a-success"
+  local capture_dir="$TMP_ROOT/repo-type-a-capture"
+  mkdir -p "$repo_dir" "$capture_dir"
+  setup_git_workspace "$repo_dir"
+  setup_codex_stub "$repo_dir"
+
+  cat >"$repo_dir/asdlc/projects/p1/init_progress_definition.yaml" <<'OUT'
+meta_info:
+  project_id: "p1"
+  project_classes:
+    - backend
+    - frontend
+    - mobile
+  project_type_code: "A"
+  project_type_label: "New project"
+steps: []
+OUT
+
+  sed -i.bak 's/- project_type_code: B/- project_type_code: A/' "$repo_dir/asdlc/projects/p1/feature-a/technical_requirements.md"
+  rm -f "$repo_dir/asdlc/projects/p1/feature-a/technical_requirements.md.bak"
+  sed -i.bak 's/- project_type_code: B/- project_type_code: A/' "$repo_dir/asdlc/projects/p1/feature-a/implementation_slices.md"
+  rm -f "$repo_dir/asdlc/projects/p1/feature-a/implementation_slices.md.bak"
+
+  local out=""
+  out="$(
+    cd "$repo_dir/asdlc" &&
+    PATH="$repo_dir/bin:$PATH" TEST_CAPTURE_DIR="$capture_dir" TEST_PROJECT_TYPE_CODE="A" \
+      .commands/feature_implementation_plan.sh --feature_path "projects/p1/feature-a"
+  )"
+
+  assert_contains "$out" "Updated projects/p1/feature-a/implementation_plan.md"
+  assert_contains "$(cat "$repo_dir/asdlc/projects/p1/feature-a/implementation_plan.md")" "- project_type_code: A"
+
+  local codex_prompt=""
+  codex_prompt="$(cat "$capture_dir/codex_prompt.txt")"
+  assert_contains "$codex_prompt" "Project type code: A"
+  assert_contains "$codex_prompt" "Use projects/p1/feature-a/implementation_slices.md as the authoritative execution-slice discovery input from Step 8.1."
+}
+
 test_requires_feature_path_argument
 test_requires_staged_command_location
 test_fails_when_technical_requirements_is_missing
 test_fails_when_implementation_slices_is_missing
 test_fails_when_model_phase_missing
 test_generates_plan_and_builds_expected_prompt
+test_type_a_generates_plan

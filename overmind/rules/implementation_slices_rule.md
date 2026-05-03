@@ -35,8 +35,7 @@ Must not own:
 - Do not modify input artifacts.
 
 ## Project Type Branching
-- If project type is `B` or `C`: generate implementation slices from the provided artifacts.
-- If project type is `A`: this stage is unsupported for now; do not generate pseudo-content.
+- If project type is `A`, `B`, or `C`: generate implementation slices from the provided artifacts.
 
 ## Output Format Baseline
 - Use the prompt-provided template as structure contract.

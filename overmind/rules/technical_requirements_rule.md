@@ -32,24 +32,28 @@ Must not own:
 - Do not modify input artifacts.
 - Do not create or modify unrelated files.
 
-## Project Type Branching
-- If project type is `B` or `C`: inspect targeted repository evidence using the applicable surface maps as the starting index.
-- If project type is `A`: this stage is unsupported for now; do not generate pseudo-content.
+## Evidence Source Strategy
+- Use the applicable surface maps as the starting index and primary source for feature-scoped repository/class context.
+- Inspect other available evidence only where needed to confirm current behavior or gaps.
+- Prefer direct repository evidence when available.
+- When only planned, derived, or non-code evidence is available, use it as context for gap analysis and planning signals, but do not present it as already implemented code.
 
 ## Evidence Rules
 - Treat `<COMMON_CONTRACT_DEFINITION_ARTIFACT>` as the stable cross-project baseline for current shared contracts.
 - Treat `<REQUIREMENTS_EARS_ARTIFACT>` as the authoritative source of valid `REQ-*` / `NFR-*` ids and desired final behavior.
-- Treat surface maps as file-selection and ownership guidance, not as the final truth of current implementation state.
-- Inspect code only under paths called out by the applicable surface maps and the smallest adjacent set of files needed to confirm behavior:
+- Treat surface maps as the primary feature-scoped index and ownership guidance, not as automatic proof that implementation already exists.
+- Inspect direct repository evidence under paths called out by the applicable surface maps when such repository evidence is available, using the smallest adjacent set of files needed to confirm behavior:
   - controllers / handlers
   - DTOs / schemas / client contracts
   - services / domain / persistence
   - security / config / migrations
   - tests near the touched feature area
+- If direct repository evidence is unavailable or incomplete, use other available project artifacts and the surface-map evidence itself to derive gaps conservatively.
 - Do not perform a full-repo inventory.
 - Prefer repository-proven claims.
 - Keep inferences minimal; when needed, mark them with `[Inference]`.
 - Do not invent implementation details or gaps without repository or artifact support.
+- Do not describe planned, blueprint-derived, or otherwise non-code evidence as already implemented behavior.
 
 ## Output Format Baseline
 - Use `overmind/templates/technical_requirements_TEMPLATE.md` as structure contract.

@@ -37,11 +37,6 @@ fail_project_type_undefined() {
   exit 1
 }
 
-fail_mcp_not_supported_for_project_a() {
-  echo "project type A is not supported yet: feature technical requirements extraction with MCP support is unavailable" >&2
-  exit 1
-}
-
 require_command() {
   local command_name="$1"
   if ! command -v "$command_name" >/dev/null 2>&1; then
@@ -556,8 +551,9 @@ $readonly_lines
 - Update only: $TECHNICAL_REQUIREMENTS_FILE
 - Use $REQUIREMENTS_EARS_FILE as the authoritative source of final feature behavior and valid \`REQ-*\` / \`NFR-*\` ids.
 - Use $COMMON_CONTRACT_DEFINITION_FILE as the stable shared-contract baseline and current cross-repo drift source.
-- Use the applicable surface maps as the feature-scoped index of where targeted code evidence should be inspected.
-- Inspect code only under repo paths named by the applicable surface maps and the smallest adjacent set of files needed to confirm current behavior or gaps (controllers, DTOs, services, security, config, migrations, tests, nearby specs). Do not perform a full-repo inventory.
+- Use the applicable surface maps as the starting index and primary source for feature-scoped repository/class context.
+- Inspect other available evidence only where needed to confirm current behavior or gaps, preferring direct repository evidence when available and otherwise using other available project artifacts or surface-map evidence. Do not perform a full-repo inventory.
+- Do not present non-code, planned, or derived evidence as already implemented code. When stronger confirmation is unavailable, keep findings gap-oriented, mark uncertainty as 'unclear', and use '[Inference]' where needed.
 - Produce one shared \`technical_requirements.md\` artifact for the whole feature, with separate repository-evidence blocks and impacted-component blocks that carry explicit repo ownership.
 - Distinguish between already implemented behavior, partially implemented behavior, missing behavior, and unclear gaps.
 - Keep this artifact feature-scoped and implementation-oriented; do not restate unrelated stable project architecture.
@@ -665,10 +661,7 @@ main() {
   project_type_code="$(resolve_project_type_code "$definition_path")"
   resolve_project_classes "$definition_path"
 
-  if [[ "$project_type_code" == "A" ]]; then
-    fail_mcp_not_supported_for_project_a
-  fi
-  if [[ "$project_type_code" != "B" && "$project_type_code" != "C" ]]; then
+  if [[ "$project_type_code" != "A" && "$project_type_code" != "B" && "$project_type_code" != "C" ]]; then
     fail_project_type_undefined
   fi
 

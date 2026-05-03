@@ -37,8 +37,7 @@ Must not own:
 - Do not create or modify unrelated files.
 
 ## Project Type Branching
-- If project type is `B` or `C`: produce the plan from implementation slices, requirements, technical requirements, and contract delta.
-- If project type is `A`: this stage is unsupported for now; do not generate pseudo-content.
+- If project type is `A`, `B`, or `C`: produce the plan from implementation slices, requirements, technical requirements, and contract delta.
 
 ## Output Format Baseline
 - Use the prompt-provided template as the structure contract.

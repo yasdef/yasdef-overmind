@@ -223,6 +223,7 @@ set -euo pipefail
 
 capture_dir="${TEST_CAPTURE_DIR:?TEST_CAPTURE_DIR must be set}"
 target_file="${TARGET_TECHNICAL_REQUIREMENTS_FILE:-projects/p1/feature-a/technical_requirements.md}"
+project_type_code="${TEST_PROJECT_TYPE_CODE:-B}"
 
 printf '%s\n' "$@" >"$capture_dir/codex_args.txt"
 printf '%s' "${!#}" >"$capture_dir/codex_prompt.txt"
@@ -234,7 +235,7 @@ cat >"$target_file" <<'DOC'
 ## 1. Document Meta
 - feature_id: AA-1
 - feature_title: create-order
-- project_type_code: B
+- project_type_code: PROJECT_TYPE_CODE_PLACEHOLDER
 - source_requirements_ears: projects/p1/feature-a/requirements_ears.md
 - source_common_contract_definition: projects/p1/common_contract_definition.md
 - source_surface_map_artifacts: projects/p1/feature-a/project_surface_struct_resp_map_backend.md, projects/p1/feature-a/project_surface_struct_resp_map_frontend.md
@@ -302,6 +303,8 @@ cat >"$target_file" <<'DOC'
 ## 7. Known Risks / Uncertainties
 - risk_1: Backend/frontend drift may recur if frontend preserves proposal-only aliases.
 DOC
+sed -i.bak "s/PROJECT_TYPE_CODE_PLACEHOLDER/$project_type_code/g" "$target_file"
+rm -f "$target_file.bak"
 OUT
   chmod +x "$repo_dir/bin/codex"
 }
@@ -434,7 +437,8 @@ test_generates_technical_requirements_and_builds_expected_prompt() {
   assert_contains "$codex_prompt" ".rules/technical_requirements_rule.md"
   assert_contains "$codex_prompt" "Target artifact: projects/p1/feature-a/technical_requirements.md"
   assert_contains "$codex_prompt" "Use projects/p1/common_contract_definition.md as the stable shared-contract baseline"
-  assert_contains "$codex_prompt" "Inspect code only under repo paths named by the applicable surface maps"
+  assert_contains "$codex_prompt" "Use the applicable surface maps as the starting index and primary source for feature-scoped repository/class context."
+  assert_contains "$codex_prompt" "Inspect other available evidence only where needed to confirm current behavior or gaps"
   assert_contains "$codex_prompt" "Produce one shared \`technical_requirements.md\` artifact"
   assert_contains "$codex_prompt" "project_surface_struct_resp_map_backend.md"
   assert_contains "$codex_prompt" "project_surface_struct_resp_map_frontend.md"
@@ -447,8 +451,45 @@ test_generates_technical_requirements_and_builds_expected_prompt() {
   assert_not_contains "$committed_files" "projects/p1/common_contract_definition.md"
 }
 
+test_type_a_generates_technical_requirements_from_surface_map_first_prompting() {
+  local repo_dir="$TMP_ROOT/repo-type-a-success"
+  local capture_dir="$TMP_ROOT/repo-type-a-capture"
+  mkdir -p "$repo_dir" "$capture_dir"
+  setup_git_workspace "$repo_dir"
+  setup_codex_stub "$repo_dir"
+
+  cat >"$repo_dir/asdlc/projects/p1/init_progress_definition.yaml" <<'OUT'
+meta_info:
+  project_id: "p1"
+  project_classes:
+    - backend
+    - frontend
+  project_type_code: "A"
+  project_type_label: "New project"
+steps: []
+OUT
+
+  local out=""
+  out="$(
+    cd "$repo_dir/asdlc" &&
+    PATH="$repo_dir/bin:$PATH" TEST_CAPTURE_DIR="$capture_dir" TEST_PROJECT_TYPE_CODE="A" \
+      .commands/feature_technical_requirements.sh --feature_path "projects/p1/feature-a"
+  )"
+
+  assert_contains "$out" "Updated projects/p1/feature-a/technical_requirements.md"
+  assert_contains "$(cat "$repo_dir/asdlc/projects/p1/feature-a/technical_requirements.md")" "- project_type_code: A"
+
+  local codex_prompt=""
+  codex_prompt="$(cat "$capture_dir/codex_prompt.txt")"
+  assert_contains "$codex_prompt" "Project type code: A"
+  assert_contains "$codex_prompt" "Use the applicable surface maps as the starting index and primary source for feature-scoped repository/class context."
+  assert_contains "$codex_prompt" "Inspect other available evidence only where needed to confirm current behavior or gaps"
+  assert_contains "$codex_prompt" "Do not present non-code, planned, or derived evidence as already implemented code."
+}
+
 test_requires_feature_path_argument
 test_requires_staged_command_location
 test_fails_when_required_common_contract_is_missing
 test_fails_when_model_phase_missing
 test_generates_technical_requirements_and_builds_expected_prompt
+test_type_a_generates_technical_requirements_from_surface_map_first_prompting

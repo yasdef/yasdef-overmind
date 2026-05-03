@@ -38,11 +38,6 @@ fail_project_type_undefined() {
   exit 1
 }
 
-fail_mcp_not_supported_for_project_a() {
-  echo "project type A is not supported yet: shared repository implementation planning with MCP extraction is unavailable" >&2
-  exit 1
-}
-
 require_command() {
   local command_name="$1"
   if ! command -v "$command_name" >/dev/null 2>&1; then
@@ -643,10 +638,7 @@ main() {
   project_type_code="$(resolve_project_type_code "$definition_path")"
   resolve_project_classes "$definition_path"
 
-  if [[ "$project_type_code" == "A" ]]; then
-    fail_mcp_not_supported_for_project_a
-  fi
-  if [[ "$project_type_code" != "B" && "$project_type_code" != "C" ]]; then
+  if [[ "$project_type_code" != "A" && "$project_type_code" != "B" && "$project_type_code" != "C" ]]; then
     fail_project_type_undefined
   fi
 
