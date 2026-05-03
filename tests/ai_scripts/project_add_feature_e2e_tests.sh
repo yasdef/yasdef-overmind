@@ -121,7 +121,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 printf '%s --feature_path %s\n' "$(basename "$0")" "$feature_path" >>"$log_file"
-echo "Select repo to analyze now (number or class name):" >&2
+echo "Select target to analyze now (number or class name):" >&2
 if ! IFS= read -r selection; then
   selection=""
 fi
@@ -718,11 +718,11 @@ OUT
       .commands/project_add_feature_e2e.sh --path projects/project-a 2>&1
   )"
 
-  assert_contains "$out" "Phase 7 repo loop status for feature: projects/project-a/feature-alpha"
+  assert_contains "$out" "Phase 7 class loop status for feature: projects/project-a/feature-alpha"
   assert_contains "$out" "Phase 7 options:"
   assert_contains "$out" "3) contract delta finished lets move forward"
-  assert_contains "$out" "Already picked/completed repo classes: backend, frontend"
-  assert_contains "$out" "Pending repo classes: none"
+  assert_contains "$out" "Already picked/completed classes: backend, frontend"
+  assert_contains "$out" "Pending classes: none"
   assert_contains "$out" "Execution stopped: user denied phase progression at 8.1."
 
   local expected_log
@@ -761,7 +761,7 @@ OUT
       .commands/project_add_feature_e2e.sh --path projects/project-a 2>&1
   )"
 
-  assert_contains "$out" "Proceeding with pending repo classes: frontend"
+  assert_contains "$out" "Proceeding with pending classes: frontend"
   assert_contains "$out" "Execution stopped: user denied phase progression at 8.1."
 
   local expected_log

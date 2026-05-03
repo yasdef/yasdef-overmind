@@ -776,12 +776,12 @@ run_phase7_loop() {
     completed_list="$(format_class_list "${PHASE7_COMPLETED_REPO_CLASSES[@]-}")"
     pending_list="$(format_class_list "${PHASE7_PENDING_REPO_CLASSES[@]-}")"
 
-    echo "Phase 7 repo loop status for feature: $FEATURE_PATH"
-    echo "Already picked/completed repo classes: $completed_list"
-    echo "Pending repo classes: $pending_list"
+    echo "Phase 7 class loop status for feature: $FEATURE_PATH"
+    echo "Already picked/completed classes: $completed_list"
+    echo "Pending classes: $pending_list"
     echo "Phase 7 options:"
-    echo "  1) Analyze one repo now"
-    echo "  2) Refresh repo status"
+    echo "  1) Analyze one class now"
+    echo "  2) Refresh class status"
     echo "  3) contract delta finished lets move forward"
     printf 'Choose [1/2/3]: ' >&2
 
@@ -815,7 +815,7 @@ run_phase7_loop() {
 
   refresh_phase7_status "$runtime_root"
   if [[ ${#PHASE7_PENDING_REPO_CLASSES[@]} -gt 0 ]]; then
-    echo "Proceeding with pending repo classes: $(format_class_list "${PHASE7_PENDING_REPO_CLASSES[@]-}")"
+    echo "Proceeding with pending classes: $(format_class_list "${PHASE7_PENDING_REPO_CLASSES[@]-}")"
   fi
 
   command_text=".commands/feature_technical_requirements.sh --feature_path $FEATURE_PATH"

@@ -294,8 +294,8 @@ test_selects_frontend_by_class_name() {
       .commands/feature_repo_surface_and_exec_context.sh --feature_path "projects/p1/feature-a" <<<"frontend" 2>&1
   )"
 
-  assert_contains "$out" "Ready repositories available for analysis:"
-  assert_contains "$out" "Select repo to analyze now (number or class name):"
+  assert_contains "$out" "Analysis targets available:"
+  assert_contains "$out" "Select target to analyze now (number or class name):"
   assert_contains "$out" "Updated projects/p1/feature-a/project_surface_struct_resp_map_frontend.md"
   assert_file_exists "$repo_dir/asdlc/projects/p1/feature-a/project_surface_struct_resp_map_frontend.md"
   assert_file_not_exists "$repo_dir/asdlc/projects/p1/feature-a/project_surface_struct_resp_map_mobile.md"

@@ -606,14 +606,14 @@ select_target_repo() {
     TARGET_REPO_CLASS="${READY_REPO_CLASSES[0]}"
     TARGET_REPO_PATH="${READY_REPO_PATHS[0]}"
     if [[ -n "$TARGET_REPO_PATH" ]]; then
-      echo "Only one ready repository available for analysis: $TARGET_REPO_CLASS -> $TARGET_REPO_PATH" >&2
+      echo "Only one analysis target available: $TARGET_REPO_CLASS -> $TARGET_REPO_PATH" >&2
     else
-      echo "Only one ready repository available for analysis: $TARGET_REPO_CLASS" >&2
+      echo "Only one analysis target available: $TARGET_REPO_CLASS" >&2
     fi
     return 0
   fi
 
-  echo "Ready repositories available for analysis:" >&2
+  echo "Analysis targets available:" >&2
   for idx in "${!READY_REPO_CLASSES[@]}"; do
     if [[ -n "${READY_REPO_PATHS[$idx]}" ]]; then
       echo "  $((idx + 1)). ${READY_REPO_CLASSES[$idx]} -> ${READY_REPO_PATHS[$idx]}" >&2
@@ -623,9 +623,9 @@ select_target_repo() {
   done
 
   while true; do
-    echo "Select repo to analyze now (number or class name):" >&2
+    echo "Select target to analyze now (number or class name):" >&2
     if ! read -r selection; then
-      die "Failed to read repository selection."
+      die "Failed to read analysis target selection."
     fi
     selection="$(trim_value "$selection")"
     [[ -n "$selection" ]] || continue
