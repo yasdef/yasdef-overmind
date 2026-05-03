@@ -180,8 +180,7 @@ sources:
   Staged command (`<asdlc>/.commands/feature_implementation_plan.sh --feature_path <.../feature-folder>`) that runs Step `8.3` and generates one shared `implementation_plan.md` for the feature using `prerequisite_gaps.md`, `implementation_slices.md`, `requirements_ears.md`, `technical_requirements.md`, and `feature_contract_delta.md`.
 
 - `overmind/scripts/feature_implementation_plan_semantic_review.sh`
-  Staged command (`<asdlc>/.commands/feature_implementation_plan_semantic_review.sh --feature_path <.../feature-folder>`) that optionally runs Step `8.4` semantic review, asks the user which finding numbers to apply, updates `implementation_plan.md`, and records decisions in `implementation_plan_semantic_review.md`.
+  Staged command (`<asdlc>/.commands/feature_implementation_plan_semantic_review.sh --feature_path <.../feature-folder>`) that optionally runs Step `8.4` semantic review, including Type A repo-scaffold-readiness suggestions, asks the user which finding numbers to apply, updates `implementation_plan.md`, and records decisions in `implementation_plan_semantic_review.md`.
 
 - `overmind/scripts/feature_assing_workers.sh`
   Staged command (`<asdlc>/.commands/feature_assing_workers.sh --feature_path <.../feature-folder>`) that requires a ready parseable `implementation_plan.md`, resolves active workers strictly by step repo class, asks for one class worker when multiple are available, and writes deterministic `#### Assigned:` values (worker UUID or class-scoped error message) on every step.
-

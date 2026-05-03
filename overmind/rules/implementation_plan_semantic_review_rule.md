@@ -10,6 +10,7 @@ Read this file fully before producing output.
 
 ## Inputs
 - Mutable plan target: `<IMPLEMENTATION_PLAN_ARTIFACT>`.
+- Read-only project definition source: `<PROJECT_INIT_PROGRESS_DEFINITION_ARTIFACT>`.
 - Read-only requirements source: `<REQUIREMENTS_EARS_ARTIFACT>`.
 - Read-only technical source: `<TECHNICAL_REQUIREMENTS_ARTIFACT>`.
 - Read-only prerequisite trace source when present: `<PREREQUISITE_GAPS_ARTIFACT>`.
@@ -29,6 +30,7 @@ Read this file fully before producing output.
   - semantically weak dependency or ordering choices,
   - requirement grouping that obscures distinct delivery slices,
   - newly delivered user-reachable surfaces with unclear inbound operator reachability.
+  - Type A repo scaffold readiness that is unclear for a class represented in the plan.
 - For each newly delivered user-reachable surface, apply this four-step access-path heuristic:
   1. identify the delivered surface in the implementation plan,
   2. inspect applicable surface maps for existing inbound affordances,
@@ -41,6 +43,7 @@ Read this file fully before producing output.
   - isolation can be intentional.
 - Do not invent new navigation requirements unless justified by `requirements_ears.md` or explicit operator confirmation recorded in the review artifact.
 - For `delivered_surface_consumption_unclear`, link the finding to at least one `REQ-*` or `NFR-*` id in `related_requirements` so the judgment remains anchored to required behavior.
+- For Type A only, use `repo_scaffold_readiness_unclear` when a planned repo class has implementation steps but project metadata does not show a ready repo path and the plan does not explicitly account for scaffold creation, verification, or parallel ownership.
 
 ## Allowed Finding Types
 Every finding must use one `finding_type` from:
@@ -49,6 +52,7 @@ Every finding must use one `finding_type` from:
 - `dependency_ordering`
 - `requirement_grouping`
 - `delivered_surface_consumption_unclear`
+- `repo_scaffold_readiness_unclear`
 
 ## Finding State Rules
 Use one `state` per finding:
@@ -72,5 +76,5 @@ Use one `state` per finding:
 ## Completion
 - If no material findings exist, set `review_status: complete` and `- no_findings: true`.
 - If findings exist, ensure each finding has terminal state and resolution notes.
-- `delivered_surface_consumption_unclear` MUST NOT be terminal (`applied`, `rejected`, `postponed`) with empty `resolution_notes`.
+- `delivered_surface_consumption_unclear` and `repo_scaffold_readiness_unclear` MUST NOT be terminal (`applied`, `rejected`, `postponed`) with empty `resolution_notes`.
 - End with the prompt-provided success line when complete, or the failure line if completion is not feasible.

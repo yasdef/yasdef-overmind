@@ -315,6 +315,7 @@ collect_applicable_surface_maps() {
 
 prepare_readonly_inputs() {
   READONLY_INPUT_FILES=(
+    "$PROJECT_DEFINITION_FILE"
     "$REQUIREMENTS_EARS_FILE"
     "$TECHNICAL_REQUIREMENTS_FILE"
     "$PREREQUISITE_GAPS_FILE"
@@ -465,7 +466,7 @@ $readonly_lines
 - After user answer, update $IMPLEMENTATION_PLAN_FILE for selected findings and update each finding state to one of: added, applied, rejected, postponed.
 - Keep \'added\' only if user answer is incomplete and the finding still needs explicit decision.
 - Set review_status complete only when all findings are terminal (applied/rejected/postponed) or no_findings true.
-- Do not allow terminal delivered_surface_consumption_unclear findings with empty resolution_notes.
+- Do not allow terminal delivered_surface_consumption_unclear or repo_scaffold_readiness_unclear findings with empty resolution_notes.
 - Keep plan edits minimal and directly linked to selected findings.
 - Before finishing, run this quality gate command: $quality_gate_command
 - If completion is not feasible with current inputs or user direction, end with this exact line:
@@ -478,6 +479,7 @@ Context:
 - Feature root: $FEATURE_PATH
 - Mutable plan target: $IMPLEMENTATION_PLAN_FILE
 - Mutable semantic review target: $IMPLEMENTATION_PLAN_SEMANTIC_REVIEW_FILE
+- Read-only project definition source: $PROJECT_DEFINITION_FILE
 - Read-only requirements source: $REQUIREMENTS_EARS_FILE
 - Read-only technical requirements source: $TECHNICAL_REQUIREMENTS_FILE
 - Read-only prerequisite gaps source: $PREREQUISITE_GAPS_FILE

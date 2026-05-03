@@ -410,11 +410,17 @@ steps:
     optional: true
     input_required:
       - type: "document"
+        value: "init_progress_definition.yaml"
+      - type: "document"
         value: "implementation_plan.md"
       - type: "document"
         value: "requirements_ears.md"
       - type: "document"
         value: "technical_requirements.md"
+      - type: "document"
+        value: "prerequisite_gaps.md"
+      - type: "document"
+        value: "project_surface_struct_resp_map_<class>.md for active project classes"
     finished_only_if_artefacts_present:
       - file: "implementation_plan_semantic_review.md"
         special_folder: "/product"
@@ -423,7 +429,7 @@ steps:
           equals: "complete"
           section: "## 1. Document Meta"
     finished_only_if_conditions_meet:
-      - condition: "implementation_plan_semantic_review.md records semantic cohesion, split-quality, and dependency-ordering findings for implementation_plan.md."
-      - condition: "Findings use one type from: step_scope_overlap, technical_gap_mix, dependency_ordering, requirement_grouping."
+      - condition: "implementation_plan_semantic_review.md records semantic cohesion, split-quality, dependency-ordering, operator-reachability, and Type A repo-scaffold-readiness findings for implementation_plan.md."
+      - condition: "Findings use one type from: step_scope_overlap, technical_gap_mix, dependency_ordering, requirement_grouping, delivered_surface_consumption_unclear, repo_scaffold_readiness_unclear."
       - condition: "When findings exist, user-selected findings are applied to implementation_plan.md and each finding is marked with terminal decision state."
       - condition: "When no semantic findings are present, implementation_plan_semantic_review.md records no_findings: true."

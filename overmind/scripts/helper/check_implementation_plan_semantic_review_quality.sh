@@ -155,11 +155,12 @@ END {
   required_meta[1] = "feature_id"
   required_meta[2] = "feature_title"
   required_meta[3] = "source_implementation_plan"
-  required_meta[4] = "source_requirements_ears"
-  required_meta[5] = "source_technical_requirements"
-  required_meta[6] = "review_status"
-  required_meta[7] = "last_updated"
-  for (i = 1; i <= 7; i++) {
+  required_meta[4] = "source_project_definition"
+  required_meta[5] = "source_requirements_ears"
+  required_meta[6] = "source_technical_requirements"
+  required_meta[7] = "review_status"
+  required_meta[8] = "last_updated"
+  for (i = 1; i <= 8; i++) {
     key = required_meta[i]
     if (!(key in meta) || is_unfilled(meta[key])) {
       fail_quality("missing or unfilled meta key: " key)
@@ -216,7 +217,8 @@ END {
         finding_type != "technical_gap_mix" &&
         finding_type != "dependency_ordering" &&
         finding_type != "requirement_grouping" &&
-        finding_type != "delivered_surface_consumption_unclear") {
+        finding_type != "delivered_surface_consumption_unclear" &&
+        finding_type != "repo_scaffold_readiness_unclear") {
       fail_quality("finding block " f " has invalid finding_type: " finding_type)
     }
 
@@ -232,6 +234,12 @@ END {
         (state == "applied" || state == "rejected" || state == "postponed") &&
         is_unfilled(finding_fields[f "|resolution_notes"])) {
       fail_quality("finding block " f " (delivered_surface_consumption_unclear) has terminal state with empty resolution_notes")
+    }
+
+    if (finding_type == "repo_scaffold_readiness_unclear" &&
+        (state == "applied" || state == "rejected" || state == "postponed") &&
+        is_unfilled(finding_fields[f "|resolution_notes"])) {
+      fail_quality("finding block " f " (repo_scaffold_readiness_unclear) has terminal state with empty resolution_notes")
     }
 
     if (finding_type == "delivered_surface_consumption_unclear" &&
