@@ -886,6 +886,10 @@ render_checklist() {
   local artifact_indexes artifact_file artifact_special artifact_folder artifact_path
   local artifact_check_key artifact_check_equals artifact_check_section artifact_required_csv artifact_required_project_type
   local artifact_required=1
+  local any_matching_artifact_mode=0
+  local any_matching_artifact_found=0
+  local any_matching_artifact_required_count=0
+  local artifact_matches_check=0
 
   for ((i = 0; i < ${#step_ids[@]}; i++)); do
     step_id="${step_ids[$i]}"
@@ -899,6 +903,12 @@ render_checklist() {
 
     if [[ "$gating_prefix_complete" -eq 1 || "$step_optional" == "true" ]]; then
       step_complete=1
+      any_matching_artifact_mode=0
+      any_matching_artifact_found=0
+      any_matching_artifact_required_count=0
+      if [[ "$step_id" == "7.1" ]]; then
+        any_matching_artifact_mode=1
+      fi
       artifact_indexes="${step_artifact_indexes[$i]:-}"
       for j in $artifact_indexes; do
         artifact_file="${artifact_files[$j]}"
@@ -940,7 +950,13 @@ render_checklist() {
 
         artifact_folder="$(resolve_scan_folder "$project_root" "$artifact_special" "$FEATURE_PATH" "$step_phase")"
         artifact_path="$artifact_folder/$artifact_file"
+        if [[ "$any_matching_artifact_mode" -eq 1 ]]; then
+          any_matching_artifact_required_count=$((any_matching_artifact_required_count + 1))
+        fi
         if [[ ! -f "$artifact_path" ]]; then
+          if [[ "$any_matching_artifact_mode" -eq 1 ]]; then
+            continue
+          fi
           step_complete=0
           break
         fi
@@ -949,12 +965,27 @@ render_checklist() {
         artifact_check_equals="${artifact_check_equals[$j]}"
         artifact_check_section="${artifact_check_sections[$j]}"
         if [[ -n "$artifact_check_key" ]]; then
-          if ! matches_scoped_key_value "$artifact_path" "$artifact_check_section" "$artifact_check_key" "$artifact_check_equals"; then
+          artifact_matches_check=0
+          if matches_scoped_key_value "$artifact_path" "$artifact_check_section" "$artifact_check_key" "$artifact_check_equals"; then
+            artifact_matches_check=1
+          fi
+          if [[ "$any_matching_artifact_mode" -eq 1 ]]; then
+            if [[ "$artifact_matches_check" -eq 1 ]]; then
+              any_matching_artifact_found=1
+            fi
+            continue
+          fi
+          if [[ "$artifact_matches_check" -ne 1 ]]; then
             step_complete=0
             break
           fi
         fi
       done
+      if [[ "$any_matching_artifact_mode" -eq 1 ]]; then
+        if [[ "$any_matching_artifact_required_count" -eq 0 || "$any_matching_artifact_found" -ne 1 ]]; then
+          step_complete=0
+        fi
+      fi
     else
       step_complete=0
     fi

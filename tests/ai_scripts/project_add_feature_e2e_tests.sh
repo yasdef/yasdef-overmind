@@ -742,7 +742,7 @@ OUT
       printf '1\n'
       printf 'frontend\n'
       printf '3\n'
-      printf 'y\n'
+      printf 'n\n'
       printf 'n\n'
     } | TEST_LOG_FILE="$log_file" TEST_SCANNER_NEXT_LINE="next step: 7 (Analyze Repos And Prepare Repo Execution Context)" \
       .commands/project_add_feature_e2e.sh --path projects/project-a 2>&1
@@ -753,10 +753,11 @@ OUT
   assert_contains "$out" "3) contract delta finished lets move forward"
   assert_contains "$out" "Already picked/completed classes: backend, frontend"
   assert_contains "$out" "Pending classes: none"
-  assert_contains "$out" "Execution stopped: user denied phase progression at 8.1."
+  assert_contains "$out" "Optional phase declined at 7.1; skipping."
+  assert_contains "$out" "Execution stopped: user denied phase progression at 8."
 
   local expected_log
-  expected_log=$'init_progress_scanner.sh --path projects/project-a/feature-alpha\ninit_progress_scanner.sh --path projects/project-a/feature-alpha\nfeature_repo_surface_and_exec_context.sh --feature_path projects/project-a/feature-alpha\nfeature_repo_surface_and_exec_context.sh --feature_path projects/project-a/feature-alpha\nfeature_technical_requirements.sh --feature_path projects/project-a/feature-alpha'
+  expected_log=$'init_progress_scanner.sh --path projects/project-a/feature-alpha\ninit_progress_scanner.sh --path projects/project-a/feature-alpha\nfeature_repo_surface_and_exec_context.sh --feature_path projects/project-a/feature-alpha\nfeature_repo_surface_and_exec_context.sh --feature_path projects/project-a/feature-alpha'
   assert_equal "$expected_log" "$(read_log "$log_file")"
 }
 
@@ -785,37 +786,29 @@ OUT
       printf '1\n'
       printf 'backend\n'
       printf '3\n'
-      printf 'y\n'
+      printf 'n\n'
       printf 'n\n'
     } | TEST_LOG_FILE="$log_file" TEST_SCANNER_NEXT_LINE="next step: 7 (Analyze Repos And Prepare Repo Execution Context)" \
       .commands/project_add_feature_e2e.sh --path projects/project-a 2>&1
   )"
 
   assert_contains "$out" "Proceeding with pending classes: frontend"
-  assert_contains "$out" "Execution stopped: user denied phase progression at 8.1."
+  assert_contains "$out" "Optional phase declined at 7.1; skipping."
+  assert_contains "$out" "Execution stopped: user denied phase progression at 8."
 
   local expected_log
-  expected_log=$'init_progress_scanner.sh --path projects/project-a/feature-alpha\ninit_progress_scanner.sh --path projects/project-a/feature-alpha\nfeature_repo_surface_and_exec_context.sh --feature_path projects/project-a/feature-alpha\nfeature_technical_requirements.sh --feature_path projects/project-a/feature-alpha'
+  expected_log=$'init_progress_scanner.sh --path projects/project-a/feature-alpha\ninit_progress_scanner.sh --path projects/project-a/feature-alpha\nfeature_repo_surface_and_exec_context.sh --feature_path projects/project-a/feature-alpha'
   assert_equal "$expected_log" "$(read_log "$log_file")"
 }
 
-test_type_a_phase7_offers_mcp_enrichment_and_runs_it_when_selected() {
-  local asdlc_root="$TMP_ROOT/asdlc-phase7-mcp-selected"
-  local log_file="$TMP_ROOT/asdlc-phase7-mcp-selected.log"
+test_step8_scanner_resume_starts_at_technical_requirements() {
+  local asdlc_root="$TMP_ROOT/asdlc-phase8-resume"
+  local log_file="$TMP_ROOT/asdlc-phase8-resume.log"
   mkdir -p "$asdlc_root"
   setup_workspace "$asdlc_root"
 
   mkdir -p "$asdlc_root/projects/project-a/feature-alpha"
   printf 'feature_path=projects/project-a/feature-alpha\n' >"$asdlc_root/projects/project-a/.project_add_feature_e2e_state.env"
-  cat >"$asdlc_root/projects/project-a/init_progress_definition.yaml" <<'OUT'
-meta_info:
-  project_type_code: "A"
-  project_classes:
-    - backend
-    - frontend
-steps: []
-OUT
-  write_external_sources_yaml "$asdlc_root/.setup/external_sources.yaml" "tech-standards-kb|stack_knowledge_base"
 
   local out=""
   out="$(
@@ -823,43 +816,28 @@ OUT
     {
       printf '2\n'
       printf '1\n'
-      printf '1\n'
-      printf 'backend\n'
-      printf '3\n'
-      printf '1\n'
-      printf 'y\n'
       printf 'n\n'
-    } | TEST_LOG_FILE="$log_file" TEST_SCANNER_NEXT_LINE="next step: 7 (Analyze Repos And Prepare Repo Execution Context)" \
+    } | TEST_LOG_FILE="$log_file" TEST_SCANNER_NEXT_LINE="next step: 8 (Create Feature-Scoped Technical Requirements)" \
       .commands/project_add_feature_e2e.sh --path projects/project-a 2>&1
   )"
 
-  assert_contains "$out" "Type A project with configured MCP sources detected."
-  assert_contains "$out" "1) Try to enrich surface maps from MCP"
-  assert_contains "$out" "2) Skip and go to technical requirements"
-  assert_contains "$out" "Execution stopped: user denied phase progression at 8.1."
+  assert_contains "$out" "Phase 8 (Create Feature-Scoped Technical Requirements)"
+  assert_contains "$out" "Execution stopped: user denied phase progression at 8."
+  assert_not_contains "$out" "Phase 7 class loop status"
 
   local expected_log
-  expected_log=$'init_progress_scanner.sh --path projects/project-a/feature-alpha\ninit_progress_scanner.sh --path projects/project-a/feature-alpha\nfeature_repo_surface_and_exec_context.sh --feature_path projects/project-a/feature-alpha\nfeature_surface_map_mcp_placeholder_enrichment.sh --feature_path projects/project-a/feature-alpha\nfeature_technical_requirements.sh --feature_path projects/project-a/feature-alpha'
+  expected_log=$'init_progress_scanner.sh --path projects/project-a/feature-alpha\ninit_progress_scanner.sh --path projects/project-a/feature-alpha'
   assert_equal "$expected_log" "$(read_log "$log_file")"
 }
 
-test_type_a_phase7_allows_skipping_mcp_enrichment_and_continues_to_technical_requirements() {
-  local asdlc_root="$TMP_ROOT/asdlc-phase7-mcp-skipped"
-  local log_file="$TMP_ROOT/asdlc-phase7-mcp-skipped.log"
+test_resume_8_runs_technical_requirements_directly() {
+  local asdlc_root="$TMP_ROOT/asdlc-resume-8"
+  local log_file="$TMP_ROOT/asdlc-resume-8.log"
   mkdir -p "$asdlc_root"
   setup_workspace "$asdlc_root"
 
   mkdir -p "$asdlc_root/projects/project-a/feature-alpha"
   printf 'feature_path=projects/project-a/feature-alpha\n' >"$asdlc_root/projects/project-a/.project_add_feature_e2e_state.env"
-  cat >"$asdlc_root/projects/project-a/init_progress_definition.yaml" <<'OUT'
-meta_info:
-  project_type_code: "A"
-  project_classes:
-    - backend
-    - frontend
-steps: []
-OUT
-  write_external_sources_yaml "$asdlc_root/.setup/external_sources.yaml" "tech-standards-kb|stack_knowledge_base"
 
   local out=""
   out="$(
@@ -867,21 +845,47 @@ OUT
     {
       printf '2\n'
       printf '1\n'
-      printf '1\n'
-      printf 'backend\n'
-      printf '3\n'
-      printf '2\n'
       printf 'y\n'
       printf 'n\n'
     } | TEST_LOG_FILE="$log_file" TEST_SCANNER_NEXT_LINE="next step: 7 (Analyze Repos And Prepare Repo Execution Context)" \
+      .commands/project_add_feature_e2e.sh --path projects/project-a --resume 8 2>&1
+  )"
+
+  assert_contains "$out" "Phase 8 (Create Feature-Scoped Technical Requirements)"
+  assert_contains "$out" "Execution stopped: user denied phase progression at 8."
+  assert_not_contains "$out" "Phase 7 class loop status"
+
+  local expected_log
+  expected_log=$'init_progress_scanner.sh --path projects/project-a/feature-alpha\ninit_progress_scanner.sh --path projects/project-a/feature-alpha\nfeature_technical_requirements.sh --feature_path projects/project-a/feature-alpha'
+  assert_equal "$expected_log" "$(read_log "$log_file")"
+}
+
+test_after_step8_orchestrator_does_not_reopen_optional_step_7_1() {
+  local asdlc_root="$TMP_ROOT/asdlc-after-step8-no-7-1"
+  local log_file="$TMP_ROOT/asdlc-after-step8-no-7-1.log"
+  mkdir -p "$asdlc_root"
+  setup_workspace "$asdlc_root"
+
+  mkdir -p "$asdlc_root/projects/project-a/feature-alpha"
+  printf 'feature_path=projects/project-a/feature-alpha\n' >"$asdlc_root/projects/project-a/.project_add_feature_e2e_state.env"
+
+  local out=""
+  out="$(
+    cd "$asdlc_root" &&
+    {
+      printf '2\n'
+      printf '1\n'
+      printf 'n\n'
+    } | TEST_LOG_FILE="$log_file" TEST_SCANNER_NEXT_LINE="next step: 8.1 (Create Implementation Slice Planning Artifact)" \
       .commands/project_add_feature_e2e.sh --path projects/project-a 2>&1
   )"
 
-  assert_contains "$out" "Type A project with configured MCP sources detected."
+  assert_contains "$out" "Phase 8.1 (Implementation Slices)"
   assert_contains "$out" "Execution stopped: user denied phase progression at 8.1."
+  assert_not_contains "$out" "Phase 7.1 (Optional MCP Placeholder Enrichment)"
 
   local expected_log
-  expected_log=$'init_progress_scanner.sh --path projects/project-a/feature-alpha\ninit_progress_scanner.sh --path projects/project-a/feature-alpha\nfeature_repo_surface_and_exec_context.sh --feature_path projects/project-a/feature-alpha\nfeature_technical_requirements.sh --feature_path projects/project-a/feature-alpha'
+  expected_log=$'init_progress_scanner.sh --path projects/project-a/feature-alpha\ninit_progress_scanner.sh --path projects/project-a/feature-alpha'
   assert_equal "$expected_log" "$(read_log "$log_file")"
 }
 
@@ -1101,21 +1105,21 @@ test_optional_step_7_1_can_be_declined_without_blocking_later_required_phases() 
       printf '2\n'    # continue existing feature
       printf '1\n'    # select feature 1
       printf 'n\n'    # decline optional step 7.1
-      printf 'n\n'    # decline step 8.1
+      printf 'n\n'    # decline step 8
     } | TEST_LOG_FILE="$log_file" \
       TEST_SCANNER_NEXT_LINE="next step: 7.1 ((optional) MCP placeholder enrichment)" \
       .commands/project_add_feature_e2e.sh --path projects/project-a 2>&1
   )"
 
   assert_contains "$out" "Optional phase declined at 7.1; skipping."
-  assert_contains "$out" "Execution stopped: user denied phase progression at 8.1."
+  assert_contains "$out" "Execution stopped: user denied phase progression at 8."
 
   local log_content
   log_content="$(read_log "$log_file")"
   # Enrichment script must NOT have run
   assert_not_contains "$log_content" "feature_surface_map_mcp_placeholder_enrichment.sh"
-  # Step 8.1 confirmation was reached, proving 7.1 did not block progression
-  assert_not_contains "$log_content" "feature_implementation_slices.sh"
+  # Step 8 confirmation was reached, proving 7.1 did not block progression
+  assert_not_contains "$log_content" "feature_technical_requirements.sh"
 }
 
 test_optional_step_7_1_runs_when_accepted_then_continues_to_next_required_phase() {
@@ -1135,7 +1139,7 @@ test_optional_step_7_1_runs_when_accepted_then_continues_to_next_required_phase(
       printf '2\n'    # continue existing feature
       printf '1\n'    # select feature 1
       printf 'y\n'    # accept optional step 7.1
-      printf 'n\n'    # decline step 8.1
+      printf 'n\n'    # decline step 8
     } | TEST_LOG_FILE="$log_file" \
       TEST_SCANNER_NEXT_LINE="next step: 7.1 ((optional) MCP placeholder enrichment)" \
       .commands/project_add_feature_e2e.sh --path projects/project-a 2>&1
@@ -1145,8 +1149,8 @@ test_optional_step_7_1_runs_when_accepted_then_continues_to_next_required_phase(
   log_content="$(read_log "$log_file")"
   # Enrichment script ran
   assert_contains "$log_content" "feature_surface_map_mcp_placeholder_enrichment.sh"
-  # Step 8.1 confirmation was reached after step 7.1 ran
-  assert_contains "$out" "Phase 8.1 (Implementation Slices)"
+  # Step 8 confirmation was reached after step 7.1 ran
+  assert_contains "$out" "Phase 8 (Create Feature-Scoped Technical Requirements)"
 }
 
 test_requires_path_argument
@@ -1164,8 +1168,9 @@ test_resume_override_starts_from_requested_phase
 test_decline_optional_step_skips_to_next_required_step
 test_phase7_repo_loop_tracks_completed_classes_until_option_three
 test_phase7_option_three_proceeds_with_pending_classes
-test_type_a_phase7_offers_mcp_enrichment_and_runs_it_when_selected
-test_type_a_phase7_allows_skipping_mcp_enrichment_and_continues_to_technical_requirements
+test_step8_scanner_resume_starts_at_technical_requirements
+test_resume_8_runs_technical_requirements_directly
+test_after_step8_orchestrator_does_not_reopen_optional_step_7_1
 test_required_phase_failure_stops_run_with_restart_guidance
 test_phase7_failure_stops_before_later_phases_with_restart_guidance
 test_continue_flow_lists_only_unfinished_features_and_uses_selected_target

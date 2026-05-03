@@ -283,7 +283,7 @@ steps:
       - condition: "Step 7.1 is optional. When run, it inspects existing surface-map artifacts for literal <to be defined during implementation> placeholders and, when a reachable knowledge-base MCP source is configured, proposes confirmed replacements for user approval."
       - condition: "Step 7.1 does not produce a new audit artifact. Its output is an in-place update of the relevant surface-map artifact only for user-confirmed replacements."
       - condition: "Step 8 may proceed when Step 7 is complete, whether Step 7.1 is skipped, no-ops, fails to find useful MCP data, or the user rejects proposed replacements."
-      - condition: "Step 7.1 is considered complete when was_enriched_with_mcp is true in the Document Meta of each active class surface map."
+      - condition: "Step 7.1 is considered complete when at least one existing active-class surface map has was_enriched_with_mcp set to true in Document Meta."
 
   - step_number: 8
     phase_name: "feature"
