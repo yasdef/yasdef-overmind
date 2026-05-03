@@ -15,7 +15,7 @@ This repository contains the standalone Overmind project. The original extractio
 1. clone `yasdef-overmind` to your local machine
 2. run `overmind/scripts/project_mgmt/project_setup_first_init_machine.sh` to establish and set up the asdlc folder for future project work - you need to provide the place where exactly the asdlc folder will exist in your system,
 after this script finishes, the staged ASDLC commands live under your generated `asdlc/` workspace; later updates can be pulled from this repo and re-applied by running the same setup script again
-3. in asdlc folder run `.commands/project_setup_add_new_project.sh` to create a new project. On this step you may provide paths to project repos, for example backend and frontend (if they exist), if it's a completely new project we need a reference to best-practice MCP (this functionality is not supported yet). You can always add or change this info later in projects/<project_id>/init_progress_definition.yaml (see meta_info part)
+3. in asdlc folder run `.commands/project_setup_add_new_project.sh` to create a new project. On this step you may provide paths to project repos, for example backend and frontend (if they exist), if it's a completely new project you may optionally configure per-class stack guidance sources in `init_progress_definition.yaml`; if absent, the system falls back to model proposals during Step `1.1` blueprint authoring. You can always add or change this info later in projects/<project_id>/init_progress_definition.yaml (see meta_info part).
 4. finish required project-level init before feature work:
    - Type A projects: Step `1` -> Step `1.1` -> Step `2` -> Step `3` (start feature).
    - Type B/C projects: Step `1` -> Step `2` -> Step `3` (start feature).
@@ -40,7 +40,7 @@ you can manualy run scripts for different steps after asdlc folder init, check
 ## Most critical issues
 - coordinator (overmind) can't distribute tasks for multiple workers (f.e. 2 backend)
 - coordinator (overmind) unable to take worker's output (see ai_audit.sh) and re-design implementation plan based on this new tasks
-- coordinator (overmind) does not support new projects (type A) - for this we need MCP integration to provide best practices instead of current repo analysis, for the same reason currently project type B (code exists but we can refactor it based on our best practices) and type C (code exists and we must follow code, not our guidelines) are processed in the same (as type C) way
+- type B (code exists, refactor to best practices) and type C (code exists, follow existing patterns) are still processed identically as type C; type B-specific planning distinctions are not yet enforced
 - we need more complex project-level management (update metainfo, add, change or delete repos etc.) 
 - we need to read epic/story from jira, current way - add them as a text/md files can remain optional but not main
 - we need sophisticated still convenient git management logic because asdlc folder belongs specific work place (laptop) but each project folder should be independent git-tracked repo to store all artefact in this project git (near codebase)
