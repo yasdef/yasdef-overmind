@@ -113,12 +113,16 @@ set_artifact_paths() {
 
 ensure_required_files() {
   local runtime_root="$1"
+  local project_type_code="${2:-}"
   local required_paths=(
     "$FEATURE_BR_FILE"
     "$USER_INPUT_HELPER"
-    "$REPO_HELPER"
   )
   local relative_path=""
+
+  if [[ "$project_type_code" != "A" ]]; then
+    required_paths+=("$REPO_HELPER")
+  fi
 
   for relative_path in "${required_paths[@]}"; do
     if [[ ! -f "$runtime_root/$relative_path" ]]; then
@@ -286,13 +290,15 @@ main() {
   local feature_br_path=""
   local user_input_helper_path=""
   local repo_helper_path=""
+  local project_type_code=""
 
   runtime_root="$(ensure_staged_command_runtime)"
   resolve_feature_path "$runtime_root" "$FEATURE_PATH_INPUT"
   set_artifact_paths
-  ensure_required_files "$runtime_root"
 
   feature_br_path="$runtime_root/$FEATURE_BR_FILE"
+  project_type_code="$(extract_meta_value "$feature_br_path" "project_type_code" 2>/dev/null || true)"
+  ensure_required_files "$runtime_root" "$project_type_code"
   user_input_helper_path="$runtime_root/$USER_INPUT_HELPER"
   repo_helper_path="$runtime_root/$REPO_HELPER"
 
@@ -301,10 +307,14 @@ main() {
     "$feature_br_path" \
     "User-input business-context check failed."
 
-  run_helper_gate \
-    "$repo_helper_path" \
-    "$feature_br_path" \
-    "Repository business-context check failed."
+  if [[ "$project_type_code" == "A" ]]; then
+    echo "Skipping repository business-context readiness gate for type A project."
+  else
+    run_helper_gate \
+      "$repo_helper_path" \
+      "$feature_br_path" \
+      "Repository business-context check failed."
+  fi
 
   update_ready_to_ears "$feature_br_path"
   commit_feature_artifacts_if_changed "$runtime_root"

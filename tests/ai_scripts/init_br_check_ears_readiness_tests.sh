@@ -63,16 +63,18 @@ OUT
 seed_feature_br_summary() {
   local repo_dir="$1"
   local feature_path="${2:-projects/p1/feature-a}"
+  local project_type_code="${3:-B}"
   mkdir -p "$repo_dir/asdlc/$feature_path"
-  cat >"$repo_dir/asdlc/$feature_path/feature_br_summary.md" <<'OUT'
+  cat >"$repo_dir/asdlc/$feature_path/feature_br_summary.md" <<EOF
 # Feature Business Requirements Summary
 
 ## 1. Document Meta
 - feature_id: FTR-42
+- project_type_code: $project_type_code
 - source_type: User input
 - last_updated: 2026-03-21
 - ready_to_ears: false
-OUT
+EOF
 }
 
 seed_optional_artifacts() {
@@ -224,6 +226,37 @@ test_fails_when_repo_helper_fails_after_user_helper_passes() {
   assert_contains "$(cat "$repo_dir/asdlc/projects/p1/feature-a/feature_br_summary.md")" "- ready_to_ears: false"
 }
 
+test_type_a_skips_repo_helper_and_still_marks_ready() {
+  local repo_dir="$TMP_ROOT/repo-type-a-success"
+  local capture_dir="$TMP_ROOT/capture-type-a-success"
+  mkdir -p "$repo_dir" "$capture_dir"
+  setup_workspace_layout "$repo_dir"
+  seed_feature_br_summary "$repo_dir" "projects/p1/feature-a" "A"
+  seed_optional_artifacts "$repo_dir"
+  write_helper_stubs "$repo_dir"
+
+  (
+    cd "$repo_dir/asdlc"
+    git init -q
+    git config user.name "Test User"
+    git config user.email "test@example.com"
+    echo "seed" >README.md
+    git add .
+    git commit -qm "seed"
+  )
+
+  local out=""
+  out="$(
+    cd "$repo_dir/asdlc" &&
+    TEST_CAPTURE_DIR="$capture_dir" TEST_REPO_HELPER_FAIL=1 .commands/feature_br_check_ears_readiness.sh --feature_path "projects/p1/feature-a"
+  )"
+
+  assert_contains "$out" "Skipping repository business-context readiness gate for type A project."
+  assert_contains "$out" "EARS readiness check passed."
+  assert_equal "user" "$(cat "$capture_dir/helper_calls.log")"
+  assert_contains "$(cat "$repo_dir/asdlc/projects/p1/feature-a/feature_br_summary.md")" "- ready_to_ears: true"
+}
+
 test_success_updates_ready_to_ears_and_commits_feature_artifacts() {
   local repo_dir="$TMP_ROOT/repo-success"
   local capture_dir="$TMP_ROOT/capture-success"
@@ -279,6 +312,7 @@ test_requires_feature_path_argument
 test_requires_staged_command_location
 test_fails_when_user_input_helper_fails_and_does_not_run_repo_helper
 test_fails_when_repo_helper_fails_after_user_helper_passes
+test_type_a_skips_repo_helper_and_still_marks_ready
 test_success_updates_ready_to_ears_and_commits_feature_artifacts
 test_success_supports_absolute_feature_path
 
