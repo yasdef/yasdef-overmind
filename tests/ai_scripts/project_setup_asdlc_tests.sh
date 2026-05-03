@@ -274,6 +274,42 @@ assert_support_assets_match_repo_sources() {
   assert_file_not_exists "$asdlc_root/.helper/check_project_tech_summary_be_quality.sh"
 }
 
+assert_support_assets_except_setup_match_repo_sources() {
+  local repo_dir="$1"
+  local asdlc_root="$2"
+
+  assert_dir_exists "$asdlc_root/.rules"
+  assert_dir_exists "$asdlc_root/.templates"
+  assert_dir_exists "$asdlc_root/.golden_examples"
+  assert_dir_exists "$asdlc_root/.helper"
+  assert_dir_exists "$asdlc_root/.setup"
+  assert_directory_contains_exact_files "$asdlc_root/.rules" "${STAGED_RULE_FILES[@]}"
+  assert_directory_contains_exact_files "$asdlc_root/.templates" "${STAGED_TEMPLATE_FILES[@]}"
+  assert_directory_contains_exact_files "$asdlc_root/.golden_examples" "${STAGED_GOLDEN_EXAMPLE_FILES[@]}"
+  assert_directory_contains_exact_files "$asdlc_root/.helper" "${STAGED_HELPER_FILES[@]}"
+  assert_directory_contains_exact_files "$asdlc_root/.setup" "${STAGED_SETUP_FILES[@]}"
+
+  local file_name=""
+  for file_name in "${STAGED_RULE_FILES[@]}"; do
+    assert_file_content_equal "$repo_dir/overmind/rules/$file_name" "$asdlc_root/.rules/$file_name"
+  done
+  for file_name in "${STAGED_TEMPLATE_FILES[@]}"; do
+    assert_file_content_equal "$repo_dir/overmind/templates/$file_name" "$asdlc_root/.templates/$file_name"
+  done
+  for file_name in "${STAGED_GOLDEN_EXAMPLE_FILES[@]}"; do
+    assert_file_content_equal "$repo_dir/overmind/golden_examples/$file_name" "$asdlc_root/.golden_examples/$file_name"
+  done
+  for file_name in "${STAGED_HELPER_FILES[@]}"; do
+    assert_file_content_equal "$repo_dir/overmind/scripts/helper/$file_name" "$asdlc_root/.helper/$file_name"
+    assert_file_executable "$asdlc_root/.helper/$file_name"
+  done
+
+  assert_file_not_exists "$asdlc_root/.rules/contracts_inventory_be_rule.md"
+  assert_file_not_exists "$asdlc_root/.templates/technical_requirements_structuring_be_TEMPLATE.md"
+  assert_file_not_exists "$asdlc_root/.golden_examples/step_state_GOLDEN_EXAMPLE.md"
+  assert_file_not_exists "$asdlc_root/.helper/check_project_tech_summary_be_quality.sh"
+}
+
 assert_feature_requirements_and_plan_commands_use_staged_runtime_assets() {
   local asdlc_root="$1"
   local technical_requirements_cmd_path="$asdlc_root/.commands/feature_technical_requirements.sh"
@@ -722,8 +758,10 @@ test_first_init_machine_update_mode_repairs_missing_commands_without_overwriting
 
   local metadata_before=""
   local add_cmd_before=""
+  local setup_models_before=""
   metadata_before="$(cat "$metadata_path")"
   add_cmd_before="$(cat "$add_cmd_path")"
+  setup_models_before="$(cat "$stale_setup_models_path")"
 
   rm -f "$common_lib_path"
 
@@ -850,7 +888,8 @@ test_first_init_machine_update_mode_repairs_missing_commands_without_overwriting
   assert_contains "$(cat "$repo_surface_context_cmd_path")" 'FRONTEND_MOBILE_QUALITY_GATE_HELPER=".helper/check_feature_repo_surface_and_exec_context_fe_quality.sh"'
   assert_feature_requirements_and_plan_commands_use_staged_runtime_assets "$asdlc_root"
   assert_file_not_exists "$stale_golden_example_path"
-  assert_support_assets_match_repo_sources "$repo_dir" "$asdlc_root"
+  assert_support_assets_except_setup_match_repo_sources "$repo_dir" "$asdlc_root"
+  assert_equal "$setup_models_before" "$(cat "$stale_setup_models_path")"
   assert_file_content_equal \
     "$repo_dir/overmind/templates/init_progress_definition_TEMPLATE.yaml" \
     "$template_path"
@@ -903,6 +942,43 @@ OUT
   assert_contains "$quickrun" ".commands/feature_assing_workers.sh --feature_path projects/<project-id>/<feature-folder>"
   assert_contains "$quickrun" 'This command writes `#### Assigned:` for every plan step with a class-matched worker UUID or `ERROR: no active worker available for class <class>`.'
   assert_contains "$quickrun" ".commands/feature_repo_surface_and_exec_context.sh --feature_path projects/<project-id>/<feature-folder>"
+}
+
+test_first_init_machine_update_mode_preserves_existing_external_sources_yaml() {
+  local repo_dir="$TMP_ROOT/repo-first-init-update-mode-preserve-external-sources"
+  mkdir -p "$repo_dir"
+  setup_git_repo_with_identity "$repo_dir"
+
+  local bootstrap_parent="$TMP_ROOT/asdlc-home-update-mode-preserve-external-sources"
+  local asdlc_root=""
+  asdlc_root="$(bootstrap_asdlc_workspace "$repo_dir" "$bootstrap_parent")"
+
+  local external_sources_path="$asdlc_root/.setup/external_sources.yaml"
+  cat >"$external_sources_path" <<'OUT'
+sources:
+  - name: runtime-kb
+    type: stack_knowledge_base
+    description: Runtime-owned MCP source
+OUT
+  local external_sources_before=""
+  external_sources_before="$(cat "$external_sources_path")"
+  local models_path="$asdlc_root/.setup/models.md"
+  cat >"$models_path" <<'OUT'
+feature_contract_delta | codex | custom-model
+OUT
+  local models_before=""
+  models_before="$(cat "$models_path")"
+
+  local out=""
+  out="$(
+    cd "$repo_dir" &&
+    printf '%s\n' "$bootstrap_parent" | overmind/scripts/project_mgmt/project_setup_first_init_machine.sh
+  )"
+
+  assert_contains "$out" "asdlc folder already exists, switch to update mode"
+  assert_contains "$out" "ASDLC workspace update completed: $asdlc_root"
+  assert_equal "$external_sources_before" "$(cat "$external_sources_path")"
+  assert_equal "$models_before" "$(cat "$models_path")"
 }
 
 test_first_init_machine_update_mode_recreates_commands_directory_when_missing() {
@@ -1627,6 +1703,7 @@ test_first_init_machine_bootstraps_asdlc_workspace_with_local_template
 test_first_init_machine_fails_when_template_source_missing
 test_first_init_machine_update_mode_repairs_missing_commands_without_overwriting_existing_files
 test_first_init_machine_update_mode_refreshes_quickrun_guide
+test_first_init_machine_update_mode_preserves_existing_external_sources_yaml
 test_first_init_machine_update_mode_recreates_commands_directory_when_missing
 test_first_init_machine_update_mode_recreates_support_asset_directories_when_missing
 test_first_init_machine_fails_when_asdlc_exists_without_metadata

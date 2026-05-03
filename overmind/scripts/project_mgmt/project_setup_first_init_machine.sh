@@ -123,6 +123,10 @@ STAGED_SETUP_FILES=(
   "external_sources.yaml"
   "models.md"
 )
+STAGED_SETUP_FILES_PRESERVE_IF_EXISTS=(
+  "external_sources.yaml"
+  "models.md"
+)
 STAGED_COMMAND_LIB_FILES=(
   "project_setup_common.sh"
 )
@@ -376,6 +380,57 @@ stage_support_asset_files() {
   done < <(find "$target_dir" -maxdepth 1 -type f | sort)
 }
 
+stage_setup_assets() {
+  local repo_root="$1"
+  local asdlc_root="$2"
+  local overwrite_existing="$3"
+  local announce_added="$4"
+  local source_dir="$repo_root/$SETUP_SOURCE_DIR"
+  local target_dir="$asdlc_root/$LOCAL_STAGED_SETUP_DIR_NAME"
+  local source_file_name=""
+  local source_path=""
+  local target_path=""
+  local existing_path=""
+  local existing_name=""
+  local existed_before="no"
+
+  if ! mkdir -p "$target_dir"; then
+    die "Failed to create ASDLC support assets directory under: $target_dir"
+  fi
+
+  for source_file_name in "${STAGED_SETUP_FILES_PRESERVE_IF_EXISTS[@]}"; do
+    source_path="$source_dir/$source_file_name"
+    [[ -f "$source_path" ]] || die "Required support asset not found: $SETUP_SOURCE_DIR/$source_file_name"
+
+    target_path="$target_dir/$source_file_name"
+    existed_before="no"
+    if [[ -f "$target_path" ]]; then
+      existed_before="yes"
+    fi
+
+    if [[ -f "$target_path" ]]; then
+      continue
+    fi
+
+    if ! cp "$source_path" "$target_path"; then
+      die "Failed to stage support asset file: $SETUP_SOURCE_DIR/$source_file_name"
+    fi
+
+    if [[ "$announce_added" == "yes" && "$existed_before" == "no" ]]; then
+      log_update_mode_added_file "$target_path"
+    fi
+  done
+
+  while IFS= read -r existing_path; do
+    existing_name="$(basename "$existing_path")"
+    if ! array_contains "$existing_name" "${STAGED_SETUP_FILES[@]}"; then
+      if ! rm -f "$existing_path"; then
+        die "Failed to remove unmanaged staged support asset: $existing_path"
+      fi
+    fi
+  done < <(find "$target_dir" -maxdepth 1 -type f | sort)
+}
+
 stage_support_assets() {
   local repo_root="$1"
   local asdlc_root="$2"
@@ -386,7 +441,7 @@ stage_support_assets() {
   stage_support_asset_files "$repo_root" "$TEMPLATES_SOURCE_DIR" "$asdlc_root" "$LOCAL_STAGED_TEMPLATES_DIR_NAME" "$overwrite_existing" "no" "$announce_added" "${STAGED_TEMPLATE_FILES[@]}"
   stage_support_asset_files "$repo_root" "$GOLDEN_EXAMPLES_SOURCE_DIR" "$asdlc_root" "$LOCAL_STAGED_GOLDEN_EXAMPLES_DIR_NAME" "$overwrite_existing" "no" "$announce_added" "${STAGED_GOLDEN_EXAMPLE_FILES[@]}"
   stage_support_asset_files "$repo_root" "$HELPER_SCRIPTS_SOURCE_DIR" "$asdlc_root" "$LOCAL_STAGED_HELPER_DIR_NAME" "$overwrite_existing" "yes" "$announce_added" "${STAGED_HELPER_FILES[@]}"
-  stage_support_asset_files "$repo_root" "$SETUP_SOURCE_DIR" "$asdlc_root" "$LOCAL_STAGED_SETUP_DIR_NAME" "$overwrite_existing" "no" "$announce_added" "${STAGED_SETUP_FILES[@]}"
+  stage_setup_assets "$repo_root" "$asdlc_root" "$overwrite_existing" "$announce_added"
 }
 
 inject_default_projects_path_config() {
