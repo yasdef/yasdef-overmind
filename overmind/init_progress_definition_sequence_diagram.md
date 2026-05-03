@@ -96,28 +96,24 @@ sequenceDiagram
       alt Type B/C
         PO->>PO: 8. Technical requirements<br/>in: surface_map_*.md + requirements_ears.md + common_contract_definition.md<br/>→ technical_requirements.md
       else Type A
-        PO->>PO: 8. Technical requirements (MCP)<br/>in: requirements_ears.md + common_contract_definition.md + MCP<br/>→ technical_requirements.md
+        PO->>PO: 8. Technical requirements (MCP)<br/>in: surface_map_*.md + requirements_ears.md + common_contract_definition.md + MCP<br/>→ technical_requirements.md
       end
 
       alt Type B/C
         PO->>PO: 8.1 Implementation slices<br/>in: technical_requirements.md + requirements_ears.md + feature_contract_delta.md + surface_map_*.md<br/>→ implementation_slices.md
       else Type A
-        PO->>PO: 8.1 Implementation slices (MCP)<br/>in: technical_requirements.md + requirements_ears.md + MCP<br/>→ implementation_slices.md
+        PO->>PO: 8.1 Implementation slices (MCP)<br/>in: technical_requirements.md + requirements_ears.md + feature_contract_delta.md + surface_map_*.md + MCP<br/>→ implementation_slices.md
       end
 
-      alt Type B/C
-        PO->>PO: 8.2 Prerequisite gap trace<br/>in: requirements_ears.md + technical_requirements.md + implementation_slices.md<br/>→ prerequisite_gaps.md | gate: zero unmet before 8.3
-      else Type A
-        PO->>PO: 8.2 skipped
-      end
+      PO->>PO: 8.2 Prerequisite gap trace<br/>in: requirements_ears.md + technical_requirements.md + implementation_slices.md<br/>→ prerequisite_gaps.md | gate: zero unmet before 8.3
 
       alt Type B/C
         PO->>PO: 8.3 Implementation plan<br/>in: prerequisite_gaps.md + implementation_slices.md + technical_requirements.md + requirements_ears.md + feature_contract_delta.md<br/>→ implementation_plan.md
       else Type A
-        PO->>PO: 8.3 Implementation plan (MCP)<br/>in: implementation_slices.md + technical_requirements.md + requirements_ears.md + MCP<br/>→ implementation_plan.md
+        PO->>PO: 8.3 Implementation plan (MCP)<br/>in: prerequisite_gaps.md + implementation_slices.md + technical_requirements.md + requirements_ears.md + feature_contract_delta.md + MCP<br/>→ implementation_plan.md
       end
       opt 8.4 Optional semantic review
-        PO->>PO: 8.4 Semantic review<br/>in: implementation_plan.md + requirements_ears.md + technical_requirements.md + prerequisite_gaps.md<br/>→ implementation_plan.md + implementation_plan_semantic_review.md
+        PO->>PO: 8.4 Semantic review<br/>in: init_progress_definition.yaml + implementation_plan.md + requirements_ears.md + technical_requirements.md + prerequisite_gaps.md + surface_map_*.md<br/>→ implementation_plan.md + implementation_plan_semantic_review.md
       end
     end
   end
