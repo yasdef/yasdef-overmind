@@ -11,6 +11,7 @@ PROJECT_PATH=""
 PROJECT_ROOT=""
 STATE_FILE=""
 FEATURE_PATH=""
+PROJECT_TYPE_CODE=""
 CACHED_FEATURE_PATH=""
 CACHED_FEATURE_PATH_RAW=""
 CACHED_FEATURE_PATH_STATE="missing"
@@ -237,6 +238,51 @@ resolve_project_path() {
   PROJECT_ROOT="${resolved_path#"$runtime_root/"}"
   PROJECT_PATH="$PROJECT_ROOT"
   STATE_FILE="$PROJECT_ROOT/$STATE_FILE_NAME"
+}
+
+extract_project_type_code_from_definition() {
+  local definition_path="$1"
+
+  [[ -f "$definition_path" ]] || return 0
+
+  awk '
+function trim(v) {
+  sub(/^[[:space:]]+/, "", v)
+  sub(/[[:space:]]+$/, "", v)
+  return v
+}
+function strip_quotes(v) {
+  v = trim(v)
+  if ((v ~ /^".*"$/) || (v ~ /^'\''.*'\''$/)) {
+    v = substr(v, 2, length(v) - 2)
+  }
+  return trim(v)
+}
+BEGIN {
+  in_meta = 0
+}
+/^meta_info:[[:space:]]*$/ {
+  in_meta = 1
+  next
+}
+/^steps:[[:space:]]*$/ {
+  if (in_meta == 1) {
+    exit 0
+  }
+}
+{
+  if (in_meta == 0) {
+    next
+  }
+
+  if ($0 ~ /^[[:space:]]{2}project_type_code:[[:space:]]*/) {
+    line = $0
+    sub(/^[[:space:]]{2}project_type_code:[[:space:]]*/, "", line)
+    print strip_quotes(line)
+    exit 0
+  }
+}
+' "$definition_path"
 }
 
 normalize_feature_path_value() {
@@ -528,7 +574,11 @@ phase_scripts() {
       printf '%s\n' "feature_br_scaffold.sh"
       ;;
     4.1)
-      printf '%s\n' "feature_scan_repo_for_br.sh" "feature_task_to_br.sh"
+      if [[ "$PROJECT_TYPE_CODE" == "A" ]]; then
+        printf '%s\n' "feature_task_to_br.sh"
+      else
+        printf '%s\n' "feature_scan_repo_for_br.sh" "feature_task_to_br.sh"
+      fi
       ;;
     4.2)
       printf '%s\n' "feature_user_br_clarification.sh" "feature_br_check_ears_readiness.sh"
@@ -1038,6 +1088,10 @@ run_phase_by_index() {
     return $?
   fi
 
+  if [[ "$phase_id" == "4.1" && "$PROJECT_TYPE_CODE" == "A" ]]; then
+    echo "Skipping repo scan in phase 4.1 for type A project: repo scan not applicable."
+  fi
+
   while IFS= read -r script_name; do
     scripts+=("$script_name")
   done < <(phase_scripts "$phase_id")
@@ -1101,6 +1155,7 @@ main() {
 
   RUNTIME_ROOT="$(resolve_runtime_root)"
   resolve_project_path "$RUNTIME_ROOT" "$TARGET_PATH_INPUT"
+  PROJECT_TYPE_CODE="$(extract_project_type_code_from_definition "$RUNTIME_ROOT/$PROJECT_PATH/init_progress_definition.yaml")"
 
   local requested_phase=""
   if [[ -n "$RESUME_STEP_INPUT" ]]; then

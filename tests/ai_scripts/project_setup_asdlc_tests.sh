@@ -5,6 +5,7 @@ SOURCE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 OPTION_1_HELPER_SRC="$SOURCE_ROOT/overmind/scripts/project_mgmt/project_setup_first_init_machine.sh"
 OPTION_2_HELPER_SRC="$SOURCE_ROOT/overmind/scripts/project_mgmt/project_setup_add_new_project.sh"
 OPTION_3_HELPER_SRC="$SOURCE_ROOT/overmind/scripts/project_mgmt/project_setup_update_project.sh"
+COMMON_LIBS_SRC="$SOURCE_ROOT/overmind/scripts/common_libs"
 OPTION_4_HELPER_SRC="$SOURCE_ROOT/overmind/scripts/project_mgmt/init_progress_scanner.sh"
 INIT_PROJECT_STACK_BLUEPRINTS_SRC="$SOURCE_ROOT/overmind/scripts/init_project_stack_blueprints.sh"
 OPTION_5_HELPER_SRC="$SOURCE_ROOT/overmind/scripts/init_common_contract_definition.sh"
@@ -89,6 +90,7 @@ STAGED_GOLDEN_EXAMPLE_FILES=(
 STAGED_HELPER_FILES=(
   "check_business_context_filled_from_repo.sh"
   "check_common_contract_definition_quality.sh"
+  "check_cross_class_peer_trigger.sh"
   "check_feature_contract_delta_quality.sh"
   "check_feature_technical_requirements_quality.sh"
   "check_implementation_slices_quality.sh"
@@ -407,10 +409,11 @@ EOF
 
 setup_repo_layout() {
   local repo_dir="$1"
-  mkdir -p "$repo_dir/overmind/scripts/project_mgmt" "$repo_dir/overmind/scripts"
+  mkdir -p "$repo_dir/overmind/scripts/project_mgmt" "$repo_dir/overmind/scripts" "$repo_dir/overmind/scripts/common_libs"
   cp "$OPTION_1_HELPER_SRC" "$repo_dir/overmind/scripts/project_mgmt/project_setup_first_init_machine.sh"
   cp "$OPTION_2_HELPER_SRC" "$repo_dir/overmind/scripts/project_mgmt/project_setup_add_new_project.sh"
   cp "$OPTION_3_HELPER_SRC" "$repo_dir/overmind/scripts/project_mgmt/project_setup_update_project.sh"
+  cp "$COMMON_LIBS_SRC/project_setup_common.sh" "$repo_dir/overmind/scripts/common_libs/project_setup_common.sh"
   cp "$OPTION_4_HELPER_SRC" "$repo_dir/overmind/scripts/project_mgmt/init_progress_scanner.sh"
   cp "$INIT_PROJECT_STACK_BLUEPRINTS_SRC" "$repo_dir/overmind/scripts/init_project_stack_blueprints.sh"
   cp "$PROJECT_ADD_FEATURE_E2E_SRC" "$repo_dir/overmind/scripts/project_mgmt/project_add_feature_e2e.sh"
@@ -513,7 +516,9 @@ test_first_init_machine_bootstraps_asdlc_workspace_with_local_template() {
   assert_dir_exists "$asdlc_root/.golden_examples"
   assert_dir_exists "$asdlc_root/.helper"
   assert_dir_exists "$asdlc_root/.setup"
+  assert_dir_exists "$asdlc_root/common_libs"
   assert_dir_exists "$asdlc_root/.git"
+  assert_file_exists "$asdlc_root/common_libs/project_setup_common.sh"
   assert_file_exists "$asdlc_root/asdlc_metadata.yaml"
   assert_file_exists "$asdlc_root/quickrun.md"
   assert_file_exists "$asdlc_root/.templates/init_progress_definition_TEMPLATE.yaml"
@@ -694,6 +699,7 @@ test_first_init_machine_update_mode_repairs_missing_commands_without_overwriting
   local repository_implementation_plan_cmd_path="$asdlc_root/.commands/feature_implementation_plan.sh"
   local implementation_plan_semantic_review_cmd_path="$asdlc_root/.commands/feature_implementation_plan_semantic_review.sh"
   local assign_workers_cmd_path="$asdlc_root/.commands/feature_assing_workers.sh"
+  local common_lib_path="$asdlc_root/common_libs/project_setup_common.sh"
   local stale_rule_path="$asdlc_root/.rules/repo_br_scan_rule.md"
   local stale_legacy_template_path="$asdlc_root/templates/init_progress_definition_TEMPLATE.yaml"
   local stale_golden_example_path="$asdlc_root/.golden_examples/step_state_GOLDEN_EXAMPLE.md"
@@ -718,6 +724,8 @@ test_first_init_machine_update_mode_repairs_missing_commands_without_overwriting
   local add_cmd_before=""
   metadata_before="$(cat "$metadata_path")"
   add_cmd_before="$(cat "$add_cmd_path")"
+
+  rm -f "$common_lib_path"
 
   rm -f \
     "$update_cmd_path" \
@@ -749,6 +757,7 @@ test_first_init_machine_update_mode_repairs_missing_commands_without_overwriting
   )"
 
   assert_contains "$out" "asdlc folder already exists, switch to update mode"
+  assert_contains "$out" "Update mode added file: $common_lib_path"
   assert_contains "$out" "Update mode added file: $update_cmd_path"
   assert_contains "$out" "Update mode added file: $scanner_cmd_path"
   assert_contains "$out" "Update mode added file: $stack_blueprints_cmd_path"
@@ -771,6 +780,7 @@ test_first_init_machine_update_mode_repairs_missing_commands_without_overwriting
   assert_contains "$out" "Update mode added file: $implementation_plan_semantic_review_cmd_path"
   assert_contains "$out" "Update mode added file: $assign_workers_cmd_path"
   assert_contains "$out" "ASDLC workspace update completed: $asdlc_root"
+  assert_file_exists "$common_lib_path"
   assert_file_exists "$add_cmd_path"
   assert_file_exists "$update_cmd_path"
   assert_file_exists "$scanner_cmd_path"
@@ -1594,8 +1604,8 @@ test_staged_br_structuring_commands_require_staged_location() {
   assert_contains "$out" "Run this command from ASDLC staged path: <asdlc>/.commands/"
 }
 
-test_update_project_script_remains_placeholder() {
-  local repo_dir="$TMP_ROOT/repo-update-project-placeholder"
+test_update_project_requires_staged_command_location() {
+  local repo_dir="$TMP_ROOT/repo-update-project-staged-guard"
   mkdir -p "$repo_dir"
   setup_git_repo_with_identity "$repo_dir"
 
@@ -1610,7 +1620,7 @@ test_update_project_script_remains_placeholder() {
   set -e
 
   assert_nonzero_status "$status"
-  assert_contains "$out" "Option 3 (update project) is not implemented yet."
+  assert_contains "$out" "Run this command from ASDLC staged path"
 }
 
 test_first_init_machine_bootstraps_asdlc_workspace_with_local_template
@@ -1634,6 +1644,6 @@ test_add_new_project_rejects_feature_name_without_alnum
 test_add_new_project_requires_staged_command_location
 test_add_new_project_rejects_metadata_with_top_level_sections_after_projects
 test_staged_br_structuring_commands_require_staged_location
-test_update_project_script_remains_placeholder
+test_update_project_requires_staged_command_location
 
 echo "All project_setup_asdlc helper tests passed."

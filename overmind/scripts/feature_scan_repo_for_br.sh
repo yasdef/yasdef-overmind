@@ -487,7 +487,6 @@ main() {
   set_artifact_paths
   ensure_feature_summary_exists "$runtime_root"
   resolve_definition_file_from_ancestor "$runtime_root"
-  collect_usable_repo_paths "$runtime_root/$PROJECT_DEFINITION_FILE"
 
   local models_path="$runtime_root/$MODELS_FILE"
   local rule_path="$runtime_root/$RULE_FILE"
@@ -502,6 +501,7 @@ main() {
   if [[ "$project_type_code" == "A" ]]; then
     fail_new_project_not_applicable
   fi
+  collect_usable_repo_paths "$runtime_root/$PROJECT_DEFINITION_FILE"
 
   load_model_config "$models_path" "$MODEL_PHASE"
   if [[ "$MODEL_CMD" != "codex" ]]; then

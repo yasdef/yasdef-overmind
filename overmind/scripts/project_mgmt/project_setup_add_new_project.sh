@@ -15,6 +15,8 @@ PROJECT_CLASS_OPTIONS=(
   "infrastructure"
 )
 
+source "$(dirname "$0")/../common_libs/project_setup_common.sh"
+
 die() {
   echo "ERROR: $*" >&2
   exit 1
@@ -141,23 +143,6 @@ generate_created_at_utc() {
   date -u +"%Y-%m-%dT%H:%M:%SZ"
 }
 
-project_type_label_for_code() {
-  case "$1" in
-  A)
-    printf '%s' "New project"
-    ;;
-  B)
-    printf '%s' "Existing project with partial context"
-    ;;
-  C)
-    printf '%s' "Existing project with code-first context"
-    ;;
-  *)
-    return 1
-    ;;
-  esac
-}
-
 prompt_project_type_code() {
   local selection=""
 
@@ -189,13 +174,6 @@ prompt_project_type_code() {
       ;;
     esac
   done
-}
-
-escape_yaml_double_quoted_value() {
-  local value="$1"
-  value="${value//\\/\\\\}"
-  value="${value//\"/\\\"}"
-  printf '%s' "$value"
 }
 
 is_class_selected() {
@@ -316,42 +294,6 @@ prompt_project_classes() {
   done
 
   printf '%s' "$selected_classes"
-}
-
-validate_repo_path() {
-  local path_value="$1"
-
-  if [[ -z "${path_value//[[:space:]]/}" ]]; then
-    echo "Repo path cannot be empty." >&2
-    return 1
-  fi
-
-  if [[ ! -e "$path_value" ]]; then
-    echo "Repo path does not exist: $path_value" >&2
-    return 1
-  fi
-
-  if [[ ! -d "$path_value" ]]; then
-    echo "Repo path is not a directory: $path_value" >&2
-    return 1
-  fi
-
-  if [[ -z "$(ls -A "$path_value" 2>/dev/null)" ]]; then
-    echo "Repo path must point to a non-empty directory: $path_value" >&2
-    return 1
-  fi
-
-  return 0
-}
-
-resolve_repo_path() {
-  local path_value="$1"
-  local resolved_path=""
-
-  if ! resolved_path="$(cd "$path_value" && pwd)"; then
-    return 1
-  fi
-  printf '%s' "$resolved_path"
 }
 
 prompt_repo_path_for_class() {

@@ -20,6 +20,17 @@ assert_contains() {
   fi
 }
 
+assert_not_contains() {
+  local haystack="$1"
+  local needle="$2"
+  if [[ "$haystack" == *"$needle"* ]]; then
+    echo "Assertion failed: expected output to not contain: $needle" >&2
+    echo "Actual output:" >&2
+    echo "$haystack" >&2
+    exit 1
+  fi
+}
+
 assert_nonzero_status() {
   local status="$1"
   if [[ "$status" -eq 0 ]]; then
@@ -200,6 +211,39 @@ test_fails_for_project_type_a() {
   assert_contains "$out" "for new projects repo scan not applicable"
 }
 
+test_type_a_short_circuits_before_repo_path_validation() {
+  local repo_dir="$TMP_ROOT/repo-type-a-deferred-paths"
+  mkdir -p "$repo_dir"
+  setup_workspace "$repo_dir"
+  seed_feature_br_summary "$repo_dir" "A"
+
+  cat >"$repo_dir/asdlc/projects/p1/init_progress_definition.yaml" <<'OUT'
+meta_info:
+  project_type_code: "A"
+  project_type_label: "New project"
+  class_repo_paths:
+    backend:
+      state: "deferred"
+      path: ""
+    frontend:
+      state: "deferred"
+      path: ""
+
+steps: []
+OUT
+
+  local status=0
+  local out=""
+  set +e
+  out="$(cd "$repo_dir/asdlc" && .commands/feature_scan_repo_for_br.sh --feature_path "projects/p1/feature-a" 2>&1)"
+  status=$?
+  set -e
+
+  assert_nonzero_status "$status"
+  assert_contains "$out" "for new projects repo scan not applicable"
+  assert_not_contains "$out" "No usable repository paths found in meta_info.class_repo_paths"
+}
+
 test_fails_when_no_usable_repo_paths() {
   local repo_dir="$TMP_ROOT/repo-no-usable-repo-paths"
   mkdir -p "$repo_dir"
@@ -264,6 +308,7 @@ test_requires_feature_path_argument
 test_requires_staged_command_location
 test_fails_when_feature_summary_missing
 test_fails_for_project_type_a
+test_type_a_short_circuits_before_repo_path_validation
 test_fails_when_no_usable_repo_paths
 test_runs_codex_and_updates_feature_summary
 

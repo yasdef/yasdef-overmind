@@ -16,6 +16,7 @@ This repository contains the standalone Overmind project. The original extractio
 2. run `overmind/scripts/project_mgmt/project_setup_first_init_machine.sh` to establish and set up the asdlc folder for future project work - you need to provide the place where exactly the asdlc folder will exist in your system,
 after this script finishes, the staged ASDLC commands live under your generated `asdlc/` workspace; later updates can be pulled from this repo and re-applied by running the same setup script again
 3. in asdlc folder run `.commands/project_setup_add_new_project.sh` to create a new project. On this step you may provide paths to project repos, for example backend and frontend (if they exist), if it's a completely new project you may optionally configure per-class stack guidance sources in `init_progress_definition.yaml`; if absent, the system falls back to model proposals during Step `1.1` blueprint authoring. You can always add or change this info later in projects/<project_id>/init_progress_definition.yaml (see meta_info part).
+3-a. it's possible to setup MCP server for step 1.1. and 7.1. can extract knowledge from it, for this first set knowledgebase mcp to your codex cli (see codex docs), second - after asdlc directory will be established - add this MCP to .setup/external_sources.yaml
 4. finish required project-level init before feature work:
    - Type A projects: Step `1` -> Step `1.1` -> Step `2` -> Step `3` (start feature).
    - Type B/C projects: Step `1` -> Step `2` -> Step `3` (start feature).
@@ -57,6 +58,58 @@ V-0.0.1
 V-0.0.2 (current)
 - planning flow significantly improved
 
+
+## Staged Commands Input Contract
+
+All staged commands are expected to run from `<asdlc>/.commands/`.
+
+Scripts working on **project level** require:
+- `--path <asdlc/projects/<project-id>>`
+- `init_common_contract_definition.sh`
+- `project_register_worker.sh`
+- `project_add_feature_e2e.sh`
+- `feature_br_scaffold.sh`
+
+Scripts working on **feature level** require:
+- `--feature_path <asdlc/projects/<project-id>/<feature-folder>>`
+- `feature_scan_repo_for_br.sh`
+- `feature_task_to_br.sh`
+- `feature_user_br_clarification.sh`
+- `feature_br_check_ears_readiness.sh`
+- `feature_br_to_ears.sh`
+- `feature_requirements_ears_review.sh`
+- `feature_contract_delta.sh`
+- `feature_repo_surface_and_exec_context.sh`
+- `feature_technical_requirements.sh`
+- `feature_implementation_slices.sh`
+- `feature_prerequisite_gaps.sh`
+- `feature_implementation_plan.sh`
+- `feature_implementation_plan_semantic_review.sh`
+- `feature_assing_workers.sh`
+
+Feature-level exception:
+- `init_progress_scanner.sh` works on a feature folder but expects `--path <asdlc/projects/<project-id>/<feature-folder>>`.
+
+`--feature_path` must:
+- exist and be a directory
+- be inside ASDLC `projects/`
+- contain `feature_br_summary.md`
+
+Project worker data lives in:
+- `projects/<project-id>/workers.yaml`
+
+## Notes
+
+- Run scripts from inside a git repository.
+- Quality helper scripts live under `overmind/scripts/helper/`.
+- Script tests are in `tests/ai_scripts/`.
+- example of external_sources configuraqtion for knowledge base MCP
+```
+sources:
+  - name: yasdef-knowledge-kb
+    type: stack_knowledge_base
+    description: Approved stack blueprints, architecture references, and project bootstrap conventions
+```
 
 ## Scripts
 
@@ -132,55 +185,3 @@ V-0.0.2 (current)
 - `overmind/scripts/feature_assing_workers.sh`
   Staged command (`<asdlc>/.commands/feature_assing_workers.sh --feature_path <.../feature-folder>`) that requires a ready parseable `implementation_plan.md`, resolves active workers strictly by step repo class, asks for one class worker when multiple are available, and writes deterministic `#### Assigned:` values (worker UUID or class-scoped error message) on every step.
 
-## Staged Commands Input Contract
-
-All staged commands are expected to run from `<asdlc>/.commands/`.
-
-Scripts working on **project level** require:
-- `--path <asdlc/projects/<project-id>>`
-- `init_common_contract_definition.sh`
-- `project_register_worker.sh`
-- `project_add_feature_e2e.sh`
-- `feature_br_scaffold.sh`
-
-Scripts working on **feature level** require:
-- `--feature_path <asdlc/projects/<project-id>/<feature-folder>>`
-- `feature_scan_repo_for_br.sh`
-- `feature_task_to_br.sh`
-- `feature_user_br_clarification.sh`
-- `feature_br_check_ears_readiness.sh`
-- `feature_br_to_ears.sh`
-- `feature_requirements_ears_review.sh`
-- `feature_contract_delta.sh`
-- `feature_repo_surface_and_exec_context.sh`
-- `feature_technical_requirements.sh`
-- `feature_implementation_slices.sh`
-- `feature_prerequisite_gaps.sh`
-- `feature_implementation_plan.sh`
-- `feature_implementation_plan_semantic_review.sh`
-- `feature_assing_workers.sh`
-
-Feature-level exception:
-- `init_progress_scanner.sh` works on a feature folder but expects `--path <asdlc/projects/<project-id>/<feature-folder>>`.
-
-`--feature_path` must:
-- exist and be a directory
-- be inside ASDLC `projects/`
-- contain `feature_br_summary.md`
-
-Project worker data lives in:
-- `projects/<project-id>/workers.yaml`
-
-## Notes
-
-- Run scripts from inside a git repository.
-- Quality helper scripts live under `overmind/scripts/helper/`.
-- Script tests are in `tests/ai_scripts/`.
-- example of external_sources configuraqtion for knowledge base MCP
-```
-sources:
-  - name: yasdef-knowledge-kb
-    type: stack_knowledge_base
-    description: Approved stack blueprints, architecture references, and
-  project bootstrap conventions
-```

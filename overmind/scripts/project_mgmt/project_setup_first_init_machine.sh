@@ -30,12 +30,14 @@ TEMPLATES_SOURCE_DIR="overmind/templates"
 GOLDEN_EXAMPLES_SOURCE_DIR="overmind/golden_examples"
 HELPER_SCRIPTS_SOURCE_DIR="overmind/scripts/helper"
 SETUP_SOURCE_DIR="overmind/setup"
+COMMON_LIBS_SOURCE_DIR="overmind/scripts/common_libs"
 LOCAL_TEMPLATE_DIR_NAME=".templates"
 LOCAL_STAGED_RULES_DIR_NAME=".rules"
 LOCAL_STAGED_TEMPLATES_DIR_NAME=".templates"
 LOCAL_STAGED_GOLDEN_EXAMPLES_DIR_NAME=".golden_examples"
 LOCAL_STAGED_HELPER_DIR_NAME=".helper"
 LOCAL_STAGED_SETUP_DIR_NAME=".setup"
+LOCAL_STAGED_COMMAND_LIBS_DIR_NAME="common_libs"
 LOCAL_TEMPLATE_FILE_NAME="init_progress_definition_TEMPLATE.yaml"
 METADATA_FILE_NAME="asdlc_metadata.yaml"
 QUICKRUN_FILE_NAME="quickrun.md"
@@ -103,6 +105,7 @@ STAGED_GOLDEN_EXAMPLE_FILES=(
 STAGED_HELPER_FILES=(
   "check_business_context_filled_from_repo.sh"
   "check_common_contract_definition_quality.sh"
+  "check_cross_class_peer_trigger.sh"
   "check_feature_contract_delta_quality.sh"
   "check_feature_technical_requirements_quality.sh"
   "check_implementation_slices_quality.sh"
@@ -119,6 +122,9 @@ STAGED_HELPER_FILES=(
 STAGED_SETUP_FILES=(
   "external_sources.yaml"
   "models.md"
+)
+STAGED_COMMAND_LIB_FILES=(
+  "project_setup_common.sh"
 )
 
 die() {
@@ -465,6 +471,47 @@ stage_command_script() {
   fi
 }
 
+stage_command_libs() {
+  local repo_root="$1"
+  local asdlc_root="$2"
+  local overwrite_existing="$3"
+  local announce_added="$4"
+  local source_dir="$repo_root/$COMMON_LIBS_SOURCE_DIR"
+  local target_dir="$asdlc_root/$LOCAL_STAGED_COMMAND_LIBS_DIR_NAME"
+  local source_file_name=""
+  local source_path=""
+  local target_path=""
+  local existed_before=""
+
+  if ! mkdir -p "$target_dir"; then
+    die "Failed to create command libs directory: $target_dir"
+  fi
+
+  for source_file_name in "${STAGED_COMMAND_LIB_FILES[@]}"; do
+    source_path="$source_dir/$source_file_name"
+    target_path="$target_dir/$source_file_name"
+    existed_before="no"
+
+    [[ -f "$source_path" ]] || die "Required command lib not found: $COMMON_LIBS_SOURCE_DIR/$source_file_name"
+
+    if [[ -f "$target_path" ]]; then
+      existed_before="yes"
+    fi
+
+    if [[ "$overwrite_existing" != "yes" && -f "$target_path" ]]; then
+      continue
+    fi
+
+    if ! cp "$source_path" "$target_path"; then
+      die "Failed to stage command lib: $COMMON_LIBS_SOURCE_DIR/$source_file_name"
+    fi
+
+    if [[ "$announce_added" == "yes" && "$existed_before" == "no" ]]; then
+      log_update_mode_added_file "$target_path"
+    fi
+  done
+}
+
 stage_commands() {
   local repo_root="$1"
   local asdlc_root="$2"
@@ -476,6 +523,7 @@ stage_commands() {
     die "Failed to create ASDLC commands directory under: $asdlc_root"
   fi
 
+  stage_command_libs "$repo_root" "$asdlc_root" "$overwrite_existing" "$announce_added"
   stage_command_script "$repo_root" "$ADD_NEW_PROJECT_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
   stage_command_script "$repo_root" "$UPDATE_PROJECT_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
   stage_command_script "$repo_root" "$INIT_PROGRESS_SCANNER_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
