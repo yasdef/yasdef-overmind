@@ -54,6 +54,36 @@ assert_file_exists() {
   fi
 }
 
+write_external_sources_yaml() {
+  local target_path="$1"
+  shift || true
+
+  mkdir -p "$(dirname "$target_path")"
+
+  if [[ "$#" -eq 0 ]]; then
+    cat >"$target_path" <<'OUT'
+sources: []
+OUT
+    return 0
+  fi
+
+  {
+    echo "sources:"
+    local entry=""
+    local name=""
+    local source_type=""
+    for entry in "$@"; do
+      name="${entry%%|*}"
+      source_type="${entry#*|}"
+      if [[ "$source_type" == "$entry" ]]; then
+        source_type="generic"
+      fi
+      printf '  - name: %s\n' "$name"
+      printf '    type: %s\n' "$source_type"
+    done
+  } >"$target_path"
+}
+
 write_feature_script_stub() {
   local target_path="$1"
   cat >"$target_path" <<'OUT'
@@ -769,6 +799,92 @@ OUT
   assert_equal "$expected_log" "$(read_log "$log_file")"
 }
 
+test_type_a_phase7_offers_mcp_enrichment_and_runs_it_when_selected() {
+  local asdlc_root="$TMP_ROOT/asdlc-phase7-mcp-selected"
+  local log_file="$TMP_ROOT/asdlc-phase7-mcp-selected.log"
+  mkdir -p "$asdlc_root"
+  setup_workspace "$asdlc_root"
+
+  mkdir -p "$asdlc_root/projects/project-a/feature-alpha"
+  printf 'feature_path=projects/project-a/feature-alpha\n' >"$asdlc_root/projects/project-a/.project_add_feature_e2e_state.env"
+  cat >"$asdlc_root/projects/project-a/init_progress_definition.yaml" <<'OUT'
+meta_info:
+  project_type_code: "A"
+  project_classes:
+    - backend
+    - frontend
+steps: []
+OUT
+  write_external_sources_yaml "$asdlc_root/.setup/external_sources.yaml" "tech-standards-kb|stack_knowledge_base"
+
+  local out=""
+  out="$(
+    cd "$asdlc_root" &&
+    {
+      printf '2\n'
+      printf '1\n'
+      printf '1\n'
+      printf 'backend\n'
+      printf '3\n'
+      printf '1\n'
+      printf 'y\n'
+      printf 'n\n'
+    } | TEST_LOG_FILE="$log_file" TEST_SCANNER_NEXT_LINE="next step: 7 (Analyze Repos And Prepare Repo Execution Context)" \
+      .commands/project_add_feature_e2e.sh --path projects/project-a 2>&1
+  )"
+
+  assert_contains "$out" "Type A project with configured MCP sources detected."
+  assert_contains "$out" "1) Try to enrich surface maps from MCP"
+  assert_contains "$out" "2) Skip and go to technical requirements"
+  assert_contains "$out" "Execution stopped: user denied phase progression at 8.1."
+
+  local expected_log
+  expected_log=$'init_progress_scanner.sh --path projects/project-a/feature-alpha\ninit_progress_scanner.sh --path projects/project-a/feature-alpha\nfeature_repo_surface_and_exec_context.sh --feature_path projects/project-a/feature-alpha\nfeature_surface_map_mcp_placeholder_enrichment.sh --feature_path projects/project-a/feature-alpha\nfeature_technical_requirements.sh --feature_path projects/project-a/feature-alpha'
+  assert_equal "$expected_log" "$(read_log "$log_file")"
+}
+
+test_type_a_phase7_allows_skipping_mcp_enrichment_and_continues_to_technical_requirements() {
+  local asdlc_root="$TMP_ROOT/asdlc-phase7-mcp-skipped"
+  local log_file="$TMP_ROOT/asdlc-phase7-mcp-skipped.log"
+  mkdir -p "$asdlc_root"
+  setup_workspace "$asdlc_root"
+
+  mkdir -p "$asdlc_root/projects/project-a/feature-alpha"
+  printf 'feature_path=projects/project-a/feature-alpha\n' >"$asdlc_root/projects/project-a/.project_add_feature_e2e_state.env"
+  cat >"$asdlc_root/projects/project-a/init_progress_definition.yaml" <<'OUT'
+meta_info:
+  project_type_code: "A"
+  project_classes:
+    - backend
+    - frontend
+steps: []
+OUT
+  write_external_sources_yaml "$asdlc_root/.setup/external_sources.yaml" "tech-standards-kb|stack_knowledge_base"
+
+  local out=""
+  out="$(
+    cd "$asdlc_root" &&
+    {
+      printf '2\n'
+      printf '1\n'
+      printf '1\n'
+      printf 'backend\n'
+      printf '3\n'
+      printf '2\n'
+      printf 'y\n'
+      printf 'n\n'
+    } | TEST_LOG_FILE="$log_file" TEST_SCANNER_NEXT_LINE="next step: 7 (Analyze Repos And Prepare Repo Execution Context)" \
+      .commands/project_add_feature_e2e.sh --path projects/project-a 2>&1
+  )"
+
+  assert_contains "$out" "Type A project with configured MCP sources detected."
+  assert_contains "$out" "Execution stopped: user denied phase progression at 8.1."
+
+  local expected_log
+  expected_log=$'init_progress_scanner.sh --path projects/project-a/feature-alpha\ninit_progress_scanner.sh --path projects/project-a/feature-alpha\nfeature_repo_surface_and_exec_context.sh --feature_path projects/project-a/feature-alpha\nfeature_technical_requirements.sh --feature_path projects/project-a/feature-alpha'
+  assert_equal "$expected_log" "$(read_log "$log_file")"
+}
+
 test_required_phase_failure_stops_run_with_restart_guidance() {
   local asdlc_root="$TMP_ROOT/asdlc-phase-failure"
   local log_file="$TMP_ROOT/asdlc-phase-failure.log"
@@ -1048,6 +1164,8 @@ test_resume_override_starts_from_requested_phase
 test_decline_optional_step_skips_to_next_required_step
 test_phase7_repo_loop_tracks_completed_classes_until_option_three
 test_phase7_option_three_proceeds_with_pending_classes
+test_type_a_phase7_offers_mcp_enrichment_and_runs_it_when_selected
+test_type_a_phase7_allows_skipping_mcp_enrichment_and_continues_to_technical_requirements
 test_required_phase_failure_stops_run_with_restart_guidance
 test_phase7_failure_stops_before_later_phases_with_restart_guidance
 test_continue_flow_lists_only_unfinished_features_and_uses_selected_target

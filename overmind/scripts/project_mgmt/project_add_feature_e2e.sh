@@ -22,6 +22,7 @@ PHASE7_ACTIVE_REPO_CLASSES=()
 PHASE7_COMPLETED_REPO_CLASSES=()
 PHASE7_PENDING_REPO_CLASSES=()
 PHASE_EXECUTION_FAILED_RC=40
+EXTERNAL_SOURCES_FILE=".setup/external_sources.yaml"
 
 PHASE_IDS=("3" "4.1" "4.2" "5" "5.1" "6" "7" "7.1" "8.1" "8.2" "8.3" "8.4")
 PHASE_OPTIONAL=("false" "false" "false" "false" "true" "false" "false" "true" "false" "false" "false" "true")
@@ -689,6 +690,67 @@ BEGIN {
 ' "$definition_path"
 }
 
+has_configured_external_sources() {
+  local runtime_root="$1"
+  local sources_path="$runtime_root/$EXTERNAL_SOURCES_FILE"
+
+  [[ -f "$sources_path" ]] || return 1
+
+  awk '
+BEGIN { in_sources = 0; found = 0 }
+/^sources:[[:space:]]*\[\][[:space:]]*$/ { exit 1 }
+/^sources:[[:space:]]*$/ { in_sources = 1; next }
+in_sources == 1 {
+  if ($0 ~ /^[^[:space:]#]/) {
+    exit(found ? 0 : 1)
+  }
+  if ($0 ~ /^[[:space:]]*-[[:space:]]*name:[[:space:]]*/) {
+    found = 1
+    exit 0
+  }
+}
+END {
+  exit(found ? 0 : 1)
+}
+' "$sources_path" >/dev/null 2>&1
+}
+
+should_offer_phase7_mcp_enrichment() {
+  local runtime_root="$1"
+
+  [[ "$PROJECT_TYPE_CODE" == "A" ]] || return 1
+  has_configured_external_sources "$runtime_root" || return 1
+  return 0
+}
+
+prompt_phase7_mcp_enrichment_choice() {
+  local selection=""
+  local normalized=""
+
+  echo "Type A project with configured MCP sources detected." >&2
+  echo "Before technical requirements, choose:" >&2
+  echo "  1) Try to enrich surface maps from MCP" >&2
+  echo "  2) Skip and go to technical requirements" >&2
+
+  while true; do
+    printf 'Choose [1/2]: ' >&2
+    if ! IFS= read -r selection; then
+      return 2
+    fi
+
+    normalized="$(to_lower "$(trim_value "$selection")")"
+    case "$normalized" in
+      1|2)
+        printf '%s' "$normalized"
+        return 0
+        ;;
+      *)
+        echo "Invalid selection: $selection" >&2
+        ;;
+    esac
+  done
+}
+
 phase7_map_file_for_class() {
   case "$1" in
     backend) printf '%s' "$FEATURE_PATH/project_surface_struct_resp_map_backend.md" ;;
@@ -770,6 +832,7 @@ run_phase7_loop() {
   local completed_list=""
   local pending_list=""
   local script_rc=0
+  local mcp_choice=""
 
   while true; do
     refresh_phase7_status "$runtime_root"
@@ -816,6 +879,31 @@ run_phase7_loop() {
   refresh_phase7_status "$runtime_root"
   if [[ ${#PHASE7_PENDING_REPO_CLASSES[@]} -gt 0 ]]; then
     echo "Proceeding with pending classes: $(format_class_list "${PHASE7_PENDING_REPO_CLASSES[@]-}")"
+  fi
+
+  if should_offer_phase7_mcp_enrichment "$runtime_root"; then
+    set +e
+    mcp_choice="$(prompt_phase7_mcp_enrichment_choice)"
+    script_rc=$?
+    set -e
+    if [[ "$script_rc" -eq 2 ]]; then
+      echo "Execution stopped: user input stream closed during phase 7 MCP enrichment choice."
+      return 20
+    fi
+    if [[ "$script_rc" -ne 0 ]]; then
+      die "Unexpected phase 7 MCP enrichment choice status: $script_rc"
+    fi
+
+    if [[ "$mcp_choice" == "1" ]]; then
+      set +e
+      run_feature_script "$runtime_root" "feature_surface_map_mcp_placeholder_enrichment.sh"
+      script_rc=$?
+      set -e
+      if [[ "$script_rc" -ne 0 ]]; then
+        print_restart_guidance "7.1" "feature_surface_map_mcp_placeholder_enrichment.sh" "$script_rc"
+        return "$PHASE_EXECUTION_FAILED_RC"
+      fi
+    fi
   fi
 
   command_text=".commands/feature_technical_requirements.sh --feature_path $FEATURE_PATH"
