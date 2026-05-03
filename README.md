@@ -55,8 +55,14 @@ V-0.0.1
 - add new feature flow end 2 end from story to requirement_ears and inplementation_plan
 - assign workers to implementation plan
 
-V-0.0.2 (current)
+V-0.0.2
 - planning flow significantly improved
+
+V-0.0.3 (current)
+- add blueprints on project level
+- unblocked new projects (type-A) creation
+- add cross-class transport section
+- add MCP as a source for type-A projects
 
 
 ## Staged Commands Input Contract
