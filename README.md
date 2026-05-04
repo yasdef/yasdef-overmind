@@ -126,7 +126,7 @@ sources:
   Staged command (`<asdlc>/.commands/project_setup_add_new_project.sh`) that creates a new project record + project folder, seeds `init_progress_definition.yaml`, and commits scaffold changes on branch `add-project/<project_id>`.
 
 - `overmind/scripts/project_mgmt/project_setup_update_project.sh`
-  Staged command (`<asdlc>/.commands/project_setup_update_project.sh`) that updates existing project metadata and paths.
+  Staged command (`<asdlc>/.commands/project_setup_update_project.sh`) that attaches a repo path to an existing project's deferred class. Interactive flow: pick project → pick deferred class → enter repo path (validates and resolves to absolute path) → persists `state: "ready"` + `path` in `init_progress_definition.yaml`. If the project is type A and all classes become `ready` after the attach, optionally prompts to reclassify to type B or C. Any prompt accepts `q` to quit cleanly without mutation.
 
 - `overmind/scripts/project_mgmt/init_progress_scanner.sh`
   Requires `--path <asdlc/projects/<project-id>/<feature-folder>>`, reads project `init_progress_definition.yaml`, and writes `<project>/step_state.md` with project-level + selected-feature checklist status.
