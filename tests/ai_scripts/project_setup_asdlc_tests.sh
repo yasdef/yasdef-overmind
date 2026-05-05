@@ -1166,18 +1166,13 @@ test_add_new_project_creates_record_workspace_and_class_repo_metadata_from_stage
   local bootstrap_parent="$TMP_ROOT/asdlc-home-add-success"
   local asdlc_root=""
   asdlc_root="$(bootstrap_asdlc_workspace "$repo_dir" "$bootstrap_parent")"
-  local main_head_before=""
   local backend_repo="$TMP_ROOT/backend-repo"
   mkdir -p "$backend_repo"
   echo "backend" >"$backend_repo/README.md"
-  echo "scratch only content" >"$asdlc_root/scratch-only.txt"
-  (
-    cd "$asdlc_root"
-    git checkout -q -b "scratch-pre-add" main
-    git add scratch-only.txt
-    git commit -qm "scratch branch only commit"
-  )
-  main_head_before="$(git -C "$asdlc_root" rev-parse main)"
+  local head_before=""
+  local current_branch_before=""
+  head_before="$(git -C "$asdlc_root" rev-parse HEAD)"
+  current_branch_before="$(git -C "$asdlc_root" rev-parse --abbrev-ref HEAD)"
 
   local caller_dir="$TMP_ROOT/caller-dir"
   mkdir -p "$caller_dir"
@@ -1197,9 +1192,7 @@ test_add_new_project_creates_record_workspace_and_class_repo_metadata_from_stage
   local metadata_content=""
   local definition_content=""
   local project_block=""
-  local add_branch_name=""
-  local committed_paths=""
-  local head_tree_paths=""
+  local git_status=""
 
   assert_contains "$out" "Created ASDLC project folder: $asdlc_root/projects/"
   assert_contains "$out" "Updated ASDLC metadata: $metadata_path"
@@ -1215,7 +1208,6 @@ test_add_new_project_creates_record_workspace_and_class_repo_metadata_from_stage
   created_at="$(extract_last_created_at "$metadata_path")"
   metadata_content="$(cat "$metadata_path")"
   project_block="$(extract_last_project_block "$metadata_path")"
-  add_branch_name="add-project/$internal_folder"
 
   assert_matches "$project_id" '^payments_api-[0-9]{13}$'
   assert_equal "$project_id" "$internal_folder"
@@ -1223,20 +1215,13 @@ test_add_new_project_creates_record_workspace_and_class_repo_metadata_from_stage
   assert_matches "$created_at" '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$'
   assert_not_contains "$project_block" "project_classes:"
   assert_not_contains "$project_block" "class_repo_paths:"
-  assert_contains "$out" "ADD-PROJECT HANDOFF"
-  assert_contains "$out" "you're in branch $add_branch_name now, dont forget to commit changes to main branch with"
-  assert_contains "$out" ">>> git checkout main && git merge $add_branch_name"
-  assert_git_branch_exists "$asdlc_root" "$add_branch_name"
-  assert_equal "$add_branch_name" "$(git -C "$asdlc_root" rev-parse --abbrev-ref HEAD)"
-  assert_equal "$main_head_before" "$(git -C "$asdlc_root" rev-parse main)"
-  assert_equal "$main_head_before" "$(git -C "$asdlc_root" rev-parse HEAD^)"
-  assert_equal "Add ASDLC project $internal_folder" "$(git -C "$asdlc_root" log -1 --pretty=%s)"
-  committed_paths="$(git -C "$asdlc_root" show --pretty='' --name-only HEAD)"
-  assert_contains "$committed_paths" "asdlc_metadata.yaml"
-  assert_contains "$committed_paths" "projects/$internal_folder/init_progress_definition.yaml"
-  assert_equal "2" "$(printf '%s\n' "$committed_paths" | sed '/^[[:space:]]*$/d' | wc -l | tr -d ' ')"
-  head_tree_paths="$(git -C "$asdlc_root" ls-tree -r --name-only HEAD)"
-  assert_not_contains "$head_tree_paths" "scratch-only.txt"
+  assert_not_contains "$out" "ADD-PROJECT HANDOFF"
+  assert_equal "$current_branch_before" "$(git -C "$asdlc_root" rev-parse --abbrev-ref HEAD)"
+  assert_equal "$head_before" "$(git -C "$asdlc_root" rev-parse HEAD)"
+  assert_equal "0" "$(git -C "$asdlc_root" branch --list 'add-project/*' | wc -l | tr -d ' ')"
+  git_status="$(git -C "$asdlc_root" status --short)"
+  assert_contains "$git_status" "asdlc_metadata.yaml"
+  assert_contains "$git_status" "projects/"
 
   project_dir="$asdlc_root/projects/$internal_folder"
   assert_dir_exists "$project_dir"
@@ -1254,39 +1239,32 @@ test_add_new_project_creates_record_workspace_and_class_repo_metadata_from_stage
   assert_equal "$internal_folder" "$definition_project_id"
 }
 
-test_add_new_project_fails_when_main_branch_missing() {
-  local repo_dir="$TMP_ROOT/repo-add-project-main-missing"
+test_add_new_project_does_not_require_git_repository() {
+  local repo_dir="$TMP_ROOT/repo-add-project-no-git"
   mkdir -p "$repo_dir"
   setup_git_repo_with_identity "$repo_dir"
 
-  local bootstrap_parent="$TMP_ROOT/asdlc-home-add-main-missing"
+  local bootstrap_parent="$TMP_ROOT/asdlc-home-add-no-git"
   local asdlc_root=""
   asdlc_root="$(bootstrap_asdlc_workspace "$repo_dir" "$bootstrap_parent")"
+  local project_id=""
+  local project_dir=""
+  rm -rf "$asdlc_root/.git"
 
-  git -C "$asdlc_root" branch -m main trunk
-  git -C "$asdlc_root" checkout -q trunk
-
-  local shim_dir="$TMP_ROOT/date-shim-main-missing"
-  create_fixed_date_shim "$shim_dir" "1700000000000" "2026-01-02T03:04:05Z"
-
-  local status=0
   local out=""
-  set +e
   out="$(
     cd "$TMP_ROOT" &&
-    printf 'Branchless\n1\n5\n2\n2\n' | PATH="$shim_dir:$PATH" "$asdlc_root/.commands/project_setup_add_new_project.sh" 2>&1
+    printf 'Branchless\n1\n5\n2\n2\n' | "$asdlc_root/.commands/project_setup_add_new_project.sh" 2>&1
   )"
-  status=$?
-  set -e
 
-  assert_nonzero_status "$status"
-  assert_contains "$out" "Git prerequisite failed: local branch 'main' is required in ASDLC repo:"
-  assert_equal "0" "$(count_project_records "$asdlc_root/asdlc_metadata.yaml")"
-  assert_equal "trunk" "$(git -C "$asdlc_root" rev-parse --abbrev-ref HEAD)"
-  assert_equal "0" "$(git -C "$asdlc_root" branch --list 'add-project/*' | wc -l | tr -d ' ')"
+  assert_contains "$out" "Created ASDLC project folder: $asdlc_root/projects/"
+  assert_equal "1" "$(count_project_records "$asdlc_root/asdlc_metadata.yaml")"
+  project_id="$(extract_last_project_uuid "$asdlc_root/asdlc_metadata.yaml")"
+  project_dir="$asdlc_root/projects/$project_id"
+  assert_dir_exists "$project_dir"
 }
 
-test_add_new_project_fails_when_worktree_is_dirty() {
+test_add_new_project_allows_dirty_worktree() {
   local repo_dir="$TMP_ROOT/repo-add-project-dirty-worktree"
   mkdir -p "$repo_dir"
   setup_git_repo_with_identity "$repo_dir"
@@ -1296,63 +1274,13 @@ test_add_new_project_fails_when_worktree_is_dirty() {
   asdlc_root="$(bootstrap_asdlc_workspace "$repo_dir" "$bootstrap_parent")"
   echo "# dirty" >>"$asdlc_root/asdlc_metadata.yaml"
 
-  local shim_dir="$TMP_ROOT/date-shim-dirty-worktree"
-  create_fixed_date_shim "$shim_dir" "1700000001000" "2026-01-02T03:04:06Z"
-
-  local status=0
   local out=""
-  set +e
   out="$(
     cd "$TMP_ROOT" &&
-    printf 'Dirty Workspace\n1\n5\n2\n2\n' | PATH="$shim_dir:$PATH" "$asdlc_root/.commands/project_setup_add_new_project.sh" 2>&1
+    printf 'Dirty Workspace\n1\n5\n2\n2\n' | "$asdlc_root/.commands/project_setup_add_new_project.sh" 2>&1
   )"
-  status=$?
-  set -e
-
-  assert_nonzero_status "$status"
-  assert_contains "$out" "Git prerequisite failed: ASDLC git worktree/index must be clean before add-project."
-  assert_equal "0" "$(count_project_records "$asdlc_root/asdlc_metadata.yaml")"
-  assert_equal "main" "$(git -C "$asdlc_root" rev-parse --abbrev-ref HEAD)"
-  assert_equal "0" "$(git -C "$asdlc_root" branch --list 'add-project/*' | wc -l | tr -d ' ')"
-}
-
-test_add_new_project_fails_when_branch_name_already_exists() {
-  local repo_dir="$TMP_ROOT/repo-add-project-branch-collision"
-  mkdir -p "$repo_dir"
-  setup_git_repo_with_identity "$repo_dir"
-
-  local bootstrap_parent="$TMP_ROOT/asdlc-home-add-branch-collision"
-  local asdlc_root=""
-  asdlc_root="$(bootstrap_asdlc_workspace "$repo_dir" "$bootstrap_parent")"
-
-  local fixed_epoch_ms="1700000002000"
-  local fixed_created_at="2026-01-02T03:04:07Z"
-  local shim_dir="$TMP_ROOT/date-shim-branch-collision"
-  local expected_project_id="collision_project-$fixed_epoch_ms"
-  local expected_branch_name="add-project/$expected_project_id"
-  local existing_branch_head_before=""
-  create_fixed_date_shim "$shim_dir" "$fixed_epoch_ms" "$fixed_created_at"
-
-  git -C "$asdlc_root" checkout -q -b "$expected_branch_name" main
-  existing_branch_head_before="$(git -C "$asdlc_root" rev-parse "$expected_branch_name")"
-  git -C "$asdlc_root" checkout -q main
-
-  local status=0
-  local out=""
-  set +e
-  out="$(
-    cd "$TMP_ROOT" &&
-    printf 'Collision Project\n1\n5\n2\n2\n' | PATH="$shim_dir:$PATH" "$asdlc_root/.commands/project_setup_add_new_project.sh" 2>&1
-  )"
-  status=$?
-  set -e
-
-  assert_nonzero_status "$status"
-  assert_contains "$out" "Git prerequisite failed: branch already exists: $expected_branch_name"
-  assert_equal "0" "$(count_project_records "$asdlc_root/asdlc_metadata.yaml")"
-  assert_equal "main" "$(git -C "$asdlc_root" rev-parse --abbrev-ref HEAD)"
-  assert_git_branch_exists "$asdlc_root" "$expected_branch_name"
-  assert_equal "$existing_branch_head_before" "$(git -C "$asdlc_root" rev-parse "$expected_branch_name")"
+  assert_contains "$out" "Created ASDLC project folder: $asdlc_root/projects/"
+  assert_equal "1" "$(count_project_records "$asdlc_root/asdlc_metadata.yaml")"
 }
 
 test_staged_scanner_reads_selected_feature_path() {
@@ -1708,9 +1636,8 @@ test_first_init_machine_update_mode_recreates_commands_directory_when_missing
 test_first_init_machine_update_mode_recreates_support_asset_directories_when_missing
 test_first_init_machine_fails_when_asdlc_exists_without_metadata
 test_add_new_project_creates_record_workspace_and_class_repo_metadata_from_staged_command
-test_add_new_project_fails_when_main_branch_missing
-test_add_new_project_fails_when_worktree_is_dirty
-test_add_new_project_fails_when_branch_name_already_exists
+test_add_new_project_does_not_require_git_repository
+test_add_new_project_allows_dirty_worktree
 test_staged_scanner_reads_selected_feature_path
 test_add_new_project_retries_invalid_repo_path_until_valid
 test_add_new_project_class_menu_shrinks_until_only_done_option_remains

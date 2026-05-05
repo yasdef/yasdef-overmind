@@ -25,7 +25,6 @@ after this script finishes, the staged ASDLC commands live under your generated 
    - Step `2`: create project-level `common_contract_definition.md` with `.commands/init_common_contract_definition.sh --path projects/<project-id>`.
    - Step `3`: start feature planning with `.commands/project_add_feature_e2e.sh --path projects/<project-id>`.
    - `project_add_feature_e2e.sh` (see p.5 below) uses the scanner to block feature progression when an earlier project step is incomplete. For a brand-new feature, it may create the Step `3` feature scaffold before reporting the missing earlier step.
-project is created in a new branch so make sure you've merged it to your main/master before you proceed
 
 --- here we finished on project level and go to feature level ---
 
@@ -106,7 +105,7 @@ Project worker data lives in:
 
 ## Notes
 
-- Run scripts from inside a git repository.
+- Some later planning scripts expect git repositories for scanned codebases or staged ASDLC workspaces, but `project_setup_add_new_project.sh` itself does not require git state.
 - Quality helper scripts live under `overmind/scripts/helper/`.
 - Script tests are in `tests/ai_scripts/`.
 - example of external_sources configuraqtion for knowledge base MCP
@@ -123,7 +122,7 @@ sources:
   Bootstraps or updates ASDLC workspace under `<selected_parent>/asdlc`. In update mode, it repairs missing staged commands, refreshes `quickrun.md`, and synchronizes only whitelisted support assets (`.rules`, `.templates`, `.golden_examples`, `.helper`, `.setup`).
 
 - `overmind/scripts/project_mgmt/project_setup_add_new_project.sh`
-  Staged command (`<asdlc>/.commands/project_setup_add_new_project.sh`) that creates a new project record + project folder, seeds `init_progress_definition.yaml`, and commits scaffold changes on branch `add-project/<project_id>`.
+  Staged command (`<asdlc>/.commands/project_setup_add_new_project.sh`) that creates a new project record + project folder and seeds `init_progress_definition.yaml` in place inside the ASDLC workspace.
 
 - `overmind/scripts/project_mgmt/project_setup_update_project.sh`
   Staged command (`<asdlc>/.commands/project_setup_update_project.sh`) that attaches a repo path to an existing project's deferred class. Interactive flow: pick project → pick deferred class → enter repo path (validates and resolves to absolute path) → persists `state: "ready"` + `path` in `init_progress_definition.yaml`. If the project is type A and all classes become `ready` after the attach, optionally prompts to reclassify to type B or C. Any prompt accepts `q` to quit cleanly without mutation.
