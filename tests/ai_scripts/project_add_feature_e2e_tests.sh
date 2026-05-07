@@ -62,6 +62,16 @@ assert_file_exists() {
   fi
 }
 
+setup_git_repo() {
+  local repo_root="$1"
+
+  git -C "$repo_root" init >/dev/null 2>&1
+  git -C "$repo_root" config user.name "Test User"
+  git -C "$repo_root" config user.email "test@example.com"
+  git -C "$repo_root" add -A
+  git -C "$repo_root" commit -m "Initial commit" >/dev/null 2>&1
+}
+
 write_external_sources_yaml() {
   local target_path="$1"
   shift || true
@@ -100,6 +110,10 @@ set -euo pipefail
 
 log_file="${TEST_LOG_FILE:?TEST_LOG_FILE must be set}"
 feature_path=""
+touch_target=""
+map_entry=""
+map_script=""
+map_value=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -116,6 +130,24 @@ while [[ $# -gt 0 ]]; do
 done
 
 printf '%s --feature_path %s\n' "$(basename "$0")" "$feature_path" >>"$log_file"
+
+if [[ -n "${TEST_SCRIPT_TOUCH_MAP:-}" ]]; then
+  while IFS= read -r map_entry; do
+    [[ -n "$map_entry" ]] || continue
+    map_script="${map_entry%%=*}"
+    map_value="${map_entry#*=}"
+    if [[ "$map_script" == "$(basename "$0")" ]]; then
+      touch_target="$map_value"
+      break
+    fi
+  done <<<"${TEST_SCRIPT_TOUCH_MAP}"
+fi
+
+if [[ -n "$touch_target" ]]; then
+  touch_path="$PWD/$touch_target"
+  mkdir -p "$(dirname "$touch_path")"
+  printf 'updated by %s\n' "$(basename "$0")" >"$touch_path"
+fi
 
 if [[ "${TEST_FAIL_SCRIPT:-}" == "$(basename "$0")" ]]; then
   echo "simulated failure from $(basename "$0")" >&2
@@ -1221,6 +1253,128 @@ test_optional_step_7_1_runs_when_accepted_then_continues_to_next_required_phase(
   assert_contains "$out" "Phase 8 (Create Feature-Scoped Technical Requirements)"
 }
 
+test_checkpoint_before_5_1_commits_dirty_workspace() {
+  local asdlc_root="$TMP_ROOT/asdlc-checkpoint-before-5-1"
+  local log_file="$TMP_ROOT/asdlc-checkpoint-before-5-1.log"
+  mkdir -p "$asdlc_root"
+  setup_workspace "$asdlc_root"
+
+  mkdir -p "$asdlc_root/projects/project-a/feature-alpha"
+  printf 'feature_path=projects/project-a/feature-alpha\n' >"$asdlc_root/projects/project-a/.project_add_feature_e2e_state.env"
+  setup_git_repo "$asdlc_root"
+  printf '# dirty ears content\n' >"$asdlc_root/projects/project-a/feature-alpha/requirements_ears.md"
+
+  local out=""
+  out="$(
+    cd "$asdlc_root" &&
+    {
+      printf '2\n'
+      printf '1\n'
+      printf 'n\n'
+      printf 'n\n'
+    } | TEST_LOG_FILE="$log_file" \
+      TEST_SCANNER_NEXT_LINE="next step: 5.1 ((optional) requirement_ears extra review)" \
+      .commands/project_add_feature_e2e.sh --path projects/project-a 2>&1
+  )"
+
+  assert_contains "$out" "Checkpoint commit created: Checkpoint: before step 5.1 (EARS review)"
+  assert_contains "$out" "Optional phase declined at 5.1; skipping."
+  assert_contains "$out" "Execution stopped: user denied phase progression at 6."
+
+  local git_log
+  git_log="$(git -C "$asdlc_root" log --format=%s)"
+  assert_contains "$git_log" "Checkpoint: before step 5.1 (EARS review)"
+}
+
+test_checkpoint_before_7_1_logs_notice_when_workspace_is_clean() {
+  local asdlc_root="$TMP_ROOT/asdlc-checkpoint-before-7-1-clean"
+  local log_file="$TMP_ROOT/asdlc-checkpoint-before-7-1-clean.log"
+  mkdir -p "$asdlc_root"
+  setup_workspace "$asdlc_root"
+
+  mkdir -p "$asdlc_root/projects/project-a/feature-alpha"
+  printf 'feature_path=projects/project-a/feature-alpha\n' >"$asdlc_root/projects/project-a/.project_add_feature_e2e_state.env"
+  setup_git_repo "$asdlc_root"
+
+  local out=""
+  out="$(
+    cd "$asdlc_root" &&
+    {
+      printf '2\n'
+      printf '1\n'
+      printf 'n\n'
+      printf 'n\n'
+    } | TEST_LOG_FILE="$log_file" \
+      TEST_SCANNER_NEXT_LINE="next step: 7.1 ((optional) MCP placeholder enrichment)" \
+      .commands/project_add_feature_e2e.sh --path projects/project-a 2>&1
+  )"
+
+  assert_contains "$out" "Checkpoint commit notice (before step 7.1 (MCP enrichment)): git commit exited 1; continuing without checkpoint."
+  assert_contains "$out" "Optional phase declined at 7.1; skipping."
+  assert_contains "$out" "Execution stopped: user denied phase progression at 8."
+}
+
+test_checkpoint_before_and_after_8_4_commit_boundary_state() {
+  local asdlc_root="$TMP_ROOT/asdlc-checkpoint-around-8-4"
+  local log_file="$TMP_ROOT/asdlc-checkpoint-around-8-4.log"
+  mkdir -p "$asdlc_root"
+  setup_workspace "$asdlc_root"
+
+  mkdir -p "$asdlc_root/projects/project-a/feature-alpha"
+  printf 'feature_path=projects/project-a/feature-alpha\n' >"$asdlc_root/projects/project-a/.project_add_feature_e2e_state.env"
+  setup_git_repo "$asdlc_root"
+  printf '# pending implementation plan\n' >"$asdlc_root/projects/project-a/feature-alpha/implementation_plan.md"
+
+  local out=""
+  out="$(
+    cd "$asdlc_root" &&
+    {
+      printf '2\n'
+      printf '1\n'
+      printf 'y\n'
+    } | TEST_LOG_FILE="$log_file" \
+      TEST_SCANNER_NEXT_LINE="next step: 8.4 ((optional) implementation plan semantic review)" \
+      TEST_SCRIPT_TOUCH_MAP="feature_implementation_plan_semantic_review.sh=projects/project-a/feature-alpha/semantic_review.md" \
+      .commands/project_add_feature_e2e.sh --path projects/project-a 2>&1
+  )"
+
+  assert_contains "$out" "Checkpoint commit created: Checkpoint: before step 8.4 (semantic review)"
+  assert_contains "$out" "Checkpoint commit created: Checkpoint: after step 8.4 (semantic review)"
+  assert_contains "$out" "Execution finished: reached end of configured phase map."
+
+  local git_log
+  git_log="$(git -C "$asdlc_root" log --format=%s)"
+  assert_contains "$git_log" "Checkpoint: after step 8.4 (semantic review)"
+  assert_contains "$git_log" "Checkpoint: before step 8.4 (semantic review)"
+}
+
+test_checkpoint_helper_skips_non_repo_workspace() {
+  local asdlc_root="$TMP_ROOT/asdlc-checkpoint-non-repo"
+  local log_file="$TMP_ROOT/asdlc-checkpoint-non-repo.log"
+  mkdir -p "$asdlc_root"
+  setup_workspace "$asdlc_root"
+
+  mkdir -p "$asdlc_root/projects/project-a/feature-alpha"
+  printf 'feature_path=projects/project-a/feature-alpha\n' >"$asdlc_root/projects/project-a/.project_add_feature_e2e_state.env"
+
+  local out=""
+  out="$(
+    cd "$asdlc_root" &&
+    {
+      printf '2\n'
+      printf '1\n'
+      printf 'n\n'
+      printf 'n\n'
+    } | TEST_LOG_FILE="$log_file" \
+      TEST_SCANNER_NEXT_LINE="next step: 5.1 ((optional) requirement_ears extra review)" \
+      .commands/project_add_feature_e2e.sh --path projects/project-a 2>&1
+  )"
+
+  assert_contains "$out" "Checkpoint commit skipped (before step 5.1 (EARS review)): runtime root is not a git repository."
+  assert_contains "$out" "Optional phase declined at 5.1; skipping."
+  assert_contains "$out" "Execution stopped: user denied phase progression at 6."
+}
+
 test_without_path_uses_only_project_in_workspace
 test_without_path_prompts_for_project_when_multiple_exist
 test_without_path_can_finish_when_multiple_projects_exist
@@ -1249,5 +1403,9 @@ test_stale_saved_feature_path_cache_is_ignored
 test_completed_cached_feature_prints_friendly_new_feature_message
 test_optional_step_7_1_can_be_declined_without_blocking_later_required_phases
 test_optional_step_7_1_runs_when_accepted_then_continues_to_next_required_phase
+test_checkpoint_before_5_1_commits_dirty_workspace
+test_checkpoint_before_7_1_logs_notice_when_workspace_is_clean
+test_checkpoint_before_and_after_8_4_commit_boundary_state
+test_checkpoint_helper_skips_non_repo_workspace
 
 echo "All project_add_feature_e2e tests passed."

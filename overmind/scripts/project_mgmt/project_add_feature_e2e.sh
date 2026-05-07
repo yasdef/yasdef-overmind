@@ -673,6 +673,41 @@ phase_label() {
   esac
 }
 
+commit_feature_progress() {
+  local label="$1"
+  local commit_message="Checkpoint: $label"
+  local git_rc=0
+
+  if ! command -v git >/dev/null 2>&1; then
+    echo "Checkpoint commit skipped ($label): git not found in PATH."
+    return 0
+  fi
+
+  if ! git -C "$RUNTIME_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    echo "Checkpoint commit skipped ($label): runtime root is not a git repository."
+    return 0
+  fi
+
+  if ! git -C "$RUNTIME_ROOT" add -A >/dev/null 2>&1; then
+    git_rc=$?
+    echo "Checkpoint commit notice ($label): git add exited $git_rc; continuing without checkpoint."
+    return 0
+  fi
+
+  set +e
+  git -C "$RUNTIME_ROOT" commit -m "$commit_message" >/dev/null 2>&1
+  git_rc=$?
+  set -e
+
+  if [[ "$git_rc" -ne 0 ]]; then
+    echo "Checkpoint commit notice ($label): git commit exited $git_rc; continuing without checkpoint."
+    return 0
+  fi
+
+  echo "Checkpoint commit created: $commit_message"
+  return 0
+}
+
 print_restart_guidance() {
   local phase_id="$1"
   local script_name="$2"
@@ -1411,10 +1446,26 @@ main() {
 
   local idx
   for ((idx = start_index; idx < ${#PHASE_IDS[@]}; idx++)); do
+    case "${PHASE_IDS[$idx]}" in
+      5.1)
+        commit_feature_progress "before step 5.1 (EARS review)"
+        ;;
+      7.1)
+        commit_feature_progress "before step 7.1 (MCP enrichment)"
+        ;;
+      8.4)
+        commit_feature_progress "before step 8.4 (semantic review)"
+        ;;
+    esac
+
     set +e
     run_phase_by_index "$RUNTIME_ROOT" "$idx"
     local phase_rc=$?
     set -e
+
+    if [[ "${PHASE_IDS[$idx]}" == "8.4" && ( "$phase_rc" -eq 0 || "$phase_rc" -eq 30 ) ]]; then
+      commit_feature_progress "after step 8.4 (semantic review)"
+    fi
 
     case "$phase_rc" in
       0)
