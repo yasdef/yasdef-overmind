@@ -57,11 +57,14 @@ V-0.0.1
 V-0.0.2
 - planning flow significantly improved
 
-V-0.0.3 (current)
+V-0.0.3
 - add blueprints on project level
 - unblocked new projects (type-A) creation
 - add cross-class transport section
 - add MCP as a source for type-A projects
+
+V-0.0.4 (current)
+- multiple flow improvements and bug fixes
 
 
 ## Staged Commands Input Contract
