@@ -2,10 +2,6 @@
 set -euo pipefail
 
 TARGET_RELATIVE_PATH="${1:-}"
-REPO_MODE_HELPER_COMMAND_PATH="overmind/scripts/helper/check_feature_technical_requirements_quality.sh"
-STAGED_MODE_HELPER_COMMAND_PATH=".helper/check_feature_technical_requirements_quality.sh"
-HELPER_COMMAND_PATH="$REPO_MODE_HELPER_COMMAND_PATH"
-WORKSPACE_ROOT=""
 
 EXIT_CONTENT_FAILURE=1
 EXIT_HELPER_FAILURE=2
@@ -22,40 +18,17 @@ require_command() {
   fi
 }
 
-resolve_workspace_root() {
-  local script_dir=""
-  local parent_dir=""
-  local root=""
-
-  if ! script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; then
-    helper_fail "Failed to resolve script directory."
-  fi
-
-  parent_dir="$(dirname "$script_dir")"
-  if [[ "$(basename "$script_dir")" == ".helper" && -f "$parent_dir/asdlc_metadata.yaml" ]]; then
-    HELPER_COMMAND_PATH="$STAGED_MODE_HELPER_COMMAND_PATH"
-    WORKSPACE_ROOT="$parent_dir"
-    return 0
-  fi
-
-  require_command git
-  if ! root="$(git -C "$script_dir" rev-parse --show-toplevel 2>/dev/null)"; then
-    helper_fail "Not a git repository at script path: $script_dir"
-  fi
-  HELPER_COMMAND_PATH="$REPO_MODE_HELPER_COMMAND_PATH"
-  WORKSPACE_ROOT="$root"
-}
-
 resolve_target_path() {
-  local workspace_root="$1"
-  local target_input="$2"
+  local target_input="$1"
+
+  [[ -n "$target_input" ]] || helper_fail "Missing target artifact path."
 
   if [[ "$target_input" = /* ]]; then
     printf '%s\n' "$target_input"
     return 0
   fi
 
-  printf '%s/%s\n' "$workspace_root" "$target_input"
+  printf '%s/%s\n' "$PWD" "$target_input"
 }
 
 trim_value() {
@@ -688,7 +661,6 @@ END {
 }
 
 main() {
-  require_command git
   require_command awk
   require_command sed
   require_command grep
@@ -713,8 +685,7 @@ main() {
   local status=0
   local repo_name=""
 
-  resolve_workspace_root
-  target_path="$(resolve_target_path "$WORKSPACE_ROOT" "$TARGET_RELATIVE_PATH")"
+  target_path="$(resolve_target_path "$TARGET_RELATIVE_PATH")"
 
   if [[ ! -f "$target_path" ]]; then
     helper_fail "Target feature technical requirements artifact not found: $TARGET_RELATIVE_PATH"
@@ -730,14 +701,14 @@ main() {
   definition_path="$project_dir/init_progress_definition.yaml"
 
   if [[ ! -f "$requirements_path" ]]; then
-    helper_fail "Required sibling artifact not found for quality check: ${requirements_path#$WORKSPACE_ROOT/}"
+    helper_fail "Required sibling artifact not found for quality check: $requirements_path"
   fi
   if [[ ! -f "$definition_path" ]]; then
-    helper_fail "Required project definition not found for quality check: ${definition_path#$WORKSPACE_ROOT/}"
+    helper_fail "Required project definition not found for quality check: $definition_path"
   fi
 
   if ! parsed_classes="$(extract_meta_project_classes "$definition_path" 2>/dev/null)"; then
-    helper_fail "Failed to read active project classes from ${definition_path#$WORKSPACE_ROOT/}"
+    helper_fail "Failed to read active project classes from $definition_path"
   fi
   while IFS= read -r class_name; do
     class_name="$(trim_value "$class_name")"
@@ -754,11 +725,11 @@ main() {
   done <<<"$parsed_classes"
 
   if [[ -z "$active_classes_csv" ]]; then
-    helper_fail "No supported repo classes found in ${definition_path#$WORKSPACE_ROOT/}"
+    helper_fail "No supported repo classes found in $definition_path"
   fi
 
   if ! parsed_refs="$(extract_requirement_refs "$requirements_path" 2>/dev/null)"; then
-    helper_fail "Failed to read requirement ids from ${requirements_path#$WORKSPACE_ROOT/}"
+    helper_fail "Failed to read requirement ids from $requirements_path"
   fi
   while IFS= read -r class_name; do
     class_name="$(trim_value "$class_name")"
@@ -770,7 +741,7 @@ main() {
   done <<<"$parsed_refs"
 
   if [[ -z "$requirement_refs_csv" ]]; then
-    helper_fail "No requirement ids found in ${requirements_path#$WORKSPACE_ROOT/}"
+    helper_fail "No requirement ids found in $requirements_path"
   fi
 
   IFS=',' read -r -a active_classes_array <<<"$active_classes_csv"
@@ -791,7 +762,7 @@ main() {
     esac
 
     if [[ ! -f "$surface_path" ]]; then
-      helper_fail "Required surface-map artifact not found for active repo '$repo_name': ${surface_path#$WORKSPACE_ROOT/}"
+      helper_fail "Required surface-map artifact not found for active repo '$repo_name': $surface_path"
     fi
 
     if surface_has_applicable_entries "$surface_path"; then

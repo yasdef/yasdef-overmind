@@ -141,16 +141,6 @@ setup_git_workspace() {
   setup_workspace_layout "$repo_dir"
   seed_feature_br_summary "$repo_dir"
   write_helper_stubs "$repo_dir"
-
-  (
-    cd "$repo_dir/asdlc"
-    git init -q
-    git config user.name "Test User"
-    git config user.email "test@example.com"
-    echo "seed" >README.md
-    git add .
-    git commit -qm "seed"
-  )
 }
 
 test_requires_feature_path_argument() {
@@ -234,17 +224,6 @@ test_type_a_skips_repo_helper_and_still_marks_ready() {
   seed_feature_br_summary "$repo_dir" "projects/p1/feature-a" "A"
   seed_optional_artifacts "$repo_dir"
   write_helper_stubs "$repo_dir"
-
-  (
-    cd "$repo_dir/asdlc"
-    git init -q
-    git config user.name "Test User"
-    git config user.email "test@example.com"
-    echo "seed" >README.md
-    git add .
-    git commit -qm "seed"
-  )
-
   local out=""
   out="$(
     cd "$repo_dir/asdlc" &&
@@ -277,11 +256,9 @@ test_success_updates_ready_to_ears_and_commits_feature_artifacts() {
   assert_file_exists "$repo_dir/asdlc/projects/p1/feature-a/user_br_input.md"
   assert_contains "$(cat "$repo_dir/asdlc/projects/p1/feature-a/feature_br_summary.md")" "- ready_to_ears: true"
 
-  local committed_files
-  committed_files="$(git -C "$repo_dir/asdlc" show --name-only --pretty='' HEAD)"
-  assert_contains "$committed_files" "projects/p1/feature-a/feature_br_summary.md"
-  assert_contains "$committed_files" "projects/p1/feature-a/missing_br_data.md"
-  assert_contains "$committed_files" "projects/p1/feature-a/user_br_input.md"
+  assert_file_exists "$repo_dir/asdlc/projects/p1/feature-a/feature_br_summary.md"
+  assert_file_exists "$repo_dir/asdlc/projects/p1/feature-a/missing_br_data.md"
+  assert_file_exists "$repo_dir/asdlc/projects/p1/feature-a/user_br_input.md"
 }
 
 test_success_supports_absolute_feature_path() {

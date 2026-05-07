@@ -250,16 +250,6 @@ setup_git_workspace() {
   setup_models_file "$repo_dir"
   seed_project_definition "$repo_dir"
   seed_feature_sources "$repo_dir"
-
-  (
-    cd "$repo_dir/asdlc"
-    git init -q
-    git config user.name "Test User"
-    git config user.email "test@example.com"
-    echo "seed" >README.md
-    git add .
-    git commit -qm "seed"
-  )
 }
 
 test_requires_feature_path_argument() {
@@ -353,12 +343,7 @@ test_generates_prerequisite_gaps_and_builds_expected_prompt() {
   assert_contains "$codex_prompt" "Target artifact: projects/p1/feature-a/prerequisite_gaps.md"
   assert_not_contains "$codex_prompt" "implementation_plan.md"
 
-  local committed_files=""
-  committed_files="$(cd "$repo_dir/asdlc" && git show --pretty='' --name-only HEAD)"
-  assert_contains "$committed_files" "projects/p1/feature-a/prerequisite_gaps.md"
-  assert_not_contains "$committed_files" "projects/p1/feature-a/requirements_ears.md"
-  assert_not_contains "$committed_files" "projects/p1/feature-a/technical_requirements.md"
-  assert_not_contains "$committed_files" "projects/p1/feature-a/implementation_slices.md"
+  assert_file_exists "$repo_dir/asdlc/projects/p1/feature-a/prerequisite_gaps.md"
 }
 
 test_type_a_generates_prerequisite_gaps() {

@@ -93,16 +93,6 @@ meta_info:
 
 steps: []
 EOF
-
-  (
-    cd "$repo_dir/asdlc"
-    git init -q
-    git config user.name "Test User"
-    git config user.email "test@example.com"
-    echo "seed" >README.md
-    git add .
-    git commit -qm "seed"
-  )
 }
 
 seed_feature_br_summary() {

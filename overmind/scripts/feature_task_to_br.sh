@@ -8,6 +8,7 @@ FEATURE_BR_FILE=""
 USER_INPUT_FILE=""
 MISSING_DATA_FILE=""
 MODELS_FILE=".setup/models.md"
+EXTERNAL_SOURCES_FILE=".setup/external_sources.yaml"
 RULE_FILE=".rules/task_to_br_rule.md"
 HELPER_SCRIPT=".helper/check_task_to_br_quality.sh"
 MISSING_TEMPLATE_FILE=".templates/missing_br_data_TEMPLATE.md"
@@ -42,10 +43,6 @@ ensure_staged_command_runtime() {
 
   if [[ "$(basename "$script_dir")" != ".commands" || ! -f "$parent_dir/asdlc_metadata.yaml" ]]; then
     die "Run this command from ASDLC staged path: <asdlc>/.commands/$SCRIPT_BASENAME"
-  fi
-
-  if ! git -C "$parent_dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    die "ASDLC workspace is not a git repository: $parent_dir"
   fi
 
   printf '%s' "$parent_dir"
@@ -151,6 +148,29 @@ prompt_required_input() {
     fi
     echo "Input cannot be empty." >&2
   done
+}
+
+prompt_input_source_choice() {
+  local choice=""
+
+  while true; do
+    printf 'Select input source:\n' >&2
+    printf '  1) Provide a local file path\n' >&2
+    printf '  2) Use Jira MCP ticket number (requires Jira MCP configured in your model environment)\n' >&2
+    printf 'Choice [1/2]: ' >&2
+    if ! IFS= read -r choice; then
+      die "User input aborted."
+    fi
+    choice="$(trim_value "$choice")"
+    case "$choice" in
+      1|2) printf '%s' "$choice"; return 0 ;;
+      *) echo "Invalid choice. Please enter 1 or 2." >&2 ;;
+    esac
+  done
+}
+
+prompt_jira_ticket_number() {
+  prompt_required_input "Jira ticket number (e.g. PROJ-123):"
 }
 
 to_repo_relative_path() {
@@ -331,6 +351,7 @@ write_user_input_context() {
   local epic_story="$5"
   local request_summary="$6"
   local extra_context="$7"
+  local jira_ticket="${8:-}"
   local generated_on=""
   local line=""
 
@@ -342,6 +363,13 @@ write_user_input_context() {
 
 ## 1. Capture Meta
 - captured_at: $generated_on
+EOF
+
+  if [[ -n "$jira_ticket" ]]; then
+    printf '%s\n' "- jira_ticket: $jira_ticket" >>"$output_path"
+  fi
+
+  cat >>"$output_path" <<EOF
 
 ## 2. Epic/Story Input
 - feature_id: $feature_id
@@ -358,6 +386,41 @@ EOF
 - request_summary: $request_summary
 - additional_business_context: $extra_context
 EOF
+}
+
+extract_jira_source_names() {
+  local sources_path="$1"
+
+  if [[ ! -f "$sources_path" ]]; then
+    return 0
+  fi
+
+  awk '
+function trim(v) { sub(/^[[:space:]]+/, "", v); sub(/[[:space:]]+$/, "", v); return v }
+function strip_quotes(v) {
+  v = trim(v)
+  if ((v ~ /^".*"$/) || (v ~ /^'\''.*'\''$/)) v = substr(v, 2, length(v)-2)
+  return trim(v)
+}
+BEGIN { in_sources=0; cur_name=""; cur_type="" }
+/^sources:[[:space:]]*\[\][[:space:]]*$/ { exit }
+/^sources:[[:space:]]*$/ { in_sources=1; next }
+in_sources {
+  if (/^[^[:space:]#]/) {
+    if (cur_name != "" && index(tolower(cur_type),"jira") > 0) print cur_name
+    exit
+  }
+  if (/^[[:space:]]*-[[:space:]]*name:/) {
+    if (cur_name != "" && index(tolower(cur_type),"jira") > 0) print cur_name
+    line=$0; sub(/^[[:space:]]*-[[:space:]]*name:[[:space:]]*/,"",line)
+    cur_name=strip_quotes(line); cur_type=""
+  } else if (/^[[:space:]]+type:/) {
+    line=$0; sub(/^[[:space:]]+type:[[:space:]]*/,"",line)
+    cur_type=strip_quotes(line)
+  }
+}
+END { if (cur_name != "" && index(tolower(cur_type),"jira") > 0) print cur_name }
+' "$sources_path"
 }
 
 load_model_config() {
@@ -415,6 +478,7 @@ build_prompt() {
   local epic_story="$6"
   local request_summary="$7"
   local extra_context="$8"
+  local jira_source_names="${9:-}"
   local gate_command="$HELPER_SCRIPT $FEATURE_BR_FILE"
 
   cat <<EOF
@@ -450,43 +514,31 @@ Instruction artifacts:
 - Missing-data template: $MISSING_TEMPLATE_FILE
 - Missing-data golden example: $MISSING_GOLDEN_EXAMPLE_FILE
 EOF
-}
 
-commit_generated_artifacts_if_changed() {
-  local repo_root="$1"
-  local relative_path=""
-  local -a candidate_paths=(
-    "$FEATURE_BR_FILE"
-    "$USER_INPUT_FILE"
-    "$MISSING_DATA_FILE"
-  )
-  local -a commit_paths=()
+  if [[ "$epic_story_source_file" == jira:* ]]; then
+    local jira_names_formatted=""
+    local name=""
+    while IFS= read -r name; do
+      [[ -n "$name" ]] || continue
+      jira_names_formatted="${jira_names_formatted}
+  - $name"
+    done <<<"$jira_source_names"
+    [[ -n "$jira_names_formatted" ]] || jira_names_formatted=" (none configured)"
 
-  for relative_path in "${candidate_paths[@]}"; do
-    if [[ -e "$repo_root/$relative_path" ]] || git -C "$repo_root" ls-files --error-unmatch -- "$relative_path" >/dev/null 2>&1; then
-      commit_paths+=("$relative_path")
-    fi
-  done
+    cat <<EOF
 
-  if [[ ${#commit_paths[@]} -eq 0 ]]; then
-    return 0
-  fi
-
-  if ! git -C "$repo_root" add --all -- "${commit_paths[@]}"; then
-    die "Failed to stage generated user-input BR artifacts."
-  fi
-
-  if git -C "$repo_root" diff --cached --quiet -- "${commit_paths[@]}"; then
-    return 0
-  fi
-
-  if ! git -C "$repo_root" commit -m "Update feature BR from task-to-BR" -- "${commit_paths[@]}" >/dev/null 2>&1; then
-    die "Failed to commit generated user-input BR artifacts."
+Jira MCP fetch instruction:
+- Epic/story source is a Jira ticket: $epic_story_source_file
+- External sources config: $EXTERNAL_SOURCES_FILE (read-only)
+- Eligible Jira MCP source names:$jira_names_formatted
+- Use one of the above named MCP servers to fetch the Jira ticket content and use it as the epic/story input.
+- If the eligible source list is empty, no listed MCP is reachable, or the ticket cannot be retrieved:
+  ask the user what to do and mention that a local .txt or .md file can be provided instead.
+EOF
   fi
 }
 
 main() {
-  require_command git
   parse_args "$@"
 
   local repo_root=""
@@ -503,18 +555,32 @@ main() {
   local prompt_arg=""
   local feature_id_input=""
   local feature_title_input=""
+  local input_source_choice=""
   local epic_story_source_path=""
   local epic_story_source_rel=""
   local epic_story_input=""
+  local jira_ticket_input=""
+  local jira_source_names=""
   local request_summary_input=""
   local extra_context_input=""
 
   project_type_code="$(extract_project_type_code "$feature_br_path")"
   feature_id_input="$(extract_optional_meta_from_feature_br "$feature_br_path" "feature_id")"
   feature_title_input="$(extract_optional_meta_from_feature_br "$feature_br_path" "feature_title")"
-  epic_story_source_path="$(prompt_epic_story_source_file "$repo_root")"
-  epic_story_source_rel="$(to_repo_relative_path "$repo_root" "$epic_story_source_path")"
-  epic_story_input="$(cat "$epic_story_source_path")"
+
+  input_source_choice="$(prompt_input_source_choice)"
+
+  if [[ "$input_source_choice" == "1" ]]; then
+    epic_story_source_path="$(prompt_epic_story_source_file "$repo_root")"
+    epic_story_source_rel="$(to_repo_relative_path "$repo_root" "$epic_story_source_path")"
+    epic_story_input="$(cat "$epic_story_source_path")"
+  else
+    jira_ticket_input="$(prompt_jira_ticket_number)"
+    epic_story_source_rel="jira:$jira_ticket_input"
+    epic_story_input=""
+    jira_source_names="$(extract_jira_source_names "$repo_root/$EXTERNAL_SOURCES_FILE")"
+  fi
+
   request_summary_input="$feature_title_input"
   extra_context_input="[UNFILLED]"
 
@@ -525,7 +591,8 @@ main() {
     "$epic_story_source_rel" \
     "$epic_story_input" \
     "$request_summary_input" \
-    "$extra_context_input"
+    "$extra_context_input" \
+    "$jira_ticket_input"
 
   load_model_config "$models_path" "$MODEL_PHASE"
   if [[ "$MODEL_CMD" != "codex" ]]; then
@@ -541,7 +608,8 @@ main() {
     "$epic_story_source_rel" \
     "$epic_story_input" \
     "$request_summary_input" \
-    "$extra_context_input")"
+    "$extra_context_input" \
+    "$jira_source_names")"
 
   local cmd=("$MODEL_CMD" -m "$MODEL_MODEL")
   if [[ ${#MODEL_ARGS[@]} -gt 0 ]]; then
@@ -558,7 +626,6 @@ main() {
     die "Model run did not produce required file: $FEATURE_BR_FILE"
   fi
 
-  commit_generated_artifacts_if_changed "$repo_root"
   echo "Updated $FEATURE_BR_FILE"
 }
 

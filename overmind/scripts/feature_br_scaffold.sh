@@ -73,10 +73,6 @@ resolve_runtime_root() {
     die "Run this command from ASDLC staged path: <asdlc>/.commands/$SCRIPT_BASENAME"
   fi
 
-  if ! git -C "$parent_dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    die "ASDLC workspace is not a git repository: $parent_dir"
-  fi
-
   printf '%s' "$parent_dir"
 }
 
@@ -354,24 +350,7 @@ write_feature_br_summary() {
   echo "Updated $OUTPUT_FILE"
 }
 
-commit_feature_br_summary_if_changed() {
-  local runtime_root="$1"
-
-  if ! git -C "$runtime_root" add "$OUTPUT_FILE"; then
-    die "Failed to stage $OUTPUT_FILE."
-  fi
-
-  if git -C "$runtime_root" diff --cached --quiet -- "$OUTPUT_FILE"; then
-    return 0
-  fi
-
-  if ! git -C "$runtime_root" commit -m "Initialize feature BR scaffold" -- "$OUTPUT_FILE" >/dev/null 2>&1; then
-    die "Failed to commit $OUTPUT_FILE."
-  fi
-}
-
 main() {
-  require_command git
   require_command awk
   require_command sed
   require_command tr
@@ -393,7 +372,6 @@ main() {
   set_output_paths
   ensure_output_target_available "$runtime_root"
   write_feature_br_summary "$runtime_root"
-  commit_feature_br_summary_if_changed "$runtime_root"
 }
 
 main "$@"

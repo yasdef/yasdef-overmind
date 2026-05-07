@@ -97,7 +97,7 @@ resolve_runtime_root() {
     return 0
   fi
 
-  die "init asdlc repo first, run this script only from asldc/.commands"
+  die "initialize the ASDLC workspace first; run this script only from asdlc/.commands"
 }
 
 ensure_required_files() {
@@ -644,41 +644,10 @@ $source_context
 EOF2
 }
 
-commit_generated_artifact() {
-  local repo_root="$1"
-  local project_id="$2"
-  local artifact_path="$3"
-  local artifact_rel_path=""
-  local commit_message="Update common contract definition for $project_id"
-
-  if ! git -C "$repo_root" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    die "Runtime root is not a git repository: $repo_root"
-  fi
-
-  if [[ "$artifact_path" != "$repo_root/"* ]]; then
-    die "Generated artifact path must stay inside ASDLC runtime root: $artifact_path"
-  fi
-
-  artifact_rel_path="${artifact_path#$repo_root/}"
-
-  if ! git -C "$repo_root" add -- "$artifact_rel_path"; then
-    die "Failed to stage generated common contract definition: $artifact_rel_path"
-  fi
-
-  if git -C "$repo_root" diff --cached --quiet -- "$artifact_rel_path"; then
-    die "No staged changes found for generated common contract definition: $artifact_rel_path"
-  fi
-
-  if ! git -C "$repo_root" commit -m "$commit_message" -- "$artifact_rel_path" >/dev/null 2>&1; then
-    die "Failed to commit generated common contract definition: $artifact_rel_path"
-  fi
-}
-
 main() {
   require_command awk
   require_command cmp
   require_command cp
-  require_command git
   require_command mktemp
   parse_args "$@"
 
@@ -741,10 +710,7 @@ main() {
     trap - EXIT
   fi
 
-  commit_generated_artifact "$repo_root" "$project_id" "$target_artifact_path"
-
   echo "Updated $target_artifact_path"
-  echo "Committed $target_artifact_path"
 }
 
 main "$@"

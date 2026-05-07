@@ -91,7 +91,7 @@ resolve_runtime_root() {
     return 0
   fi
 
-  die "init asdlc repo first, run this script only from asldc/.commands"
+  die "initialize the ASDLC workspace first; run this script only from asdlc/.commands"
 }
 
 resolve_project_root() {
@@ -325,6 +325,16 @@ load_active_stack_classes() {
   done < <(extract_project_classes "$definition_path")
 }
 
+ensure_generated_blueprints_exist() {
+  local target_path=""
+
+  for target_path in "${TARGET_BLUEPRINT_PATHS[@]}"; do
+    if [[ ! -f "$target_path" ]]; then
+      die "Model run did not produce required file: $target_path"
+    fi
+  done
+}
+
 load_model_config() {
   local models_path="$1"
   local phase="$2"
@@ -427,42 +437,8 @@ $(render_class_context)
 EOF2
 }
 
-commit_generated_artifacts() {
-  local repo_root="$1"
-  local project_id="$2"
-  local rel_paths=()
-  local path=""
-  local rel_path=""
-
-  if ! git -C "$repo_root" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    die "Runtime root is not a git repository: $repo_root"
-  fi
-
-  for path in "${TARGET_BLUEPRINT_PATHS[@]}"; do
-    if [[ "$path" != "$repo_root/"* ]]; then
-      die "Generated artifact path must stay inside ASDLC runtime root: $path"
-    fi
-    rel_path="${path#$repo_root/}"
-    rel_paths+=("$rel_path")
-  done
-
-  if ! git -C "$repo_root" add -- "${rel_paths[@]}"; then
-    die "Failed to stage generated stack blueprints."
-  fi
-
-  if git -C "$repo_root" diff --cached --quiet -- "${rel_paths[@]}"; then
-    echo "No stack blueprint changes to commit."
-    return 0
-  fi
-
-  if ! git -C "$repo_root" commit -m "Update project stack blueprints for $project_id" -- "${rel_paths[@]}" >/dev/null 2>&1; then
-    die "Failed to commit generated stack blueprints."
-  fi
-}
-
 main() {
   require_command awk
-  require_command git
   parse_args "$@"
 
   local repo_root=""
@@ -516,8 +492,7 @@ main() {
     "${cmd[@]}"
   )
 
-  commit_generated_artifacts "$repo_root" "$project_id"
-
+  ensure_generated_blueprints_exist
   echo "Updated project stack blueprints for $PROJECT_ROOT"
 }
 

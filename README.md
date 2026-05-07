@@ -15,7 +15,7 @@ This repository contains the standalone Overmind project. The original extractio
 1. clone `yasdef-overmind` to your local machine
 2. run `overmind/scripts/project_mgmt/project_setup_first_init_machine.sh` to establish and set up the asdlc folder for future project work - you need to provide the place where exactly the asdlc folder will exist in your system,
 after this script finishes, the staged ASDLC commands live under your generated `asdlc/` workspace; later updates can be pulled from this repo and re-applied by running the same setup script again
-3. in asdlc folder run `.commands/project_setup_add_new_project.sh` to create a new project. On this step you may provide paths to project repos, for example backend and frontend (if they exist), if it's a completely new project you may optionally configure per-class stack guidance sources in `init_progress_definition.yaml`; if absent, the system falls back to model proposals during Step `1.1` blueprint authoring. You can always add or change this info later in projects/<project_id>/init_progress_definition.yaml (see meta_info part).
+3. in asdlc folder run `.commands/project_setup_add_new_project.sh` to create a new project. This creates `projects/<project-id>/`, seeds `init_progress_definition.yaml`, initializes that project folder as its own git repository, and creates the first commit. On this step you may provide paths to project repos, for example backend and frontend (if they exist), if it's a completely new project you may optionally configure per-class stack guidance sources in `init_progress_definition.yaml`; if absent, the system falls back to model proposals during Step `1.1` blueprint authoring. You can always add or change this info later in projects/<project_id>/init_progress_definition.yaml (see meta_info part).
 3-a. it's possible to setup MCP server for step 1.1. and 7.1. can extract knowledge from it, for this first set knowledgebase mcp to your codex cli (see codex docs), second - after asdlc directory will be established - add this MCP to .setup/external_sources.yaml
 4. finish required project-level init before feature work:
    - Type A projects: Step `1` -> Step `1.1` -> Step `2` -> Step `3` (start feature).
@@ -25,7 +25,6 @@ after this script finishes, the staged ASDLC commands live under your generated 
    - Step `2`: create project-level `common_contract_definition.md` with `.commands/init_common_contract_definition.sh --path projects/<project-id>`.
    - Step `3`: start feature planning with `.commands/project_add_feature_e2e.sh --path projects/<project-id>`.
    - `project_add_feature_e2e.sh` (see p.5 below) uses the scanner to block feature progression when an earlier project step is incomplete. For a brand-new feature, it may create the Step `3` feature scaffold before reporting the missing earlier step.
-project is created in a new branch so make sure you've merged it to your main/master before you proceed
 
 --- here we finished on project level and go to feature level ---
 
@@ -44,7 +43,7 @@ you can manualy run scripts for different steps after asdlc folder init, check
 - type B (code exists, refactor to best practices) and type C (code exists, follow existing patterns) are still processed identically as type C; type B-specific planning distinctions are not yet enforced
 - we need more complex project-level management (update metainfo, add, change or delete repos etc.) 
 - we need to read epic/story from jira, current way - add them as a text/md files can remain optional but not main
-- we need sophisticated still convenient git management logic because asdlc folder belongs specific work place (laptop) but each project folder should be independent git-tracked repo to store all artefact in this project git (near codebase)
+- ASDLC workspace artifacts currently live only in the local filesystem; there is no built-in artifact versioning flow yet
 
 ## Release-notes
 
@@ -106,7 +105,8 @@ Project worker data lives in:
 
 ## Notes
 
-- Run scripts from inside a git repository.
+- The staged ASDLC workspace itself is just a normal folder and is not initialized as a git repository.
+- Each newly created ASDLC project folder under `projects/<project-id>/` is initialized as its own git repository with an initial commit containing `init_progress_definition.yaml`.
 - Quality helper scripts live under `overmind/scripts/helper/`.
 - Script tests are in `tests/ai_scripts/`.
 - example of external_sources configuraqtion for knowledge base MCP
@@ -123,7 +123,7 @@ sources:
   Bootstraps or updates ASDLC workspace under `<selected_parent>/asdlc`. In update mode, it repairs missing staged commands, refreshes `quickrun.md`, and synchronizes only whitelisted support assets (`.rules`, `.templates`, `.golden_examples`, `.helper`, `.setup`).
 
 - `overmind/scripts/project_mgmt/project_setup_add_new_project.sh`
-  Staged command (`<asdlc>/.commands/project_setup_add_new_project.sh`) that creates a new project record + project folder, seeds `init_progress_definition.yaml`, and commits scaffold changes on branch `add-project/<project_id>`.
+  Staged command (`<asdlc>/.commands/project_setup_add_new_project.sh`) that creates a new project record + project folder, seeds `init_progress_definition.yaml`, initializes `projects/<project-id>/` as a git repository, and creates the first commit.
 
 - `overmind/scripts/project_mgmt/project_setup_update_project.sh`
   Staged command (`<asdlc>/.commands/project_setup_update_project.sh`) that attaches a repo path to an existing project's deferred class. Interactive flow: pick project → pick deferred class → enter repo path (validates and resolves to absolute path) → persists `state: "ready"` + `path` in `init_progress_definition.yaml`. If the project is type A and all classes become `ready` after the attach, optionally prompts to reclassify to type B or C. Any prompt accepts `q` to quit cleanly without mutation.

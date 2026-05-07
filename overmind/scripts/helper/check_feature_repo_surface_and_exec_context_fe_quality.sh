@@ -18,28 +18,17 @@ require_command() {
   fi
 }
 
-resolve_workspace_root() {
-  local script_dir=""
-
-  if ! script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; then
-    helper_fail "Failed to resolve script directory."
-  fi
-
-  if ! git -C "$script_dir" rev-parse --show-toplevel 2>/dev/null; then
-    helper_fail "Not a git repository at script path: $script_dir"
-  fi
-}
-
 resolve_target_path() {
-  local workspace_root="$1"
-  local target_input="$2"
+  local target_input="$1"
+
+  [[ -n "$target_input" ]] || helper_fail "Missing target artifact path."
 
   if [[ "$target_input" = /* ]]; then
     printf '%s\n' "$target_input"
     return 0
   fi
 
-  printf '%s/%s\n' "$workspace_root" "$target_input"
+  printf '%s/%s\n' "$PWD" "$target_input"
 }
 
 validate_surface_content() {
@@ -331,7 +320,6 @@ END {
 }
 
 main() {
-  require_command git
   require_command awk
   require_command grep
 
@@ -339,11 +327,8 @@ main() {
     helper_fail "Missing target artifact path argument. Usage: <surface-map-path>"
   fi
 
-  local workspace_root=""
-  workspace_root="$(resolve_workspace_root)"
-
   local surface_path=""
-  surface_path="$(resolve_target_path "$workspace_root" "$TARGET_SURFACE_RELATIVE_PATH")"
+  surface_path="$(resolve_target_path "$TARGET_SURFACE_RELATIVE_PATH")"
 
   if [[ ! -f "$surface_path" ]]; then
     helper_fail "Target frontend/mobile surface map artifact not found: $surface_path"

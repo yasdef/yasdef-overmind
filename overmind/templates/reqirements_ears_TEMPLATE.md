@@ -42,6 +42,10 @@ Use the header form `### Requirement <N> — <Short title>` (not `REQ-<N>`).
 
 **Verification:** <tests, endpoints, logs, metrics, docs that prove this requirement is met>
 
+**Linked Artifacts:**
+- (omit this field entirely when no linked artifacts are relevant to this requirement)
+- <LAR-NNN>
+
 ---
 
 ### Requirement <N+1> — <Short title>
@@ -65,6 +69,17 @@ Write NFRs using the same block structure so they stay as precise and testable a
 - THE <System Name> SHALL <latency/availability/security/compliance constraint>.
 
 **Verification:** <load test, SLO dashboard, security checks, audit evidence>
+
+---
+
+## Linked Artifacts
+> Copied verbatim from BR section 16. Omit this section entirely when BR section 16 is empty.
+> Each entry captures: id (LAR-NNN), title, type, locator.
+
+- id: [LAR-NNN]
+  title: [UNFILLED]
+  type: [UNFILLED]
+  locator: [UNFILLED]
 
 ---
 

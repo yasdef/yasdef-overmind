@@ -18,28 +18,17 @@ require_command() {
   fi
 }
 
-resolve_workspace_root() {
-  local script_dir=""
-
-  if ! script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; then
-    helper_fail "Failed to resolve script directory."
-  fi
-
-  if ! git -C "$script_dir" rev-parse --show-toplevel 2>/dev/null; then
-    helper_fail "Not a git repository at script path: $script_dir"
-  fi
-}
-
 resolve_target_path() {
-  local workspace_root="$1"
-  local target_input="$2"
+  local target_input="$1"
+
+  [[ -n "$target_input" ]] || helper_fail "Missing target artifact path."
 
   if [[ "$target_input" = /* ]]; then
     printf '%s\n' "$target_input"
     return 0
   fi
 
-  printf '%s/%s\n' "$workspace_root" "$target_input"
+  printf '%s/%s\n' "$PWD" "$target_input"
 }
 
 trim_value() {
@@ -585,7 +574,6 @@ END {
 }
 
 main() {
-  require_command git
   require_command awk
   require_command grep
   require_command sed
@@ -594,7 +582,6 @@ main() {
     helper_fail "Usage: $(basename "$0") <implementation-slices-path>"
   fi
 
-  local workspace_root=""
   local target_path=""
   local target_dir=""
   local project_dir=""
@@ -610,8 +597,7 @@ main() {
   local normalized_class=""
   local active_classes_csv=""
 
-  workspace_root="$(resolve_workspace_root)"
-  target_path="$(resolve_target_path "$workspace_root" "$TARGET_RELATIVE_PATH")"
+  target_path="$(resolve_target_path "$TARGET_RELATIVE_PATH")"
 
   if [[ ! -f "$target_path" ]]; then
     helper_fail "Target implementation slices artifact not found: $TARGET_RELATIVE_PATH"
@@ -630,20 +616,20 @@ main() {
   definition_path="$project_dir/init_progress_definition.yaml"
 
   if [[ ! -f "$requirements_path" ]]; then
-    helper_fail "Required sibling artifact not found for quality check: ${requirements_path#$workspace_root/}"
+    helper_fail "Required sibling artifact not found for quality check: $requirements_path"
   fi
   if [[ ! -f "$technical_requirements_path" ]]; then
-    helper_fail "Required sibling artifact not found for quality check: ${technical_requirements_path#$workspace_root/}"
+    helper_fail "Required sibling artifact not found for quality check: $technical_requirements_path"
   fi
   if [[ ! -f "$feature_contract_delta_path" ]]; then
-    helper_fail "Required sibling artifact not found for quality check: ${feature_contract_delta_path#$workspace_root/}"
+    helper_fail "Required sibling artifact not found for quality check: $feature_contract_delta_path"
   fi
   if [[ ! -f "$definition_path" ]]; then
-    helper_fail "Required project definition not found for quality check: ${definition_path#$workspace_root/}"
+    helper_fail "Required project definition not found for quality check: $definition_path"
   fi
 
   if ! parsed_classes="$(extract_meta_project_classes "$definition_path" 2>/dev/null)"; then
-    helper_fail "Failed to read active project classes from ${definition_path#$workspace_root/}"
+    helper_fail "Failed to read active project classes from $definition_path"
   fi
 
   while IFS= read -r class_name; do
@@ -658,12 +644,12 @@ main() {
   done <<<"$parsed_classes"
 
   if [[ -z "$active_classes_csv" ]]; then
-    helper_fail "No supported repo classes found in ${definition_path#$workspace_root/}"
+    helper_fail "No supported repo classes found in $definition_path"
   fi
 
   if [[ -f "$prerequisite_gaps_path" ]]; then
     if ! parsed_required_surfaces="$(extract_required_missing_surfaces "$prerequisite_gaps_path" 2>/dev/null)"; then
-      helper_fail "Failed to read required missing operator-facing surfaces from ${prerequisite_gaps_path#$workspace_root/}"
+      helper_fail "Failed to read required missing operator-facing surfaces from $prerequisite_gaps_path"
     fi
     while IFS= read -r class_name; do
       class_name="$(trim_value "$class_name")"

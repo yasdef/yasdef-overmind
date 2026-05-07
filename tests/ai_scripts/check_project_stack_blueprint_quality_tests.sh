@@ -35,16 +35,7 @@ setup_repo_with_helper() {
   mkdir -p "$repo_dir/overmind/scripts/helper"
   cp "$HELPER_SRC" "$repo_dir/overmind/scripts/helper/check_project_stack_blueprint_quality.sh"
   chmod +x "$repo_dir/overmind/scripts/helper/check_project_stack_blueprint_quality.sh"
-
-  (
-    cd "$repo_dir"
-    git init -q
-    git config user.name "Test User"
-    git config user.email "test@example.com"
-    echo "seed" >README.md
-    git add README.md overmind
-    git commit -qm "seed"
-  )
+  echo "seed" >"$repo_dir/README.md"
 }
 
 copy_golden() {

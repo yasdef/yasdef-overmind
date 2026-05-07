@@ -82,16 +82,6 @@ OUT
 ## 7. Loop Decision
 - unresolved_after_stop: [UNFILLED]
 OUT
-
-  (
-    cd "$repo_dir/asdlc"
-    git init -q
-    git config user.name "Test User"
-    git config user.email "test@example.com"
-    echo "seed" >README.md
-    git add .
-    git commit -qm "seed"
-  )
 }
 
 setup_codex_stub() {

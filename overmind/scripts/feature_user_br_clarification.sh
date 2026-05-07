@@ -40,10 +40,6 @@ ensure_staged_command_runtime() {
     die "Run this command from ASDLC staged path: <asdlc>/.commands/$SCRIPT_BASENAME"
   fi
 
-  if ! git -C "$parent_dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    die "ASDLC workspace is not a git repository: $parent_dir"
-  fi
-
   printf '%s' "$parent_dir"
 }
 
@@ -273,40 +269,7 @@ Context:
 EOF
 }
 
-commit_loop_artifacts_if_changed() {
-  local repo_root="$1"
-  local -a candidate_paths=(
-    "$FEATURE_BR_FILE"
-    "$MISSING_DATA_FILE"
-  )
-  local -a commit_paths=()
-  local relative_path=""
-
-  for relative_path in "${candidate_paths[@]}"; do
-    if [[ -e "$repo_root/$relative_path" ]] || git -C "$repo_root" ls-files --error-unmatch -- "$relative_path" >/dev/null 2>&1; then
-      commit_paths+=("$relative_path")
-    fi
-  done
-
-  if [[ ${#commit_paths[@]} -eq 0 ]]; then
-    return 0
-  fi
-
-  if ! git -C "$repo_root" add --all -- "${commit_paths[@]}"; then
-    die "Failed to stage user BR clarification artifacts."
-  fi
-
-  if git -C "$repo_root" diff --cached --quiet -- "${commit_paths[@]}"; then
-    return 0
-  fi
-
-  if ! git -C "$repo_root" commit -m "Resolve feature user BR clarification" -- "${commit_paths[@]}" >/dev/null 2>&1; then
-    die "Failed to commit user BR clarification artifacts."
-  fi
-}
-
 main() {
-  require_command git
   parse_args "$@"
 
   local repo_root=""
@@ -369,7 +332,6 @@ main() {
     die "Missing-data loop remains unresolved: $MISSING_DATA_FILE still contains non-rised items."
   fi
 
-  commit_loop_artifacts_if_changed "$repo_root"
   echo "Processed $MISSING_DATA_FILE via user BR clarification."
 }
 

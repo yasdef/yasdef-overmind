@@ -6,8 +6,9 @@ ASDLC_PROJECTS_DIR_NAME="projects"
 ASDLC_TEMPLATES_DIR_NAME=".templates"
 ASDLC_PROJECT_TEMPLATE_FILE_NAME="init_progress_definition_TEMPLATE.yaml"
 PROJECT_DEFINITION_FILE_NAME="init_progress_definition.yaml"
-MAIN_BRANCH_NAME="main"
-ADD_PROJECT_BRANCH_PREFIX="add-project"
+PROJECT_GIT_INIT_COMMIT_MESSAGE="Initialize ASDLC project workspace"
+PROJECT_GIT_FALLBACK_USER_NAME="Overmind ASDLC"
+PROJECT_GIT_FALLBACK_USER_EMAIL="overmind-asdlc@local.invalid"
 PROJECT_CLASS_OPTIONS=(
   "backend"
   "frontend"
@@ -50,70 +51,6 @@ resolve_asdlc_root_from_staged_path() {
   fi
 
   printf '%s' "$asdlc_root"
-}
-
-resolve_asdlc_git_root() {
-  local asdlc_root="$1"
-  local git_root=""
-  local asdlc_root_resolved=""
-  local git_root_resolved=""
-
-  if ! asdlc_root_resolved="$(cd "$asdlc_root" && pwd -P)"; then
-    die "Failed to resolve ASDLC root path: $asdlc_root"
-  fi
-
-  if ! git_root="$(git -C "$asdlc_root" rev-parse --show-toplevel 2>/dev/null)"; then
-    die "Git prerequisite failed: ASDLC root is not a git repository: $asdlc_root"
-  fi
-
-  if ! git_root_resolved="$(cd "$git_root" && pwd -P)"; then
-    die "Failed to resolve ASDLC git root path: $git_root"
-  fi
-
-  if [[ "$git_root_resolved" != "$asdlc_root_resolved" ]]; then
-    die "Git prerequisite failed: ASDLC root must be git repository root: $asdlc_root (resolved: $git_root)"
-  fi
-
-  printf '%s' "$git_root"
-}
-
-require_main_branch_exists() {
-  local asdlc_git_root="$1"
-
-  if ! git -C "$asdlc_git_root" show-ref --verify --quiet "refs/heads/$MAIN_BRANCH_NAME"; then
-    die "Git prerequisite failed: local branch '$MAIN_BRANCH_NAME' is required in ASDLC repo: $asdlc_git_root"
-  fi
-}
-
-require_clean_git_state() {
-  local asdlc_git_root="$1"
-
-  if [[ -n "$(git -C "$asdlc_git_root" status --porcelain)" ]]; then
-    die "Git prerequisite failed: ASDLC git worktree/index must be clean before add-project."
-  fi
-}
-
-build_add_project_branch_name() {
-  local project_id="$1"
-  printf '%s/%s' "$ADD_PROJECT_BRANCH_PREFIX" "$project_id"
-}
-
-ensure_branch_does_not_exist() {
-  local asdlc_git_root="$1"
-  local branch_name="$2"
-
-  if git -C "$asdlc_git_root" show-ref --verify --quiet "refs/heads/$branch_name"; then
-    die "Git prerequisite failed: branch already exists: $branch_name"
-  fi
-}
-
-checkout_add_project_branch() {
-  local asdlc_git_root="$1"
-  local branch_name="$2"
-
-  if ! git -C "$asdlc_git_root" checkout -q -b "$branch_name" "$MAIN_BRANCH_NAME"; then
-    die "Failed to create and checkout add-project branch: $branch_name"
-  fi
 }
 
 prompt_feature_name() {
@@ -571,30 +508,39 @@ BEGIN {
   fi
 }
 
-commit_add_project_changes() {
-  local asdlc_git_root="$1"
-  local project_id="$2"
-  local metadata_rel_path="$ASDLC_METADATA_FILE_NAME"
-  local project_rel_path="$ASDLC_PROJECTS_DIR_NAME/$project_id"
+ensure_project_git_identity() {
+  local project_root="$1"
 
-  if ! git -C "$asdlc_git_root" add -- "$metadata_rel_path" "$project_rel_path"; then
-    die "Failed to stage add-project changes for commit."
+  if ! git -C "$project_root" config user.name >/dev/null 2>&1; then
+    if ! git -C "$project_root" config user.name "$PROJECT_GIT_FALLBACK_USER_NAME" >/dev/null 2>&1; then
+      die "Failed to configure git user.name for project repo: $project_root"
+    fi
   fi
 
-  if ! git -C "$asdlc_git_root" commit -m "Add ASDLC project $project_id" >/dev/null 2>&1; then
-    die "Failed to commit add-project changes on dedicated branch."
+  if ! git -C "$project_root" config user.email >/dev/null 2>&1; then
+    if ! git -C "$project_root" config user.email "$PROJECT_GIT_FALLBACK_USER_EMAIL" >/dev/null 2>&1; then
+      die "Failed to configure git user.email for project repo: $project_root"
+    fi
   fi
 }
 
-print_main_branch_handoff() {
-  local add_project_branch_name="$1"
-  local merge_command="git checkout main && git merge $add_project_branch_name"
+initialize_project_git_repo() {
+  local project_root="$1"
+  local definition_file_name="$2"
 
-  echo "========================================"
-  echo "ADD-PROJECT HANDOFF"
-  echo "you're in branch $add_project_branch_name now, dont forget to commit changes to main branch with"
-  echo ">>> $merge_command"
-  echo "========================================"
+  if ! git -C "$project_root" init -q; then
+    die "Failed to initialize project git repository: $project_root"
+  fi
+
+  ensure_project_git_identity "$project_root"
+
+  if ! git -C "$project_root" add -- "$definition_file_name"; then
+    die "Failed to stage initial project definition for git bootstrap: $project_root/$definition_file_name"
+  fi
+
+  if ! git -C "$project_root" commit -qm "$PROJECT_GIT_INIT_COMMIT_MESSAGE"; then
+    die "Failed to create initial project git commit: $project_root"
+  fi
 }
 
 main() {
@@ -608,7 +554,6 @@ main() {
 
   local script_dir=""
   local asdlc_root=""
-  local asdlc_git_root=""
   local metadata_path=""
   local template_path=""
   local projects_root=""
@@ -619,7 +564,6 @@ main() {
   local project_folder_name=""
   local project_folder_path=""
   local project_definition_path=""
-  local add_project_branch_name=""
   local project_classes=""
   local repo_path_states=""
   local project_type_code=""
@@ -663,13 +607,6 @@ main() {
     die "Project folder already exists: $project_folder_path"
   fi
 
-  asdlc_git_root="$(resolve_asdlc_git_root "$asdlc_root")"
-  require_main_branch_exists "$asdlc_git_root"
-  require_clean_git_state "$asdlc_git_root"
-  add_project_branch_name="$(build_add_project_branch_name "$project_folder_name")"
-  ensure_branch_does_not_exist "$asdlc_git_root" "$add_project_branch_name"
-  checkout_add_project_branch "$asdlc_git_root" "$add_project_branch_name"
-
   if ! mkdir -p "$project_folder_path"; then
     die "Failed to create project folder: $project_folder_path"
   fi
@@ -682,17 +619,14 @@ main() {
     die "Failed to write project classes and repo paths into project definition."
   fi
 
+  initialize_project_git_repo "$project_folder_path" "$PROJECT_DEFINITION_FILE_NAME"
+
   if ! append_project_record "$metadata_path" "$project_folder_name" "$feature_name_raw" "$project_folder_name" "$created_at"; then
     die "Failed to append project record to ASDLC metadata."
   fi
 
-  if ! commit_add_project_changes "$asdlc_git_root" "$project_folder_name"; then
-    die "Failed to commit add-project changes."
-  fi
-
   echo "Created ASDLC project folder: $project_folder_path"
   echo "Updated ASDLC metadata: $metadata_path"
-  print_main_branch_handoff "$add_project_branch_name"
 }
 
 main "$@"

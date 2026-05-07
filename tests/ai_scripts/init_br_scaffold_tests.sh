@@ -92,16 +92,6 @@ projects:
 OUT
 
   write_project_definition "$repo_dir" "B"
-
-  (
-    cd "$repo_dir/asdlc"
-    git init -q
-    git config user.name "Test User"
-    git config user.email "test@example.com"
-    echo "seed" >README.md
-    git add .
-    git commit -qm "seed"
-  )
 }
 
 test_requires_path_argument() {
@@ -192,7 +182,6 @@ test_creates_summary_from_project_metadata() {
   assert_contains "$(cat "$summary_path")" "- feature_title: Invoice Approval"
   assert_contains "$(cat "$summary_path")" "- project_type_code: A"
   assert_contains "$(cat "$summary_path")" "- project_type_label: New project"
-  assert_equal "Initialize feature BR scaffold" "$(git -C "$repo_dir/asdlc" log -1 --pretty=%s)"
 }
 
 test_requires_path_argument

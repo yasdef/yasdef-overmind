@@ -108,10 +108,6 @@ ensure_staged_command_runtime() {
     die "Run this command from ASDLC staged path: <asdlc>/.commands/$SCRIPT_BASENAME"
   fi
 
-  if ! git -C "$parent_dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    die "ASDLC workspace is not a git repository: $parent_dir"
-  fi
-
   printf '%s' "$parent_dir"
 }
 
@@ -621,24 +617,7 @@ ensure_readonly_inputs_unchanged() {
   done
 }
 
-commit_output_if_changed() {
-  local runtime_root="$1"
-
-  if ! git -C "$runtime_root" add -- "$IMPLEMENTATION_SLICES_FILE"; then
-    die "Failed to stage $IMPLEMENTATION_SLICES_FILE."
-  fi
-
-  if git -C "$runtime_root" diff --cached --quiet -- "$IMPLEMENTATION_SLICES_FILE"; then
-    return 0
-  fi
-
-  if ! git -C "$runtime_root" commit -m "Generate implementation slices planning artifact" -- "$IMPLEMENTATION_SLICES_FILE" >/dev/null 2>&1; then
-    die "Failed to commit $IMPLEMENTATION_SLICES_FILE."
-  fi
-}
-
 main() {
-  require_command git
   require_command awk
   require_command cmp
   require_command cp
@@ -700,7 +679,6 @@ main() {
   fi
 
   ensure_readonly_inputs_unchanged "$runtime_root"
-  commit_output_if_changed "$runtime_root"
   echo "Updated $IMPLEMENTATION_SLICES_FILE"
 }
 

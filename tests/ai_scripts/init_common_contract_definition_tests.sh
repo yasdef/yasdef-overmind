@@ -80,15 +80,6 @@ meta:
   description: "staged command test"
 projects:
 OUT
-
-  (
-    cd "$asdlc_root"
-    git init -q
-    git config user.name "Test User"
-    git config user.email "test@example.com"
-    git add asdlc_metadata.yaml .commands/init_common_contract_definition.sh .rules/common_contract_definition_rule.md .templates/common_contract_definition_TEMPLATE.md .golden_examples/common_contract_definition_GOLDEN_EXAMPLE.md .helper/check_cross_class_peer_trigger.sh
-    git commit -qm "seed staged workspace"
-  )
 }
 
 setup_staged_models_file() {
@@ -248,7 +239,7 @@ test_fails_fast_when_run_from_repo_path() {
   set -e
 
   assert_nonzero_status "$status"
-  assert_contains "$out" "init asdlc repo first, run this script only from asldc/.commands"
+  assert_contains "$out" "initialize the ASDLC workspace first; run this script only from asdlc/.commands"
 }
 
 test_fails_when_path_argument_is_missing() {
@@ -431,12 +422,6 @@ test_runs_codex_with_project_scoped_output_and_repo_context() {
   write_staged_quality_gate_stub "$asdlc_root"
   setup_codex_stub "$asdlc_root"
   write_project_definition "$project_dir" "ready" "$backend_repo" "ready" "$frontend_repo"
-  git -C "$asdlc_root" checkout -q -b "feature/common-contract-auto-commit"
-
-  local branch_before=""
-  local branch_after=""
-  local committed_paths=""
-  branch_before="$(git -C "$asdlc_root" rev-parse --abbrev-ref HEAD)"
 
   local out=""
   out="$({
@@ -447,16 +432,10 @@ test_runs_codex_with_project_scoped_output_and_repo_context() {
   })"
 
   assert_contains "$out" "Updated $project_dir/common_contract_definition.md"
-  assert_contains "$out" "Committed $project_dir/common_contract_definition.md"
   assert_file_exists "$capture_dir/codex_args.txt"
   assert_file_exists "$capture_dir/codex_prompt.txt"
   assert_file_exists "$project_dir/common_contract_definition.md"
   assert_file_not_exists "$capture_dir/helper_arg.txt"
-  assert_equal "Update common contract definition for sample-project" "$(git -C "$asdlc_root" log -1 --pretty=%s)"
-  committed_paths="$(git -C "$asdlc_root" show --pretty='' --name-only HEAD)"
-  assert_contains "$committed_paths" "projects/sample-project/common_contract_definition.md"
-  branch_after="$(git -C "$asdlc_root" rev-parse --abbrev-ref HEAD)"
-  assert_equal "$branch_before" "$branch_after"
 
   local codex_args
   codex_args="$(cat "$capture_dir/codex_args.txt")"
@@ -490,9 +469,6 @@ test_type_a_runs_with_read_only_stack_blueprint_context() {
   setup_codex_stub "$asdlc_root"
   write_project_definition "$project_dir" "deferred" "" "deferred" "" "A"
   write_valid_stack_blueprints "$project_dir"
-  git -C "$asdlc_root" add "projects/sample-project/init_progress_definition.yaml" "projects/sample-project/project_stack_blueprint_backend.md" "projects/sample-project/project_stack_blueprint_frontend.md"
-  git -C "$asdlc_root" commit -qm "seed type a project"
-  git -C "$asdlc_root" checkout -q -b "feature/common-contract-type-a"
 
   local out=""
   out="$({
@@ -527,8 +503,6 @@ test_type_a_fails_if_model_modifies_read_only_blueprint() {
   setup_codex_stub "$asdlc_root"
   write_project_definition "$project_dir" "deferred" "" "deferred" "" "A"
   write_valid_stack_blueprints "$project_dir"
-  git -C "$asdlc_root" add "projects/sample-project/init_progress_definition.yaml" "projects/sample-project/project_stack_blueprint_backend.md" "projects/sample-project/project_stack_blueprint_frontend.md"
-  git -C "$asdlc_root" commit -qm "seed type a project"
 
   local status=0
   local out=""

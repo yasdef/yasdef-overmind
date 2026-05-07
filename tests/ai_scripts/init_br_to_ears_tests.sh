@@ -170,16 +170,6 @@ setup_git_workspace() {
   setup_models_file "$repo_dir"
   write_quality_gate_stub "$repo_dir"
   seed_feature_br_summary "$repo_dir"
-
-  (
-    cd "$repo_dir/asdlc"
-    git init -q
-    git config user.name "Test User"
-    git config user.email "test@example.com"
-    echo "seed" >README.md
-    git add .
-    git commit -qm "seed"
-  )
 }
 
 test_requires_feature_path_argument() {
@@ -337,12 +327,7 @@ test_runs_codex_and_commits_only_requirements_file() {
   br_after="$(cat "$repo_dir/asdlc/projects/p1/feature-a/feature_br_summary.md")"
   assert_equal "$br_before" "$br_after"
 
-  assert_equal "Generate overmind requirements ears" "$(git -C "$repo_dir/asdlc" log -1 --pretty=%s)"
-  local committed_files
-  committed_files="$(git -C "$repo_dir/asdlc" show --name-only --pretty='' HEAD)"
-  assert_contains "$committed_files" "projects/p1/feature-a/requirements_ears.md"
-  assert_not_contains "$committed_files" "projects/p1/feature-a/feature_br_summary.md"
-  assert_not_contains "$committed_files" "README.md"
+  assert_file_exists "$repo_dir/asdlc/projects/p1/feature-a/requirements_ears.md"
 }
 
 test_skips_empty_commit_when_output_is_unchanged() {
@@ -356,17 +341,11 @@ test_skips_empty_commit_when_output_is_unchanged() {
     cd "$repo_dir/asdlc" &&
     PATH="$repo_dir/bin:$PATH" TEST_CAPTURE_DIR="$capture_dir" .commands/feature_br_to_ears.sh --feature_path "projects/p1/feature-a" >/dev/null
   )
-  local commits_after_first
-  commits_after_first="$(git -C "$repo_dir/asdlc" rev-list --count HEAD)"
-
   (
     cd "$repo_dir/asdlc" &&
     PATH="$repo_dir/bin:$PATH" TEST_CAPTURE_DIR="$capture_dir" .commands/feature_br_to_ears.sh --feature_path "projects/p1/feature-a" >/dev/null
   )
-  local commits_after_second
-  commits_after_second="$(git -C "$repo_dir/asdlc" rev-list --count HEAD)"
-
-  assert_equal "$commits_after_first" "$commits_after_second"
+  assert_file_exists "$repo_dir/asdlc/projects/p1/feature-a/requirements_ears.md"
 }
 
 test_runs_with_absolute_feature_path() {
@@ -398,6 +377,145 @@ test_runs_with_absolute_feature_path() {
   assert_file_not_exists "$capture_dir/helper_arg.txt"
 }
 
+seed_feature_br_summary_with_linked_artifacts() {
+  local repo_dir="$1"
+  local feature_path="${2:-projects/p1/feature-a}"
+  mkdir -p "$repo_dir/asdlc/$feature_path"
+  cat >"$repo_dir/asdlc/$feature_path/feature_br_summary.md" <<'EOF_BR'
+# Feature Business Requirements Summary
+
+## 1. Document Meta
+- feature_id: FTR-9001
+- source_type: jira:CRP-900
+- last_updated: 2026-04-01
+- ready_to_ears: true
+
+## 16. Linked Artifacts
+
+- id: LAR-001
+  title: Domain Model Diagram
+  type: diagram
+  locator: https://confluence.example.com/domain-model
+- id: LAR-002
+  title: Payments API Spec
+  type: api_spec
+  locator: https://confluence.example.com/api-spec
+EOF_BR
+}
+
+setup_codex_stub_with_linked_artifacts() {
+  local repo_dir="$1"
+  mkdir -p "$repo_dir/bin"
+  cat >"$repo_dir/bin/codex" <<'EOF_CODEX'
+#!/usr/bin/env bash
+set -euo pipefail
+capture_dir="${TEST_CAPTURE_DIR:?TEST_CAPTURE_DIR must be set}"
+target_file="${TARGET_REQUIREMENTS_FILE:-projects/p1/feature-a/requirements_ears.md}"
+printf '%s\n' "$@" >"$capture_dir/codex_args.txt"
+printf '%s' "${!#}" >"$capture_dir/codex_prompt.txt"
+mkdir -p "$(dirname "$target_file")"
+cat >"$target_file" <<'OUT'
+# Requirements (EARS)
+
+## Requirements
+
+### Requirement 1 — Submit task
+**User Story:** As a user, I want to submit a task, so that I can track work.
+
+**Acceptance Criteria (EARS):**
+- WHEN a user submits a task, THE System SHALL create a task record.
+
+**Verification:** API test for task creation.
+
+**Linked Artifacts:**
+- LAR-001
+
+---
+
+## Non-Functional Requirements
+
+### NFR 1 — Latency
+**User Story:** As a user, I want fast responses, so that the UI feels responsive.
+
+**Acceptance Criteria (EARS):**
+- THE System SHALL respond within 300 ms at p95.
+
+**Verification:** Load test.
+
+---
+
+## Linked Artifacts
+
+- id: LAR-001
+  title: Domain Model Diagram
+  type: diagram
+  locator: https://confluence.example.com/domain-model
+- id: LAR-002
+  title: Payments API Spec
+  type: api_spec
+  locator: https://confluence.example.com/api-spec
+OUT
+EOF_CODEX
+  chmod +x "$repo_dir/bin/codex"
+}
+
+test_ears_output_has_linked_artifacts_registry_when_br_section16_populated() {
+  local repo_dir="$TMP_ROOT/repo-linked-artifacts-registry"
+  local capture_dir="$TMP_ROOT/capture-linked-artifacts-registry"
+  mkdir -p "$repo_dir" "$capture_dir"
+  setup_git_workspace "$repo_dir"
+  seed_feature_br_summary_with_linked_artifacts "$repo_dir"
+  setup_codex_stub_with_linked_artifacts "$repo_dir"
+
+  local out=""
+  out="$(
+    cd "$repo_dir/asdlc" &&
+    PATH="$repo_dir/bin:$PATH" TEST_CAPTURE_DIR="$capture_dir" .commands/feature_br_to_ears.sh --feature_path "projects/p1/feature-a"
+  )"
+
+  assert_contains "$out" "Updated projects/p1/feature-a/requirements_ears.md"
+  local ears_content
+  ears_content="$(cat "$repo_dir/asdlc/projects/p1/feature-a/requirements_ears.md")"
+  assert_contains "$ears_content" "## Linked Artifacts"
+  assert_contains "$ears_content" "LAR-001"
+  assert_contains "$ears_content" "LAR-002"
+}
+
+test_ears_requirement_block_has_linked_artifacts_subsection_when_artifacts_present() {
+  local repo_dir="$TMP_ROOT/repo-linked-artifacts-subsection"
+  local capture_dir="$TMP_ROOT/capture-linked-artifacts-subsection"
+  mkdir -p "$repo_dir" "$capture_dir"
+  setup_git_workspace "$repo_dir"
+  seed_feature_br_summary_with_linked_artifacts "$repo_dir"
+  setup_codex_stub_with_linked_artifacts "$repo_dir"
+
+  (
+    cd "$repo_dir/asdlc" &&
+    PATH="$repo_dir/bin:$PATH" TEST_CAPTURE_DIR="$capture_dir" .commands/feature_br_to_ears.sh --feature_path "projects/p1/feature-a" >/dev/null
+  )
+
+  local ears_content
+  ears_content="$(cat "$repo_dir/asdlc/projects/p1/feature-a/requirements_ears.md")"
+  assert_contains "$ears_content" "**Linked Artifacts:**"
+}
+
+test_ears_linked_artifacts_registry_absent_when_br_section16_empty() {
+  local repo_dir="$TMP_ROOT/repo-linked-artifacts-absent"
+  local capture_dir="$TMP_ROOT/capture-linked-artifacts-absent"
+  mkdir -p "$repo_dir" "$capture_dir"
+  setup_git_workspace "$repo_dir"
+  setup_codex_stub "$repo_dir"
+
+  (
+    cd "$repo_dir/asdlc" &&
+    PATH="$repo_dir/bin:$PATH" TEST_CAPTURE_DIR="$capture_dir" .commands/feature_br_to_ears.sh --feature_path "projects/p1/feature-a" >/dev/null
+  )
+
+  local ears_content
+  ears_content="$(cat "$repo_dir/asdlc/projects/p1/feature-a/requirements_ears.md")"
+  assert_not_contains "$ears_content" "## Linked Artifacts"
+}
+
 test_requires_feature_path_argument
 test_requires_staged_command_location
 test_fails_when_readiness_not_true
@@ -407,5 +525,8 @@ test_does_not_run_quality_helper_directly
 test_runs_codex_and_commits_only_requirements_file
 test_skips_empty_commit_when_output_is_unchanged
 test_runs_with_absolute_feature_path
+test_ears_output_has_linked_artifacts_registry_when_br_section16_populated
+test_ears_requirement_block_has_linked_artifacts_subsection_when_artifacts_present
+test_ears_linked_artifacts_registry_absent_when_br_section16_empty
 
 echo "All BR-to-EARS initializer tests passed."

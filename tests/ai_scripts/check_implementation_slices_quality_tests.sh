@@ -33,16 +33,7 @@ setup_repo_with_helper() {
   mkdir -p "$repo_dir/overmind/scripts/helper"
   cp "$HELPER_SRC" "$repo_dir/overmind/scripts/helper/check_implementation_slices_quality.sh"
   chmod +x "$repo_dir/overmind/scripts/helper/check_implementation_slices_quality.sh"
-
-  (
-    cd "$repo_dir"
-    git init -q
-    git config user.name "Test User"
-    git config user.email "test@example.com"
-    echo "seed" >README.md
-    git add README.md overmind
-    git commit -qm "seed"
-  )
+  echo "seed" >"$repo_dir/README.md"
 }
 
 write_project_definition() {
@@ -365,7 +356,8 @@ test_fails_when_technical_requirements_is_missing() {
   out="$(printf '%s\n' "$result" | tail -n +2)"
 
   assert_equal "2" "$status"
-  assert_contains "$out" "Required sibling artifact not found for quality check: projects/p1/feature-a/technical_requirements.md"
+  assert_contains "$out" "Required sibling artifact not found for quality check:"
+  assert_contains "$out" "projects/p1/feature-a/technical_requirements.md"
 }
 
 test_fails_when_ordering_scope_is_invalid() {

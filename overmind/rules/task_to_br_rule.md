@@ -83,3 +83,26 @@ Exit codes:
 - If `missing_br_data.md` contains unresolved `rised_item_N` entries, `## 7. Loop Decision -> unresolved_after_stop` is filled.
 - FR/BR lines are concrete and input-traceable; generic/buzzword-only placeholders are not accepted.
 - Every populated value is business-readable and traceable to user input.
+
+## Linked Artifact Extraction (Jira Source Only)
+
+1. This rule applies only when `## 1. Document Meta -> source_type` contains `jira:<ticket>` (i.e. the input source is a Jira MCP fetch). Skip this rule entirely for file-path sources.
+2. After extracting business content, inspect the Jira MCP story response for linked non-text artifacts: attached images, PDFs, linked Confluence pages, referenced API specs, data schemas, design mocks, and any other non-text items surfaced by the MCP response.
+3. Populate `## 16. Linked Artifacts` in `<TARGET_BR_ARTIFACT>` with one entry per discovered artifact, using the LAR-NNN sequential ID scheme (LAR-001, LAR-002, …) scoped to this document.
+4. Always emit `## 16. Linked Artifacts` in the output, even when the list is empty. Do not omit the section.
+5. Each entry must capture exactly these four fields:
+   - `id`: LAR-NNN sequential identifier (LAR-001, LAR-002, …), document-local and gap-free.
+   - `title`: human-readable artifact name as found in the Jira/Confluence metadata.
+   - `type`: one value from the closed vocabulary below.
+   - `locator`: URL or path to the artifact as returned by the MCP response.
+6. Use only the following closed type vocabulary for the `type` field:
+   - `data_schema` — structured data schema or data model document
+   - `diagram` — architecture, flow, sequence, or entity-relationship diagram
+   - `api_spec` — API specification or contract (OpenAPI, AsyncAPI, Protobuf, etc.)
+   - `design_mock` — UI design mockup or wireframe
+   - `document` — general document, Confluence page, or unclassified text artifact
+   - `image` — image file not covered by another type
+   - `pdf` — PDF file
+   - `other` — any artifact that does not match the above types
+7. Do not download or interpret artifact content; record only metadata (id, title, type, locator/URL).
+8. If the MCP response does not surface linked items as structured data (only plain text with no link metadata), emit `## 16. Linked Artifacts` with an empty list. This is correct behavior, not a failure.

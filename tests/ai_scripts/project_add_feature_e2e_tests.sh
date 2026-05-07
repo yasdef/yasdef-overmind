@@ -46,6 +46,14 @@ assert_nonzero_status() {
   fi
 }
 
+assert_zero_status() {
+  local status="$1"
+  if [[ "$status" -ne 0 ]]; then
+    echo "Assertion failed: expected zero status, got $status" >&2
+    exit 1
+  fi
+}
+
 assert_file_exists() {
   local path="$1"
   if [[ ! -f "$path" ]]; then
@@ -315,16 +323,6 @@ OUT
   cat >"$asdlc_root/projects/project-a/init_progress_definition.yaml" <<'OUT'
 steps: []
 OUT
-
-  (
-    cd "$asdlc_root"
-    git init -q
-    git config user.name "Test User"
-    git config user.email "test@example.com"
-    echo "seed" >README.md
-    git add .
-    git commit -qm "seed"
-  )
 }
 
 read_log() {
@@ -334,21 +332,91 @@ read_log() {
   fi
 }
 
-test_requires_path_argument() {
-  local asdlc_root="$TMP_ROOT/asdlc-missing-path"
-  local log_file="$TMP_ROOT/asdlc-missing-path.log"
+test_without_path_uses_only_project_in_workspace() {
+  local asdlc_root="$TMP_ROOT/asdlc-single-project-autodetect"
+  local log_file="$TMP_ROOT/asdlc-single-project-autodetect.log"
   mkdir -p "$asdlc_root"
   setup_workspace "$asdlc_root"
+
+  local out=""
+  out="$(
+    cd "$asdlc_root" &&
+    {
+      printf 'y\n'
+    } | TEST_LOG_FILE="$log_file" TEST_SCAFFOLD_FEATURE_REL="projects/project-a/feature-alpha" TEST_SCANNER_NEXT_LINE="next step: none" \
+      .commands/project_add_feature_e2e.sh 2>&1
+  )"
+
+  assert_contains "$out" "No --path provided. Found one ASDLC project; using path: projects/project-a"
+  assert_contains "$out" "Saved feature_path: projects/project-a/feature-alpha"
+  assert_not_contains "$out" "Multiple projects found under ASDLC projects"
+
+  local log_content
+  log_content="$(read_log "$log_file")"
+  assert_contains "$log_content" "feature_br_scaffold.sh --path projects/project-a"
+  assert_contains "$log_content" "init_progress_scanner.sh --path projects/project-a/feature-alpha"
+}
+
+test_without_path_prompts_for_project_when_multiple_exist() {
+  local asdlc_root="$TMP_ROOT/asdlc-multi-project-autodetect"
+  local log_file="$TMP_ROOT/asdlc-multi-project-autodetect.log"
+  mkdir -p "$asdlc_root"
+  setup_workspace "$asdlc_root"
+
+  mkdir -p "$asdlc_root/projects/project-b"
+  cat >"$asdlc_root/projects/project-b/init_progress_definition.yaml" <<'OUT'
+steps: []
+OUT
+
+  local out=""
+  out="$(
+    cd "$asdlc_root" &&
+    {
+      printf '2\n'
+      printf 'y\n'
+    } | TEST_LOG_FILE="$log_file" TEST_SCAFFOLD_FEATURE_REL="projects/project-b/feature-beta" TEST_SCANNER_NEXT_LINE="next step: none" \
+      .commands/project_add_feature_e2e.sh 2>&1
+  )"
+
+  assert_contains "$out" "No --path provided. Multiple projects found under ASDLC projects:"
+  assert_contains "$out" "1) project-a [projects/project-a]"
+  assert_contains "$out" "2) project-b [projects/project-b]"
+  assert_contains "$out" "Selected project: projects/project-b"
+  assert_contains "$out" "Saved feature_path: projects/project-b/feature-beta"
+
+  local log_content
+  log_content="$(read_log "$log_file")"
+  assert_contains "$log_content" "feature_br_scaffold.sh --path projects/project-b"
+  assert_contains "$log_content" "init_progress_scanner.sh --path projects/project-b/feature-beta"
+  assert_not_contains "$log_content" "feature_br_scaffold.sh --path projects/project-a"
+}
+
+test_without_path_can_finish_when_multiple_projects_exist() {
+  local asdlc_root="$TMP_ROOT/asdlc-multi-project-finish"
+  local log_file="$TMP_ROOT/asdlc-multi-project-finish.log"
+  mkdir -p "$asdlc_root"
+  setup_workspace "$asdlc_root"
+
+  mkdir -p "$asdlc_root/projects/project-b"
+  cat >"$asdlc_root/projects/project-b/init_progress_definition.yaml" <<'OUT'
+steps: []
+OUT
 
   local status=0
   local out=""
   set +e
-  out="$(cd "$asdlc_root" && TEST_LOG_FILE="$log_file" .commands/project_add_feature_e2e.sh 2>&1)"
+  out="$(
+    cd "$asdlc_root" &&
+    {
+      printf 'q\n'
+    } | TEST_LOG_FILE="$log_file" .commands/project_add_feature_e2e.sh 2>&1
+  )"
   status=$?
   set -e
 
-  assert_nonzero_status "$status"
-  assert_contains "$out" "Missing required argument: --path <project-folder-path>."
+  assert_zero_status "$status"
+  assert_contains "$out" "Execution finished: no project selected."
+  assert_equal "" "$(read_log "$log_file")"
 }
 
 test_scaffold_first_run_persists_feature_path_and_calls_scanner() {
@@ -1153,7 +1221,9 @@ test_optional_step_7_1_runs_when_accepted_then_continues_to_next_required_phase(
   assert_contains "$out" "Phase 8 (Create Feature-Scoped Technical Requirements)"
 }
 
-test_requires_path_argument
+test_without_path_uses_only_project_in_workspace
+test_without_path_prompts_for_project_when_multiple_exist
+test_without_path_can_finish_when_multiple_projects_exist
 test_scaffold_first_run_persists_feature_path_and_calls_scanner
 test_scaffold_path_capture_accepts_prefixed_created_line
 test_scaffold_path_capture_falls_back_to_updated_line

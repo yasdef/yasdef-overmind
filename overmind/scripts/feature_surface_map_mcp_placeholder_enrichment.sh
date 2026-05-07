@@ -96,10 +96,6 @@ ensure_staged_command_runtime() {
     die "Run this command from ASDLC staged path: <asdlc>/.commands/$SCRIPT_BASENAME"
   fi
 
-  if ! git -C "$parent_dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    die "ASDLC workspace is not a git repository: $parent_dir"
-  fi
-
   printf '%s' "$parent_dir"
 }
 
@@ -386,30 +382,7 @@ ensure_file_unchanged() {
   fi
 }
 
-commit_changed_maps_if_needed() {
-  local runtime_root="$1"
-  shift
-  local changed_maps=("$@")
-
-  if [[ ${#changed_maps[@]} -eq 0 ]]; then
-    return 0
-  fi
-
-  if ! git -C "$runtime_root" add -- "${changed_maps[@]}"; then
-    die "Failed to stage enriched surface-map artifacts."
-  fi
-
-  if git -C "$runtime_root" diff --cached --quiet -- "${changed_maps[@]}"; then
-    return 0
-  fi
-
-  if ! git -C "$runtime_root" commit -m "Enrich surface-map placeholders with MCP" -- "${changed_maps[@]}" >/dev/null 2>&1; then
-    die "Failed to commit enriched surface-map artifacts."
-  fi
-}
-
 main() {
-  require_command git
   require_command awk
   require_command cmp
   require_command cp
@@ -501,7 +474,6 @@ main() {
   fi
 
   if [[ ${#changed_maps[@]} -gt 0 ]]; then
-    commit_changed_maps_if_needed "$runtime_root" "${changed_maps[@]}"
     for idx in "${!changed_maps[@]}"; do
       echo "Updated ${changed_maps[$idx]}"
     done
