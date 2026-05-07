@@ -5,11 +5,6 @@ TARGET_RELATIVE_PATH="${1:-}"
 REQUIREMENTS_EARS_RELATIVE_PATH="${2:-}"
 TECHNICAL_REQUIREMENTS_RELATIVE_PATH="${3:-}"
 
-REPO_MODE_HELPER_COMMAND_PATH="overmind/scripts/helper/check_prerequisite_gaps_quality.sh"
-STAGED_MODE_HELPER_COMMAND_PATH=".helper/check_prerequisite_gaps_quality.sh"
-HELPER_COMMAND_PATH="$REPO_MODE_HELPER_COMMAND_PATH"
-WORKSPACE_ROOT=""
-
 EXIT_CONTENT_FAILURE=1
 EXIT_HELPER_FAILURE=2
 
@@ -25,40 +20,17 @@ require_command() {
   fi
 }
 
-resolve_workspace_root() {
-  local script_dir=""
-  local parent_dir=""
-  local root=""
-
-  if ! script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; then
-    helper_fail "Failed to resolve script directory."
-  fi
-
-  parent_dir="$(dirname "$script_dir")"
-  if [[ "$(basename "$script_dir")" == ".helper" && -f "$parent_dir/asdlc_metadata.yaml" ]]; then
-    HELPER_COMMAND_PATH="$STAGED_MODE_HELPER_COMMAND_PATH"
-    WORKSPACE_ROOT="$parent_dir"
-    return 0
-  fi
-
-  require_command git
-  if ! root="$(git -C "$script_dir" rev-parse --show-toplevel 2>/dev/null)"; then
-    helper_fail "Not a git repository at script path: $script_dir"
-  fi
-  HELPER_COMMAND_PATH="$REPO_MODE_HELPER_COMMAND_PATH"
-  WORKSPACE_ROOT="$root"
-}
-
 resolve_target_path() {
-  local workspace_root="$1"
-  local target_input="$2"
+  local target_input="$1"
+
+  [[ -n "$target_input" ]] || helper_fail "Missing target artifact path."
 
   if [[ "$target_input" = /* ]]; then
     printf '%s\n' "$target_input"
     return 0
   fi
 
-  printf '%s/%s\n' "$workspace_root" "$target_input"
+  printf '%s/%s\n' "$PWD" "$target_input"
 }
 
 trim_value() {
@@ -466,17 +438,15 @@ main() {
   require_command awk
   require_command sed
 
-  resolve_workspace_root
-
   if [[ -z "$TARGET_RELATIVE_PATH" ]]; then
-    helper_fail "Usage: $HELPER_COMMAND_PATH <prerequisite_gaps.md> [requirements_ears.md] [technical_requirements.md]"
+    helper_fail "Usage: $(basename "$0") <prerequisite_gaps.md> [requirements_ears.md] [technical_requirements.md]"
   fi
 
   local target_path=""
   local requirements_path=""
   local technical_requirements_path=""
 
-  target_path="$(resolve_target_path "$WORKSPACE_ROOT" "$TARGET_RELATIVE_PATH")"
+  target_path="$(resolve_target_path "$TARGET_RELATIVE_PATH")"
 
   if [[ ! -f "$target_path" ]]; then
     helper_fail "Target prerequisite gaps artifact not found: $TARGET_RELATIVE_PATH"
@@ -491,8 +461,8 @@ main() {
   validate_prerequisite_gaps "$target_path" || has_errors=1
 
   if [[ -n "$REQUIREMENTS_EARS_RELATIVE_PATH" && -n "$TECHNICAL_REQUIREMENTS_RELATIVE_PATH" ]]; then
-    requirements_path="$(resolve_target_path "$WORKSPACE_ROOT" "$REQUIREMENTS_EARS_RELATIVE_PATH")"
-    technical_requirements_path="$(resolve_target_path "$WORKSPACE_ROOT" "$TECHNICAL_REQUIREMENTS_RELATIVE_PATH")"
+    requirements_path="$(resolve_target_path "$REQUIREMENTS_EARS_RELATIVE_PATH")"
+    technical_requirements_path="$(resolve_target_path "$TECHNICAL_REQUIREMENTS_RELATIVE_PATH")"
 
     if [[ -f "$requirements_path" && -f "$technical_requirements_path" ]]; then
       run_literal_cross_check "$target_path" "$requirements_path" "$technical_requirements_path" || has_errors=1

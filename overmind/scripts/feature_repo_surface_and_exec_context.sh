@@ -126,10 +126,6 @@ ensure_staged_command_runtime() {
     die "Run this command from ASDLC staged path: <asdlc>/.commands/$SCRIPT_BASENAME"
   fi
 
-  if ! git -C "$parent_dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    die "ASDLC workspace is not a git repository: $parent_dir"
-  fi
-
   printf '%s' "$parent_dir"
 }
 
@@ -877,26 +873,7 @@ ensure_file_unchanged() {
   fi
 }
 
-commit_outputs_if_changed() {
-  local runtime_root="$1"
-  local commit_message=""
-
-  if ! git -C "$runtime_root" add -- "$PROJECT_SURFACE_MAP_FILE"; then
-    die "Failed to stage output artifacts."
-  fi
-
-  if git -C "$runtime_root" diff --cached --quiet -- "$PROJECT_SURFACE_MAP_FILE"; then
-    return 0
-  fi
-
-  commit_message="Generate repo surface and execution context for $TARGET_REPO_CLASS"
-  if ! git -C "$runtime_root" commit -m "$commit_message" -- "$PROJECT_SURFACE_MAP_FILE" >/dev/null 2>&1; then
-    die "Failed to commit repo surface and execution context artifact."
-  fi
-}
-
 main() {
-  require_command git
   require_command awk
   require_command cmp
   require_command cp
@@ -980,8 +957,6 @@ main() {
   ensure_file_unchanged "$before_definition" "$definition_path" "$PROJECT_DEFINITION_FILE"
   ensure_file_unchanged "$before_requirements" "$requirements_path" "$REQUIREMENTS_EARS_FILE"
   ensure_file_unchanged "$before_contract_delta" "$contract_delta_path" "$FEATURE_CONTRACT_DELTA_FILE"
-
-  commit_outputs_if_changed "$runtime_root"
   echo "Updated $PROJECT_SURFACE_MAP_FILE"
 }
 

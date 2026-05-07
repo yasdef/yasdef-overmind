@@ -2,10 +2,6 @@
 set -euo pipefail
 
 TARGET_RELATIVE_PATH="${1:-common_contract_definition.md}"
-REPO_MODE_HELPER_COMMAND_PATH="overmind/scripts/helper/check_common_contract_definition_quality.sh"
-STAGED_MODE_HELPER_COMMAND_PATH=".helper/check_common_contract_definition_quality.sh"
-HELPER_COMMAND_PATH="$REPO_MODE_HELPER_COMMAND_PATH"
-WORKSPACE_ROOT=""
 
 EXIT_CONTENT_FAILURE=1
 EXIT_HELPER_FAILURE=2
@@ -22,47 +18,22 @@ require_command() {
   fi
 }
 
-resolve_workspace_root() {
-  local script_dir=""
-  local parent_dir=""
-  local root=""
-
-  if ! script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; then
-    helper_fail "Failed to resolve script directory."
-  fi
-
-  parent_dir="$(dirname "$script_dir")"
-  if [[ "$(basename "$script_dir")" == ".helper" && -f "$parent_dir/asdlc_metadata.yaml" ]]; then
-    HELPER_COMMAND_PATH="$STAGED_MODE_HELPER_COMMAND_PATH"
-    WORKSPACE_ROOT="$parent_dir"
-    return 0
-  fi
-
-  require_command git
-  if ! root="$(git -C "$script_dir" rev-parse --show-toplevel 2>/dev/null)"; then
-    helper_fail "Not a git repository at script path: $script_dir"
-  fi
-  HELPER_COMMAND_PATH="$REPO_MODE_HELPER_COMMAND_PATH"
-  WORKSPACE_ROOT="$root"
-}
-
 resolve_target_path() {
-  local repo_root="$1"
-  local target_input="$2"
+  local target_input="$1"
 
   if [[ "$target_input" = /* ]]; then
     printf '%s\n' "$target_input"
     return 0
   fi
 
-  printf '%s/%s\n' "$repo_root" "$target_input"
+  printf '%s/%s\n' "$PWD" "$target_input"
 }
 
 validate_content() {
   local target_path="$1"
   local status=0
   local rerun_command=""
-  rerun_command="$HELPER_COMMAND_PATH $target_path"
+  rerun_command="$0 $target_path"
 
   set +e
   awk -v rerun_command="$rerun_command" -v target_path="$target_path" '
@@ -400,12 +371,8 @@ main() {
   require_command awk
   require_command grep
 
-  local repo_root=""
-  resolve_workspace_root
-  repo_root="$WORKSPACE_ROOT"
-
   local target_path=""
-  target_path="$(resolve_target_path "$repo_root" "$TARGET_RELATIVE_PATH")"
+  target_path="$(resolve_target_path "$TARGET_RELATIVE_PATH")"
 
   if [[ ! -f "$target_path" ]]; then
     helper_fail "Target common contract definition artifact not found: $target_path"

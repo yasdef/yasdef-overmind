@@ -34,10 +34,6 @@ ensure_staged_command_runtime() {
     die "Run this command from ASDLC staged path: <asdlc>/.commands/$SCRIPT_BASENAME"
   fi
 
-  if ! git -C "$parent_dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    die "ASDLC workspace is not a git repository: $parent_dir"
-  fi
-
   printf '%s' "$parent_dir"
 }
 
@@ -263,24 +259,7 @@ END {
   fi
 }
 
-commit_feature_artifacts_if_changed() {
-  local repo_root="$1"
-
-  if ! git -C "$repo_root" add --all -- "$PRODUCT_DIR"; then
-    die "Failed to stage changes under $PRODUCT_DIR."
-  fi
-
-  if git -C "$repo_root" diff --cached --quiet -- "$PRODUCT_DIR"; then
-    return 0
-  fi
-
-  if ! git -C "$repo_root" commit -m "Mark feature BR ready to EARS" -- "$PRODUCT_DIR" >/dev/null 2>&1; then
-    die "Failed to commit changes under $PRODUCT_DIR before finish."
-  fi
-}
-
 main() {
-  require_command git
   require_command awk
   require_command mv
 
@@ -317,7 +296,6 @@ main() {
   fi
 
   update_ready_to_ears "$feature_br_path"
-  commit_feature_artifacts_if_changed "$runtime_root"
 
   echo "EARS readiness check passed."
 }

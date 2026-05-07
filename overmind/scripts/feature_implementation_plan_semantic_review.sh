@@ -53,10 +53,6 @@ ensure_staged_command_runtime() {
     die "Run this command from ASDLC staged path: <asdlc>/.commands/$SCRIPT_BASENAME"
   fi
 
-  if ! git -C "$parent_dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    die "ASDLC workspace is not a git repository: $parent_dir"
-  fi
-
   printf '%s' "$parent_dir"
 }
 
@@ -535,28 +531,7 @@ run_quality_gate() {
   fi
 }
 
-commit_output_if_changed() {
-  local runtime_root="$1"
-  local -a commit_paths=(
-    "$IMPLEMENTATION_PLAN_FILE"
-    "$IMPLEMENTATION_PLAN_SEMANTIC_REVIEW_FILE"
-  )
-
-  if ! git -C "$runtime_root" add -- "${commit_paths[@]}"; then
-    die "Failed to stage semantic-review outputs."
-  fi
-
-  if git -C "$runtime_root" diff --cached --quiet -- "${commit_paths[@]}"; then
-    return 0
-  fi
-
-  if ! git -C "$runtime_root" commit -m "Review and apply implementation plan semantic findings" -- "${commit_paths[@]}" >/dev/null 2>&1; then
-    die "Failed to commit semantic-review outputs."
-  fi
-}
-
 main() {
-  require_command git
   require_command awk
   require_command cmp
   require_command cp
@@ -608,7 +583,6 @@ main() {
 
   ensure_readonly_inputs_unchanged "$runtime_root"
   run_quality_gate "$runtime_root"
-  commit_output_if_changed "$runtime_root"
   echo "Updated $IMPLEMENTATION_PLAN_FILE"
   echo "Updated $IMPLEMENTATION_PLAN_SEMANTIC_REVIEW_FILE"
 }

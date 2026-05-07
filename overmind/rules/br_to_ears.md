@@ -104,3 +104,19 @@ Extract conversion ingredients from these BR areas before drafting blocks:
 - If needed, include short trace hints compatible with the current template, for example:
   - `Source refs: FR-2, BR-1, rejection_cases`
 - Keep traceability lightweight; do not redefine template structure.
+
+## Linked Artifact Propagation (from BR Section 16)
+
+### Document-Level Registry
+- Read `## 16. Linked Artifacts` from `<BR_SUMMARY_SOURCE_ARTIFACT>`.
+- If the list contains at least one entry, emit a `## Linked Artifacts` section at the end of `<EARS_TARGET_ARTIFACT>` (after `## Non-Functional Requirements` or the last section before any authoring notes), copying all entries verbatim with their id, title, type, and locator fields.
+- If `## 16. Linked Artifacts` in the BR is empty (no entries), omit the `## Linked Artifacts` section from the EARS output entirely.
+
+### Per-Requirement Association
+- For each `### Requirement` block, apply semantic judgment to identify which LAR-NNN entries from BR section 16 are relevant to the behavior described in that requirement.
+- When one or more LAR IDs are judged relevant, add a `**Linked Artifacts:**` field after `**Verification:**` listing those LAR IDs as bullet points (one per line), consistent with the bold-label style used by `**User Story:**` and `**Verification:**`.
+- When no artifacts are relevant to a particular requirement, omit the `**Linked Artifacts:**` field for that block entirely.
+
+### Registry Integrity
+- Every LAR-NNN ID referenced in any `**Linked Artifacts:**` field must have a matching entry in the document-level `## Linked Artifacts` registry.
+- Do not introduce LAR IDs that are not present in BR section 16.

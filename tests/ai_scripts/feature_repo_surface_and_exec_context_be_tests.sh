@@ -192,16 +192,6 @@ setup_git_workspace() {
   write_quality_gate_stub "$repo_dir"
   seed_project_definition "$repo_dir" "$backend_repo_path"
   seed_feature_sources "$repo_dir"
-
-  (
-    cd "$repo_dir/asdlc"
-    git init -q
-    git config user.name "Test User"
-    git config user.email "test@example.com"
-    echo "seed" >README.md
-    git add .
-    git commit -qm "seed"
-  )
 }
 
 test_requires_feature_path_argument() {
@@ -366,14 +356,7 @@ test_runs_codex_and_commits_only_target_files() {
 
   assert_equal "$requirements_before" "$(cat "$repo_dir/asdlc/projects/p1/feature-a/requirements_ears.md")"
   assert_equal "$delta_before" "$(cat "$repo_dir/asdlc/projects/p1/feature-a/feature_contract_delta.md")"
-
-  assert_equal "Generate repo surface and execution context for backend" "$(git -C "$repo_dir/asdlc" log -1 --pretty=%s)"
-  local committed_files
-  committed_files="$(git -C "$repo_dir/asdlc" show --name-only --pretty='' HEAD)"
-  assert_contains "$committed_files" "projects/p1/feature-a/project_surface_struct_resp_map_backend.md"
-  assert_not_contains "$committed_files" "projects/p1/feature-a/requirements_ears.md"
-  assert_not_contains "$committed_files" "projects/p1/feature-a/feature_contract_delta.md"
-  assert_not_contains "$committed_files" "README.md"
+  assert_file_exists "$repo_dir/asdlc/projects/p1/feature-a/project_surface_struct_resp_map_backend.md"
 }
 
 test_skips_empty_commit_when_output_is_unchanged() {
@@ -389,18 +372,12 @@ test_skips_empty_commit_when_output_is_unchanged() {
     PATH="$repo_dir/bin:$PATH" TEST_CAPTURE_DIR="$capture_dir" \
       .commands/feature_repo_surface_and_exec_context.sh --feature_path "projects/p1/feature-a" >/dev/null
   )
-  local commits_after_first
-  commits_after_first="$(git -C "$repo_dir/asdlc" rev-list --count HEAD)"
-
   (
     cd "$repo_dir/asdlc" &&
     PATH="$repo_dir/bin:$PATH" TEST_CAPTURE_DIR="$capture_dir" \
       .commands/feature_repo_surface_and_exec_context.sh --feature_path "projects/p1/feature-a" >/dev/null
   )
-  local commits_after_second
-  commits_after_second="$(git -C "$repo_dir/asdlc" rev-list --count HEAD)"
-
-  assert_equal "$commits_after_first" "$commits_after_second"
+  assert_file_exists "$repo_dir/asdlc/projects/p1/feature-a/project_surface_struct_resp_map_backend.md"
 }
 
 test_runs_with_absolute_feature_path() {
@@ -507,17 +484,6 @@ test_type_a_blueprint_only_invokes_model_and_writes_backend_surface_map() {
   seed_feature_sources "$repo_dir"
   seed_backend_blueprint "$repo_dir"
   setup_codex_stub "$repo_dir"
-
-  (
-    cd "$repo_dir/asdlc"
-    git init -q
-    git config user.name "Test User"
-    git config user.email "test@example.com"
-    echo "seed" >README.md
-    git add .
-    git commit -qm "seed"
-  )
-
   local out=""
   out="$(
     cd "$repo_dir/asdlc" &&
@@ -546,17 +512,6 @@ test_type_a_partial_repo_uses_both_evidence_sources() {
   seed_feature_sources "$repo_dir"
   seed_backend_blueprint "$repo_dir"
   setup_codex_stub "$repo_dir"
-
-  (
-    cd "$repo_dir/asdlc"
-    git init -q
-    git config user.name "Test User"
-    git config user.email "test@example.com"
-    echo "seed" >README.md
-    git add .
-    git commit -qm "seed"
-  )
-
   local backend_repo_resolved
   backend_repo_resolved="$(cd "$backend_repo" && pwd -P)"
 
@@ -586,17 +541,6 @@ test_type_a_fails_without_repo_or_blueprint() {
   write_quality_gate_stub "$repo_dir"
   seed_type_a_project_definition_no_repo "$repo_dir"
   seed_feature_sources "$repo_dir"
-
-  (
-    cd "$repo_dir/asdlc"
-    git init -q
-    git config user.name "Test User"
-    git config user.email "test@example.com"
-    echo "seed" >README.md
-    git add .
-    git commit -qm "seed"
-  )
-
   local status=0
   local out=""
   set +e

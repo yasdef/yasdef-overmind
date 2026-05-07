@@ -6,6 +6,9 @@ ASDLC_PROJECTS_DIR_NAME="projects"
 ASDLC_TEMPLATES_DIR_NAME=".templates"
 ASDLC_PROJECT_TEMPLATE_FILE_NAME="init_progress_definition_TEMPLATE.yaml"
 PROJECT_DEFINITION_FILE_NAME="init_progress_definition.yaml"
+PROJECT_GIT_INIT_COMMIT_MESSAGE="Initialize ASDLC project workspace"
+PROJECT_GIT_FALLBACK_USER_NAME="Overmind ASDLC"
+PROJECT_GIT_FALLBACK_USER_EMAIL="overmind-asdlc@local.invalid"
 PROJECT_CLASS_OPTIONS=(
   "backend"
   "frontend"
@@ -505,6 +508,40 @@ BEGIN {
   fi
 }
 
+ensure_project_git_identity() {
+  local project_root="$1"
+
+  if ! git -C "$project_root" config user.name >/dev/null 2>&1; then
+    if ! git -C "$project_root" config user.name "$PROJECT_GIT_FALLBACK_USER_NAME" >/dev/null 2>&1; then
+      die "Failed to configure git user.name for project repo: $project_root"
+    fi
+  fi
+
+  if ! git -C "$project_root" config user.email >/dev/null 2>&1; then
+    if ! git -C "$project_root" config user.email "$PROJECT_GIT_FALLBACK_USER_EMAIL" >/dev/null 2>&1; then
+      die "Failed to configure git user.email for project repo: $project_root"
+    fi
+  fi
+}
+
+initialize_project_git_repo() {
+  local project_root="$1"
+  local definition_file_name="$2"
+
+  if ! git -C "$project_root" init -q; then
+    die "Failed to initialize project git repository: $project_root"
+  fi
+
+  ensure_project_git_identity "$project_root"
+
+  if ! git -C "$project_root" add -- "$definition_file_name"; then
+    die "Failed to stage initial project definition for git bootstrap: $project_root/$definition_file_name"
+  fi
+
+  if ! git -C "$project_root" commit -qm "$PROJECT_GIT_INIT_COMMIT_MESSAGE"; then
+    die "Failed to create initial project git commit: $project_root"
+  fi
+}
 main() {
   require_command sed
   require_command tr
@@ -579,6 +616,8 @@ main() {
   if ! inject_project_bootstrap_into_definition "$project_definition_path" "$project_folder_name" "$project_classes" "$repo_path_states" "$project_type_code" "$project_type_label"; then
     die "Failed to write project classes and repo paths into project definition."
   fi
+
+  initialize_project_git_repo "$project_folder_path" "$PROJECT_DEFINITION_FILE_NAME"
 
   if ! append_project_record "$metadata_path" "$project_folder_name" "$feature_name_raw" "$project_folder_name" "$created_at"; then
     die "Failed to append project record to ASDLC metadata."

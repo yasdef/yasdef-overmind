@@ -461,16 +461,6 @@ setup_git_workspace() {
   setup_workspace_layout "$repo_dir"
   setup_models_file "$repo_dir"
   seed_feature_sources "$repo_dir"
-
-  (
-    cd "$repo_dir/asdlc"
-    git init -q
-    git config user.name "Test User"
-    git config user.email "test@example.com"
-    echo "seed" >README.md
-    git add .
-    git commit -qm "seed"
-  )
 }
 
 test_requires_feature_path_argument() {
@@ -595,16 +585,8 @@ test_runs_codex_and_commits_plan_and_review_outputs() {
   assert_equal "$requirements_before" "$(cat "$repo_dir/asdlc/projects/p1/feature-a/requirements_ears.md")"
   assert_equal "$technical_before" "$(cat "$repo_dir/asdlc/projects/p1/feature-a/technical_requirements.md")"
 
-  assert_equal "Review and apply implementation plan semantic findings" "$(git -C "$repo_dir/asdlc" log -1 --pretty=%s)"
-  local committed_files
-  committed_files="$(git -C "$repo_dir/asdlc" show --name-only --pretty='' HEAD)"
-  assert_contains "$committed_files" "projects/p1/feature-a/implementation_plan.md"
-  assert_contains "$committed_files" "projects/p1/feature-a/implementation_plan_semantic_review.md"
-  assert_not_contains "$committed_files" "projects/p1/feature-a/requirements_ears.md"
-  assert_not_contains "$committed_files" "projects/p1/feature-a/technical_requirements.md"
-  assert_not_contains "$committed_files" "projects/p1/feature-a/prerequisite_gaps.md"
-  assert_not_contains "$committed_files" "projects/p1/init_progress_definition.yaml"
-  assert_not_contains "$committed_files" "README.md"
+  assert_file_exists "$repo_dir/asdlc/projects/p1/feature-a/implementation_plan.md"
+  assert_file_exists "$repo_dir/asdlc/projects/p1/feature-a/implementation_plan_semantic_review.md"
 }
 
 test_runs_with_absolute_feature_path() {

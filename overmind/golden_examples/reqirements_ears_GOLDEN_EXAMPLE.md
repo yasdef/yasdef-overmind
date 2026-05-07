@@ -39,6 +39,9 @@ This example intentionally keeps one primary obligation focus per block
 
 **Verification:** API test for `POST /tasks` success responses and persisted task fields.
 
+**Linked Artifacts:**
+- LAR-001
+
 ---
 
 ### Requirement 2 — Reject invalid create-task requests
@@ -80,6 +83,9 @@ This example intentionally keeps one primary obligation focus per block
 
 **Verification:** Integration test that enables reminders and asserts an event is enqueued for eligible tasks.
 
+**Linked Artifacts:**
+- LAR-002
+
 ---
 
 ### Requirement 6 — Prevent edits after completion
@@ -112,6 +118,19 @@ This example intentionally keeps one primary obligation focus per block
 - THE Example Task Tracking Service SHALL return `GET /tasks` responses within 300 ms at p95 under the defined test load.
 
 **Verification:** Load test report and CI performance gate for p95 latency.
+
+---
+
+## Linked Artifacts
+
+- id: LAR-001
+  title: Task Entity Data Schema
+  type: data_schema
+  locator: https://confluence.example.com/display/ETTS/task-entity-schema
+- id: LAR-002
+  title: Reminder Event Contract
+  type: api_spec
+  locator: https://confluence.example.com/display/ETTS/reminder-event-contract
 
 ---
 

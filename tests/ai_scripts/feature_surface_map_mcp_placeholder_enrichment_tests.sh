@@ -120,16 +120,6 @@ meta_info:
   class_repo_paths: {}
 steps: []
 EOF
-
-  (
-    cd "$asdlc_root"
-    git init -q
-    git config user.name "Test User"
-    git config user.email "test@example.com"
-    echo "seed" >README.md
-    git add .
-    git commit -qm "seed"
-  )
 }
 
 write_codex_logging_stub() {
@@ -407,7 +397,7 @@ test_user_confirmation_applies_placeholder_replacement() {
   assert_contains "$updated_content" "REST"
 }
 
-test_confirmed_enrichment_commits_changed_surface_map() {
+test_confirmed_enrichment_updates_changed_surface_map() {
   local asdlc_root="$TMP_ROOT/user-confirm-commit"
   setup_asdlc_workspace "$asdlc_root"
 
@@ -424,24 +414,10 @@ test_confirmed_enrichment_commits_changed_surface_map() {
   local map_abs="$asdlc_root/projects/project-a/feature-confirm-commit/project_surface_struct_resp_map_backend.md"
   write_codex_modifying_stub "$asdlc_root/.commands/codex" "$map_abs" "REST" "$prompt_capture"
 
-  local before_head=""
-  before_head="$(git -C "$asdlc_root" rev-parse HEAD)"
-
   local out=""
   out="$(cd "$asdlc_root" && PATH="$asdlc_root/.commands:$PATH" \
     .commands/feature_surface_map_mcp_placeholder_enrichment.sh \
     --feature_path projects/project-a/feature-confirm-commit 2>&1)"
-
-  local after_head=""
-  after_head="$(git -C "$asdlc_root" rev-parse HEAD)"
-
-  if [[ "$before_head" == "$after_head" ]]; then
-    echo "Assertion failed: expected changed map to be committed" >&2
-    exit 1
-  fi
-  assert_equal "Enrich surface-map placeholders with MCP" "$(git -C "$asdlc_root" log -1 --pretty=%s)"
-  assert_contains "$(git -C "$asdlc_root" show --name-only --pretty=format: HEAD)" \
-    "projects/project-a/feature-confirm-commit/project_surface_struct_resp_map_backend.md"
   assert_contains "$out" "Updated projects/project-a/feature-confirm-commit/project_surface_struct_resp_map_backend.md"
 }
 
@@ -738,8 +714,8 @@ echo "  PASS: user rejection leaves maps unchanged"
 test_user_confirmation_applies_placeholder_replacement
 echo "  PASS: user confirmation applies placeholder replacement"
 
-test_confirmed_enrichment_commits_changed_surface_map
-echo "  PASS: confirmed enrichment commits changed surface map"
+test_confirmed_enrichment_updates_changed_surface_map
+echo "  PASS: confirmed enrichment updates changed surface map"
 
 test_backend_quality_helper_referenced_in_prompt_for_backend_map
 echo "  PASS: backend quality helper referenced in prompt for backend map"

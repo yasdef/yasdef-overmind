@@ -182,3 +182,14 @@
 
 ### Non-critical questions
 - non_critical_questions: Should reset success email include device metadata?
+
+## 16. Linked Artifacts
+
+- id: LAR-001
+  title: Password Reset Flow Diagram
+  type: diagram
+  locator: https://confluence.example.com/display/AUTH/password-reset-flow
+- id: LAR-002
+  title: Auth API Contract v3 — Reset Endpoints
+  type: api_spec
+  locator: https://confluence.example.com/display/AUTH/api-contract-v3

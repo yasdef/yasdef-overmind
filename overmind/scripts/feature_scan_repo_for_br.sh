@@ -107,10 +107,6 @@ resolve_runtime_root() {
     die "Run this command from ASDLC staged path: <asdlc>/.commands/$SCRIPT_BASENAME"
   fi
 
-  if ! git -C "$parent_dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    die "ASDLC workspace is not a git repository: $parent_dir"
-  fi
-
   printf '%s' "$parent_dir"
 }
 
@@ -461,24 +457,7 @@ Rule prompt file:
 EOF_PROMPT
 }
 
-commit_feature_br_summary_if_changed() {
-  local runtime_root="$1"
-
-  if ! git -C "$runtime_root" add "$FEATURE_BR_FILE"; then
-    die "Failed to stage $FEATURE_BR_FILE."
-  fi
-
-  if git -C "$runtime_root" diff --cached --quiet -- "$FEATURE_BR_FILE"; then
-    return 0
-  fi
-
-  if ! git -C "$runtime_root" commit -m "Update feature BR summary from repo scan" -- "$FEATURE_BR_FILE" >/dev/null 2>&1; then
-    die "Failed to commit $FEATURE_BR_FILE."
-  fi
-}
-
 main() {
-  require_command git
   parse_args "$@"
 
   local runtime_root=""
@@ -526,7 +505,6 @@ main() {
     die "Model run did not produce required file: $FEATURE_BR_FILE"
   fi
 
-  commit_feature_br_summary_if_changed "$runtime_root"
   echo "Updated $FEATURE_BR_FILE"
 }
 

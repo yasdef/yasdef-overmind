@@ -43,10 +43,6 @@ ensure_staged_command_runtime() {
     die "Run this command from ASDLC staged path: <asdlc>/.commands/$SCRIPT_BASENAME"
   fi
 
-  if ! git -C "$parent_dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    die "ASDLC workspace is not a git repository: $parent_dir"
-  fi
-
   printf '%s' "$parent_dir"
 }
 
@@ -242,28 +238,7 @@ ensure_user_br_input_unchanged() {
   fi
 }
 
-commit_review_artifacts_if_changed() {
-  local runtime_root="$1"
-  local -a commit_paths=(
-    "$REQUIREMENTS_EARS_FILE"
-    "$REQUIREMENTS_EARS_REVIEW_FILE"
-  )
-
-  if ! git -C "$runtime_root" add -- "${commit_paths[@]}"; then
-    die "Failed to stage review artifacts."
-  fi
-
-  if git -C "$runtime_root" diff --cached --quiet -- "${commit_paths[@]}"; then
-    return 0
-  fi
-
-  if ! git -C "$runtime_root" commit -m "Review overmind requirements ears" -- "${commit_paths[@]}" >/dev/null 2>&1; then
-    die "Failed to commit review artifacts."
-  fi
-}
-
 main() {
-  require_command git
   require_command awk
   require_command cmp
   parse_args "$@"
@@ -312,7 +287,6 @@ main() {
   fi
 
   ensure_user_br_input_unchanged "$before_snapshot" "$user_br_input_path"
-  commit_review_artifacts_if_changed "$runtime_root"
   echo "Updated $REQUIREMENTS_EARS_FILE"
   echo "Updated $REQUIREMENTS_EARS_REVIEW_FILE"
 }

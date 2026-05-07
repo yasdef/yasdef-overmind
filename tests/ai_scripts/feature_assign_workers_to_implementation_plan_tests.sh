@@ -106,15 +106,6 @@ EOF
 
   cp "$ASSIGN_SCRIPT_SRC" "$asdlc_root/.commands/feature_assing_workers.sh"
   chmod +x "$asdlc_root/.commands/feature_assing_workers.sh"
-
-  (
-    cd "$asdlc_root"
-    git init -q
-    git config user.name "Test User"
-    git config user.email "test@example.com"
-    git add asdlc_metadata.yaml
-    git commit -qm "seed"
-  )
 }
 
 create_project_and_feature() {

@@ -89,15 +89,6 @@ meta:
   description: "staged command test"
 projects:
 OUT
-
-  (
-    cd "$asdlc_root"
-    git init -q
-    git config user.name "Test User"
-    git config user.email "test@example.com"
-    git add .
-    git commit -qm "seed staged workspace"
-  )
 }
 
 write_project_definition() {
@@ -123,8 +114,6 @@ meta_info:
 
 steps: []
 EOF_DEF
-  git -C "$(cd "$project_dir/../.." && pwd)" add "projects/$(basename "$project_dir")/init_progress_definition.yaml"
-  git -C "$(cd "$project_dir/../.." && pwd)" commit -qm "seed project"
 }
 
 setup_codex_stub() {
@@ -527,7 +516,6 @@ test_revision_uses_same_validation_and_commits() {
   local backend_content=""
   backend_content="$(cat "$project_dir/project_stack_blueprint_backend.md")"
   assert_contains "$backend_content" "language: Node.js 22"
-  assert_equal "Update project stack blueprints for sample-project" "$(git -C "$asdlc_root" log -1 --pretty=%s)"
 }
 
 test_final_blueprint_contains_gap5_structure_without_authoring_state() {

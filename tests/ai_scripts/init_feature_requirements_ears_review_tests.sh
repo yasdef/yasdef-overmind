@@ -218,16 +218,6 @@ setup_git_workspace() {
   setup_models_file "$repo_dir"
   write_quality_gate_stub "$repo_dir"
   seed_feature_sources "$repo_dir"
-
-  (
-    cd "$repo_dir/asdlc"
-    git init -q
-    git config user.name "Test User"
-    git config user.email "test@example.com"
-    echo "seed" >README.md
-    git add .
-    git commit -qm "seed"
-  )
 }
 
 test_requires_feature_path_argument() {
@@ -372,13 +362,8 @@ test_runs_codex_and_commits_only_review_artifacts() {
   user_input_after="$(cat "$repo_dir/asdlc/projects/p1/feature-a/user_br_input.md")"
   assert_equal "$user_input_before" "$user_input_after"
 
-  assert_equal "Review overmind requirements ears" "$(git -C "$repo_dir/asdlc" log -1 --pretty=%s)"
-  local committed_files
-  committed_files="$(git -C "$repo_dir/asdlc" show --name-only --pretty='' HEAD)"
-  assert_contains "$committed_files" "projects/p1/feature-a/requirements_ears.md"
-  assert_contains "$committed_files" "projects/p1/feature-a/requirements_ears_review.md"
-  assert_not_contains "$committed_files" "projects/p1/feature-a/user_br_input.md"
-  assert_not_contains "$committed_files" "README.md"
+  assert_file_exists "$repo_dir/asdlc/projects/p1/feature-a/requirements_ears.md"
+  assert_file_exists "$repo_dir/asdlc/projects/p1/feature-a/requirements_ears_review.md"
 }
 
 test_runs_with_absolute_feature_path() {

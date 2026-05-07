@@ -198,16 +198,6 @@ setup_git_workspace() {
   write_quality_gate_stub "$repo_dir"
   seed_project_definition "$repo_dir" "$fe_repo_path" "$mobile_repo_path"
   seed_feature_sources "$repo_dir"
-
-  (
-    cd "$repo_dir/asdlc"
-    git init -q
-    git config user.name "Test User"
-    git config user.email "test@example.com"
-    echo "seed" >README.md
-    git add .
-    git commit -qm "seed"
-  )
 }
 
 test_requires_feature_path_argument() {
@@ -325,7 +315,6 @@ test_selects_frontend_by_class_name() {
 
   assert_equal "$requirements_before" "$(cat "$repo_dir/asdlc/projects/p1/feature-a/requirements_ears.md")"
   assert_equal "$delta_before" "$(cat "$repo_dir/asdlc/projects/p1/feature-a/feature_contract_delta.md")"
-  assert_equal "Generate repo surface and execution context for frontend" "$(git -C "$repo_dir/asdlc" log -1 --pretty=%s)"
 }
 
 test_selects_mobile_by_number() {
@@ -361,11 +350,7 @@ test_selects_mobile_by_number() {
   assert_contains "$codex_prompt" "- mobile: $mobile_repo_resolved"
   assert_not_contains "$codex_prompt" "- frontend: $fe_repo_resolved"
 
-  assert_equal "Generate repo surface and execution context for mobile" "$(git -C "$repo_dir/asdlc" log -1 --pretty=%s)"
-  local committed_files
-  committed_files="$(git -C "$repo_dir/asdlc" show --name-only --pretty='' HEAD)"
-  assert_contains "$committed_files" "projects/p1/feature-a/project_surface_struct_resp_map_mobile.md"
-  assert_not_contains "$committed_files" "projects/p1/feature-a/project_surface_struct_resp_map_frontend.md"
+  assert_file_exists "$repo_dir/asdlc/projects/p1/feature-a/project_surface_struct_resp_map_mobile.md"
 }
 
 test_does_not_run_quality_helper_directly() {
@@ -407,18 +392,12 @@ test_skips_empty_commit_when_output_is_unchanged() {
     PATH="$repo_dir/bin:$PATH" TEST_CAPTURE_DIR="$capture_dir" \
       .commands/feature_repo_surface_and_exec_context.sh --feature_path "projects/p1/feature-a" <<<"frontend" >/dev/null
   )
-  local commits_after_first
-  commits_after_first="$(git -C "$repo_dir/asdlc" rev-list --count HEAD)"
-
   (
     cd "$repo_dir/asdlc" &&
     PATH="$repo_dir/bin:$PATH" TEST_CAPTURE_DIR="$capture_dir" \
       .commands/feature_repo_surface_and_exec_context.sh --feature_path "projects/p1/feature-a" <<<"frontend" >/dev/null
   )
-  local commits_after_second
-  commits_after_second="$(git -C "$repo_dir/asdlc" rev-list --count HEAD)"
-
-  assert_equal "$commits_after_first" "$commits_after_second"
+  assert_file_exists "$repo_dir/asdlc/projects/p1/feature-a/project_surface_struct_resp_map_frontend.md"
 }
 
 test_runs_with_absolute_feature_path() {
@@ -473,16 +452,6 @@ setup_git_workspace_type_a() {
   setup_models_file "$repo_dir"
   write_quality_gate_stub "$repo_dir"
   seed_feature_sources "$repo_dir"
-
-  (
-    cd "$repo_dir/asdlc"
-    git init -q
-    git config user.name "Test User"
-    git config user.email "test@example.com"
-    echo "seed" >README.md
-    git add .
-    git commit -qm "seed"
-  )
 }
 
 seed_type_a_frontend_only_no_repo() {

@@ -666,16 +666,20 @@ Worker records are stored in:
 
 1. Preferred: run feature steps 3..8.3 with the lightweight orchestrator:
 \`\`\`bash
+.commands/project_add_feature_e2e.sh
+\`\`\`
+\`\`\`bash
 .commands/project_add_feature_e2e.sh --path projects/<project-id>
 \`\`\`
+If \`--path\` is omitted, the script auto-selects the only project under \`projects/\` or prompts you to choose one when multiple projects exist.
 This run discovers unfinished feature folders for the project first and, when any exist, asks whether to start a new feature or continue one of the unfinished features.
 The last selected feature path is cached in:
 \`projects/<project-id>/.project_add_feature_e2e_state.env\`
 as a convenience only; discovery plus scanner status remains the source of truth for project-level feature selection.
 Resume examples:
 \`\`\`bash
+.commands/project_add_feature_e2e.sh --resume 4.2
 .commands/project_add_feature_e2e.sh --path projects/<project-id>
-.commands/project_add_feature_e2e.sh --path projects/<project-id> --resume 4.2
 .commands/project_add_feature_e2e.sh --path projects/<project-id> --resume 8.2
 \`\`\`
 2. Manual fallback - create feature BR scaffold:
@@ -753,45 +757,6 @@ Careful: provide a feature path here, not a project path.
 EOF
 }
 
-initialize_git_repo_and_commit_bootstrap_if_possible() {
-  local repo_root="$1"
-  local asdlc_root="$2"
-  local repo_user_name=""
-  local repo_user_email=""
-
-  if ! git -C "$asdlc_root" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    if ! git -C "$asdlc_root" init -q >/dev/null 2>&1; then
-      warn "Failed to initialize git repository under: $asdlc_root"
-      return 0
-    fi
-  fi
-
-  if ! git -C "$asdlc_root" config --get user.name >/dev/null 2>&1; then
-    if repo_user_name="$(git -C "$repo_root" config --get user.name 2>/dev/null)" && [[ -n "$repo_user_name" ]]; then
-      git -C "$asdlc_root" config user.name "$repo_user_name" >/dev/null 2>&1 || true
-    fi
-  fi
-  if ! git -C "$asdlc_root" config --get user.email >/dev/null 2>&1; then
-    if repo_user_email="$(git -C "$repo_root" config --get user.email 2>/dev/null)" && [[ -n "$repo_user_email" ]]; then
-      git -C "$asdlc_root" config user.email "$repo_user_email" >/dev/null 2>&1 || true
-    fi
-  fi
-
-  if ! git -C "$asdlc_root" add -- . >/dev/null 2>&1; then
-    warn "Failed to stage ASDLC bootstrap artifacts for commit: $asdlc_root"
-    return 0
-  fi
-
-  if git -C "$asdlc_root" diff --cached --quiet; then
-    warn "No ASDLC bootstrap artifacts to commit under: $asdlc_root"
-    return 0
-  fi
-
-  if ! git -C "$asdlc_root" commit -m "Initialize ASDLC workspace bootstrap" >/dev/null 2>&1; then
-    warn "Failed to commit ASDLC bootstrap artifacts under: $asdlc_root"
-  fi
-}
-
 main() {
   require_command git
   require_command awk
@@ -828,8 +793,6 @@ main() {
   stage_commands "$repo_root" "$asdlc_root" "yes" "no"
   remove_obsolete_staged_commands "$asdlc_root"
   write_quickrun_guide "$asdlc_root"
-  initialize_git_repo_and_commit_bootstrap_if_possible "$repo_root" "$asdlc_root"
-
   echo "ASDLC workspace bootstrap completed: $asdlc_root"
 }
 

@@ -22,6 +22,8 @@ PHASE7_ACTIVE_REPO_CLASSES=()
 PHASE7_COMPLETED_REPO_CLASSES=()
 PHASE7_PENDING_REPO_CLASSES=()
 PHASE_EXECUTION_FAILED_RC=40
+DISCOVERED_PROJECT_PATHS=()
+DISCOVERED_PROJECT_NAMES=()
 
 PHASE_IDS=("3" "4.1" "4.2" "5" "5.1" "6" "7" "7.1" "8" "8.1" "8.2" "8.3" "8.4")
 PHASE_OPTIONAL=("false" "false" "false" "false" "true" "false" "false" "true" "false" "false" "false" "false" "true")
@@ -34,10 +36,10 @@ die() {
 
 print_usage() {
   cat <<'USAGE'
-Usage: project_add_feature_e2e.sh --path <project-folder-path> [--resume <step>]
+Usage: project_add_feature_e2e.sh [--path <project-folder-path>] [--resume <step>]
 
 Options:
-  --path <project-folder-path>  ASDLC project folder (for example: projects/<project-id>)
+  --path <project-folder-path>  Optional ASDLC project folder (for example: projects/<project-id>)
   --resume <step>               Optional step override (for example: 3, 4.1, 4.2, 5, 5.1, 6, 7, 7.1 (optional MCP placeholder enrichment), 8, 8.1, 8.2 (prerequisite gap trace), 8.3 (implementation plan), 8.4 (optional semantic review))
 USAGE
 }
@@ -180,7 +182,6 @@ parse_args() {
     shift
   done
 
-  [[ -n "$TARGET_PATH_INPUT" ]] || die "Missing required argument: --path <project-folder-path>."
 }
 
 resolve_runtime_root() {
@@ -196,11 +197,124 @@ resolve_runtime_root() {
     die "Run this command from ASDLC staged path: <asdlc>/.commands/$SCRIPT_BASENAME"
   fi
 
-  if ! git -C "$parent_dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    die "ASDLC workspace is not a git repository: $parent_dir"
+  printf '%s' "$parent_dir"
+}
+
+resolve_projects_root() {
+  local runtime_root="$1"
+  local projects_root="$runtime_root/projects"
+
+  if [[ ! -d "$projects_root" ]]; then
+    die "Required directory not found: $projects_root"
   fi
 
-  printf '%s' "$parent_dir"
+  if ! projects_root="$(cd "$projects_root" && pwd -P)"; then
+    die "Failed to resolve ASDLC projects directory: $runtime_root/projects"
+  fi
+
+  printf '%s' "$projects_root"
+}
+
+discover_projects() {
+  local runtime_root="$1"
+  local projects_root="$2"
+  local child_path=""
+  local resolved_path=""
+  local rel_path=""
+
+  DISCOVERED_PROJECT_PATHS=()
+  DISCOVERED_PROJECT_NAMES=()
+
+  while IFS= read -r child_path; do
+    [[ -n "$child_path" ]] || continue
+    [[ -f "$child_path/init_progress_definition.yaml" ]] || continue
+
+    if ! resolved_path="$(cd "$child_path" && pwd -P)"; then
+      die "Failed to resolve project path: $child_path"
+    fi
+
+    rel_path="${resolved_path#"$runtime_root/"}"
+    DISCOVERED_PROJECT_PATHS+=("$rel_path")
+    DISCOVERED_PROJECT_NAMES+=("$(basename "$resolved_path")")
+  done < <(find "$projects_root" -mindepth 1 -maxdepth 1 -type d ! -name '.*' -print | LC_ALL=C sort)
+}
+
+prompt_project_selection() {
+  local answer=""
+  local idx=0
+  local total="${#DISCOVERED_PROJECT_PATHS[@]}"
+
+  [[ "$total" -gt 1 ]] || return 1
+
+  echo "No --path provided. Multiple projects found under ASDLC projects:"
+  for ((idx = 0; idx < total; idx++)); do
+    printf '  %s) %s [%s]\n' "$((idx + 1))" "${DISCOVERED_PROJECT_NAMES[$idx]}" "${DISCOVERED_PROJECT_PATHS[$idx]}"
+  done
+  echo "  q) Finish without running project_add_feature_e2e.sh"
+
+  while true; do
+    printf 'Choose project [1-%s] or q to finish: ' "$total" >&2
+    if ! IFS= read -r answer; then
+      return 2
+    fi
+
+    answer="$(to_lower "$(trim_value "$answer")")"
+    if [[ "$answer" =~ ^[0-9]+$ ]] && (( answer >= 1 && answer <= total )); then
+      TARGET_PATH_INPUT="${DISCOVERED_PROJECT_PATHS[$((answer - 1))]}"
+      echo "Selected project: $TARGET_PATH_INPUT"
+      return 0
+    fi
+
+    case "$answer" in
+      q|quit|exit|finish|stop)
+        return 1
+        ;;
+      *)
+        echo "Please answer with a number between 1 and $total, or q to finish." >&2
+        ;;
+    esac
+  done
+}
+
+auto_select_project_path() {
+  local runtime_root="$1"
+  local projects_root=""
+  local project_count=0
+  local selection_rc=0
+
+  projects_root="$(resolve_projects_root "$runtime_root")"
+  discover_projects "$runtime_root" "$projects_root"
+  project_count="${#DISCOVERED_PROJECT_PATHS[@]}"
+
+  if [[ "$project_count" -eq 0 ]]; then
+    die "No project folders containing init_progress_definition.yaml were found under: $projects_root"
+  fi
+
+  if [[ "$project_count" -eq 1 ]]; then
+    TARGET_PATH_INPUT="${DISCOVERED_PROJECT_PATHS[0]}"
+    echo "No --path provided. Found one ASDLC project; using path: $TARGET_PATH_INPUT"
+    return 0
+  fi
+
+  prompt_project_selection
+  selection_rc=$?
+
+  case "$selection_rc" in
+    0)
+      return 0
+      ;;
+    1)
+      echo "Execution finished: no project selected."
+      return 20
+      ;;
+    2)
+      echo "Execution stopped: user input stream closed during project selection."
+      return 20
+      ;;
+    *)
+      die "Unexpected project selection status: $selection_rc"
+      ;;
+  esac
 }
 
 resolve_project_path() {
@@ -1138,6 +1252,19 @@ main() {
   parse_args "$@"
 
   RUNTIME_ROOT="$(resolve_runtime_root)"
+  if [[ -z "$TARGET_PATH_INPUT" ]]; then
+    local project_selection_rc=0
+    set +e
+    auto_select_project_path "$RUNTIME_ROOT"
+    project_selection_rc=$?
+    set -e
+    if [[ "$project_selection_rc" -eq 20 ]]; then
+      exit 0
+    fi
+    if [[ "$project_selection_rc" -ne 0 ]]; then
+      die "Unexpected project auto-selection status: $project_selection_rc"
+    fi
+  fi
   resolve_project_path "$RUNTIME_ROOT" "$TARGET_PATH_INPUT"
   PROJECT_TYPE_CODE="$(extract_project_type_code_from_definition "$RUNTIME_ROOT/$PROJECT_PATH/init_progress_definition.yaml")"
 

@@ -212,6 +212,27 @@ assert_git_branch_exists() {
   fi
 }
 
+assert_git_repo_initialized() {
+  local repo_path="$1"
+  local inside_work_tree=""
+  inside_work_tree="$(git -C "$repo_path" rev-parse --is-inside-work-tree 2>/dev/null || true)"
+  if [[ "$inside_work_tree" != "true" ]]; then
+    echo "Assertion failed: expected git repository at: $repo_path" >&2
+    exit 1
+  fi
+}
+
+assert_git_head_subject() {
+  local repo_path="$1"
+  local expected_subject="$2"
+  local actual_subject=""
+  actual_subject="$(git -C "$repo_path" log -1 --pretty=%s)"
+  if [[ "$actual_subject" != "$expected_subject" ]]; then
+    echo "Assertion failed: expected git HEAD subject '$expected_subject', got '$actual_subject'" >&2
+    exit 1
+  fi
+}
+
 list_regular_file_names_maxdepth_one() {
   local path="$1"
   find "$path" -maxdepth 1 -type f -exec basename {} \; | sort
@@ -525,7 +546,6 @@ bootstrap_asdlc_workspace() {
     cd "$repo_dir"
     printf '%s\n' "$bootstrap_parent" | overmind/scripts/project_mgmt/project_setup_first_init_machine.sh >/dev/null
   )
-  ensure_repo_has_local_main_branch "$asdlc_root"
   printf '%s' "$asdlc_root"
 }
 
@@ -553,7 +573,6 @@ test_first_init_machine_bootstraps_asdlc_workspace_with_local_template() {
   assert_dir_exists "$asdlc_root/.helper"
   assert_dir_exists "$asdlc_root/.setup"
   assert_dir_exists "$asdlc_root/common_libs"
-  assert_dir_exists "$asdlc_root/.git"
   assert_file_exists "$asdlc_root/common_libs/project_setup_common.sh"
   assert_file_exists "$asdlc_root/asdlc_metadata.yaml"
   assert_file_exists "$asdlc_root/quickrun.md"
@@ -608,8 +627,6 @@ test_first_init_machine_bootstraps_asdlc_workspace_with_local_template() {
   assert_file_content_equal \
     "$repo_dir/overmind/templates/init_progress_definition_TEMPLATE.yaml" \
     "$asdlc_root/.templates/init_progress_definition_TEMPLATE.yaml"
-  assert_equal "true" "$(git -C "$asdlc_root" rev-parse --is-inside-work-tree)"
-  assert_equal "Initialize ASDLC workspace bootstrap" "$(git -C "$asdlc_root" log -1 --pretty=%s)"
 
   local add_cmd=""
   local scanner_cmd=""
@@ -624,10 +641,12 @@ test_first_init_machine_bootstraps_asdlc_workspace_with_local_template() {
   assert_contains "$quickrun" "## 2. Create EARS Requirements"
   assert_contains "$quickrun" 'Project path example: `projects/<project-id>`'
   assert_contains "$quickrun" 'Feature path example: `projects/<project-id>/<feature-folder>`'
+  assert_contains "$quickrun" ".commands/project_add_feature_e2e.sh"
   assert_contains "$quickrun" ".commands/project_add_feature_e2e.sh --path projects/<project-id>"
-  assert_contains "$quickrun" ".commands/project_add_feature_e2e.sh --path projects/<project-id> --resume 4.2"
+  assert_contains "$quickrun" '.commands/project_add_feature_e2e.sh --resume 4.2'
   assert_contains "$quickrun" ".commands/project_add_feature_e2e.sh --path projects/<project-id> --resume 8.2"
   assert_contains "$quickrun" '.project_add_feature_e2e_state.env'
+  assert_contains "$quickrun" 'If `--path` is omitted, the script auto-selects the only project under `projects/`'
   assert_contains "$quickrun" "discovers unfinished feature folders for the project first"
   assert_contains "$quickrun" "asks whether to start a new feature or continue one of the unfinished features"
   assert_contains "$quickrun" "as a convenience only; discovery plus scanner status remains the source of truth"
@@ -924,9 +943,11 @@ OUT
   quickrun="$(cat "$quickrun_path")"
   assert_not_contains "$quickrun" "legacy quickrun content"
   assert_contains "$quickrun" "## 3. Continue Toward Implementation"
+  assert_contains "$quickrun" ".commands/project_add_feature_e2e.sh"
   assert_contains "$quickrun" ".commands/project_add_feature_e2e.sh --path projects/<project-id>"
-  assert_contains "$quickrun" ".commands/project_add_feature_e2e.sh --path projects/<project-id> --resume 4.2"
+  assert_contains "$quickrun" '.commands/project_add_feature_e2e.sh --resume 4.2'
   assert_contains "$quickrun" ".commands/project_add_feature_e2e.sh --path projects/<project-id> --resume 8.2"
+  assert_contains "$quickrun" 'If `--path` is omitted, the script auto-selects the only project under `projects/`'
   assert_contains "$quickrun" "discovers unfinished feature folders for the project first"
   assert_contains "$quickrun" "asks whether to start a new feature or continue one of the unfinished features"
   assert_contains "$quickrun" ".commands/project_register_worker.sh --path projects/<project-id>"
@@ -1169,11 +1190,6 @@ test_add_new_project_creates_record_workspace_and_class_repo_metadata_from_stage
   local backend_repo="$TMP_ROOT/backend-repo"
   mkdir -p "$backend_repo"
   echo "backend" >"$backend_repo/README.md"
-  local head_before=""
-  local current_branch_before=""
-  head_before="$(git -C "$asdlc_root" rev-parse HEAD)"
-  current_branch_before="$(git -C "$asdlc_root" rev-parse --abbrev-ref HEAD)"
-
   local caller_dir="$TMP_ROOT/caller-dir"
   mkdir -p "$caller_dir"
 
@@ -1192,7 +1208,6 @@ test_add_new_project_creates_record_workspace_and_class_repo_metadata_from_stage
   local metadata_content=""
   local definition_content=""
   local project_block=""
-  local git_status=""
 
   assert_contains "$out" "Created ASDLC project folder: $asdlc_root/projects/"
   assert_contains "$out" "Updated ASDLC metadata: $metadata_path"
@@ -1216,15 +1231,11 @@ test_add_new_project_creates_record_workspace_and_class_repo_metadata_from_stage
   assert_not_contains "$project_block" "project_classes:"
   assert_not_contains "$project_block" "class_repo_paths:"
   assert_not_contains "$out" "ADD-PROJECT HANDOFF"
-  assert_equal "$current_branch_before" "$(git -C "$asdlc_root" rev-parse --abbrev-ref HEAD)"
-  assert_equal "$head_before" "$(git -C "$asdlc_root" rev-parse HEAD)"
-  assert_equal "0" "$(git -C "$asdlc_root" branch --list 'add-project/*' | wc -l | tr -d ' ')"
-  git_status="$(git -C "$asdlc_root" status --short)"
-  assert_contains "$git_status" "asdlc_metadata.yaml"
-  assert_contains "$git_status" "projects/"
 
   project_dir="$asdlc_root/projects/$internal_folder"
   assert_dir_exists "$project_dir"
+  assert_git_repo_initialized "$project_dir"
+  assert_file_exists "$project_dir/.git/config"
   assert_file_exists "$project_dir/init_progress_definition.yaml"
   definition_content="$(cat "$project_dir/init_progress_definition.yaml")"
   assert_contains "$definition_content" 'project_id: "'"$internal_folder"'"'
@@ -1237,6 +1248,8 @@ test_add_new_project_creates_record_workspace_and_class_repo_metadata_from_stage
   assert_contains "$definition_content" $'    frontend:\n      state: "deferred"\n      path: ""'
   definition_project_id="$(extract_project_id_from_definition "$project_dir/init_progress_definition.yaml")"
   assert_equal "$internal_folder" "$definition_project_id"
+  assert_git_head_subject "$project_dir" "Initialize ASDLC project workspace"
+  assert_equal "init_progress_definition.yaml" "$(git -C "$project_dir" ls-files)"
 }
 
 test_add_new_project_does_not_require_git_repository() {
@@ -1249,8 +1262,6 @@ test_add_new_project_does_not_require_git_repository() {
   asdlc_root="$(bootstrap_asdlc_workspace "$repo_dir" "$bootstrap_parent")"
   local project_id=""
   local project_dir=""
-  rm -rf "$asdlc_root/.git"
-
   local out=""
   out="$(
     cd "$TMP_ROOT" &&
@@ -1262,6 +1273,8 @@ test_add_new_project_does_not_require_git_repository() {
   project_id="$(extract_last_project_uuid "$asdlc_root/asdlc_metadata.yaml")"
   project_dir="$asdlc_root/projects/$project_id"
   assert_dir_exists "$project_dir"
+  assert_git_repo_initialized "$project_dir"
+  assert_git_head_subject "$project_dir" "Initialize ASDLC project workspace"
 }
 
 test_add_new_project_allows_dirty_worktree() {

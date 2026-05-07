@@ -1,7 +1,7 @@
 # Init Progress Definition
 
 Single source of truth (Mermaid embedded below).
-Operational note: `project_add_feature_e2e.sh --path projects/<project-id>` runs Step 3 scaffold, resolves `feature_path`, calls `init_progress_scanner.sh` each run, then continues from scanner `next step` (or `--resume <step>`).
+Operational note: `project_add_feature_e2e.sh [--path projects/<project-id>]` runs Step 3 scaffold, resolves `feature_path`, calls `init_progress_scanner.sh` each run, then continues from scanner `next step` (or `--resume <step>`). When `--path` is omitted, the script uses the only project under `projects/` or prompts the user to choose one.
 
 ```mermaid
 sequenceDiagram
