@@ -111,6 +111,7 @@ steps:
         special_folder: "/product"
     finished_only_if_conditions_meet:
       - condition: "feature_task_to_br.sh output is captured in user_br_input.md for this feature."
+      - condition: "user_br_input.md retains the actual source story/request content used during task-to-BR extraction."
       - condition: "For project types B and C, repository scan context has been requested from active BE/FE/Mobile lines at most once per line and only for non-new projects."
       - condition: "For project type A, repository scan is explicitly skipped as not applicable."
 
@@ -158,7 +159,7 @@ steps:
     optional: true
     input_required:
       - type: "document"
-        value: "user_br_input.md"
+        value: "feature_br_summary.md"
       - type: "document"
         value: "requirements_ears.md"
     finished_only_if_artefacts_present:
@@ -169,7 +170,7 @@ steps:
           equals: "complete"
           section: "## 1. Document Meta"
     finished_only_if_conditions_meet:
-      - condition: "requirements_ears_review.md records the review findings discovered by checking requirements_ears.md against user_br_input.md."
+      - condition: "requirements_ears_review.md records the review findings discovered by checking requirements_ears.md against feature_br_summary.md."
       - condition: "Each review finding is tracked with one state from: escalated, added to ears, rejected, postponed."
       - condition: "When review_status is complete, no escalated findings remain."
 

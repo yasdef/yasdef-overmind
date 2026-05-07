@@ -489,6 +489,7 @@ Hard constraints:
 - Preserve section order, headings, and field keys.
 - Fill all sections as much as possible EXCEPT do not fill or edit \`## 13. Existing-System Context\`.
 - Use only user-provided business context and the current BR content. Do not invent unsupported facts.
+- Treat $USER_INPUT_FILE as the durable captured source-input artifact for this feature.
 - Read and follow $RULE_FILE fully before editing.
 - Treat $RULE_FILE as authoritative for this phase.
 - When task-to-BR decomposition is complete, end your final response with this exact last line: "Task-to-BR phase is finished. Nothing else to do now; press Ctrl-C so orchestrator can start the next phase"
@@ -532,6 +533,8 @@ Jira MCP fetch instruction:
 - External sources config: $EXTERNAL_SOURCES_FILE (read-only)
 - Eligible Jira MCP source names:$jira_names_formatted
 - Use one of the above named MCP servers to fetch the Jira ticket content and use it as the epic/story input.
+- Before finalizing, update $USER_INPUT_FILE so \`## 2. Epic/Story Input -> epic_or_story\` contains the fetched Jira story text used for this run.
+- Preserve the existing capture metadata in $USER_INPUT_FILE when adding the fetched Jira story text.
 - If the eligible source list is empty, no listed MCP is reachable, or the ticket cannot be retrieved:
   ask the user what to do and mention that a local .txt or .md file can be provided instead.
 EOF

@@ -3,7 +3,7 @@
 ## 1. Document Meta
 - feature_id: FEAT-2001
 - feature_title: Admin moderation workspace access rules
-- source_user_br_input: projects/p1/admin-moderation/user_br_input.md
+- source_feature_br_summary: projects/p1/admin-moderation/feature_br_summary.md
 - source_requirements_ears: projects/p1/admin-moderation/requirements_ears.md
 - review_status: complete
 - last_updated: 2026-04-11
@@ -18,7 +18,7 @@
 ### Finding 1 - ACTIVE status must guard workspace APIs
 - severity: Medium
 - state: added to ears
-- source_feature_story_reference: user_br_input.md -> access-control notes for moderation workspace
+- source_br_summary_reference: feature_br_summary.md -> business rules and access-control notes for moderation workspace
 - related_requirement_targets: Requirement 8, Requirement 10, Requirement 15, Requirement 16
 - gap_summary: ACTIVE status is enforced at login or open-page level, but post-authentication workspace API access is not explicitly protected in requirements_ears.md.
 - recommendation: Add explicit EARS statements that deny moderation workspace access and data to authenticated admins who are not ACTIVE.
@@ -30,7 +30,7 @@
 ### Finding 2 - Audit export timing left intentionally open
 - severity: Low
 - state: postponed
-- source_feature_story_reference: user_br_input.md -> reporting follow-up notes
+- source_br_summary_reference: feature_br_summary.md -> open scope boundaries for reporting follow-up
 - related_requirement_targets: new requirement
 - gap_summary: The source story hints at audit export support later, but it is not committed as in-scope behavior for this feature.
 - recommendation: Keep audit export out of current requirements_ears.md and revisit only if the feature scope is expanded.

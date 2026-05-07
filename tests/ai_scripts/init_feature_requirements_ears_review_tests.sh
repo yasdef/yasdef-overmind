@@ -123,14 +123,22 @@ seed_feature_sources() {
   local feature_path="${2:-projects/p1/feature-a}"
   mkdir -p "$repo_dir/asdlc/$feature_path"
 
-  cat >"$repo_dir/asdlc/$feature_path/user_br_input.md" <<'OUT'
-# User BR Input
+  cat >"$repo_dir/asdlc/$feature_path/feature_br_summary.md" <<'OUT'
+# Feature Business Requirements Summary
 
-User story:
-- As an admin, I need moderation workspace access to remain restricted to ACTIVE admins during workspace use, not only at login.
+## 1. Document Meta
+- feature_id: FEAT-REVIEW-001
+- feature_title: Moderation workspace access
+- project_type_code: B
+- source_type: User input
+- last_updated: 2026-04-11
+- ready_to_ears: true
 
-Acceptance notes:
-- Non-ACTIVE authenticated admins must not receive moderation workspace data.
+## 7. Business Rules and Decision Logic
+- BR-1: Only ACTIVE admins may use moderation workspace data and actions after authentication.
+
+## 15. Open Questions
+- none
 OUT
 
   cat >"$repo_dir/asdlc/$feature_path/requirements_ears.md" <<'OUT'
@@ -184,7 +192,7 @@ cat >"$target_review" <<'REVIEW'
 ## 1. Document Meta
 - feature_id: FEAT-REVIEW-001
 - feature_title: Feature review test
-- source_user_br_input: projects/p1/feature-a/user_br_input.md
+- source_feature_br_summary: projects/p1/feature-a/feature_br_summary.md
 - source_requirements_ears: projects/p1/feature-a/requirements_ears.md
 - review_status: complete
 - last_updated: 2026-04-11
@@ -199,7 +207,7 @@ cat >"$target_review" <<'REVIEW'
 ### Finding 1 - ACTIVE status must guard workspace APIs
 - severity: Medium
 - state: added to ears
-- source_feature_story_reference: user_br_input.md -> access control notes
+- source_br_summary_reference: feature_br_summary.md -> business rules and access control notes
 - related_requirement_targets: Requirement 1
 - gap_summary: ACTIVE was not enforced after authentication.
 - recommendation: Add explicit ACTIVE guard behavior for non-ACTIVE authenticated admins.
@@ -322,8 +330,8 @@ test_runs_codex_and_commits_only_review_artifacts() {
   setup_git_workspace "$repo_dir"
   setup_codex_stub "$repo_dir"
 
-  local user_input_before
-  user_input_before="$(cat "$repo_dir/asdlc/projects/p1/feature-a/user_br_input.md")"
+  local summary_before
+  summary_before="$(cat "$repo_dir/asdlc/projects/p1/feature-a/feature_br_summary.md")"
   echo "local-change" >>"$repo_dir/asdlc/README.md"
 
   local out=""
@@ -349,7 +357,7 @@ test_runs_codex_and_commits_only_review_artifacts() {
   local codex_prompt
   codex_prompt="$(cat "$capture_dir/codex_prompt.txt")"
   assert_contains "$codex_prompt" ".rules/requirements_ears_review_rule.md"
-  assert_contains "$codex_prompt" "Read-only user BR input source: projects/p1/feature-a/user_br_input.md"
+  assert_contains "$codex_prompt" "Read-only feature BR summary source: projects/p1/feature-a/feature_br_summary.md"
   assert_contains "$codex_prompt" "Mutable requirements EARS target: projects/p1/feature-a/requirements_ears.md"
   assert_contains "$codex_prompt" "Mutable review ledger target: projects/p1/feature-a/requirements_ears_review.md"
   assert_contains "$codex_prompt" "Template file: .templates/requirements_ears_review_TEMPLATE.md"
@@ -358,9 +366,9 @@ test_runs_codex_and_commits_only_review_artifacts() {
   assert_contains "$codex_prompt" "I would recommend: <exact recommended change for this finding>"
   assert_contains "$codex_prompt" "Should I add recommended changes? Please answer yes/no or provide your answer."
 
-  local user_input_after
-  user_input_after="$(cat "$repo_dir/asdlc/projects/p1/feature-a/user_br_input.md")"
-  assert_equal "$user_input_before" "$user_input_after"
+  local summary_after
+  summary_after="$(cat "$repo_dir/asdlc/projects/p1/feature-a/feature_br_summary.md")"
+  assert_equal "$summary_before" "$summary_after"
 
   assert_file_exists "$repo_dir/asdlc/projects/p1/feature-a/requirements_ears.md"
   assert_file_exists "$repo_dir/asdlc/projects/p1/feature-a/requirements_ears_review.md"
@@ -390,7 +398,7 @@ test_runs_with_absolute_feature_path() {
 
   local codex_prompt
   codex_prompt="$(cat "$capture_dir/codex_prompt.txt")"
-  assert_contains "$codex_prompt" "Read-only user BR input source: $feature_path/user_br_input.md"
+  assert_contains "$codex_prompt" "Read-only feature BR summary source: $feature_path/feature_br_summary.md"
   assert_contains "$codex_prompt" "Mutable review ledger target: $feature_path/requirements_ears_review.md"
   assert_not_contains "$codex_prompt" "Mutable review ledger target: projects/p1/feature-a/requirements_ears_review.md"
   assert_file_not_exists "$capture_dir/helper_arg.txt"

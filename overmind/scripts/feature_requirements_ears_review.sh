@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_BASENAME="$(basename "${BASH_SOURCE[0]}")"
 FEATURE_PATH_INPUT=""
 FEATURE_PATH=""
-USER_BR_INPUT_FILE=""
+FEATURE_BR_SUMMARY_FILE=""
 REQUIREMENTS_EARS_FILE=""
 REQUIREMENTS_EARS_REVIEW_FILE=""
 REVIEW_TEMPLATE_FILE=".templates/requirements_ears_review_TEMPLATE.md"
@@ -112,7 +112,7 @@ resolve_feature_path() {
 }
 
 set_artifact_paths() {
-  USER_BR_INPUT_FILE="$FEATURE_PATH/user_br_input.md"
+  FEATURE_BR_SUMMARY_FILE="$FEATURE_PATH/feature_br_summary.md"
   REQUIREMENTS_EARS_FILE="$FEATURE_PATH/requirements_ears.md"
   REQUIREMENTS_EARS_REVIEW_FILE="$FEATURE_PATH/requirements_ears_review.md"
 }
@@ -120,7 +120,7 @@ set_artifact_paths() {
 ensure_required_files() {
   local runtime_root="$1"
   local required_paths=(
-    "$USER_BR_INPUT_FILE"
+    "$FEATURE_BR_SUMMARY_FILE"
     "$REQUIREMENTS_EARS_FILE"
     "$REVIEW_TEMPLATE_FILE"
     "$REVIEW_GOLDEN_EXAMPLE_FILE"
@@ -195,10 +195,10 @@ Hard constraints:
 - Treat $RULE_FILE as authoritative for this review behavior.
 - Use $REVIEW_TEMPLATE_FILE as output structure contract.
 - Use $REVIEW_GOLDEN_EXAMPLE_FILE as style contract.
-- Treat $USER_BR_INPUT_FILE as read-only source input; do not modify it.
+- Treat $FEATURE_BR_SUMMARY_FILE as read-only source input; do not modify it.
 - Update only $REQUIREMENTS_EARS_FILE and $REQUIREMENTS_EARS_REVIEW_FILE.
 - Create or update $REQUIREMENTS_EARS_REVIEW_FILE as the durable findings ledger for this phase.
-- Compare $REQUIREMENTS_EARS_FILE against $USER_BR_INPUT_FILE for material business gaps only.
+- Compare $REQUIREMENTS_EARS_FILE against $FEATURE_BR_SUMMARY_FILE for material business gaps only.
 - Ask the user about one finding at a time, highest severity first.
 - For each active finding, show the finding and recommendation explicitly before asking for a decision:
   "Here is the finding: <concise gap summary for the current finding>"
@@ -218,7 +218,7 @@ Context:
 - ASDLC workspace root: $runtime_root
 - Runtime path bindings are authoritative for this invocation.
 - Feature artifact root: $FEATURE_PATH
-- Read-only user BR input source: $USER_BR_INPUT_FILE
+- Read-only feature BR summary source: $FEATURE_BR_SUMMARY_FILE
 - Mutable requirements EARS target: $REQUIREMENTS_EARS_FILE
 - Mutable review ledger target: $REQUIREMENTS_EARS_REVIEW_FILE
 - Rule file: $RULE_FILE
@@ -229,12 +229,12 @@ Context:
 EOF
 }
 
-ensure_user_br_input_unchanged() {
+ensure_feature_br_summary_unchanged() {
   local before_snapshot="$1"
-  local user_br_input_path="$2"
+  local feature_br_summary_path="$2"
 
-  if ! cmp -s "$before_snapshot" "$user_br_input_path"; then
-    die "Requirements EARS extra review must not modify $USER_BR_INPUT_FILE; it is read-only input."
+  if ! cmp -s "$before_snapshot" "$feature_br_summary_path"; then
+    die "Requirements EARS extra review must not modify $FEATURE_BR_SUMMARY_FILE; it is read-only input."
   fi
 }
 
@@ -248,7 +248,7 @@ main() {
   resolve_feature_path "$runtime_root" "$FEATURE_PATH_INPUT"
   set_artifact_paths
 
-  local user_br_input_path=""
+  local feature_br_summary_path=""
   local review_path=""
   local models_path=""
   local prompt_arg=""
@@ -256,7 +256,7 @@ main() {
 
   ensure_required_files "$runtime_root"
 
-  user_br_input_path="$runtime_root/$USER_BR_INPUT_FILE"
+  feature_br_summary_path="$runtime_root/$FEATURE_BR_SUMMARY_FILE"
   review_path="$runtime_root/$REQUIREMENTS_EARS_REVIEW_FILE"
   models_path="$runtime_root/$MODELS_FILE"
   load_model_config "$models_path" "$MODEL_PHASE"
@@ -266,7 +266,7 @@ main() {
   require_command "$MODEL_CMD"
 
   before_snapshot="$(mktemp)"
-  cp "$user_br_input_path" "$before_snapshot"
+  cp "$feature_br_summary_path" "$before_snapshot"
   trap '[[ -n "${before_snapshot:-}" ]] && rm -f "$before_snapshot"' EXIT
 
   prompt_arg="$(build_prompt "$runtime_root")"
@@ -286,7 +286,7 @@ main() {
     die "Model run did not produce required file: $REQUIREMENTS_EARS_REVIEW_FILE"
   fi
 
-  ensure_user_br_input_unchanged "$before_snapshot" "$user_br_input_path"
+  ensure_feature_br_summary_unchanged "$before_snapshot" "$feature_br_summary_path"
   echo "Updated $REQUIREMENTS_EARS_FILE"
   echo "Updated $REQUIREMENTS_EARS_REVIEW_FILE"
 }

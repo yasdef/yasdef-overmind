@@ -8,6 +8,7 @@ Task-to-BR decomposition contract for runtime BR artifacts
 1. Update only:
    - `<TARGET_BR_ARTIFACT>`
    - `<MISSING_DATA_ARTIFACT>`
+   - `<CAPTURED_USER_INPUT_ARTIFACT>` only when the source is Jira and the fetched story text must be persisted into the captured input record
 2. Preserve BR section order, headings, keys, and one-line FR/BR item structure.
 3. Do not add, remove, or rename BR sections/keys.
 4. Do not fill `## 13. Existing-System Context` at this stage.
@@ -22,6 +23,7 @@ Task-to-BR decomposition contract for runtime BR artifacts
 11. Do not silently assume missing details: every unresolved or low-confidence business detail MUST be externalized as `rised_item_N` (`rised=false`) in `<MISSING_DATA_ARTIFACT>`.
 12. Ambiguity triggers (for example: "fast", "better", "simple", "as needed", "TBD", "etc.") MUST be converted into explicit follow-up business questions and tracked as unresolved ledger items.
 13. Do not write generic placeholder FR/BR content. If a requirement/rule is not specific and traceable to user input, keep it `[UNFILLED]` and track the gap in `<MISSING_DATA_ARTIFACT>`.
+14. If the source is Jira, persist the fetched story/request text into `<CAPTURED_USER_INPUT_ARTIFACT>` before finishing so downstream phases retain the actual source narrative.
 
 ## Gate Command
 Run from repository root after each extraction round:

@@ -139,7 +139,7 @@ END {
 
   required_meta[1] = "feature_id"
   required_meta[2] = "feature_title"
-  required_meta[3] = "source_user_br_input"
+  required_meta[3] = "source_feature_br_summary"
   required_meta[4] = "source_requirements_ears"
   required_meta[5] = "review_status"
   required_meta[6] = "last_updated"
@@ -171,7 +171,7 @@ END {
   for (f = 1; f <= finding_count; f++) {
     required_finding_field[1] = "severity"
     required_finding_field[2] = "state"
-    required_finding_field[3] = "source_feature_story_reference"
+    required_finding_field[3] = "source_br_summary_reference"
     required_finding_field[4] = "related_requirement_targets"
     required_finding_field[5] = "gap_summary"
     required_finding_field[6] = "recommendation"

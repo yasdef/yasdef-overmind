@@ -2,14 +2,14 @@
 
 ## Purpose
 
-- Review `requirements_ears.md` against the source `user_br_input.md`.
+- Review `requirements_ears.md` against the validated source `feature_br_summary.md`.
 - Surface only material business findings that affect scope, actor rules, guard
   conditions, rejection paths, state constraints, or required coverage.
 - Maintain a durable findings ledger in `requirements_ears_review.md`.
 
 ## Inputs
 
-- Read-only feature story source: `<USER_BR_INPUT_SOURCE_ARTIFACT>`.
+- Read-only validated BR summary source: `<BR_SUMMARY_SOURCE_ARTIFACT>`.
 - Mutable EARS target: `<REQUIREMENTS_EARS_ARTIFACT>`.
 - Mutable review ledger target: `<REVIEW_TARGET_ARTIFACT>`.
 - Structure contract: `.templates/requirements_ears_review_TEMPLATE.md`.
@@ -19,7 +19,7 @@
 
 ## Review Scope
 
-- Compare the intended business behavior in `<USER_BR_INPUT_SOURCE_ARTIFACT>` to the
+- Compare the intended business behavior in `<BR_SUMMARY_SOURCE_ARTIFACT>` to the
   current EARS behavior in `<REQUIREMENTS_EARS_ARTIFACT>`.
 - Raise findings only when there is a material gap or contradiction, such as:
   - missing guard or rejection behavior,
@@ -75,7 +75,7 @@
 
 ## Editing Rules
 
-- Treat `<USER_BR_INPUT_SOURCE_ARTIFACT>` as read-only.
+- Treat `<BR_SUMMARY_SOURCE_ARTIFACT>` as read-only.
 - Update only `<REQUIREMENTS_EARS_ARTIFACT>` and `<REVIEW_TARGET_ARTIFACT>`.
 - Keep EARS output business-facing and implementation-agnostic.
 - When changing EARS, prefer minimal edits that close the reviewed gap without

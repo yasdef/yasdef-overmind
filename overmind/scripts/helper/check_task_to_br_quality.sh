@@ -21,6 +21,37 @@ resolve_target_path() {
   printf '%s/%s\n' "$PWD" "$target_input"
 }
 
+captured_user_input_has_story_content() {
+  local input_path="$1"
+
+  awk '
+BEGIN {
+  in_story = 0
+  has_content = 0
+}
+/^- epic_or_story:[[:space:]]*\|[[:space:]]*$/ {
+  in_story = 1
+  next
+}
+{
+  if (!in_story) {
+    next
+  }
+
+  if ($0 ~ /^-[[:space:]]+[A-Za-z0-9_-]+:[[:space:]]*/ || $0 ~ /^##[[:space:]]+/) {
+    exit(has_content ? 0 : 1)
+  }
+
+  if ($0 ~ /^  [^[:space:]].*$/) {
+    has_content = 1
+  }
+}
+END {
+  exit(has_content ? 0 : 1)
+}
+' "$input_path"
+}
+
 main() {
   local target_path=""
   target_path="$(resolve_target_path "$TARGET_RELATIVE_PATH")"
@@ -32,6 +63,20 @@ main() {
   missing_data_path="$(dirname "$target_path")/missing_br_data.md"
   if [[ ! -f "$missing_data_path" ]]; then
     missing_data_path=""
+  fi
+
+  local user_input_path=""
+  user_input_path="$(dirname "$target_path")/user_br_input.md"
+  if [[ ! -f "$user_input_path" ]]; then
+    echo "business-context gate failed"
+    echo "missing: user_br_input.md is missing"
+    exit 1
+  fi
+
+  if ! captured_user_input_has_story_content "$user_input_path"; then
+    echo "business-context gate failed"
+    echo "missing: user_br_input.md -> epic_or_story must contain actual source story/request content"
+    exit 1
   fi
 
   awk -v missing_data_path="$missing_data_path" '

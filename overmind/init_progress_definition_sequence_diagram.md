@@ -65,7 +65,7 @@ sequenceDiagram
       PO->>PO: 5. BR → EARS → requirements_ears.md
       opt 5.1 Optional EARS review
         loop Until no escalated findings
-          PO->>PO: 5.1 Review EARS vs user_br_input.md → requirements_ears_review.md
+          PO->>PO: 5.1 Review EARS vs feature_br_summary.md → requirements_ears_review.md
           PO->>PO: Apply accepted edits or record rejection
         end
       end

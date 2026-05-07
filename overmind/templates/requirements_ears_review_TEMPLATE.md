@@ -1,12 +1,12 @@
 # Requirements EARS Extra Review - Template
 
 Use this artifact to track review findings discovered when `requirements_ears.md`
-is checked against the source `user_br_input.md`.
+is checked against the validated source `feature_br_summary.md`.
 
 ## 1. Document Meta
 - feature_id: [UNFILLED]
 - feature_title: [UNFILLED]
-- source_user_br_input: [UNFILLED]
+- source_feature_br_summary: [UNFILLED]
 - source_requirements_ears: [UNFILLED]
 - review_status: in_progress
 - last_updated: [UNFILLED]
@@ -25,7 +25,7 @@ is checked against the source `user_br_input.md`.
 ### Finding <N> - <Short gap title>
 - severity: Medium
 - state: escalated
-- source_feature_story_reference: <section, bullet, or note in user_br_input.md that motivated the finding>
+- source_br_summary_reference: <section, bullet, or note in feature_br_summary.md that motivated the finding>
 - related_requirement_targets: <Requirement ids to update, or `new requirement`>
 - gap_summary: <what is missing, ambiguous, or inconsistent in requirements_ears.md>
 - recommendation: <recommended requirement change in plain language>

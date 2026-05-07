@@ -106,9 +106,49 @@ set -euo pipefail
 
 capture_dir="${TEST_CAPTURE_DIR:?TEST_CAPTURE_DIR must be set}"
 feature_root="${TEST_FEATURE_ROOT:?TEST_FEATURE_ROOT must be set}"
+user_input_file="${TEST_USER_INPUT_FILE:-}"
+captured_story_text="${TEST_CAPTURED_STORY_TEXT:-}"
 
 printf '%s\n' "$@" >"$capture_dir/codex_args.txt"
 printf '%s' "${!#}" >"$capture_dir/codex_prompt.txt"
+
+if [[ -n "$user_input_file" && -n "$captured_story_text" ]]; then
+  tmp_user_input="$(mktemp)"
+  STORY_TEXT="$captured_story_text" awk '
+BEGIN {
+  in_story = 0
+  story_written = 0
+  story_text = ENVIRON["STORY_TEXT"]
+  story_count = split(story_text, story_lines, /\n/)
+}
+$0 == "- epic_or_story: |" {
+  in_story = 1
+  story_written = 1
+  print
+  for (i = 1; i <= story_count; i++) {
+    print "  " story_lines[i]
+  }
+  next
+}
+{
+  if (in_story && ($0 ~ /^-[[:space:]]+/ || $0 ~ /^##[[:space:]]+/)) {
+    in_story = 0
+  }
+
+  if (in_story) {
+    next
+  }
+
+  print
+}
+END {
+  if (!story_written) {
+    exit 1
+  }
+}
+' "$user_input_file" >"$tmp_user_input"
+  mv "$tmp_user_input" "$user_input_file"
+fi
 
 cat >"$feature_root/feature_br_summary.md" <<'DOC'
 # Feature Business Requirements Summary
@@ -236,6 +276,7 @@ OUT
     cd "$repo_dir/asdlc"
     printf "2\nCRP-122\n" | \
       PATH="$repo_dir/bin:$PATH" TEST_CAPTURE_DIR="$capture_dir" TEST_FEATURE_ROOT="$repo_dir/asdlc/projects/p1/feature-a" \
+      TEST_USER_INPUT_FILE="$repo_dir/asdlc/projects/p1/feature-a/user_br_input.md" TEST_CAPTURED_STORY_TEXT="Fetched Jira story for CRP-122" \
       .commands/feature_task_to_br.sh --feature_path "projects/p1/feature-a" >/dev/null
   )
 
@@ -246,6 +287,7 @@ OUT
 
   assert_contains "$user_input_content" "jira_ticket: CRP-122"
   assert_contains "$user_input_content" "epic_story_source_file: jira:CRP-122"
+  assert_contains "$user_input_content" "Fetched Jira story for CRP-122"
   assert_contains "$prompt_content" "my-jira-mcp"
   assert_contains "$prompt_content" "Jira MCP fetch instruction"
 }
@@ -268,6 +310,7 @@ OUT
     cd "$repo_dir/asdlc"
     printf "2\nT-1\n" | \
       PATH="$repo_dir/bin:$PATH" TEST_CAPTURE_DIR="$capture_dir" TEST_FEATURE_ROOT="$repo_dir/asdlc/projects/p1/feature-a" \
+      TEST_USER_INPUT_FILE="$repo_dir/asdlc/projects/p1/feature-a/user_br_input.md" TEST_CAPTURED_STORY_TEXT="Fetched Jira story for T-1" \
       .commands/feature_task_to_br.sh --feature_path "projects/p1/feature-a" >/dev/null
   )
 
@@ -309,6 +352,7 @@ test_empty_ticket_number_rejected() {
     cd "$repo_dir/asdlc"
     printf "2\n\n\nCRP-122\n" | \
       PATH="$repo_dir/bin:$PATH" TEST_CAPTURE_DIR="$capture_dir" TEST_FEATURE_ROOT="$repo_dir/asdlc/projects/p1/feature-a" \
+      TEST_USER_INPUT_FILE="$repo_dir/asdlc/projects/p1/feature-a/user_br_input.md" TEST_CAPTURED_STORY_TEXT="Fetched Jira story for CRP-122" \
       .commands/feature_task_to_br.sh --feature_path "projects/p1/feature-a" >/dev/null
   )
 
@@ -318,6 +362,7 @@ test_empty_ticket_number_rejected() {
   prompt_content="$(cat "$capture_dir/codex_prompt.txt")"
 
   assert_contains "$user_input_content" "jira_ticket: CRP-122"
+  assert_contains "$user_input_content" "Fetched Jira story for CRP-122"
   assert_contains "$prompt_content" "jira:CRP-122"
 }
 
@@ -342,6 +387,22 @@ capture_dir="${TEST_CAPTURE_DIR:?TEST_CAPTURE_DIR must be set}"
 feature_root="${TEST_FEATURE_ROOT:?TEST_FEATURE_ROOT must be set}"
 printf '%s\n' "$@" >"$capture_dir/codex_args.txt"
 printf '%s' "${!#}" >"$capture_dir/codex_prompt.txt"
+cat >"$feature_root/user_br_input.md" <<'DOC'
+# User Business Input
+
+## 1. Capture Meta
+- captured_at: 2026-04-06
+- jira_ticket: CRP-999
+
+## 2. Epic/Story Input
+- feature_id: FTR-42
+- feature_title: Invoice approval baseline
+- epic_story_source_file: jira:CRP-999
+- epic_or_story: |
+  Fetched Jira story for CRP-999
+- request_summary: Invoice approval baseline
+- additional_business_context: [UNFILLED]
+DOC
 cat >"$feature_root/feature_br_summary.md" <<'DOC'
 # Feature Business Requirements Summary
 
@@ -400,6 +461,22 @@ capture_dir="${TEST_CAPTURE_DIR:?TEST_CAPTURE_DIR must be set}"
 feature_root="${TEST_FEATURE_ROOT:?TEST_FEATURE_ROOT must be set}"
 printf '%s\n' "$@" >"$capture_dir/codex_args.txt"
 printf '%s' "${!#}" >"$capture_dir/codex_prompt.txt"
+cat >"$feature_root/user_br_input.md" <<'DOC'
+# User Business Input
+
+## 1. Capture Meta
+- captured_at: 2026-04-06
+- jira_ticket: CRP-999
+
+## 2. Epic/Story Input
+- feature_id: FTR-42
+- feature_title: Invoice approval baseline
+- epic_story_source_file: jira:CRP-999
+- epic_or_story: |
+  Fetched Jira story for CRP-999
+- request_summary: Invoice approval baseline
+- additional_business_context: [UNFILLED]
+DOC
 cat >"$feature_root/feature_br_summary.md" <<'DOC'
 # Feature Business Requirements Summary
 

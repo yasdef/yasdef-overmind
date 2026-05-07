@@ -33,6 +33,21 @@ setup_repo_with_helper() {
   cp "$HELPER_SRC" "$repo_dir/overmind/scripts/helper/check_task_to_br_quality.sh"
   chmod +x "$repo_dir/overmind/scripts/helper/check_task_to_br_quality.sh"
   echo "seed" >"$repo_dir/README.md"
+  cat >"$repo_dir/overmind/product/user_br_input.md" <<'OUT'
+# User Business Input
+
+## 1. Capture Meta
+- captured_at: 2026-03-20
+
+## 2. Epic/Story Input
+- feature_id: FEAT-1
+- feature_title: Invoice approvals
+- epic_story_source_file: feature-story.md
+- epic_or_story: |
+  As a product owner I want invoice approval visibility.
+- request_summary: Invoice approval visibility
+- additional_business_context: [UNFILLED]
+OUT
 }
 
 write_complete_summary() {
@@ -600,6 +615,38 @@ test_helper_returns_exit_code_2_for_missing_target_file() {
   assert_contains "$out" "ERROR: Target BR summary not found:"
 }
 
+test_helper_fails_when_captured_user_input_story_content_is_missing() {
+  local repo_dir="$TMP_ROOT/repo-helper-missing-story-content"
+  mkdir -p "$repo_dir"
+  setup_repo_with_helper "$repo_dir"
+  write_complete_summary "$repo_dir"
+  cat >"$repo_dir/overmind/product/user_br_input.md" <<'OUT'
+# User Business Input
+
+## 1. Capture Meta
+- captured_at: 2026-03-20
+
+## 2. Epic/Story Input
+- feature_id: FEAT-1
+- feature_title: Invoice approvals
+- epic_story_source_file: jira:CRP-122
+- epic_or_story: |
+- request_summary: Invoice approval visibility
+- additional_business_context: [UNFILLED]
+OUT
+
+  local status=0
+  local out=""
+  set +e
+  out="$(cd "$repo_dir" && overmind/scripts/helper/check_task_to_br_quality.sh 2>&1)"
+  status=$?
+  set -e
+
+  assert_equal "1" "$status"
+  assert_contains "$out" "business-context gate failed"
+  assert_contains "$out" "missing: user_br_input.md -> epic_or_story must contain actual source story/request content"
+}
+
 test_helper_passes_when_required_fields_fr_and_br_exist
 test_helper_fails_with_exit_code_1_when_required_business_goal_is_missing
 test_helper_fails_with_exit_code_1_when_no_populated_fr_exists
@@ -614,5 +661,6 @@ test_helper_fails_when_missing_data_has_non_rised_items
 test_helper_passes_when_missing_data_rised_items_have_loop_fields_filled
 test_helper_passes_when_missing_data_has_multiple_answer_pointers
 test_helper_returns_exit_code_2_for_missing_target_file
+test_helper_fails_when_captured_user_input_story_content_is_missing
 
 echo "All user-input BR business-context gate helper tests passed."

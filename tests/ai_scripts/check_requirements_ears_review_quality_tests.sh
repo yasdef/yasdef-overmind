@@ -43,7 +43,7 @@ write_valid_review() {
 ## 1. Document Meta
 - feature_id: FEAT-REVIEW-001
 - feature_title: Payments access review
-- source_user_br_input: overmind/product/user_br_input.md
+- source_feature_br_summary: overmind/product/feature_br_summary.md
 - source_requirements_ears: overmind/product/requirements_ears.md
 - review_status: complete
 - last_updated: 2026-04-11
@@ -58,7 +58,7 @@ write_valid_review() {
 ### Finding 1 - Close missing ACTIVE guard
 - severity: Medium
 - state: added to ears
-- source_feature_story_reference: user_br_input.md -> access guard notes
+- source_br_summary_reference: feature_br_summary.md -> access guard notes
 - related_requirement_targets: Requirement 8, Requirement 10
 - gap_summary: ACTIVE was missing after authentication.
 - recommendation: Add explicit ACTIVE post-auth guard.
