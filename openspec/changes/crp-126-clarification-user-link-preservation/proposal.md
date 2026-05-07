@@ -4,7 +4,9 @@ During the step 4.2 BR clarification dialogue, users frequently paste Confluence
 
 ## What Changes
 
-- Extend `user_br_clarification_rule.md` with a link-preservation rule: whenever the user's reply contains one or more URLs, append a new LAR-NNN entry for each URL to `## 16. Linked Artifacts` in `feature_br_summary.md`, using the same id/title/type/locator schema already defined for Jira-sourced artifacts.
+- Extend `user_br_clarification_rule.md` so the general clarification flow treats a user-provided link as the same kind of business input as a direct text answer, but only when the link actually answers or materially clarifies the current business question.
+- Preserve only those user-provided URLs that are actually used as business input in the clarification round by appending a new LAR-NNN entry to `## 16. Linked Artifacts` in `feature_br_summary.md`, using the same id/title/type/locator schema already defined for Jira-sourced artifacts.
+- When a relevant link contains more information than needed, record only the question-relevant business content in the BR while still preserving the link for traceability.
 - Update the hint comment in `feature_br_summary_TEMPLATE.md` section 16 to reflect that the section is also populated from user-provided links at step 4.2.
 - All other link-handling behavior (fetching, reading, applying content) is unchanged.
 

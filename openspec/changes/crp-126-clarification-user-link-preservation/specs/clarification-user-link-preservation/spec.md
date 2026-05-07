@@ -1,18 +1,33 @@
 ## ADDED Requirements
 
-### Requirement: Preserve user-provided links in linked artifacts registry
-During the step 4.2 BR clarification dialogue, whenever the user's reply contains one or more HTTP(S) URLs, the model SHALL append a new LAR-NNN entry for each URL to `## 16. Linked Artifacts` in `feature_br_summary.md`, using the same id/title/type/locator schema used by the Jira-source extraction at step 3.
+### Requirement: Relevant user-provided links are treated as business input
+During the step 4.2 BR clarification dialogue, the model SHALL treat a user-provided HTTP(S) URL as business input only when the linked content answers or materially clarifies the currently discussed business question.
 
-#### Scenario: User reply contains a single URL
-- **WHEN** the user provides exactly one URL in a clarification reply
+#### Scenario: User reply contains a relevant URL
+- **WHEN** the user provides a URL whose content answers the current clarification question
+- **THEN** the model may use that linked content as the business answer for the current round
+
+#### Scenario: User reply contains an irrelevant URL
+- **WHEN** the user provides a URL whose content does not answer the current clarification question
+- **THEN** the model does not use that linked content as the answer for the current round
+
+#### Scenario: Relevant link contains more content than needed
+- **WHEN** the user provides a URL whose content answers the current clarification question but also includes unrelated extra information
+- **THEN** the model records only the business content that is relevant to the current question in `feature_br_summary.md`
+
+### Requirement: Preserve only answer-bearing user-provided links
+During the step 4.2 BR clarification dialogue, whenever the model uses a user-provided HTTP(S) URL as business input for the current clarification question, the model SHALL append a new LAR-NNN entry for that URL to `## 16. Linked Artifacts` in `feature_br_summary.md`, using the same id/title/type/locator schema used by the Jira-source extraction at step 3.
+
+#### Scenario: User reply contains a single relevant URL
+- **WHEN** the user provides exactly one relevant URL in a clarification reply
 - **THEN** the model adds one new LAR-NNN entry to `## 16. Linked Artifacts` with the next sequential id, a derived title, an inferred type, and the URL as locator
 
-#### Scenario: User reply contains multiple URLs
-- **WHEN** the user provides two or more URLs in a single clarification reply
-- **THEN** the model adds one LAR-NNN entry per URL in sequential order
+#### Scenario: User reply contains multiple relevant URLs
+- **WHEN** the user provides two or more relevant URLs in a single clarification reply
+- **THEN** the model adds one LAR-NNN entry per relevant URL in sequential order
 
-#### Scenario: User reply contains no URL
-- **WHEN** the user reply contains no HTTP(S) URL
+#### Scenario: User reply contains no relevant URL
+- **WHEN** the user reply contains no relevant HTTP(S) URL
 - **THEN** `## 16. Linked Artifacts` is not modified by this rule
 
 ### Requirement: LAR id assignment continues existing sequence
@@ -32,6 +47,10 @@ If the URL supplied by the user already exists as a `locator` value in any exist
 #### Scenario: URL already recorded from step 3
 - **WHEN** the user pastes a URL that matches the `locator` of an existing LAR entry
 - **THEN** no new LAR entry is added and the existing entry is left unchanged
+
+#### Scenario: Irrelevant URL is not preserved
+- **WHEN** the user pastes a URL that does not answer the current clarification question
+- **THEN** no new LAR entry is added for that URL
 
 ### Requirement: Type vocabulary is consistent with step 3
 The `type` field of user-sourced LAR entries SHALL use the same closed vocabulary defined in `task_to_br_rule.md`: `data_schema`, `diagram`, `api_spec`, `design_mock`, `document`, `image`, `pdf`, `other`. When type cannot be determined, `document` is used as the default.

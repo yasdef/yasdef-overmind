@@ -174,7 +174,7 @@
 - non_critical_questions: [UNFILLED]
 
 ## 16. Linked Artifacts
-> Populated only when source is `jira:<ticket>`. Always emitted; leave the list empty when no non-text artifacts are found.
+> Populated from Jira-sourced artifacts in step 3 and user-provided links during BR clarification in step 4.2. Always emitted; leave the list empty when no artifacts or links are found.
 > Each entry captures: id (LAR-NNN), title, type, locator.
 > Supported types: data_schema | diagram | api_spec | design_mock | document | image | pdf | other.
 
