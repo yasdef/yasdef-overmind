@@ -70,11 +70,29 @@ Use one `state` per finding:
 ## Editing Rules
 - Update only `<IMPLEMENTATION_PLAN_ARTIFACT>` and `<IMPLEMENTATION_PLAN_SEMANTIC_REVIEW_ARTIFACT>`.
 - Never modify `<REQUIREMENTS_EARS_ARTIFACT>` or `<TECHNICAL_REQUIREMENTS_ARTIFACT>`.
+- Never add ad-hoc sections or free-form blocks to `<IMPLEMENTATION_PLAN_ARTIFACT>`.
+- Apply selected findings to `<IMPLEMENTATION_PLAN_ARTIFACT>` only by:
+  - adding checklist bullets to an existing `### Step ...` block,
+  - splitting an existing step into valid `### Step ...` blocks,
+  - adding a new valid `### Step ...` block,
+  - adjusting `#### Depends on:`, `#### Evidence:`, or `#### Preserved Surface:` lines as needed.
 - Keep implementation-plan edits minimal and directly tied to selected findings.
 - Preserve full traceability of decisions in the review artifact.
+
+## Minimal Plan Patch Guidance
+- Prefer adding checklist bullets to an existing step when the selected finding belongs to the same repo owner, same semantic delivery slice, same dependency position, and same requirement/evidence scope.
+- Prefer splitting an existing step when the current step mixes independent semantic slices, separate repo-owned work, or work that should have different dependency timing.
+- Prefer adding a new valid step only when the selected finding represents independently executable work, prerequisite work, repo-scaffold/readiness work, or work that cannot be cleanly attached to an existing step without weakening the step boundary.
+- Keep the patch proportional to the selected findings; do not create extra steps solely for tidier wording.
+
+## Type A Scaffold Readiness Guidance
+- Resolve selected `repo_scaffold_readiness_unclear` findings inside the normal implementation-plan structure.
+- Prefer adding concrete readiness bullets to an existing repo-owned step when that step already covers setup, scaffold, or repo-readiness work for the affected class.
+- Add a new repo-owned scaffold/readiness step only when scaffold/readiness is a separate prerequisite or cannot be cleanly represented in an existing step.
 
 ## Completion
 - If no material findings exist, set `review_status: complete` and `- no_findings: true`.
 - If findings exist, ensure each finding has terminal state and resolution notes.
 - `delivered_surface_consumption_unclear` and `repo_scaffold_readiness_unclear` MUST NOT be terminal (`applied`, `rejected`, `postponed`) with empty `resolution_notes`.
+- If `<IMPLEMENTATION_PLAN_ARTIFACT>` is changed, run the prompt-provided implementation-plan quality gate before finalizing.
 - End with the prompt-provided success line when complete, or the failure line if completion is not feasible.

@@ -17,6 +17,7 @@ REVIEW_GOLDEN_EXAMPLE_FILE=".golden_examples/implementation_plan_semantic_review
 MODELS_FILE=".setup/models.md"
 RULE_FILE=".rules/implementation_plan_semantic_review_rule.md"
 QUALITY_GATE_HELPER=".helper/check_implementation_plan_semantic_review_quality.sh"
+IMPLEMENTATION_PLAN_QUALITY_GATE_HELPER=".helper/check_implementation_plan_quality.sh"
 MODEL_PHASE="implementation_plan_semantic_review"
 
 MODEL_CMD=""
@@ -333,6 +334,7 @@ ensure_required_files() {
     "$MODELS_FILE"
     "$RULE_FILE"
     "$QUALITY_GATE_HELPER"
+    "$IMPLEMENTATION_PLAN_QUALITY_GATE_HELPER"
     "$PROJECT_DEFINITION_FILE"
   )
   local relative_path=""
@@ -438,6 +440,7 @@ build_prompt() {
   local surface_map_lines=""
   local active_repo_class_lines=""
   local quality_gate_command="$QUALITY_GATE_HELPER $IMPLEMENTATION_PLAN_SEMANTIC_REVIEW_FILE"
+  local implementation_plan_quality_gate_command="$IMPLEMENTATION_PLAN_QUALITY_GATE_HELPER $IMPLEMENTATION_PLAN_FILE"
 
   failure_msg="$(failure_line)"
   success_msg="$(success_line)"
@@ -488,6 +491,8 @@ $surface_map_lines
 - Golden example file: $REVIEW_GOLDEN_EXAMPLE_FILE
 - Quality gate helper: $QUALITY_GATE_HELPER
 - Quality gate command: $quality_gate_command
+- Implementation plan quality gate helper: $IMPLEMENTATION_PLAN_QUALITY_GATE_HELPER
+- Implementation plan quality gate command: $implementation_plan_quality_gate_command
 EOF_PROMPT
 }
 

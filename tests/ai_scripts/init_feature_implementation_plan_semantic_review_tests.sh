@@ -4,6 +4,7 @@ set -euo pipefail
 SOURCE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 SCRIPT_SRC="$SOURCE_ROOT/overmind/scripts/feature_implementation_plan_semantic_review.sh"
 HELPER_SRC="$SOURCE_ROOT/overmind/scripts/helper/check_implementation_plan_semantic_review_quality.sh"
+PLAN_HELPER_SRC="$SOURCE_ROOT/overmind/scripts/helper/check_implementation_plan_quality.sh"
 RULE_SRC="$SOURCE_ROOT/overmind/rules/implementation_plan_semantic_review_rule.md"
 TEMPLATE_SRC="$SOURCE_ROOT/overmind/templates/implementation_plan_semantic_review_TEMPLATE.md"
 GOLDEN_EXAMPLE_SRC="$SOURCE_ROOT/overmind/golden_examples/implementation_plan_semantic_review_GOLDEN_EXAMPLE.md"
@@ -71,11 +72,13 @@ setup_workspace_layout() {
 
   cp "$SCRIPT_SRC" "$repo_dir/asdlc/.commands/feature_implementation_plan_semantic_review.sh"
   cp "$HELPER_SRC" "$repo_dir/asdlc/.helper/check_implementation_plan_semantic_review_quality.sh"
+  cp "$PLAN_HELPER_SRC" "$repo_dir/asdlc/.helper/check_implementation_plan_quality.sh"
   cp "$RULE_SRC" "$repo_dir/asdlc/.rules/implementation_plan_semantic_review_rule.md"
   cp "$TEMPLATE_SRC" "$repo_dir/asdlc/.templates/implementation_plan_semantic_review_TEMPLATE.md"
   cp "$GOLDEN_EXAMPLE_SRC" "$repo_dir/asdlc/.golden_examples/implementation_plan_semantic_review_GOLDEN_EXAMPLE.md"
   chmod +x "$repo_dir/asdlc/.commands/feature_implementation_plan_semantic_review.sh"
   chmod +x "$repo_dir/asdlc/.helper/check_implementation_plan_semantic_review_quality.sh"
+  chmod +x "$repo_dir/asdlc/.helper/check_implementation_plan_quality.sh"
 
   cat >"$repo_dir/asdlc/asdlc_metadata.yaml" <<'OUT'
 meta:
@@ -580,6 +583,7 @@ test_runs_codex_and_commits_plan_and_review_outputs() {
   assert_contains "$codex_prompt" "Update only projects/p1/feature-a/implementation_plan.md and projects/p1/feature-a/implementation_plan_semantic_review.md."
   assert_contains "$codex_prompt" "Which finding numbers should I apply to implementation_plan.md?"
   assert_contains "$codex_prompt" ".helper/check_implementation_plan_semantic_review_quality.sh projects/p1/feature-a/implementation_plan_semantic_review.md"
+  assert_contains "$codex_prompt" ".helper/check_implementation_plan_quality.sh projects/p1/feature-a/implementation_plan.md"
 
   assert_equal "$definition_before" "$(cat "$repo_dir/asdlc/projects/p1/init_progress_definition.yaml")"
   assert_equal "$requirements_before" "$(cat "$repo_dir/asdlc/projects/p1/feature-a/requirements_ears.md")"
