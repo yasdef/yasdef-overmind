@@ -43,6 +43,20 @@ assert_file_exists() {
   fi
 }
 
+assert_file_not_exists() {
+  local path="$1"
+  if [[ -e "$path" ]]; then
+    echo "Assertion failed: expected path to be absent: $path" >&2
+    exit 1
+  fi
+}
+
+feature_state_path() {
+  local project_dir="$1"
+  local feature_dir="$2"
+  printf '%s/step_state_%s.md' "$project_dir" "$(basename "$feature_dir")"
+}
+
 setup_asdlc_with_scanner() {
   local asdlc_root="$1"
   mkdir -p "$asdlc_root/.commands" "$asdlc_root/.helper" "$asdlc_root/projects"
@@ -118,8 +132,10 @@ EOF_BR
   assert_contains "$out" "- [x] 4 BR readiness"
   assert_contains "$out" "next step: none"
 
-  local state_path="$project_dir/step_state.md"
+  local state_path=""
+  state_path="$(feature_state_path "$project_dir" "$feature_dir")"
   assert_file_exists "$state_path"
+  assert_file_not_exists "$project_dir/step_state.md"
   assert_equal "$(cat "$state_path")" "$out"
 }
 
@@ -252,7 +268,8 @@ EOF_DEF
 
   assert_contains "$out" "- [x] 1 Project artifact exists"
   assert_contains "$out" "- [x] 2 Feature artifact exists"
-  assert_file_exists "$project_dir/step_state.md"
+  assert_file_exists "$(feature_state_path "$project_dir" "$feature_dir")"
+  assert_file_not_exists "$project_dir/step_state.md"
 }
 
 test_scanner_checks_init_phase_artifacts_from_project_root_even_with_product_special_folder() {
@@ -341,6 +358,62 @@ EOF_BR
   assert_contains "$out_feature_two" "- [x] 1 Project readiness marker"
   assert_contains "$out_feature_two" "- [x] 2 EARS requirements generated"
   assert_contains "$out_feature_two" "--- FEATURE LEVEL TASKS Sibling Feature ---"
+}
+
+test_scanner_persists_separate_feature_scoped_state_files_without_overwrite() {
+  local asdlc_root="$TMP_ROOT/asdlc-feature-scoped-state-files"
+  setup_asdlc_with_scanner "$asdlc_root"
+
+  local project_dir="$asdlc_root/projects/project-multi-feature"
+  local feature_alpha="$project_dir/feature-alpha"
+  local feature_beta="$project_dir/feature-beta"
+  local alpha_state_path=""
+  local beta_state_path=""
+  mkdir -p "$feature_alpha" "$feature_beta"
+
+  cat >"$project_dir/init_progress_definition.yaml" <<'EOF_DEF'
+meta_info:
+  project_classes:
+    - backend
+
+steps:
+  - step_number: 1
+    phase_name: "init"
+    step_name: "Project readiness marker"
+    finished_only_if_artefacts_present:
+      - file: "project_ready.md"
+  - step_number: 2
+    phase_name: "feature"
+    step_name: "Feature requirements generated"
+    finished_only_if_artefacts_present:
+      - file: "requirements_ears.md"
+        special_folder: "/product"
+EOF_DEF
+
+  echo "project ready" >"$project_dir/project_ready.md"
+  echo "alpha ready" >"$feature_alpha/requirements_ears.md"
+
+  local alpha_out=""
+  alpha_out="$($asdlc_root/.commands/init_progress_scanner.sh --path "$feature_alpha")"
+  alpha_state_path="$(feature_state_path "$project_dir" "$feature_alpha")"
+  beta_state_path="$(feature_state_path "$project_dir" "$feature_beta")"
+
+  assert_file_exists "$alpha_state_path"
+  assert_equal "$(cat "$alpha_state_path")" "$alpha_out"
+  assert_file_not_exists "$beta_state_path"
+  assert_contains "$alpha_out" "- [x] 2 Feature requirements generated"
+  assert_contains "$alpha_out" "next step: none"
+
+  local alpha_persisted=""
+  alpha_persisted="$(cat "$alpha_state_path")"
+  local beta_out=""
+  beta_out="$($asdlc_root/.commands/init_progress_scanner.sh --path "$feature_beta")"
+
+  assert_file_exists "$beta_state_path"
+  assert_equal "$(cat "$beta_state_path")" "$beta_out"
+  assert_equal "$alpha_persisted" "$(cat "$alpha_state_path")"
+  assert_contains "$beta_out" "- [ ] 2 Feature requirements generated"
+  assert_contains "$beta_out" "next step: 2 (Feature requirements generated)"
 }
 
 test_scanner_applies_required_if_project_classes() {
@@ -908,6 +981,7 @@ test_scanner_rejects_feature_path_outside_asdlc_projects
 test_scanner_infers_project_root_from_selected_feature_folder
 test_scanner_checks_init_phase_artifacts_from_project_root_even_with_product_special_folder
 test_scanner_evaluates_project_root_and_selected_feature_only
+test_scanner_persists_separate_feature_scoped_state_files_without_overwrite
 test_scanner_applies_required_if_project_classes
 test_scanner_applies_required_if_project_type
 test_scanner_does_not_require_type_a_stack_blueprints_for_type_b_or_c

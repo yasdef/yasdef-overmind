@@ -637,6 +637,7 @@ Path conventions:
 - Project path example: \`projects/<project-id>\`
 - Feature path example: \`projects/<project-id>/<feature-folder>\`
 - \`init_progress_scanner.sh\` expects a feature path, not a project path.
+- Successful scanner runs persist \`projects/<project-id>/step_state_<feature-folder>.md\`; stdout remains the canonical machine-consumable output.
 
 ## 1. Create Or Update Project
 
@@ -754,6 +755,8 @@ This command writes \`#### Assigned:\` for every plan step with a class-matched 
 .commands/init_progress_scanner.sh --path projects/<project-id>/<feature-folder>
 \`\`\`
 Careful: provide a feature path here, not a project path.
+The persisted checklist file is written to:
+\`projects/<project-id>/step_state_<feature-folder>.md\`
 EOF
 }
 

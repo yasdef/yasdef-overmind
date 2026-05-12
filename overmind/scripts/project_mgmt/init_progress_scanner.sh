@@ -7,7 +7,8 @@ FEATURE_TITLE_FALLBACK="<feature not initialized>"
 FEATURE_PATH=""
 FEATURE_INPUT_PATH=""
 PROJECT_DEFINITION_FILE="init_progress_definition.yaml"
-PROJECT_OUTPUT_FILE="step_state.md"
+PROJECT_OUTPUT_FILE_PREFIX="step_state_"
+PROJECT_OUTPUT_FILE_SUFFIX=".md"
 PROJECT_TYPE_CODE=""
 PROJECT_CLASSES=()
 SCANNER_ASDLC_ROOT=""
@@ -154,6 +155,16 @@ infer_project_root_from_feature_root() {
   done
 
   die "Selected feature path must belong to one ASDLC project with $PROJECT_DEFINITION_FILE under: $projects_root"
+}
+
+resolve_project_output_filename() {
+  local feature_root="$1"
+  local feature_folder=""
+
+  feature_folder="$(basename "$feature_root")"
+  [[ -n "$feature_folder" ]] || die "Failed to derive feature folder basename from selected path: $feature_root"
+
+  printf '%s%s%s' "$PROJECT_OUTPUT_FILE_PREFIX" "$feature_folder" "$PROJECT_OUTPUT_FILE_SUFFIX"
 }
 
 replace_file_if_changed() {
@@ -1042,6 +1053,7 @@ main() {
   local project_root=""
   local feature_root=""
   local definition_path=""
+  local output_file_name=""
   local output_path=""
 
   projects_root="$(resolve_projects_root)"
@@ -1063,7 +1075,8 @@ main() {
   esac
 
   definition_path="$project_root/$PROJECT_DEFINITION_FILE"
-  output_path="$project_root/$PROJECT_OUTPUT_FILE"
+  output_file_name="$(resolve_project_output_filename "$feature_root")"
+  output_path="$project_root/$output_file_name"
 
   [[ -f "$definition_path" ]] || die "Definition file not found: $definition_path"
 

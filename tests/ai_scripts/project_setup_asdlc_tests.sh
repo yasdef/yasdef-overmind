@@ -641,6 +641,7 @@ test_first_init_machine_bootstraps_asdlc_workspace_with_local_template() {
   assert_contains "$quickrun" "## 2. Create EARS Requirements"
   assert_contains "$quickrun" 'Project path example: `projects/<project-id>`'
   assert_contains "$quickrun" 'Feature path example: `projects/<project-id>/<feature-folder>`'
+  assert_contains "$quickrun" 'Successful scanner runs persist `projects/<project-id>/step_state_<feature-folder>.md`; stdout remains the canonical machine-consumable output.'
   assert_contains "$quickrun" ".commands/project_add_feature_e2e.sh"
   assert_contains "$quickrun" ".commands/project_add_feature_e2e.sh --path projects/<project-id>"
   assert_contains "$quickrun" '.commands/project_add_feature_e2e.sh --resume 4.2'
@@ -673,6 +674,7 @@ test_first_init_machine_bootstraps_asdlc_workspace_with_local_template() {
   assert_contains "$quickrun" 'This command writes `#### Assigned:` for every plan step with a class-matched worker UUID or `ERROR: no active worker available for class <class>`.'
   assert_contains "$quickrun" ".commands/init_progress_scanner.sh --path projects/<project-id>/<feature-folder>"
   assert_contains "$quickrun" "Careful: provide a feature path here, not a project path."
+  assert_contains "$quickrun" 'projects/<project-id>/step_state_<feature-folder>.md'
   assert_contains "$metadata" "meta:"
   assert_contains "$metadata" "projects:"
   assert_contains "$(cat "$asdlc_root/.commands/feature_br_scaffold.sh")" 'TEMPLATE_FILE=".templates/feature_br_summary_TEMPLATE.md"'
@@ -963,6 +965,7 @@ OUT
   assert_contains "$quickrun" ".commands/feature_assing_workers.sh --feature_path projects/<project-id>/<feature-folder>"
   assert_contains "$quickrun" 'This command writes `#### Assigned:` for every plan step with a class-matched worker UUID or `ERROR: no active worker available for class <class>`.'
   assert_contains "$quickrun" ".commands/feature_repo_surface_and_exec_context.sh --feature_path projects/<project-id>/<feature-folder>"
+  assert_contains "$quickrun" 'step_state_<feature-folder>.md'
 }
 
 test_first_init_machine_update_mode_preserves_existing_external_sources_yaml() {
@@ -1320,7 +1323,7 @@ test_staged_scanner_reads_selected_feature_path() {
   project_dir="$asdlc_root/projects/$project_id"
   feature_dir="$project_dir/feature-scan"
   mkdir -p "$feature_dir"
-  state_path="$project_dir/step_state.md"
+  state_path="$project_dir/step_state_feature-scan.md"
 
   cat >"$project_dir/init_progress_definition.yaml" <<'EOF'
 meta_info:
@@ -1363,6 +1366,7 @@ EOF
   assert_contains "$second_scan" "- [x] 1 Project-level marker"
   assert_contains "$second_scan" "- [x] 2 Feature-level marker"
   assert_contains "$second_scan" "next step: none"
+  assert_file_exists "$state_path"
 }
 
 test_add_new_project_retries_invalid_repo_path_until_valid() {

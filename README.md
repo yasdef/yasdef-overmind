@@ -133,7 +133,7 @@ sources:
   Staged command (`<asdlc>/.commands/project_setup_update_project.sh`) that attaches a repo path to an existing project's deferred class. Interactive flow: pick project → pick deferred class → enter repo path (validates and resolves to absolute path) → persists `state: "ready"` + `path` in `init_progress_definition.yaml`. If the project is type A and all classes become `ready` after the attach, optionally prompts to reclassify to type B or C. Any prompt accepts `q` to quit cleanly without mutation.
 
 - `overmind/scripts/project_mgmt/init_progress_scanner.sh`
-  Requires `--path <asdlc/projects/<project-id>/<feature-folder>>`, reads project `init_progress_definition.yaml`, and writes `<project>/step_state.md` with project-level + selected-feature checklist status.
+  Requires `--path <asdlc/projects/<project-id>/<feature-folder>>`, reads project `init_progress_definition.yaml`, writes `projects/<project-id>/step_state_<feature-folder>.md` with project-level + selected-feature checklist status, and keeps stdout as the canonical machine-consumable scan output.
 
 - `overmind/scripts/init_common_contract_definition.sh`
   Staged-runtime command (`<asdlc>/.commands/init_common_contract_definition.sh --path <asdlc/projects/<project-id>>`) that builds project-level `common_contract_definition.md` from usable ready repositories.
