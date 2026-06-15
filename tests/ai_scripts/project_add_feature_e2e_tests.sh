@@ -3,8 +3,12 @@ set -euo pipefail
 
 SOURCE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 SCRIPT_SRC="$SOURCE_ROOT/overmind/scripts/project_mgmt/project_add_feature_e2e.sh"
+PROJECT_SETUP_COMMON_SRC="$SOURCE_ROOT/overmind/scripts/common_libs/project_setup_common.sh"
+CLASS_REPO_PATHS_SRC="$SOURCE_ROOT/overmind/scripts/common_libs/class_repo_paths.sh"
+PERSIST_CLASS_REPO_ATTACH_SRC="$SOURCE_ROOT/overmind/scripts/common_libs/persist_class_repo_attach.sh"
 
 TMP_ROOT="$(mktemp -d)"
+TMP_ROOT="$(cd "$TMP_ROOT" && pwd -P)"
 trap 'rm -rf "$TMP_ROOT"' EXIT
 
 assert_contains() {
@@ -62,9 +66,21 @@ assert_file_exists() {
   fi
 }
 
+assert_file_not_exists() {
+  local path="$1"
+  if [[ -e "$path" ]]; then
+    echo "Assertion failed: expected file to not exist: $path" >&2
+    exit 1
+  fi
+}
+
 setup_git_repo() {
   local repo_root="$1"
 
+  mkdir -p "$repo_root"
+  if [[ -z "$(find "$repo_root" -mindepth 1 -maxdepth 1 -print -quit)" ]]; then
+    echo "seed" >"$repo_root/README.md"
+  fi
   git -C "$repo_root" init >/dev/null 2>&1
   git -C "$repo_root" config user.name "Test User"
   git -C "$repo_root" config user.email "test@example.com"
@@ -239,10 +255,14 @@ OUT
 setup_workspace() {
   local asdlc_root="$1"
 
-  mkdir -p "$asdlc_root/.commands" "$asdlc_root/projects/project-a"
+  mkdir -p "$asdlc_root/.commands" "$asdlc_root/common_libs" "$asdlc_root/projects/project-a"
 
   cp "$SCRIPT_SRC" "$asdlc_root/.commands/project_add_feature_e2e.sh"
   chmod +x "$asdlc_root/.commands/project_add_feature_e2e.sh"
+  cp "$PROJECT_SETUP_COMMON_SRC" "$asdlc_root/common_libs/project_setup_common.sh"
+  cp "$CLASS_REPO_PATHS_SRC" "$asdlc_root/common_libs/class_repo_paths.sh"
+  cp "$PERSIST_CLASS_REPO_ATTACH_SRC" "$asdlc_root/common_libs/persist_class_repo_attach.sh"
+  chmod +x "$asdlc_root/common_libs/project_setup_common.sh" "$asdlc_root/common_libs/class_repo_paths.sh" "$asdlc_root/common_libs/persist_class_repo_attach.sh"
 
   cat >"$asdlc_root/.commands/feature_br_scaffold.sh" <<'OUT'
 #!/usr/bin/env bash
@@ -332,6 +352,35 @@ printf '%s\n' "$scanner_line"
 OUT
   chmod +x "$asdlc_root/.commands/init_progress_scanner.sh"
 
+  cat >"$asdlc_root/.commands/project_contract_reconciliation.sh" <<'OUT'
+#!/usr/bin/env bash
+set -euo pipefail
+
+log_file="${TEST_LOG_FILE:?TEST_LOG_FILE must be set}"
+project_path=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --path)
+      shift
+      project_path="${1:-}"
+      ;;
+    *)
+      echo "unknown arg: $1" >&2
+      exit 1
+      ;;
+  esac
+  shift
+done
+
+printf '%s --path %s\n' "$(basename "$0")" "$project_path" >>"$log_file"
+if [[ "${TEST_FAIL_RECONCILIATION:-0}" == "1" ]]; then
+  echo "simulated reconciliation failure" >&2
+  exit 17
+fi
+OUT
+  chmod +x "$asdlc_root/.commands/project_contract_reconciliation.sh"
+
   write_feature_script_stub "$asdlc_root/.commands/feature_scan_repo_for_br.sh"
   write_feature_script_stub "$asdlc_root/.commands/feature_task_to_br.sh"
   write_feature_script_stub "$asdlc_root/.commands/feature_user_br_clarification.sh"
@@ -362,6 +411,300 @@ read_log() {
   if [[ -f "$path" ]]; then
     cat "$path"
   fi
+}
+
+write_project_definition_with_backend_deferred() {
+  local project_path="$1"
+
+  cat >"$project_path/init_progress_definition.yaml" <<'OUT'
+meta_info:
+  project_id: "project-a"
+  project_classes:
+    - backend
+  project_type_code: "A"
+  project_type_label: "New project"
+  class_repo_paths:
+    backend:
+      state: "deferred"
+      path: ""
+steps: []
+OUT
+}
+
+write_backend_blueprint_with_planned_repo_path() {
+  local project_path="$1"
+  local planned_repo_path="$2"
+
+  cat >"$project_path/project_stack_blueprint_backend.md" <<OUT
+# Project Stack Blueprint - Backend
+
+## 1. Meta
+- class: backend
+- repo_name: backend
+- service_name: backend
+- planned_repo_path: $planned_repo_path (planned)
+- group_id: com.example
+- last_updated: 2026-06-14
+OUT
+}
+
+read_backend_definition_field() {
+  local definition_path="$1"
+  local field_name="$2"
+
+  awk -v field="$field_name" '
+    BEGIN { in_block = 0; in_backend = 0 }
+    /^  class_repo_paths:[[:space:]]*$/ { in_block = 1; next }
+    in_block && /^[^ ]/ { in_block = 0; in_backend = 0 }
+    in_block && /^    backend:[[:space:]]*$/ { in_backend = 1; next }
+    in_block && /^    [a-z][a-zA-Z_]*:[[:space:]]*$/ { in_backend = 0; next }
+    in_backend && $0 ~ "^[[:space:]]*" field ":" {
+      line = $0
+      sub("^[[:space:]]*" field ":[[:space:]]*", "", line)
+      gsub(/^"|"$/, "", line)
+      print line
+      exit
+    }
+  ' "$definition_path"
+}
+
+test_deferred_class_prompt_yes_attaches_planned_repo_with_policy_c() {
+  local asdlc_root="$TMP_ROOT/asdlc-attach-yes"
+  local log_file="$TMP_ROOT/asdlc-attach-yes.log"
+  local planned_repo="$TMP_ROOT/planned-backend-repo"
+  mkdir -p "$asdlc_root" "$planned_repo"
+  setup_workspace "$asdlc_root"
+  setup_git_repo "$planned_repo"
+  write_project_definition_with_backend_deferred "$asdlc_root/projects/project-a"
+  write_backend_blueprint_with_planned_repo_path "$asdlc_root/projects/project-a" "$planned_repo"
+
+  local out=""
+  out="$(
+    cd "$asdlc_root" &&
+    {
+      printf 'y\n'
+      printf 'y\n'
+    } | TEST_LOG_FILE="$log_file" TEST_SCAFFOLD_FEATURE_REL="projects/project-a/feature-alpha" TEST_SCANNER_NEXT_LINE="next step: none" \
+      .commands/project_add_feature_e2e.sh --path projects/project-a 2>&1
+  )"
+
+  assert_contains "$out" "Class 'backend' blueprint declares planned repo path $planned_repo and a scannable repository exists there."
+  assert_equal "ready" "$(read_backend_definition_field "$asdlc_root/projects/project-a/init_progress_definition.yaml" "state")"
+  assert_equal "$planned_repo" "$(read_backend_definition_field "$asdlc_root/projects/project-a/init_progress_definition.yaml" "path")"
+  assert_equal "C" "$(read_backend_definition_field "$asdlc_root/projects/project-a/init_progress_definition.yaml" "policy")"
+  assert_file_exists "$asdlc_root/projects/project-a/.contract_reconciled_backend"
+  assert_contains "$(cat "$log_file")" "project_contract_reconciliation.sh --path $asdlc_root/projects/project-a"
+}
+
+test_deferred_class_prompt_no_leaves_class_deferred() {
+  local asdlc_root="$TMP_ROOT/asdlc-attach-no"
+  local log_file="$TMP_ROOT/asdlc-attach-no.log"
+  local planned_repo="$TMP_ROOT/no-backend-repo"
+  mkdir -p "$asdlc_root" "$planned_repo"
+  setup_workspace "$asdlc_root"
+  setup_git_repo "$planned_repo"
+  write_project_definition_with_backend_deferred "$asdlc_root/projects/project-a"
+  write_backend_blueprint_with_planned_repo_path "$asdlc_root/projects/project-a" "$planned_repo"
+
+  local out=""
+  out="$(
+    cd "$asdlc_root" &&
+    {
+      printf 'n\n'
+      printf 'y\n'
+    } | TEST_LOG_FILE="$log_file" TEST_SCAFFOLD_FEATURE_REL="projects/project-a/feature-alpha" TEST_SCANNER_NEXT_LINE="next step: none" \
+      .commands/project_add_feature_e2e.sh --path projects/project-a 2>&1
+  )"
+
+  assert_contains "$out" "Class 'backend' blueprint declares planned repo path $planned_repo and a scannable repository exists there."
+  assert_equal "deferred" "$(read_backend_definition_field "$asdlc_root/projects/project-a/init_progress_definition.yaml" "state")"
+  assert_equal "" "$(read_backend_definition_field "$asdlc_root/projects/project-a/init_progress_definition.yaml" "policy")"
+}
+
+test_deferred_class_prompt_alternate_path_attaches_alternate_repo() {
+  local asdlc_root="$TMP_ROOT/asdlc-attach-alt"
+  local log_file="$TMP_ROOT/asdlc-attach-alt.log"
+  local planned_repo="$TMP_ROOT/alt-planned-backend-repo"
+  local alternate_repo="$TMP_ROOT/alt-actual-backend-repo"
+  mkdir -p "$asdlc_root" "$planned_repo" "$alternate_repo"
+  setup_workspace "$asdlc_root"
+  setup_git_repo "$planned_repo"
+  setup_git_repo "$alternate_repo"
+  write_project_definition_with_backend_deferred "$asdlc_root/projects/project-a"
+  write_backend_blueprint_with_planned_repo_path "$asdlc_root/projects/project-a" "$planned_repo"
+
+  local out=""
+  out="$(
+    cd "$asdlc_root" &&
+    {
+      printf '%s\n' "$alternate_repo"
+      printf 'y\n'
+    } | TEST_LOG_FILE="$log_file" TEST_SCAFFOLD_FEATURE_REL="projects/project-a/feature-alpha" TEST_SCANNER_NEXT_LINE="next step: none" \
+      .commands/project_add_feature_e2e.sh --path projects/project-a 2>&1
+  )"
+
+  assert_contains "$out" "Class 'backend' blueprint declares planned repo path $planned_repo and a scannable repository exists there."
+  assert_equal "ready" "$(read_backend_definition_field "$asdlc_root/projects/project-a/init_progress_definition.yaml" "state")"
+  assert_equal "$alternate_repo" "$(read_backend_definition_field "$asdlc_root/projects/project-a/init_progress_definition.yaml" "path")"
+  assert_equal "C" "$(read_backend_definition_field "$asdlc_root/projects/project-a/init_progress_definition.yaml" "policy")"
+}
+
+test_deferred_class_prompt_invalid_alternate_path_reprompts_once_then_attaches() {
+  local asdlc_root="$TMP_ROOT/asdlc-attach-alt-retry"
+  local log_file="$TMP_ROOT/asdlc-attach-alt-retry.log"
+  local planned_repo="$TMP_ROOT/alt-retry-planned-backend-repo"
+  local invalid_alternate_repo="$TMP_ROOT/alt-retry-missing-backend-repo"
+  local retry_repo="$TMP_ROOT/alt-retry-actual-backend-repo"
+  mkdir -p "$asdlc_root" "$planned_repo" "$retry_repo"
+  setup_workspace "$asdlc_root"
+  setup_git_repo "$planned_repo"
+  setup_git_repo "$retry_repo"
+  write_project_definition_with_backend_deferred "$asdlc_root/projects/project-a"
+  write_backend_blueprint_with_planned_repo_path "$asdlc_root/projects/project-a" "$planned_repo"
+
+  local out=""
+  out="$(
+    cd "$asdlc_root" &&
+    {
+      printf '%s\n' "$invalid_alternate_repo"
+      printf '%s\n' "$retry_repo"
+      printf 'y\n'
+    } | TEST_LOG_FILE="$log_file" TEST_SCAFFOLD_FEATURE_REL="projects/project-a/feature-alpha" TEST_SCANNER_NEXT_LINE="next step: none" \
+      .commands/project_add_feature_e2e.sh --path projects/project-a 2>&1
+  )"
+
+  assert_contains "$out" "Repo path is not a directory: $invalid_alternate_repo"
+  assert_contains "$out" "Enter alternate repo path for class 'backend' or leave blank to skip:"
+  assert_equal "ready" "$(read_backend_definition_field "$asdlc_root/projects/project-a/init_progress_definition.yaml" "state")"
+  assert_equal "$retry_repo" "$(read_backend_definition_field "$asdlc_root/projects/project-a/init_progress_definition.yaml" "path")"
+  assert_equal "C" "$(read_backend_definition_field "$asdlc_root/projects/project-a/init_progress_definition.yaml" "policy")"
+}
+
+test_deferred_class_with_nonexistent_planned_repo_path_stays_silent() {
+  local asdlc_root="$TMP_ROOT/asdlc-attach-missing-planned"
+  local log_file="$TMP_ROOT/asdlc-attach-missing-planned.log"
+  local missing_repo="$TMP_ROOT/missing-planned-backend-repo"
+  mkdir -p "$asdlc_root"
+  setup_workspace "$asdlc_root"
+  write_project_definition_with_backend_deferred "$asdlc_root/projects/project-a"
+  write_backend_blueprint_with_planned_repo_path "$asdlc_root/projects/project-a" "$missing_repo"
+
+  local out=""
+  out="$(
+    cd "$asdlc_root" &&
+    {
+      printf 'y\n'
+    } | TEST_LOG_FILE="$log_file" TEST_SCAFFOLD_FEATURE_REL="projects/project-a/feature-alpha" TEST_SCANNER_NEXT_LINE="next step: none" \
+      .commands/project_add_feature_e2e.sh --path projects/project-a 2>&1
+  )"
+
+  assert_not_contains "$out" "Attach it and switch this class to repo-backed"
+  assert_equal "deferred" "$(read_backend_definition_field "$asdlc_root/projects/project-a/init_progress_definition.yaml" "state")"
+}
+
+test_deferred_class_attach_skips_reconciliation_when_marker_exists() {
+  local asdlc_root="$TMP_ROOT/asdlc-attach-marker-exists"
+  local log_file="$TMP_ROOT/asdlc-attach-marker-exists.log"
+  local planned_repo="$TMP_ROOT/marker-exists-backend-repo"
+  mkdir -p "$asdlc_root" "$planned_repo"
+  setup_workspace "$asdlc_root"
+  setup_git_repo "$planned_repo"
+  write_project_definition_with_backend_deferred "$asdlc_root/projects/project-a"
+  write_backend_blueprint_with_planned_repo_path "$asdlc_root/projects/project-a" "$planned_repo"
+  : >"$asdlc_root/projects/project-a/.contract_reconciled_backend"
+
+  local out=""
+  out="$(
+    cd "$asdlc_root" &&
+    {
+      printf 'y\n'
+      printf 'y\n'
+    } | TEST_LOG_FILE="$log_file" TEST_SCAFFOLD_FEATURE_REL="projects/project-a/feature-alpha" TEST_SCANNER_NEXT_LINE="next step: none" \
+      .commands/project_add_feature_e2e.sh --path projects/project-a 2>&1
+  )"
+
+  assert_contains "$out" "Class 'backend' blueprint declares planned repo path $planned_repo and a scannable repository exists there."
+  assert_equal "ready" "$(read_backend_definition_field "$asdlc_root/projects/project-a/init_progress_definition.yaml" "state")"
+  assert_not_contains "$(cat "$log_file")" "project_contract_reconciliation.sh"
+}
+
+test_ready_class_without_reconciliation_marker_retries_on_next_run() {
+  local asdlc_root="$TMP_ROOT/asdlc-attach-retry-reconciliation"
+  local log_file="$TMP_ROOT/asdlc-attach-retry-reconciliation.log"
+  local planned_repo="$TMP_ROOT/retry-reconciliation-backend-repo"
+  mkdir -p "$asdlc_root" "$planned_repo"
+  setup_workspace "$asdlc_root"
+  setup_git_repo "$planned_repo"
+  write_project_definition_with_backend_deferred "$asdlc_root/projects/project-a"
+  write_backend_blueprint_with_planned_repo_path "$asdlc_root/projects/project-a" "$planned_repo"
+
+  local out=""
+  local status=0
+  set +e
+  out="$(
+    cd "$asdlc_root" &&
+    {
+      printf 'y\n'
+    } | TEST_LOG_FILE="$log_file" TEST_FAIL_RECONCILIATION=1 TEST_SCAFFOLD_FEATURE_REL="projects/project-a/feature-alpha" TEST_SCANNER_NEXT_LINE="next step: none" \
+      .commands/project_add_feature_e2e.sh --path projects/project-a 2>&1
+  )"
+  status=$?
+  set -e
+
+  assert_nonzero_status "$status"
+  assert_contains "$out" "simulated reconciliation failure"
+  assert_equal "ready" "$(read_backend_definition_field "$asdlc_root/projects/project-a/init_progress_definition.yaml" "state")"
+  assert_file_not_exists "$asdlc_root/projects/project-a/.contract_reconciled_backend"
+  assert_contains "$(cat "$log_file")" "project_contract_reconciliation.sh --path $asdlc_root/projects/project-a"
+
+  : >"$log_file"
+  out="$(
+    cd "$asdlc_root" &&
+    {
+      printf 'y\n'
+    } | TEST_LOG_FILE="$log_file" TEST_SCAFFOLD_FEATURE_REL="projects/project-a/feature-alpha" TEST_SCANNER_NEXT_LINE="next step: none" \
+      .commands/project_add_feature_e2e.sh --path projects/project-a 2>&1
+  )"
+
+  assert_not_contains "$out" "Attach it and switch this class to repo-backed"
+  assert_file_exists "$asdlc_root/projects/project-a/.contract_reconciled_backend"
+  assert_contains "$(cat "$log_file")" "project_contract_reconciliation.sh --path $asdlc_root/projects/project-a"
+}
+
+test_alternate_attach_reconciliation_failure_does_not_prompt_for_another_path() {
+  local asdlc_root="$TMP_ROOT/asdlc-alt-reconciliation-fail"
+  local log_file="$TMP_ROOT/asdlc-alt-reconciliation-fail.log"
+  local planned_repo="$TMP_ROOT/alt-reconciliation-planned-repo"
+  local alternate_repo="$TMP_ROOT/alt-reconciliation-selected-repo"
+  local second_repo="$TMP_ROOT/alt-reconciliation-second-repo"
+  mkdir -p "$asdlc_root" "$planned_repo" "$alternate_repo" "$second_repo"
+  setup_workspace "$asdlc_root"
+  setup_git_repo "$planned_repo"
+  setup_git_repo "$alternate_repo"
+  setup_git_repo "$second_repo"
+  write_project_definition_with_backend_deferred "$asdlc_root/projects/project-a"
+  write_backend_blueprint_with_planned_repo_path "$asdlc_root/projects/project-a" "$planned_repo"
+
+  local out=""
+  local status=0
+  set +e
+  out="$(
+    cd "$asdlc_root" &&
+    {
+      printf '%s\n' "$alternate_repo"
+      printf '%s\n' "$second_repo"
+    } | TEST_LOG_FILE="$log_file" TEST_FAIL_RECONCILIATION=1 TEST_SCAFFOLD_FEATURE_REL="projects/project-a/feature-alpha" TEST_SCANNER_NEXT_LINE="next step: none" \
+      .commands/project_add_feature_e2e.sh --path projects/project-a 2>&1
+  )"
+  status=$?
+  set -e
+
+  assert_nonzero_status "$status"
+  assert_contains "$out" "simulated reconciliation failure"
+  assert_not_contains "$out" "Enter alternate repo path for class 'backend' or leave blank to skip:"
+  assert_equal "ready" "$(read_backend_definition_field "$asdlc_root/projects/project-a/init_progress_definition.yaml" "state")"
+  assert_equal "$alternate_repo" "$(read_backend_definition_field "$asdlc_root/projects/project-a/init_progress_definition.yaml" "path")"
+  assert_file_not_exists "$asdlc_root/projects/project-a/.contract_reconciled_backend"
 }
 
 test_without_path_uses_only_project_in_workspace() {
@@ -1375,6 +1718,14 @@ test_checkpoint_helper_skips_non_repo_workspace() {
   assert_contains "$out" "Execution stopped: user denied phase progression at 6."
 }
 
+test_deferred_class_prompt_yes_attaches_planned_repo_with_policy_c
+test_deferred_class_prompt_no_leaves_class_deferred
+test_deferred_class_prompt_alternate_path_attaches_alternate_repo
+test_deferred_class_prompt_invalid_alternate_path_reprompts_once_then_attaches
+test_deferred_class_with_nonexistent_planned_repo_path_stays_silent
+test_deferred_class_attach_skips_reconciliation_when_marker_exists
+test_ready_class_without_reconciliation_marker_retries_on_next_run
+test_alternate_attach_reconciliation_failure_does_not_prompt_for_another_path
 test_without_path_uses_only_project_in_workspace
 test_without_path_prompts_for_project_when_multiple_exist
 test_without_path_can_finish_when_multiple_projects_exist

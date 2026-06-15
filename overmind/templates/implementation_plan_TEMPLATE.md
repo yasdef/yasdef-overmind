@@ -7,7 +7,7 @@ Each step must belong to exactly one repo class so backend, frontend, and mobile
 ## Format Rules
 - Use one `### Step <major>.<minor> <title> [REQ-<id>] [NFR-<id>] ...` heading per implementable slice.
 - Immediately under each step add `#### Repo: <backend|frontend|mobile>`.
-- Add `#### Depends on: <none|step ids>` to show cross-repo ordering when relevant.
+- Add `#### Depends on: <none|same-feature step ids|cross-feature refs>` to show ordering when relevant. Cross-feature refs use exactly `<feature-folder>/<step-id>`; same-feature entries use step ids without `/`.
 - Add `#### Evidence: <gap/TECH_REQ-1 | gap/TECH_REQ-NFR-1, comp/component-slug, ...>` and keep evidence links at step scope (not checklist bullets).
 - Add `#### Preserved Surface: <none|operator-facing surface identity>` so required missing operator-facing delivery remains explicit through planning, whether the surface is a page/route/shell, CLI/admin tool, job, or endpoint.
 - Add `#### Assigned: <worker-uuid>` only after a worker is explicitly assigned.
@@ -16,7 +16,7 @@ Each step must belong to exactly one repo class so backend, frontend, and mobile
 
 ### Step 1.1 [UNFILLED] [REQ-1] [NFR-1]
 #### Repo: [backend|frontend|mobile]
-#### Depends on: [none|1.0]
+#### Depends on: [none|1.0|0003_customer_accounts/3.2]
 #### Evidence: [gap/TECH_REQ-1 | gap/TECH_REQ-NFR-1, comp/component-slug]
 #### Preserved Surface: [none|UNFILLED]
 #### Assigned: [OPTIONAL]

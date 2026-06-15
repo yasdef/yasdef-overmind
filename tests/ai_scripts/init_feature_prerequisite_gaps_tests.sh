@@ -6,6 +6,9 @@ SCRIPT_SRC="$SOURCE_ROOT/overmind/scripts/feature_prerequisite_gaps.sh"
 RULE_SRC="$SOURCE_ROOT/overmind/rules/prerequisite_gaps_rule.md"
 TEMPLATE_SRC="$SOURCE_ROOT/overmind/templates/prerequisite_gaps_TEMPLATE.md"
 GOLDEN_SRC="$SOURCE_ROOT/overmind/golden_examples/prerequisite_gaps_GOLDEN_EXAMPLE.md"
+HELPER_SRC="$SOURCE_ROOT/overmind/scripts/helper/check_prerequisite_gaps_quality.sh"
+CLASS_REPO_PATHS_LIB_SRC="$SOURCE_ROOT/overmind/scripts/common_libs/class_repo_paths.sh"
+SIBLING_FEATURE_LISTER_SRC="$SOURCE_ROOT/overmind/scripts/common_libs/list_committed_sibling_features.sh"
 
 TMP_ROOT="$(mktemp -d)"
 trap 'rm -rf "$TMP_ROOT"' EXIT
@@ -66,13 +69,24 @@ setup_workspace_layout() {
     "$repo_dir/asdlc/.golden_examples" \
     "$repo_dir/asdlc/.helper" \
     "$repo_dir/asdlc/.setup" \
+    "$repo_dir/asdlc/common_libs" \
     "$repo_dir/asdlc/projects/p1/feature-a"
 
   cp "$SCRIPT_SRC" "$repo_dir/asdlc/.commands/feature_prerequisite_gaps.sh"
   cp "$RULE_SRC" "$repo_dir/asdlc/.rules/prerequisite_gaps_rule.md"
   cp "$TEMPLATE_SRC" "$repo_dir/asdlc/.templates/prerequisite_gaps_TEMPLATE.md"
   cp "$GOLDEN_SRC" "$repo_dir/asdlc/.golden_examples/prerequisite_gaps_GOLDEN_EXAMPLE.md"
-  chmod +x "$repo_dir/asdlc/.commands/feature_prerequisite_gaps.sh"
+  cp "$CLASS_REPO_PATHS_LIB_SRC" "$repo_dir/asdlc/common_libs/class_repo_paths.sh"
+  cp "$SIBLING_FEATURE_LISTER_SRC" "$repo_dir/asdlc/common_libs/list_committed_sibling_features.sh"
+  cat >"$repo_dir/asdlc/common_libs/sync_repo_to_default_branch.sh" <<'OUT'
+#!/usr/bin/env bash
+set -euo pipefail
+exit 0
+OUT
+  chmod +x \
+    "$repo_dir/asdlc/.commands/feature_prerequisite_gaps.sh" \
+    "$repo_dir/asdlc/common_libs/list_committed_sibling_features.sh" \
+    "$repo_dir/asdlc/common_libs/sync_repo_to_default_branch.sh"
 
   cat >"$repo_dir/asdlc/.helper/check_prerequisite_gaps_quality.sh" <<'OUT'
 #!/usr/bin/env bash
@@ -188,6 +202,23 @@ OUT
 OUT
 }
 
+seed_sibling_implementation_plan() {
+  local repo_dir="$1"
+  local sibling_folder="$2"
+
+  mkdir -p "$repo_dir/asdlc/projects/p1/$sibling_folder"
+  cat >"$repo_dir/asdlc/projects/p1/$sibling_folder/implementation_plan.md" <<'OUT'
+# Implementation Plan
+
+## 3. Implementation Steps
+### Step 2.1: Add admin login route
+#### Depends on:
+- none
+#### Evidence:
+- Adds /admin/login route and Admin login page for operator authentication.
+OUT
+}
+
 setup_codex_stub() {
   local repo_dir="$1"
   mkdir -p "$repo_dir/bin"
@@ -198,12 +229,23 @@ set -euo pipefail
 capture_dir="${TEST_CAPTURE_DIR:?TEST_CAPTURE_DIR must be set}"
 target_file="${TARGET_PREREQUISITE_GAPS_FILE:-projects/p1/feature-a/prerequisite_gaps.md}"
 project_type_code="${TEST_PROJECT_TYPE_CODE:-B}"
+status_variant="${TEST_PREREQ_STATUS_VARIANT:-scheduled-in-slices}"
 
 printf '%s\n' "$@" >"$capture_dir/codex_args.txt"
 printf '%s' "${!#}" >"$capture_dir/codex_prompt.txt"
 
 mkdir -p "$(dirname "$target_file")"
-cat >"$target_file" <<'DOC'
+if [[ "$status_variant" == "scheduled-in-feature" ]]; then
+  admin_status="scheduled_in_feature feature-z/2.1"
+  admin_evidence="feature-z/implementation_plan.md step 2.1 adds /admin/login route and Admin login page."
+  admin_slice_ref="none"
+else
+  admin_status="scheduled_in_slices"
+  admin_evidence="Slice 2 adds /admin/login route and screen"
+  admin_slice_ref="slice-2"
+fi
+
+cat >"$target_file" <<DOC
 # Prerequisite Gaps
 
 ## 1. Document Meta
@@ -221,11 +263,11 @@ cat >"$target_file" <<'DOC'
 - prerequisites: see entries below
 
 #### Prerequisite: Admin login page
-- status: scheduled_in_slices
+- status: $admin_status
 - surface_kind: required_missing_user_reachable_surface
 - surface_identity: Admin login page
-- evidence: Slice 2 adds /admin/login route and screen
-- slice_ref: slice-2
+- evidence: $admin_evidence
+- slice_ref: $admin_slice_ref
 
 ### Requirement: REQ-6
 - requirement_summary: Operator query entrypoint
@@ -341,9 +383,50 @@ test_generates_prerequisite_gaps_and_builds_expected_prompt() {
   assert_contains "$codex_prompt" "Use projects/p1/feature-a/implementation_slices.md as the ground truth for scheduled_in_slices status."
   assert_contains "$codex_prompt" "Use this quality gate command before finalizing: .helper/check_prerequisite_gaps_quality.sh projects/p1/feature-a/prerequisite_gaps.md projects/p1/feature-a/requirements_ears.md projects/p1/feature-a/technical_requirements.md"
   assert_contains "$codex_prompt" "Target artifact: projects/p1/feature-a/prerequisite_gaps.md"
-  assert_not_contains "$codex_prompt" "implementation_plan.md"
+  assert_contains "$codex_prompt" "Sibling plan sources: none"
+  assert_not_contains "$codex_prompt" "In-flight plan source:"
 
   assert_file_exists "$repo_dir/asdlc/projects/p1/feature-a/prerequisite_gaps.md"
+}
+
+test_binds_sibling_plan_and_accepts_scheduled_in_feature() {
+  local repo_dir="$TMP_ROOT/repo-sibling-feature"
+  local capture_dir="$TMP_ROOT/repo-sibling-feature-capture"
+  mkdir -p "$repo_dir" "$capture_dir"
+  setup_git_workspace "$repo_dir"
+  seed_sibling_implementation_plan "$repo_dir" "feature-z"
+  setup_codex_stub "$repo_dir"
+  cp "$HELPER_SRC" "$repo_dir/asdlc/.helper/check_prerequisite_gaps_quality.sh"
+  chmod +x "$repo_dir/asdlc/.helper/check_prerequisite_gaps_quality.sh"
+
+  local out=""
+  out="$(
+    cd "$repo_dir/asdlc" &&
+    PATH="$repo_dir/bin:$PATH" TEST_CAPTURE_DIR="$capture_dir" TEST_PREREQ_STATUS_VARIANT="scheduled-in-feature" \
+      .commands/feature_prerequisite_gaps.sh --feature_path "projects/p1/feature-a"
+  )"
+
+  local gaps_text=""
+  gaps_text="$(cat "$repo_dir/asdlc/projects/p1/feature-a/prerequisite_gaps.md")"
+  assert_contains "$gaps_text" "- status: scheduled_in_feature feature-z/2.1"
+  assert_contains "$gaps_text" "- evidence: feature-z/implementation_plan.md step 2.1 adds /admin/login route and Admin login page."
+  assert_not_contains "$gaps_text" "- status: unmet"
+
+  local codex_prompt=""
+  codex_prompt="$(cat "$capture_dir/codex_prompt.txt")"
+  assert_contains "$codex_prompt" "Use prompt-bound sibling implementation_plan.md sources as the ground truth for scheduled_in_feature <feature-folder>/<step-id> status."
+  assert_contains "$codex_prompt" "projects/p1/feature-z/implementation_plan.md"
+  assert_contains "$codex_prompt" "In-flight plan source: feature-z/implementation_plan.md"
+
+  local helper_out=""
+  helper_out="$(
+    cd "$repo_dir/asdlc" &&
+    .helper/check_prerequisite_gaps_quality.sh \
+      projects/p1/feature-a/prerequisite_gaps.md \
+      projects/p1/feature-a/requirements_ears.md \
+      projects/p1/feature-a/technical_requirements.md
+  )"
+  assert_contains "$helper_out" "quality gate passed"
 }
 
 test_type_a_generates_prerequisite_gaps() {
@@ -389,6 +472,7 @@ test_requires_feature_path_argument
 test_requires_staged_command_location
 test_fails_when_model_phase_missing
 test_generates_prerequisite_gaps_and_builds_expected_prompt
+test_binds_sibling_plan_and_accepts_scheduled_in_feature
 test_type_a_generates_prerequisite_gaps
 
 echo "All prerequisite gap initializer tests passed."

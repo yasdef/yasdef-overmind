@@ -25,6 +25,7 @@
 - key_components: [UNFILLED]
 - transport_layer: [UNFILLED]
 - user_reachable_surface: [UNFILLED]
+- divergent_from_blueprint: [OPTIONAL §<n>]
 
 ### 3.2 Application / Service Layer
 - responsibility_summary: [UNFILLED]
@@ -32,6 +33,7 @@
 - key_components: [UNFILLED]
 - transport_layer: [UNFILLED]
 - user_reachable_surface: [UNFILLED]
+- divergent_from_blueprint: [OPTIONAL §<n>]
 
 ### 3.3 Domain Layer
 - responsibility_summary: [UNFILLED]
@@ -39,6 +41,7 @@
 - key_components: [UNFILLED]
 - transport_layer: [UNFILLED]
 - user_reachable_surface: [UNFILLED]
+- divergent_from_blueprint: [OPTIONAL §<n>]
 
 ### 3.4 Persistence / Data Layer
 - responsibility_summary: [UNFILLED]
@@ -46,6 +49,7 @@
 - key_components: [UNFILLED]
 - transport_layer: [UNFILLED]
 - user_reachable_surface: [UNFILLED]
+- divergent_from_blueprint: [OPTIONAL §<n>]
 
 ### 3.5 Integration Layer
 - responsibility_summary: [UNFILLED]
@@ -53,6 +57,7 @@
 - key_components: [UNFILLED]
 - transport_layer: [UNFILLED]
 - user_reachable_surface: [UNFILLED]
+- divergent_from_blueprint: [OPTIONAL §<n>]
 
 ### 3.6 Runtime / Ops Layer
 - responsibility_summary: [UNFILLED]
@@ -60,6 +65,7 @@
 - key_components: [UNFILLED]
 - transport_layer: [UNFILLED]
 - user_reachable_surface: [UNFILLED]
+- divergent_from_blueprint: [OPTIONAL §<n>]
 
 ### 3.7 Test Layer
 - responsibility_summary: [UNFILLED]
@@ -67,6 +73,7 @@
 - key_components: [UNFILLED]
 - transport_layer: [UNFILLED]
 - user_reachable_surface: [UNFILLED]
+- divergent_from_blueprint: [OPTIONAL §<n>]
 
 ### 3.8 Another Layer(s)
 > add as much new layers as needed based on same pattern and follow number convention

@@ -30,7 +30,11 @@ Read this file fully before producing output.
   - semantically weak dependency or ordering choices,
   - requirement grouping that obscures distinct delivery slices,
   - newly delivered user-reachable surfaces with unclear inbound operator reachability.
+  - surface-map rows tagged `(in-flight <feature-folder>)` that overlap current-plan delivery.
   - Type A repo scaffold readiness that is unclear for a class represented in the plan.
+- Treat every read-only surface-map row tagged `(in-flight <feature-folder>)` as an in-flight sibling promise overlap that must be raised as a product-fit finding.
+- Use finding type `step_scope_overlap` for in-flight sibling promise overlaps, cite the tagged surface-map row in `related_evidence`, and name the sibling feature folder in the summary or rationale.
+- In-flight sibling promise overlap findings do not hard-block; users may apply, reject, or postpone them with resolution notes through the existing finding workflow.
 - For each newly delivered user-reachable surface, apply this four-step access-path heuristic:
   1. identify the delivered surface in the implementation plan,
   2. inspect applicable surface maps for existing inbound affordances,

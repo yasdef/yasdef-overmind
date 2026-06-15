@@ -40,28 +40,30 @@ Must not own:
 - Use only repository paths listed in prompt context as scan scope.
 - Update only `<TARGET_PROJECT_SURFACE_MAP_ARTIFACT>`.
 
-## Project Type Branching
-- If project type is `B` or `C`: produce the surface map from repository evidence plus feature inputs.
-- If project type is `A`: the prompt provides an approved stack blueprint as planned structural evidence and optionally a ready repository path when the class repo is scannable. Apply the following rules per section:
-  - **§3 layer blocks**: enumerate only layers materialized in the repo or anticipated in the blueprint §3 section. Omit layers absent from both sources entirely — do not create a §3 entry with placeholder values.
-  - **§4 `repo_paths`**: real repo path → blueprint §3.x `folder_paths` tagged `(planned)` → `<to be defined during implementation>`.
-  - **§4 `transport_layer`**: repo-observed archetype → blueprint §3.x archetype → `<to be defined during implementation>`.
-  - **§4 `evidence`**: real repo path → blueprint section id (e.g. `project_stack_blueprint_backend.md §3.1`) → delta item id alone; always combined with `feature_contract_delta.md <item id>`. Prose-only evidence is invalid.
-  - **§4 `user_reachable_surface`**: union of `feature_contract_delta.md` tokens, repo-scanned tokens, and blueprint §4 tokens that apply. Use `none` when no applicable entry exists. Do not use `<to be defined during implementation>` here.
-  - One source per field within a §4 block. Do not mix repo and blueprint evidence within the same field.
+## Evidence Resolution Chain
+- Resolve each row in `Key Parts of Repo and Their Responsibilities` and each row in `Backend Surfaces Touched With Current Feature` or `Frontend / Mobile Surfaces Touched With Current Feature` per class and per row using the permanent chain: repo scan → in-flight feature promises → blueprint (`(planned)` tag) → literal `<to be defined during implementation>`.
+- The chain runs only for surfaces this feature's requirements touch; "absent" means this feature's need is not satisfied, never an inventory claim about the repo.
+- Repo scan evidence is available only when the prompt binds a ready repository path for the target class. Repo scan rows cite the concrete repository path.
+- In-flight feature promise evidence is available only when committed sibling plans are bound by the prompt.
+- Rows resolved from a sibling plan must carry the tag `(in-flight <feature-folder>)` and evidence must cite `<feature-folder>/implementation_plan.md step <step-id>`.
+- Blueprint evidence is available when approved `project_stack_blueprint_<class>.md` exists for the target class. Blueprint-derived values are planned structural evidence only, must be tagged `(planned)`, and must not be presented as repository-proven code evidence.
+- Blueprint evidence citations must append the blueprint's `Meta` block `last_updated` value, exactly: `project_stack_blueprint_<class>.md §<n> (last_updated: <YYYY-MM-DD>)`.
+- A blueprint is never retired; it remains fallback evidence for unmaterialized layers for the life of the project.
+- For policy `C`, when a layer under `project_surface_struct_resp_map_<class>.md ## 3. Key Parts of Repo and Their Responsibilities` is materialized in the repo but diverges from `project_stack_blueprint_<class>.md ## 3. Layer Bindings`, resolve the layer from repo evidence and add at most one passive bullet field in that layer block, exactly: `- divergent_from_blueprint: §<n>`, where `§<n>` is the subsection number under `project_stack_blueprint_<class>.md ## 3. Layer Bindings` that the materialized repo layer diverges from. This field is optional, never required, never prompts, and never blocks.
+- One source per row; do not mix repo, promise, blueprint, and placeholder sources in the same row. Every non-repo source must be tagged.
+- Keep each row's transport and structural evidence single-tiered through the permanent chain. For `user_reachable_surface`, use an explicit union that always includes applicable concrete tokens from `feature_contract_delta.md` plus concrete tokens from the row's selected repo, in-flight promise, or blueprint tier. Use `none` only when no applicable entry exists. Do not use `<to be defined during implementation>` for this field.
+- For every applicable row in `Backend Surfaces Touched With Current Feature` or `Frontend / Mobile Surfaces Touched With Current Feature`, `evidence` must combine the selected chain-tier citation with `feature_contract_delta.md <item id>` for the feature touch. Prose-only evidence is invalid.
 
 ## Output Format Baseline
 - Use the prompt-provided template as the structure contract.
 - Use the prompt-provided golden example as the style contract.
 - Preserve heading order and key names from the template.
-- Keep section `3` general to the repository or codebase layer responsibilities.
-- Keep section `4` focused only on surfaces touched with the current feature.
+- Keep `Key Parts of Repo and Their Responsibilities` general to the repository or codebase layer responsibilities.
+- Keep `Backend Surfaces Touched With Current Feature` and `Frontend / Mobile Surfaces Touched With Current Feature` focused only on surfaces touched with the current feature.
 
 ## Evidence Rules
-- Use only repository-proven evidence plus declared feature input artifacts.
-- For project type `A`: blueprint-derived paths and archetypes are planned structural evidence only. Tag blueprint-derived values as `(planned)`. Do not present them as already existing repository code.
-- Blueprint evidence (`project_stack_blueprint_<class>.md`) is consumed by Step `7` only for project type `A`. Do not bind or reference stack blueprints for project types `B` or `C`.
-- Do not invent layers, module boundaries, or touched surfaces without evidence from repo or blueprint.
+- Use only repository-proven evidence, declared feature input artifacts, and prompt-bound non-repo evidence from the permanent chain.
+- Do not invent layers, module boundaries, or touched surfaces without evidence from repo, prompt-bound sibling plans, or blueprint.
 - Keep feature scope narrow to this feature delta.
 - Explain each layer or touched surface in concise plain language.
 - Do not duplicate details that belong in other artifacts.
@@ -73,7 +75,7 @@ Must not own:
 
 ## Transport vs User-Reachable Split
 
-Every Section 3 layer block and every Section 4 surface block in the output surface map SHALL record two explicit subfields:
+Every row in `Key Parts of Repo and Their Responsibilities` and every row in `Backend Surfaces Touched With Current Feature` or `Frontend / Mobile Surfaces Touched With Current Feature` SHALL record two explicit subfields:
 - `transport_layer`: internal callable code present in the repository (API clients, services, hooks, repositories, helpers) that other code can invoke. Use `none` when no transport-layer code exists for this block.
 - `user_reachable_surface`: operator-invocable entry points that an operator or end user can invoke without writing code. Use `none` when no user-reachable surface exists.
 

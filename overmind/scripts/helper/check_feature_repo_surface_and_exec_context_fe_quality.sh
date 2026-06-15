@@ -44,7 +44,7 @@ function trim(v) {
 }
 function is_unfilled(v) {
   v = trim(v)
-  return (v == "" || toupper(v) == "[UNFILLED]")
+  return (v == "" || toupper(v) == "[UNFILLED]" || toupper(v) ~ /\[OPTIONAL/)
 }
 function fail_quality(message) {
   print "quality gate failed: " message
@@ -98,8 +98,8 @@ BEGIN {
 {
   line = trim($0)
 
-  if (toupper($0) ~ /\[UNFILLED\]/) {
-    fail_quality("artifact still contains [UNFILLED] placeholders")
+  if (toupper($0) ~ /\[UNFILLED\]/ || toupper($0) ~ /\[OPTIONAL/) {
+    fail_quality("artifact still contains template placeholders")
   }
 
   if (line == "# Project Surface Structure + Responsibility Map (Frontend / Mobile)") {

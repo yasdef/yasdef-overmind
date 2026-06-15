@@ -3,7 +3,7 @@
 Read this file fully before generating output.
 
 ## Purpose
-- Derive a deterministic list of externally-invocable prerequisites per EARS requirement and record whether each is already present in the repository or scheduled in `implementation_slices.md`.
+- Derive a deterministic list of externally-invocable prerequisites per EARS requirement and record whether each is already present in the repository, scheduled in `implementation_slices.md`, or promised by a sibling feature plan.
 - Gate Step 8.3 on zero `unmet` entries: every missing prerequisite must be promoted into `implementation_slices.md` before the plan can start.
 - Keep required missing operator-facing surfaces explicitly identifiable for downstream preservation checks, and keep them distinguishable from transport-only/internal execution gaps.
 - Produce deterministic output for `<TARGET_PREREQUISITE_GAPS_ARTIFACT>`.
@@ -11,7 +11,7 @@ Read this file fully before generating output.
 ## Ownership Boundaries
 Owns:
 - per-EARS-requirement trace of externally-invocable prerequisites
-- status classification per prerequisite: `present_in_repo`, `scheduled_in_slices`, or `unmet`
+- status classification per prerequisite: `present_in_repo`, `scheduled_in_slices`, `scheduled_in_feature <feature-folder>/<step-id>`, or `unmet`
 - evidence linking each prerequisite to a `user_reachable_surface` entry or a slice identifier
 - stable `surface_identity` naming for required missing operator-facing surfaces (`user_reachable_surface`)
 - explicit `surface_kind` classification used by downstream slice/plan preservation checks
@@ -25,6 +25,7 @@ Must not own:
 - Read final feature behavior from `<REQUIREMENTS_EARS_ARTIFACT>`.
 - Read `user_reachable_surface` subfields from `<TECHNICAL_REQUIREMENTS_ARTIFACT>` as the ground truth for `present_in_repo` decisions.
 - Read slice identifiers from `<IMPLEMENTATION_SLICES_ARTIFACT>` as the ground truth for `scheduled_in_slices` decisions.
+- Read prompt-bound sibling `implementation_plan.md` sources as the ground truth for `scheduled_in_feature <feature-folder>/<step-id>` decisions.
 - Update only `<TARGET_PREREQUISITE_GAPS_ARTIFACT>`.
 - Do not modify input artifacts.
 
@@ -38,14 +39,15 @@ Only prerequisites in these per-class categories belong in `prerequisite_gaps.md
 ## Field Definitions
 
 ### `status`
-Allowed values: `present_in_repo`, `scheduled_in_slices`, `unmet`
+Allowed values: `present_in_repo`, `scheduled_in_slices`, `scheduled_in_feature <feature-folder>/<step-id>`, `unmet`
 - `present_in_repo`: a matching `user_reachable_surface` entry exists in `technical_requirements.md`. Transport-layer presence alone does not satisfy this; the user-reachable surface must be confirmed.
 - `scheduled_in_slices`: no matching `user_reachable_surface` exists, but the prerequisite is covered by a slice in `implementation_slices.md`. The `slice_ref` field must be populated.
+- `scheduled_in_feature <feature-folder>/<step-id>`: no matching `user_reachable_surface` exists and no current-feature slice covers the prerequisite, but a prompt-bound sibling feature plan step covers it. The status value must include the sibling feature folder and exact step identifier.
 - `unmet`: the prerequisite is neither present in the repo nor scheduled in slices. Any `unmet` entry must be resolved by adding a slice to `implementation_slices.md` before Step 8.3.
 
 ### `surface_kind`
 Allowed values: `required_missing_user_reachable_surface`, `present_user_reachable_surface`, `transport_or_internal_execution_gap`
-- `required_missing_user_reachable_surface`: use when the prerequisite is required by EARS behavior and the operator-facing surface is currently missing (`unmet` or `scheduled_in_slices`).
+- `required_missing_user_reachable_surface`: use when the prerequisite is required by EARS behavior and the operator-facing surface is currently missing (`unmet`, `scheduled_in_slices`, or `scheduled_in_feature <feature-folder>/<step-id>`).
 - `present_user_reachable_surface`: use when the operator-facing prerequisite is already present in repository state (`present_in_repo`).
 - `transport_or_internal_execution_gap`: never use for an emitted prerequisite entry; transport/internal concerns must stay outside prerequisite entries and be represented as `prerequisites: none` for that requirement block.
 
@@ -58,6 +60,7 @@ Allowed values: `required_missing_user_reachable_surface`, `present_user_reachab
 ### `evidence`
 - For `present_in_repo`: the exact `user_reachable_surface` token (e.g., `POST /api/v1/orders`, `/checkout/summary`) that confirms the prerequisite. Must not be left blank.
 - For `scheduled_in_slices`: the slice description or a brief rationale describing why this slice covers the prerequisite. Must not be left blank.
+- For `scheduled_in_feature <feature-folder>/<step-id>`: cite the sibling feature plan and step that cover the prerequisite, including the operator-facing surface identity or route. Must not be left blank.
 - For `unmet`: leave blank or omit; no evidence exists by definition.
 
 ### `slice_ref`
@@ -73,7 +76,8 @@ Allowed values: `required_missing_user_reachable_surface`, `present_user_reachab
 - For each extracted prerequisite:
   1. Check `user_reachable_surface` entries in `technical_requirements.md` for a match. If found, status is `present_in_repo`.
   2. If not present in repo, check `implementation_slices.md` for a slice that covers this entry point. If found, status is `scheduled_in_slices`.
-  3. If neither, status is `unmet`.
+  3. If not scheduled in current-feature slices, check prompt-bound sibling `implementation_plan.md` sources for a step that covers this entry point. If found, status is `scheduled_in_feature <feature-folder>/<step-id>`.
+  4. If none of the above apply, status is `unmet`.
 - Set `surface_kind` and `surface_identity` deterministically:
   - required missing operator-facing prerequisite: `surface_kind: required_missing_user_reachable_surface`, stable non-empty `surface_identity`
   - already present operator-facing prerequisite: `surface_kind: present_user_reachable_surface`, `surface_identity: none`
@@ -82,6 +86,7 @@ Allowed values: `required_missing_user_reachable_surface`, `present_user_reachab
 ## Gate Condition
 - `prerequisite_gaps.md` is valid only when zero `unmet` entries remain.
 - Any `unmet` entry must be resolved by adding a new or updated slice to `implementation_slices.md` and re-running this step with `scheduled_in_slices` status and a populated `slice_ref`.
+- A prerequisite covered by a sibling feature plan may instead be re-run with `scheduled_in_feature <feature-folder>/<step-id>` status and `slice_ref: none`.
 - Deleting an `unmet` entry without adding a corresponding slice is not a valid resolution.
 
 ## Output Format Baseline

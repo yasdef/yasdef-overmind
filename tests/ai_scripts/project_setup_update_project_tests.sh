@@ -8,6 +8,7 @@ OPTION_3_HELPER_SRC="$SOURCE_ROOT/overmind/scripts/project_mgmt/project_setup_up
 COMMON_LIBS_SRC="$SOURCE_ROOT/overmind/scripts/common_libs"
 
 TMP_ROOT="$(mktemp -d)"
+TMP_ROOT="$(cd "$TMP_ROOT" && pwd -P)"
 trap 'rm -rf "$TMP_ROOT"' EXIT
 
 assert_zero_status() {
@@ -90,6 +91,11 @@ setup_repo_layout() {
   cp "$OPTION_2_HELPER_SRC" "$repo_dir/overmind/scripts/project_mgmt/project_setup_add_new_project.sh"
   cp "$OPTION_3_HELPER_SRC" "$repo_dir/overmind/scripts/project_mgmt/project_setup_update_project.sh"
   cp "$COMMON_LIBS_SRC/project_setup_common.sh" "$repo_dir/overmind/scripts/common_libs/project_setup_common.sh"
+  cp "$COMMON_LIBS_SRC/class_repo_paths.sh" "$repo_dir/overmind/scripts/common_libs/class_repo_paths.sh"
+  cp "$COMMON_LIBS_SRC/check_implementation_plan_readiness.sh" "$repo_dir/overmind/scripts/common_libs/check_implementation_plan_readiness.sh"
+  cp "$COMMON_LIBS_SRC/list_committed_sibling_features.sh" "$repo_dir/overmind/scripts/common_libs/list_committed_sibling_features.sh"
+  cp "$COMMON_LIBS_SRC/persist_class_repo_attach.sh" "$repo_dir/overmind/scripts/common_libs/persist_class_repo_attach.sh"
+  cp "$COMMON_LIBS_SRC/sync_repo_to_default_branch.sh" "$repo_dir/overmind/scripts/common_libs/sync_repo_to_default_branch.sh"
   cp "$SOURCE_ROOT/overmind/scripts/project_mgmt/init_progress_scanner.sh" "$repo_dir/overmind/scripts/project_mgmt/init_progress_scanner.sh"
   cp "$SOURCE_ROOT/overmind/scripts/init_project_stack_blueprints.sh" "$repo_dir/overmind/scripts/init_project_stack_blueprints.sh"
   cp "$SOURCE_ROOT/overmind/scripts/project_mgmt/project_add_feature_e2e.sh" "$repo_dir/overmind/scripts/project_mgmt/project_add_feature_e2e.sh"
@@ -217,6 +223,7 @@ create_valid_repo_dir() {
   local path="$1"
   mkdir -p "$path"
   echo "placeholder" >"$path/placeholder.txt"
+  git -C "$path" init -q
 }
 
 test_update_project_quits_at_project_prompt() {
@@ -305,7 +312,10 @@ test_update_project_invalid_path_reprompts_then_succeeds() {
   create_valid_repo_dir "$valid_repo"
 
   local empty_dir="$TMP_ROOT/empty-dir-invalid-path-test"
+  local non_git_dir="$TMP_ROOT/non-git-dir-invalid-path-test"
   mkdir -p "$empty_dir"
+  mkdir -p "$non_git_dir"
+  echo "not git" >"$non_git_dir/README.md"
 
   local def_path="$asdlc_root/projects/proj-001/init_progress_definition.yaml"
   local before=""
@@ -314,7 +324,7 @@ test_update_project_invalid_path_reprompts_then_succeeds() {
   local out=""
   local status=0
   set +e
-  out="$(printf '1\n1\n\n/nonexistent/path/xyz\n/tmp/not_a_dir_placeholder\n%s\n%s\n3\n' "$empty_dir" "$valid_repo" | \
+  out="$(printf '1\n1\n\n/nonexistent/path/xyz\n/tmp/not_a_dir_placeholder\n%s\n%s\n%s\n3\n' "$empty_dir" "$non_git_dir" "$valid_repo" | \
     "$asdlc_root/.commands/project_setup_update_project.sh" 2>&1)"
   status=$?
   set -e
@@ -323,12 +333,14 @@ test_update_project_invalid_path_reprompts_then_succeeds() {
   assert_contains "$out" "Repo path cannot be empty"
   assert_contains "$out" "does not exist"
   assert_contains "$out" "must point to a non-empty directory"
+  assert_contains "$out" "Repo path must contain .git: $non_git_dir"
 
   local after_type=""
   after_type="$(grep '^  project_type_code:' "$def_path" | sed 's/.*"\(.*\)".*/\1/')"
   assert_equal "A" "$after_type"
   assert_contains "$(cat "$def_path")" "state: \"ready\""
   assert_contains "$(cat "$def_path")" "path: \"$valid_repo\""
+  assert_contains "$(cat "$def_path")" "policy: \"C\""
 }
 
 test_update_project_only_deferred_classes_shown() {
@@ -385,9 +397,9 @@ test_update_project_all_ready_nothing_to_add() {
   assert_contains "$out" "Nothing to add"
 }
 
-test_update_project_successful_attach_flips_exactly_two_lines() {
-  local repo_dir="$TMP_ROOT/repo-update-attach-two-lines"
-  local bootstrap_parent="$TMP_ROOT/asdlc-update-attach-two-lines"
+test_update_project_successful_attach_flips_state_path_and_policy() {
+  local repo_dir="$TMP_ROOT/repo-update-attach-state-path-policy"
+  local bootstrap_parent="$TMP_ROOT/asdlc-update-attach-state-path-policy"
   mkdir -p "$repo_dir"
   setup_git_repo_with_identity "$repo_dir"
   local asdlc_root=""
@@ -416,11 +428,12 @@ test_update_project_successful_attach_flips_exactly_two_lines() {
 
   assert_contains "$after" "state: \"ready\""
   assert_contains "$after" "path: \"$valid_repo\""
+  assert_contains "$after" "policy: \"C\""
   assert_contains "$after" "state: \"deferred\""
 
   local diff_lines=""
   diff_lines="$(diff <(echo "$before") <(echo "$after") | grep '^[<>]' | wc -l | tr -d ' ' || true)"
-  assert_equal "4" "$diff_lines"
+  assert_equal "5" "$diff_lines"
 
   assert_contains "$after" "steps:"
 }
@@ -646,7 +659,7 @@ test_update_project_quits_at_path_prompt
 test_update_project_invalid_path_reprompts_then_succeeds
 test_update_project_only_deferred_classes_shown
 test_update_project_all_ready_nothing_to_add
-test_update_project_successful_attach_flips_exactly_two_lines
+test_update_project_successful_attach_flips_state_path_and_policy
 test_update_project_corrupted_state_exits_clean_without_mutation
 test_update_project_type_a_reclassify_to_b
 test_update_project_type_a_reclassify_to_c

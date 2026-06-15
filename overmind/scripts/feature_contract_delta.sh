@@ -21,6 +21,13 @@ MODEL_PHASE="feature_contract_delta"
 MODEL_CMD=""
 MODEL_MODEL=""
 MODEL_ARGS=()
+READY_REPO_PATHS=()
+READY_REPO_CONTEXT_LINES=()
+SYNC_REPO_TO_DEFAULT_BRANCH=""
+LIST_COMMITTED_SIBLING_FEATURES=""
+PENDING_CONTRACT_DELTA_FILES=()
+READONLY_INPUT_FILES=()
+READONLY_SNAPSHOTS=()
 
 die() {
   echo "ERROR: $*" >&2
@@ -143,6 +150,7 @@ set_artifact_paths() {
 ensure_required_files() {
   local runtime_root="$1"
   local required_paths=(
+    "$PROJECT_ROOT/$PROJECT_DEFINITION_FILE"
     "$FEATURE_BR_FILE"
     "$REQUIREMENTS_EARS_FILE"
     "$COMMON_CONTRACT_DEFINITION_FILE"
@@ -160,72 +168,6 @@ ensure_required_files() {
       die "Required file not found: $relative_path"
     fi
   done
-}
-
-extract_meta_value() {
-  local feature_br_path="$1"
-  local target_key="$2"
-
-  awk -v target_key="$target_key" '
-function trim(v) {
-  sub(/^[[:space:]]+/, "", v)
-  sub(/[[:space:]]+$/, "", v)
-  return v
-}
-function strip_quotes(v) {
-  if ((v ~ /^".*"$/) || (v ~ /^'\''.*'\''$/)) {
-    v = substr(v, 2, length(v) - 2)
-  }
-  return v
-}
-BEGIN {
-  in_meta = 0
-  found = 0
-}
-/^##[[:space:]]+/ {
-  heading = trim($0)
-  in_meta = (heading ~ /^##[[:space:]]+1\.[[:space:]]+Document[[:space:]]+Meta[[:space:]]*$/)
-  next
-}
-{
-  if (!in_meta) {
-    next
-  }
-
-  line = $0
-  sub(/^[[:space:]]*-[[:space:]]*/, "", line)
-  colon_index = index(line, ":")
-  if (colon_index <= 0) {
-    next
-  }
-
-  key = trim(substr(line, 1, colon_index - 1))
-  value = strip_quotes(trim(substr(line, colon_index + 1)))
-  if (key == target_key) {
-    print value
-    found = 1
-    exit 0
-  }
-}
-END {
-  exit(found ? 0 : 1)
-}
-' "$feature_br_path"
-}
-
-extract_project_type_code() {
-  local feature_br_path="$1"
-  local value=""
-
-  if ! value="$(extract_meta_value "$feature_br_path" "project_type_code")"; then
-    die "Missing key project_type_code in ## 1. Document Meta: $FEATURE_BR_FILE"
-  fi
-
-  if [[ -z "$value" ]]; then
-    die "project_type_code must not be empty in $FEATURE_BR_FILE"
-  fi
-
-  printf '%s' "$value"
 }
 
 load_model_config() {
@@ -274,11 +216,133 @@ load_model_config() {
   fi
 }
 
+source_class_repo_paths_lib() {
+  local runtime_root="$1"
+  local lib_path="$runtime_root/common_libs/class_repo_paths.sh"
+  [[ -f "$lib_path" ]] || die "Required command lib not found: common_libs/class_repo_paths.sh"
+  # shellcheck source=/dev/null
+  source "$lib_path"
+}
+
+resolve_sync_repo_helper() {
+  local runtime_root="$1"
+  SYNC_REPO_TO_DEFAULT_BRANCH="$runtime_root/common_libs/sync_repo_to_default_branch.sh"
+  [[ -x "$SYNC_REPO_TO_DEFAULT_BRANCH" ]] || die "Required command lib not found or not executable: common_libs/sync_repo_to_default_branch.sh"
+}
+
+resolve_sibling_lister_helper() {
+  local runtime_root="$1"
+  LIST_COMMITTED_SIBLING_FEATURES="$runtime_root/common_libs/list_committed_sibling_features.sh"
+  [[ -x "$LIST_COMMITTED_SIBLING_FEATURES" ]] || die "Required command lib not found or not executable: common_libs/list_committed_sibling_features.sh"
+}
+
+collect_ready_repo_paths() {
+  local definition_path="$1"
+  local entry=""
+  local class_name=""
+  local resolved_path=""
+  local ready_paths=""
+
+  READY_REPO_PATHS=()
+  READY_REPO_CONTEXT_LINES=()
+
+  if ! ready_paths="$(class_repo_paths_collect_ready_paths "$definition_path" 2>&1)"; then
+    die "$ready_paths"
+  fi
+
+  while IFS= read -r entry; do
+    [[ -n "$entry" ]] || continue
+    IFS='|' read -r class_name resolved_path <<<"$entry"
+    "$SYNC_REPO_TO_DEFAULT_BRANCH" "$resolved_path"
+    READY_REPO_PATHS+=("$resolved_path")
+    READY_REPO_CONTEXT_LINES+=("- $class_name: $resolved_path")
+  done <<<"$ready_paths"
+}
+
+collect_pending_contract_delta_sources() {
+  local runtime_root="$1"
+  local feature_abs_path="$runtime_root/$FEATURE_PATH"
+  local sibling_features=""
+  local sibling_folder=""
+  local relative_path=""
+
+  PENDING_CONTRACT_DELTA_FILES=()
+
+  if ! sibling_features="$("$LIST_COMMITTED_SIBLING_FEATURES" --feature_path "$feature_abs_path" 2>&1)"; then
+    echo "$sibling_features" >&2
+    exit 1
+  fi
+
+  while IFS= read -r sibling_folder; do
+    [[ -n "$sibling_folder" ]] || continue
+    relative_path="$PROJECT_ROOT/$sibling_folder/feature_contract_delta.md"
+    if [[ -f "$runtime_root/$relative_path" ]]; then
+      PENDING_CONTRACT_DELTA_FILES+=("$relative_path")
+    fi
+  done <<<"$sibling_features"
+}
+
+prepare_readonly_inputs() {
+  local pending_file=""
+
+  READONLY_INPUT_FILES=(
+    "$FEATURE_BR_FILE"
+    "$REQUIREMENTS_EARS_FILE"
+    "$COMMON_CONTRACT_DEFINITION_FILE"
+  )
+
+  if [[ ${#PENDING_CONTRACT_DELTA_FILES[@]} -gt 0 ]]; then
+    for pending_file in "${PENDING_CONTRACT_DELTA_FILES[@]}"; do
+      READONLY_INPUT_FILES+=("$pending_file")
+    done
+  fi
+}
+
+render_ready_repo_context_lines() {
+  local line=""
+  if [[ ${#READY_REPO_CONTEXT_LINES[@]} -eq 0 ]]; then
+    printf '%s\n' "- none"
+    return 0
+  fi
+
+  for line in "${READY_REPO_CONTEXT_LINES[@]}"; do
+    printf '%s\n' "$line"
+  done
+}
+
+render_readonly_input_lines() {
+  local path=""
+  for path in "${READONLY_INPUT_FILES[@]}"; do
+    printf '  - %s\n' "$path"
+  done
+}
+
+render_pending_contract_delta_context_lines() {
+  local path=""
+  local folder_and_file=""
+
+  if [[ ${#PENDING_CONTRACT_DELTA_FILES[@]} -eq 0 ]]; then
+    printf '%s\n' "- none"
+    return 0
+  fi
+
+  for path in "${PENDING_CONTRACT_DELTA_FILES[@]}"; do
+    folder_and_file="${path#"$PROJECT_ROOT/"}"
+    printf '%s\n' "- Pending contract delta source: $folder_and_file"
+  done
+}
+
 build_prompt() {
   local runtime_root="$1"
-  local project_type_code="$2"
   local quality_command="$QUALITY_GATE_HELPER $FEATURE_CONTRACT_DELTA_FILE"
   local project_definition_path="$PROJECT_ROOT/$PROJECT_DEFINITION_FILE"
+  local repo_context_lines=""
+  local readonly_input_lines=""
+  local pending_contract_delta_lines=""
+
+  repo_context_lines="$(render_ready_repo_context_lines)"
+  readonly_input_lines="$(render_readonly_input_lines)"
+  pending_contract_delta_lines="$(render_pending_contract_delta_context_lines)"
 
   cat <<EOF
 Define feature-level shared contract delta from EARS requirements and common contract baseline.
@@ -289,27 +353,24 @@ Hard constraints:
 - Use $FEATURE_CONTRACT_TEMPLATE_FILE as output structure contract.
 - Use $FEATURE_CONTRACT_GOLDEN_EXAMPLE_FILE as style contract.
 - Read these as input only and do not modify them:
-  - $FEATURE_BR_FILE
-  - $REQUIREMENTS_EARS_FILE
-  - $COMMON_CONTRACT_DEFINITION_FILE
+$readonly_input_lines
 - Update only $FEATURE_CONTRACT_DELTA_FILE.
-- Keep output focused on feature-level contract additions/changes vs baseline.
-- Keep one independent delta per \`### Delta N\` block and add \`Delta 2+\` blocks when multiple deltas exist.
-- Before finishing, ensure output can pass this quality gate command: $quality_command
-- Evaluate whether gate compliance is feasible with current inputs and constraints.
-- If gate compliance is not feasible, stop and end with this exact line:
-  "feature contract delta gate cannot pass with current EARS/common-contract inputs. Please provide instructions what to do, or adjust requirements and rerun this phase"
-- If quality gate is feasible with current inputs and passed, end your final response with this exact last line:
-  "Feature contract delta phase is finished. Nothing else to do now; press Ctrl-C so orchestrator can start the next phase"
+- Draft $FEATURE_CONTRACT_DELTA_FILE before running any quality gate command.
+- Use this quality gate command before finalizing: $quality_command
+- Handle quality gate outcomes exactly as defined by $RULE_FILE.
 
 Context:
 - ASDLC workspace root: $runtime_root
 - Project root: $PROJECT_ROOT
 - Feature root: $FEATURE_PATH
-- Project type code: $project_type_code
 - Feature BR source: $FEATURE_BR_FILE
 - Requirements EARS source: $REQUIREMENTS_EARS_FILE
 - Common contract baseline source: $COMMON_CONTRACT_DEFINITION_FILE
+- Repositories to scan (meta_info.class_repo_paths with state=ready):
+$repo_context_lines
+- Pending sibling contract deltas:
+$pending_contract_delta_lines
+- Pending contract delta source labels are relative to $PROJECT_ROOT; open the matching read-only input at $PROJECT_ROOT/<folder>/feature_contract_delta.md.
 - Target artifact: $FEATURE_CONTRACT_DELTA_FILE
 - Rule file: $RULE_FILE
 - Template file: $FEATURE_CONTRACT_TEMPLATE_FILE
@@ -320,14 +381,35 @@ Context:
 EOF
 }
 
-ensure_file_unchanged() {
-  local before_snapshot="$1"
-  local target_path="$2"
-  local relative_name="$3"
+snapshot_readonly_inputs() {
+  local runtime_root="$1"
+  local relative_path=""
+  local snapshot_path=""
 
-  if ! cmp -s "$before_snapshot" "$target_path"; then
-    die "This phase must not modify $relative_name; it is read-only input."
-  fi
+  READONLY_SNAPSHOTS=()
+  for relative_path in "${READONLY_INPUT_FILES[@]}"; do
+    snapshot_path="$(mktemp)"
+    cp "$runtime_root/$relative_path" "$snapshot_path"
+    READONLY_SNAPSHOTS+=("$snapshot_path")
+  done
+}
+
+cleanup_snapshots() {
+  local snapshot_path=""
+  for snapshot_path in "${READONLY_SNAPSHOTS[@]-}"; do
+    [[ -n "$snapshot_path" ]] && rm -f "$snapshot_path"
+  done
+}
+
+ensure_readonly_inputs_unchanged() {
+  local runtime_root="$1"
+  local idx=0
+
+  for idx in "${!READONLY_INPUT_FILES[@]}"; do
+    if ! cmp -s "${READONLY_SNAPSHOTS[$idx]}" "$runtime_root/${READONLY_INPUT_FILES[$idx]}"; then
+      die "This phase must not modify ${READONLY_INPUT_FILES[$idx]}; it is read-only input."
+    fi
+  done
 }
 
 main() {
@@ -341,15 +423,15 @@ main() {
   local feature_br_path=""
   local requirements_ears_path=""
   local common_contract_path=""
+  local project_definition_path=""
   local output_path=""
   local models_path=""
-  local project_type_code=""
   local prompt_arg=""
-  local before_feature_br=""
-  local before_requirements=""
-  local before_common_contract=""
 
   runtime_root="$(ensure_staged_command_runtime)"
+  source_class_repo_paths_lib "$runtime_root"
+  resolve_sync_repo_helper "$runtime_root"
+  resolve_sibling_lister_helper "$runtime_root"
   resolve_feature_path "$runtime_root" "$FEATURE_PATH_INPUT"
   resolve_project_root "$runtime_root"
   set_artifact_paths
@@ -358,25 +440,23 @@ main() {
   feature_br_path="$runtime_root/$FEATURE_BR_FILE"
   requirements_ears_path="$runtime_root/$REQUIREMENTS_EARS_FILE"
   common_contract_path="$runtime_root/$COMMON_CONTRACT_DEFINITION_FILE"
+  project_definition_path="$runtime_root/$PROJECT_ROOT/$PROJECT_DEFINITION_FILE"
   output_path="$runtime_root/$FEATURE_CONTRACT_DELTA_FILE"
   models_path="$runtime_root/$MODELS_FILE"
 
-  project_type_code="$(extract_project_type_code "$feature_br_path")"
+  collect_ready_repo_paths "$project_definition_path"
+  collect_pending_contract_delta_sources "$runtime_root"
+  prepare_readonly_inputs
   load_model_config "$models_path" "$MODEL_PHASE"
   if [[ "$MODEL_CMD" != "codex" ]]; then
     die "Invalid '$MODEL_PHASE' command in $MODELS_FILE: expected 'codex', got '$MODEL_CMD'."
   fi
   require_command "$MODEL_CMD"
 
-  before_feature_br="$(mktemp)"
-  before_requirements="$(mktemp)"
-  before_common_contract="$(mktemp)"
-  cp "$feature_br_path" "$before_feature_br"
-  cp "$requirements_ears_path" "$before_requirements"
-  cp "$common_contract_path" "$before_common_contract"
-  trap '[[ -n "${before_feature_br:-}" ]] && rm -f "$before_feature_br"; [[ -n "${before_requirements:-}" ]] && rm -f "$before_requirements"; [[ -n "${before_common_contract:-}" ]] && rm -f "$before_common_contract"' EXIT
+  snapshot_readonly_inputs "$runtime_root"
+  trap cleanup_snapshots EXIT
 
-  prompt_arg="$(build_prompt "$runtime_root" "$project_type_code")"
+  prompt_arg="$(build_prompt "$runtime_root")"
 
   local cmd=("$MODEL_CMD" -m "$MODEL_MODEL")
   if [[ ${#MODEL_ARGS[@]} -gt 0 ]]; then
@@ -393,9 +473,7 @@ main() {
     die "Model run did not produce required file: $FEATURE_CONTRACT_DELTA_FILE"
   fi
 
-  ensure_file_unchanged "$before_feature_br" "$feature_br_path" "$FEATURE_BR_FILE"
-  ensure_file_unchanged "$before_requirements" "$requirements_ears_path" "$REQUIREMENTS_EARS_FILE"
-  ensure_file_unchanged "$before_common_contract" "$common_contract_path" "$COMMON_CONTRACT_DEFINITION_FILE"
+  ensure_readonly_inputs_unchanged "$runtime_root"
   echo "Updated $FEATURE_CONTRACT_DELTA_FILE"
 }
 

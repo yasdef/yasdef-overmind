@@ -12,19 +12,10 @@ MODEL_PHASE="repo_analyse"
 PROJECT_DEFINITION_FILE=""
 REPO_PATHS=()
 REPO_CONTEXT_LINES=()
+SYNC_REPO_TO_DEFAULT_BRANCH=""
 
 die() {
   echo "ERROR: $*" >&2
-  exit 1
-}
-
-fail_project_type_undefined() {
-  echo "unable to define project type" >&2
-  exit 1
-}
-
-fail_new_project_not_applicable() {
-  echo "for new projects repo scan not applicable" >&2
   exit 1
 }
 
@@ -33,31 +24,6 @@ require_command() {
   if ! command -v "$command_name" >/dev/null 2>&1; then
     die "Required command not found: $command_name"
   fi
-}
-
-trim_value() {
-  printf '%s' "$1" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'
-}
-
-strip_quotes() {
-  local value="$1"
-  value="$(trim_value "$value")"
-  if [[ "$value" =~ ^\".*\"$ || "$value" =~ ^\'.*\'$ ]]; then
-    value="${value:1:${#value}-2}"
-  fi
-  printf '%s' "$(trim_value "$value")"
-}
-
-array_contains() {
-  local needle="$1"
-  shift || true
-  local item=""
-  for item in "$@"; do
-    if [[ "$item" == "$needle" ]]; then
-      return 0
-    fi
-  done
-  return 1
 }
 
 normalize_feature_path() {
@@ -182,187 +148,43 @@ ensure_feature_summary_exists() {
   fi
 }
 
-extract_project_type_code() {
-  local feature_br_path="$1"
-  local code=""
-
-  if [[ ! -f "$feature_br_path" ]]; then
-    fail_project_type_undefined
-  fi
-
-  code="$(
-    awk '
-function trim(v) {
-  sub(/^[[:space:]]+/, "", v)
-  sub(/[[:space:]]+$/, "", v)
-  return v
-}
-{
-  line = $0
-  sub(/^[[:space:]]*-[[:space:]]*/, "", line)
-  if (line ~ /^project_type_code[[:space:]]*:/) {
-    sub(/^project_type_code[[:space:]]*:[[:space:]]*/, "", line)
-    line = trim(line)
-    if ((line ~ /^".*"$/) || (line ~ /^'\''.*'\''$/)) {
-      line = substr(line, 2, length(line) - 2)
-    }
-    print line
-    exit
-  }
-}
-' "$feature_br_path"
-  )"
-
-  if [[ -z "${code:-}" || "$code" == "[UNFILLED]" ]]; then
-    fail_project_type_undefined
-  fi
-
-  printf '%s' "$code"
+source_class_repo_paths_lib() {
+  local runtime_root="$1"
+  local lib_path="$runtime_root/common_libs/class_repo_paths.sh"
+  [[ -f "$lib_path" ]] || die "Required command lib not found: common_libs/class_repo_paths.sh"
+  # shellcheck source=/dev/null
+  source "$lib_path"
 }
 
-extract_meta_class_repo_path_entries() {
-  local definition_path="$1"
-
-  awk '
-function trim(v) {
-  sub(/^[[:space:]]+/, "", v)
-  sub(/[[:space:]]+$/, "", v)
-  return v
-}
-function strip_yaml_quotes(v) {
-  v = trim(v)
-  if ((v ~ /^".*"$/) || (v ~ /^'\''.*'\''$/)) {
-    v = substr(v, 2, length(v) - 2)
-  }
-  return trim(v)
-}
-function flush_entry() {
-  if (current_class != "") {
-    print current_class "|" current_state "|" current_path
-  }
-  current_class = ""
-  current_state = ""
-  current_path = ""
-}
-BEGIN {
-  in_meta = 0
-  in_paths = 0
-  current_class = ""
-  current_state = ""
-  current_path = ""
-}
-/^meta_info:[[:space:]]*$/ {
-  in_meta = 1
-  next
-}
-/^steps:[[:space:]]*$/ {
-  if (in_meta == 1) {
-    flush_entry()
-    exit 0
-  }
-}
-{
-  if (in_meta == 0) {
-    next
-  }
-
-  if (in_paths == 0) {
-    if ($0 ~ /^[[:space:]]{2}class_repo_paths:[[:space:]]*\{\}[[:space:]]*$/) {
-      exit 0
-    }
-    if ($0 ~ /^[[:space:]]{2}class_repo_paths:[[:space:]]*$/) {
-      in_paths = 1
-      next
-    }
-    next
-  }
-
-  if ($0 ~ /^[[:space:]]{2}[A-Za-z0-9_.-]+:[[:space:]]*$/) {
-    flush_entry()
-    exit 0
-  }
-
-  if ($0 ~ /^[[:space:]]{4}[A-Za-z0-9_.-]+:[[:space:]]*$/) {
-    flush_entry()
-    line = $0
-    sub(/^[[:space:]]{4}/, "", line)
-    sub(/:[[:space:]]*$/, "", line)
-    current_class = trim(line)
-    next
-  }
-
-  if (current_class != "" && $0 ~ /^[[:space:]]{6}state:[[:space:]]*/) {
-    line = $0
-    sub(/^[[:space:]]{6}state:[[:space:]]*/, "", line)
-    current_state = strip_yaml_quotes(line)
-    next
-  }
-
-  if (current_class != "" && $0 ~ /^[[:space:]]{6}path:[[:space:]]*/) {
-    line = $0
-    sub(/^[[:space:]]{6}path:[[:space:]]*/, "", line)
-    current_path = strip_yaml_quotes(line)
-    next
-  }
-}
-END {
-  flush_entry()
-}
-' "$definition_path"
+resolve_sync_repo_helper() {
+  local runtime_root="$1"
+  SYNC_REPO_TO_DEFAULT_BRANCH="$runtime_root/common_libs/sync_repo_to_default_branch.sh"
+  [[ -x "$SYNC_REPO_TO_DEFAULT_BRANCH" ]] || die "Required command lib not found or not executable: common_libs/sync_repo_to_default_branch.sh"
 }
 
 collect_usable_repo_paths() {
   local definition_path="$1"
-  local parsed_entries=""
   local entry=""
   local class_name=""
-  local class_state=""
-  local class_path=""
-  local normalized_state=""
-  local normalized_path=""
   local resolved_path=""
+  local ready_paths=""
 
   REPO_PATHS=()
   REPO_CONTEXT_LINES=()
 
-  if ! parsed_entries="$(extract_meta_class_repo_path_entries "$definition_path" 2>/dev/null)"; then
-    die "Failed to read meta_info.class_repo_paths from $PROJECT_DEFINITION_FILE."
+  if ! ready_paths="$(class_repo_paths_collect_ready_paths "$definition_path" 2>&1)"; then
+    die "$ready_paths"
   fi
 
   while IFS= read -r entry; do
     [[ -n "$entry" ]] || continue
-    IFS='|' read -r class_name class_state class_path <<<"$entry"
+    IFS='|' read -r class_name resolved_path <<<"$entry"
+    "$SYNC_REPO_TO_DEFAULT_BRANCH" "$resolved_path"
+    REPO_PATHS+=("$resolved_path")
+    REPO_CONTEXT_LINES+=("- $class_name: $resolved_path")
+  done <<<"$ready_paths"
 
-    class_name="$(trim_value "$class_name")"
-    normalized_state="$(printf '%s' "$(trim_value "$class_state")" | tr '[:upper:]' '[:lower:]')"
-    normalized_path="$(strip_quotes "$class_path")"
-    [[ -n "$class_name" ]] || continue
-
-    if [[ "$normalized_state" != "ready" ]]; then
-      continue
-    fi
-
-    if [[ -z "$normalized_path" ]]; then
-      die "Repo path for class '$class_name' is marked ready but path is empty in $PROJECT_DEFINITION_FILE."
-    fi
-
-    if [[ ! -d "$normalized_path" ]]; then
-      die "Repo path for class '$class_name' does not exist or is not a directory: $normalized_path"
-    fi
-
-    if ! resolved_path="$(cd "$normalized_path" && pwd)"; then
-      die "Failed to resolve repo path for class '$class_name': $normalized_path"
-    fi
-
-    if ! array_contains "$resolved_path" "${REPO_PATHS[@]-}"; then
-      REPO_PATHS+=("$resolved_path")
-      REPO_CONTEXT_LINES+=("- $class_name: $resolved_path")
-    fi
-  done <<<"$parsed_entries"
-
-  if [[ ${#REPO_PATHS[@]} -eq 0 ]]; then
-    die "No usable repository paths found in meta_info.class_repo_paths (state: ready with existing directories required)."
-  fi
+  return 0
 }
 
 render_repo_context_lines() {
@@ -420,8 +242,7 @@ load_model_config() {
 
 build_prompt() {
   local runtime_root="$1"
-  local project_type_code="$2"
-  local definition_file="$3"
+  local definition_file="$2"
   local repo_context_lines=""
   local gate_command="$REPO_GATE_HELPER $FEATURE_BR_FILE"
 
@@ -441,7 +262,6 @@ Hard constraints:
 
 Context:
 - ASDLC workspace root: $runtime_root
-- Project type code: $project_type_code
 - Runtime path bindings are authoritative for this invocation.
 - Feature artifact root: $FEATURE_PATH
 - Target artifact: $FEATURE_BR_FILE
@@ -462,6 +282,8 @@ main() {
 
   local runtime_root=""
   runtime_root="$(resolve_runtime_root)"
+  source_class_repo_paths_lib "$runtime_root"
+  resolve_sync_repo_helper "$runtime_root"
   resolve_feature_path "$runtime_root" "$FEATURE_PATH_INPUT"
   set_artifact_paths
   ensure_feature_summary_exists "$runtime_root"
@@ -469,18 +291,17 @@ main() {
 
   local models_path="$runtime_root/$MODELS_FILE"
   local rule_path="$runtime_root/$RULE_FILE"
-  local project_type_code=""
   local prompt_arg=""
 
   if [[ ! -f "$rule_path" ]]; then
     die "Rules file not found: $RULE_FILE"
   fi
 
-  project_type_code="$(extract_project_type_code "$runtime_root/$FEATURE_BR_FILE")"
-  if [[ "$project_type_code" == "A" ]]; then
-    fail_new_project_not_applicable
-  fi
   collect_usable_repo_paths "$runtime_root/$PROJECT_DEFINITION_FILE"
+  if [[ ${#REPO_PATHS[@]} -eq 0 ]]; then
+    echo "No ready repository paths found in meta_info.class_repo_paths; repo scan phase is a no-op."
+    return 0
+  fi
 
   load_model_config "$models_path" "$MODEL_PHASE"
   if [[ "$MODEL_CMD" != "codex" ]]; then
@@ -488,7 +309,7 @@ main() {
   fi
   require_command "$MODEL_CMD"
 
-  prompt_arg="$(build_prompt "$runtime_root" "$project_type_code" "$PROJECT_DEFINITION_FILE")"
+  prompt_arg="$(build_prompt "$runtime_root" "$PROJECT_DEFINITION_FILE")"
 
   local cmd=("$MODEL_CMD" -m "$MODEL_MODEL")
   if [[ ${#MODEL_ARGS[@]} -gt 0 ]]; then

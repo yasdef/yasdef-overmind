@@ -61,6 +61,8 @@ Must not own:
 - Do not invent new business behavior outside `<EARS_SOURCE_ARTIFACT>`.
 - Keep statements concise and testable.
 
+Prompt-bound `Pending contract delta source: <folder>/feature_contract_delta.md` entries are evidence of in-flight sibling contract claims. The current delta must not silently contradict those claims; report overlaps at this step, but do not resolve them here.
+
 ## §5 Cross-Class Transport/Contract Approach Mirror
 - Determine whether §5 applies by running the runtime-bound cross-class peer trigger helper (see prompt context). It exits 0 and prints `cross_class_peer_trigger: active` when the §5 mirror applies, or `cross_class_peer_trigger: inactive` when it is a no-op. Omit the `## 5. Cross-Class Transport/Contract Approach Mirror` section entirely on `inactive`.
 - When active, write one `### Backend: <identity>` block per active backend, mirroring the current `transport_protocol` and `schema_format` from `common_contract_definition.md` §7 verbatim by default.

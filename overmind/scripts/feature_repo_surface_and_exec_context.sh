@@ -35,17 +35,17 @@ TARGET_QUALITY_GATE_HELPER=""
 TARGET_TRACK_LABEL=""
 TARGET_PROJECT_CLASSES_VALUE=""
 TARGET_BLUEPRINT_FILE=""
+SYNC_REPO_TO_DEFAULT_BRANCH=""
+LIST_COMMITTED_SIBLING_FEATURES=""
+IN_FLIGHT_FEATURE_FOLDERS=()
+OPTIONAL_READ_ONLY_PATHS=()
+OPTIONAL_READ_ONLY_NAMES=()
+OPTIONAL_READ_ONLY_SNAPSHOTS=()
 
 die() {
   echo "ERROR: $*" >&2
   exit 1
 }
-
-fail_project_type_undefined() {
-  echo "unable to define project type" >&2
-  exit 1
-}
-
 
 require_command() {
   local command_name="$1"
@@ -56,15 +56,6 @@ require_command() {
 
 trim_value() {
   printf '%s' "$1" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'
-}
-
-strip_quotes() {
-  local value="$1"
-  value="$(trim_value "$value")"
-  if [[ "$value" =~ ^\".*\"$ || "$value" =~ ^\'.*\'$ ]]; then
-    value="${value:1:${#value}-2}"
-  fi
-  printf '%s' "$(trim_value "$value")"
 }
 
 array_contains() {
@@ -215,74 +206,6 @@ ensure_target_support_files() {
   done
 }
 
-project_type_label_for_code() {
-  case "$1" in
-    A) printf '%s' "New project" ;;
-    B) printf '%s' "Existing project with partial context" ;;
-    C) printf '%s' "Existing project with code-first context" ;;
-    *) return 1 ;;
-  esac
-}
-
-extract_meta_scalar() {
-  local definition_path="$1"
-  local target_key="$2"
-
-  awk -v target_key="$target_key" '
-function trim(v) {
-  sub(/^[[:space:]]+/, "", v)
-  sub(/[[:space:]]+$/, "", v)
-  return v
-}
-function strip_quotes(v) {
-  if ((v ~ /^".*"$/) || (v ~ /^'\''.*'\''$/)) {
-    v = substr(v, 2, length(v) - 2)
-  }
-  return v
-}
-BEGIN {
-  in_meta = 0
-  found = 0
-}
-/^meta_info:[[:space:]]*$/ {
-  in_meta = 1
-  next
-}
-/^steps:[[:space:]]*$/ {
-  if (in_meta == 1) {
-    exit 1
-  }
-}
-{
-  if (in_meta == 0) {
-    next
-  }
-
-  line = $0
-  if (line !~ /^[[:space:]]{2}[A-Za-z0-9_.-]+:[[:space:]]*/) {
-    next
-  }
-
-  sub(/^[[:space:]]{2}/, "", line)
-  colon_index = index(line, ":")
-  if (colon_index <= 0) {
-    next
-  }
-
-  key = trim(substr(line, 1, colon_index - 1))
-  value = strip_quotes(trim(substr(line, colon_index + 1)))
-  if (key == target_key) {
-    print value
-    found = 1
-    exit 0
-  }
-}
-END {
-  exit(found ? 0 : 1)
-}
-' "$definition_path"
-}
-
 extract_meta_project_classes() {
   local definition_path="$1"
 
@@ -357,28 +280,6 @@ BEGIN {
 ' "$definition_path"
 }
 
-resolve_project_type_code() {
-  local definition_path="$1"
-  local project_type_code=""
-  local project_type_label=""
-  local expected_label=""
-
-  if ! project_type_code="$(extract_meta_scalar "$definition_path" "project_type_code" 2>/dev/null)"; then
-    fail_project_type_undefined
-  fi
-  if ! project_type_label="$(extract_meta_scalar "$definition_path" "project_type_label" 2>/dev/null)"; then
-    fail_project_type_undefined
-  fi
-  if ! expected_label="$(project_type_label_for_code "$project_type_code" 2>/dev/null)"; then
-    fail_project_type_undefined
-  fi
-  if [[ "$project_type_label" != "$expected_label" ]]; then
-    fail_project_type_undefined
-  fi
-
-  printf '%s' "$project_type_code"
-}
-
 resolve_project_classes() {
   local definition_path="$1"
   local parsed_classes=""
@@ -388,7 +289,7 @@ resolve_project_classes() {
   PROJECT_CLASSES=()
 
   if ! parsed_classes="$(extract_meta_project_classes "$definition_path" 2>/dev/null)"; then
-    fail_project_type_undefined
+    die "Failed to read meta_info.project_classes from $PROJECT_DEFINITION_FILE."
   fi
 
   while IFS= read -r class_name; do
@@ -402,144 +303,66 @@ resolve_project_classes() {
           PROJECT_CLASSES+=("$normalized_class")
         fi
         ;;
-      *)
-        fail_project_type_undefined
-        ;;
+      *) die "Unsupported project class in $PROJECT_DEFINITION_FILE: $class_name" ;;
     esac
   done <<<"$parsed_classes"
 
   if [[ ${#PROJECT_CLASSES[@]} -eq 0 ]]; then
-    fail_project_type_undefined
+    die "No supported project_classes found in $PROJECT_DEFINITION_FILE."
   fi
 }
 
-extract_meta_class_repo_path_entries() {
-  local definition_path="$1"
-
-  awk '
-function trim(v) {
-  sub(/^[[:space:]]+/, "", v)
-  sub(/[[:space:]]+$/, "", v)
-  return v
-}
-function strip_yaml_quotes(v) {
-  v = trim(v)
-  if ((v ~ /^".*"$/) || (v ~ /^'\''.*'\''$/)) {
-    v = substr(v, 2, length(v) - 2)
-  }
-  return trim(v)
-}
-function flush_entry() {
-  if (current_class != "") {
-    print current_class "|" current_state "|" current_path
-  }
-  current_class = ""
-  current_state = ""
-  current_path = ""
-}
-BEGIN {
-  in_meta = 0
-  in_paths = 0
-  current_class = ""
-  current_state = ""
-  current_path = ""
-}
-/^meta_info:[[:space:]]*$/ {
-  in_meta = 1
-  next
-}
-/^steps:[[:space:]]*$/ {
-  if (in_meta == 1) {
-    flush_entry()
-    exit 0
-  }
-}
-{
-  if (in_meta == 0) {
-    next
-  }
-
-  if (in_paths == 0) {
-    if ($0 ~ /^[[:space:]]{2}class_repo_paths:[[:space:]]*\{\}[[:space:]]*$/) {
-      exit 0
-    }
-    if ($0 ~ /^[[:space:]]{2}class_repo_paths:[[:space:]]*$/) {
-      in_paths = 1
-      next
-    }
-    next
-  }
-
-  if ($0 ~ /^[[:space:]]{2}[A-Za-z0-9_.-]+:[[:space:]]*$/) {
-    flush_entry()
-    exit 0
-  }
-
-  if ($0 ~ /^[[:space:]]{4}[A-Za-z0-9_.-]+:[[:space:]]*$/) {
-    flush_entry()
-    line = $0
-    sub(/^[[:space:]]{4}/, "", line)
-    sub(/:[[:space:]]*$/, "", line)
-    current_class = trim(line)
-    next
-  }
-
-  if (current_class != "" && $0 ~ /^[[:space:]]{6}state:[[:space:]]*/) {
-    line = $0
-    sub(/^[[:space:]]{6}state:[[:space:]]*/, "", line)
-    current_state = strip_yaml_quotes(line)
-    next
-  }
-
-  if (current_class != "" && $0 ~ /^[[:space:]]{6}path:[[:space:]]*/) {
-    line = $0
-    sub(/^[[:space:]]{6}path:[[:space:]]*/, "", line)
-    current_path = strip_yaml_quotes(line)
-    next
-  }
-}
-END {
-  flush_entry()
-}
-' "$definition_path"
+source_class_repo_paths_lib() {
+  local runtime_root="$1"
+  local lib_path="$runtime_root/common_libs/class_repo_paths.sh"
+  [[ -f "$lib_path" ]] || die "Required command lib not found: common_libs/class_repo_paths.sh"
+  # shellcheck source=/dev/null
+  source "$lib_path"
 }
 
-find_class_repo_entry() {
-  local definition_path="$1"
-  local target_class="$2"
-  local parsed_entries=""
-  local entry=""
-  local class_name=""
-  local class_state=""
-  local class_path=""
-  local normalized_class=""
+resolve_sync_repo_helper() {
+  local runtime_root="$1"
+  SYNC_REPO_TO_DEFAULT_BRANCH="$runtime_root/common_libs/sync_repo_to_default_branch.sh"
+  [[ -x "$SYNC_REPO_TO_DEFAULT_BRANCH" ]] || die "Required command lib not found or not executable: common_libs/sync_repo_to_default_branch.sh"
+}
 
-  if ! parsed_entries="$(extract_meta_class_repo_path_entries "$definition_path" 2>/dev/null)"; then
-    die "Failed to read meta_info.class_repo_paths from $PROJECT_DEFINITION_FILE."
+resolve_sibling_lister_helper() {
+  local runtime_root="$1"
+  LIST_COMMITTED_SIBLING_FEATURES="$runtime_root/common_libs/list_committed_sibling_features.sh"
+  [[ -x "$LIST_COMMITTED_SIBLING_FEATURES" ]] || die "Required command lib not found or not executable: common_libs/list_committed_sibling_features.sh"
+}
+
+collect_in_flight_plan_sources() {
+  local runtime_root="$1"
+  local feature_abs_path="$runtime_root/$FEATURE_PATH"
+  local sibling_features=""
+  local sibling_folder=""
+
+  IN_FLIGHT_FEATURE_FOLDERS=()
+
+  if ! sibling_features="$("$LIST_COMMITTED_SIBLING_FEATURES" --feature_path "$feature_abs_path" 2>&1)"; then
+    echo "$sibling_features" >&2
+    exit 1
   fi
 
-  while IFS= read -r entry; do
-    [[ -n "$entry" ]] || continue
-    IFS='|' read -r class_name class_state class_path <<<"$entry"
-    normalized_class="$(printf '%s' "$(trim_value "$class_name")" | tr '[:upper:]' '[:lower:]')"
-    if [[ "$normalized_class" == "$target_class" ]]; then
-      printf '%s|%s\n' "$(trim_value "$class_state")" "$class_path"
-      return 0
-    fi
-  done <<<"$parsed_entries"
-
-  return 1
+  while IFS= read -r sibling_folder; do
+    sibling_folder="$(trim_value "$sibling_folder")"
+    [[ -n "$sibling_folder" ]] || continue
+    IN_FLIGHT_FEATURE_FOLDERS+=("$sibling_folder")
+  done <<<"$sibling_features"
 }
 
-collect_ready_repo_targets() {
+collect_surface_targets() {
   local definition_path="$1"
+  local runtime_root="$2"
   local active_class=""
   local entry=""
   local state=""
-  local repo_path=""
   local normalized_state=""
-  local normalized_path=""
+  local ready_paths=""
   local resolved_path=""
+  local blueprint_rel=""
+  local synced_paths=()
 
   READY_REPO_CLASSES=()
   READY_REPO_PATHS=()
@@ -551,32 +374,46 @@ collect_ready_repo_targets() {
       *) continue ;;
     esac
 
-    if ! entry="$(find_class_repo_entry "$definition_path" "$active_class" 2>/dev/null)"; then
+    blueprint_rel="$PROJECT_ROOT/project_stack_blueprint_${active_class}.md"
+
+    if ! entry="$(class_repo_paths_find_entry "$definition_path" "$active_class" 2>/dev/null)"; then
       READY_REPO_NOTES+=("$active_class: missing class_repo_paths entry")
+      if [[ -f "$runtime_root/$blueprint_rel" ]]; then
+        READY_REPO_CLASSES+=("$active_class")
+        READY_REPO_PATHS+=("")
+      fi
       continue
     fi
 
-    IFS='|' read -r state repo_path <<<"$entry"
+    IFS='|' read -r state _repo_path <<<"$entry"
     normalized_state="$(printf '%s' "$(trim_value "$state")" | tr '[:upper:]' '[:lower:]')"
     if [[ "$normalized_state" != "ready" ]]; then
       READY_REPO_NOTES+=("$active_class: state is '$normalized_state', not ready")
+      if [[ -f "$runtime_root/$blueprint_rel" ]]; then
+        READY_REPO_CLASSES+=("$active_class")
+        READY_REPO_PATHS+=("")
+      fi
       continue
     fi
 
-    normalized_path="$(strip_quotes "$repo_path")"
-    if [[ -z "$normalized_path" ]]; then
-      READY_REPO_NOTES+=("$active_class: repo path is empty")
+    if ! ready_paths="$(class_repo_paths_collect_ready_paths "$definition_path" "$active_class" 2>&1)"; then
+      READY_REPO_NOTES+=("$active_class: $ready_paths")
+      if [[ -f "$runtime_root/$blueprint_rel" ]]; then
+        READY_REPO_CLASSES+=("$active_class")
+        READY_REPO_PATHS+=("")
+      fi
       continue
     fi
-    if [[ ! -d "$normalized_path" ]]; then
-      READY_REPO_NOTES+=("$active_class: repo path is not a directory: $normalized_path")
-      continue
-    fi
-    if ! resolved_path="$(cd "$normalized_path" && pwd -P)"; then
-      READY_REPO_NOTES+=("$active_class: failed to resolve repo path: $normalized_path")
+    if [[ -z "$ready_paths" ]]; then
+      READY_REPO_NOTES+=("$active_class: no ready repo path resolved")
       continue
     fi
 
+    IFS='|' read -r _resolved_class resolved_path <<<"$ready_paths"
+    if ! array_contains "$resolved_path" "${synced_paths[@]-}"; then
+      "$SYNC_REPO_TO_DEFAULT_BRANCH" "$resolved_path"
+      synced_paths+=("$resolved_path")
+    fi
     READY_REPO_CLASSES+=("$active_class")
     READY_REPO_PATHS+=("$resolved_path")
   done
@@ -588,7 +425,7 @@ collect_ready_repo_targets() {
       details="$details
 - $note"
     done
-    die "No ready repository paths found for active classes in $PROJECT_DEFINITION_FILE.${details}"
+    die "No ready repository paths or stack blueprints found for active classes in $PROJECT_DEFINITION_FILE.${details}"
   fi
 }
 
@@ -648,56 +485,6 @@ select_target_repo() {
   done
 }
 
-collect_type_a_targets() {
-  local definition_path="$1"
-  local runtime_root="$2"
-  local active_class=""
-  local entry=""
-  local state=""
-  local repo_path=""
-  local normalized_state=""
-  local normalized_path=""
-  local resolved_path=""
-  local class_repo_path=""
-  local blueprint_rel=""
-
-  READY_REPO_CLASSES=()
-  READY_REPO_PATHS=()
-
-  for active_class in "${PROJECT_CLASSES[@]}"; do
-    case "$active_class" in
-      backend|frontend|mobile) ;;
-      *) continue ;;
-    esac
-
-    blueprint_rel="$PROJECT_ROOT/project_stack_blueprint_${active_class}.md"
-    if [[ ! -f "$runtime_root/$blueprint_rel" ]]; then
-      die "Missing required blueprint for type A class $active_class: $blueprint_rel"
-    fi
-
-    class_repo_path=""
-    if entry="$(find_class_repo_entry "$definition_path" "$active_class" 2>/dev/null)"; then
-      IFS='|' read -r state repo_path <<<"$entry"
-      normalized_state="$(printf '%s' "$(trim_value "$state")" | tr '[:upper:]' '[:lower:]')"
-      if [[ "$normalized_state" == "ready" ]]; then
-        normalized_path="$(strip_quotes "$repo_path")"
-        if [[ -n "$normalized_path" && -d "$normalized_path" ]]; then
-          if resolved_path="$(cd "$normalized_path" && pwd -P 2>/dev/null)"; then
-            class_repo_path="$resolved_path"
-          fi
-        fi
-      fi
-    fi
-
-    READY_REPO_CLASSES+=("$active_class")
-    READY_REPO_PATHS+=("$class_repo_path")
-  done
-
-  if [[ ${#READY_REPO_CLASSES[@]} -eq 0 ]]; then
-    die "No active backend, frontend, or mobile classes found for type A project."
-  fi
-}
-
 configure_target_bindings() {
   case "$TARGET_REPO_CLASS" in
     backend)
@@ -736,6 +523,31 @@ render_selected_repo_context_line() {
   else
     printf '%s\n' "- $TARGET_REPO_CLASS: (no ready repository; blueprint evidence is primary planned structural evidence)"
   fi
+}
+
+render_in_flight_read_only_inputs() {
+  local sibling_folder=""
+
+  if [[ ${#IN_FLIGHT_FEATURE_FOLDERS[@]} -eq 0 ]]; then
+    return 0
+  fi
+
+  for sibling_folder in "${IN_FLIGHT_FEATURE_FOLDERS[@]}"; do
+    printf '\n  - %s/%s/implementation_plan.md' "$PROJECT_ROOT" "$sibling_folder"
+  done
+}
+
+render_in_flight_context_lines() {
+  local sibling_folder=""
+
+  if [[ ${#IN_FLIGHT_FEATURE_FOLDERS[@]} -eq 0 ]]; then
+    return 0
+  fi
+
+  printf '\n%s\n' "- In-flight promise evidence:"
+  for sibling_folder in "${IN_FLIGHT_FEATURE_FOLDERS[@]}"; do
+    printf '%s\n' "- In-flight plan source: $sibling_folder/implementation_plan.md"
+  done
 }
 
 load_model_config() {
@@ -794,24 +606,27 @@ success_line_for_target() {
 
 build_prompt() {
   local runtime_root="$1"
-  local project_type_code="$2"
   local quality_command="$TARGET_QUALITY_GATE_HELPER $PROJECT_SURFACE_MAP_FILE"
   local repo_context_line=""
   local failure_line=""
   local success_line=""
-  local type_a_read_only_input=""
-  local type_a_blueprint_context=""
+  local blueprint_read_only_input=""
+  local blueprint_context=""
+  local in_flight_read_only_inputs=""
+  local in_flight_context_lines=""
 
   repo_context_line="$(render_selected_repo_context_line)"
   failure_line="$(failure_line_for_target)"
   success_line="$(success_line_for_target)"
+  in_flight_read_only_inputs="$(render_in_flight_read_only_inputs)"
+  in_flight_context_lines="$(render_in_flight_context_lines)"
 
-  if [[ "$project_type_code" == "A" ]]; then
+  if [[ -n "$TARGET_BLUEPRINT_FILE" ]]; then
     local rel_blueprint="${TARGET_BLUEPRINT_FILE#"$runtime_root/"}"
-    type_a_read_only_input="
-  - $rel_blueprint (type A stack blueprint; planned structural evidence; per-field resolution chain in $RULE_FILE)"
-    type_a_blueprint_context="
-- Type A stack blueprint (planned structural evidence): $rel_blueprint"
+    blueprint_read_only_input="
+  - $rel_blueprint (stack blueprint fallback; planned structural evidence; per-field resolution chain in $RULE_FILE)"
+    blueprint_context="
+- Stack blueprint source: $rel_blueprint"
   fi
 
   cat <<EOF
@@ -825,7 +640,7 @@ Hard constraints:
 - Read these as input only and do not modify them:
   - $PROJECT_DEFINITION_FILE
   - $REQUIREMENTS_EARS_FILE
-  - $FEATURE_CONTRACT_DELTA_FILE${type_a_read_only_input}
+  - $FEATURE_CONTRACT_DELTA_FILE${blueprint_read_only_input}${in_flight_read_only_inputs}
 - Update only: $PROJECT_SURFACE_MAP_FILE
 - Use only the selected repository path listed below as scan scope.
 - Before finishing, ensure output can pass this quality gate command: $quality_command
@@ -848,12 +663,11 @@ Context:
 - ASDLC workspace root: $runtime_root
 - Project root: $PROJECT_ROOT
 - Feature root: $FEATURE_PATH
-- Project type code: $project_type_code
 - Project definition source: $PROJECT_DEFINITION_FILE
 - Requirements source: $REQUIREMENTS_EARS_FILE
 - Feature contract delta source: $FEATURE_CONTRACT_DELTA_FILE
 - Selected repository to scan:
-$repo_context_line${type_a_blueprint_context}
+$repo_context_line${blueprint_context}${in_flight_context_lines}
 - Target repo surface map artifact: $PROJECT_SURFACE_MAP_FILE
 - Rule file: $RULE_FILE
 - Template file: $TARGET_TEMPLATE_FILE
@@ -873,6 +687,62 @@ ensure_file_unchanged() {
   fi
 }
 
+collect_optional_read_only_inputs() {
+  local runtime_root="$1"
+  local sibling_folder=""
+  local relative_path=""
+  local full_path=""
+
+  OPTIONAL_READ_ONLY_PATHS=()
+  OPTIONAL_READ_ONLY_NAMES=()
+
+  if [[ -n "$TARGET_BLUEPRINT_FILE" ]]; then
+    relative_path="${TARGET_BLUEPRINT_FILE#"$runtime_root/"}"
+    OPTIONAL_READ_ONLY_PATHS+=("$TARGET_BLUEPRINT_FILE")
+    OPTIONAL_READ_ONLY_NAMES+=("$relative_path")
+  fi
+
+  if [[ ${#IN_FLIGHT_FEATURE_FOLDERS[@]} -gt 0 ]]; then
+    for sibling_folder in "${IN_FLIGHT_FEATURE_FOLDERS[@]}"; do
+      relative_path="$PROJECT_ROOT/$sibling_folder/implementation_plan.md"
+      full_path="$runtime_root/$relative_path"
+      [[ -f "$full_path" ]] || die "Required in-flight plan source not found: $relative_path"
+      OPTIONAL_READ_ONLY_PATHS+=("$full_path")
+      OPTIONAL_READ_ONLY_NAMES+=("$relative_path")
+    done
+  fi
+}
+
+snapshot_optional_read_only_inputs() {
+  local snapshot_dir="$1"
+  local idx=0
+  local snapshot_path=""
+
+  OPTIONAL_READ_ONLY_SNAPSHOTS=()
+
+  if [[ ${#OPTIONAL_READ_ONLY_PATHS[@]} -eq 0 ]]; then
+    return 0
+  fi
+
+  for idx in "${!OPTIONAL_READ_ONLY_PATHS[@]}"; do
+    snapshot_path="$snapshot_dir/optional-read-only-$idx"
+    cp "${OPTIONAL_READ_ONLY_PATHS[$idx]}" "$snapshot_path"
+    OPTIONAL_READ_ONLY_SNAPSHOTS+=("$snapshot_path")
+  done
+}
+
+ensure_optional_read_only_inputs_unchanged() {
+  local idx=0
+
+  if [[ ${#OPTIONAL_READ_ONLY_PATHS[@]} -eq 0 ]]; then
+    return 0
+  fi
+
+  for idx in "${!OPTIONAL_READ_ONLY_PATHS[@]}"; do
+    ensure_file_unchanged "${OPTIONAL_READ_ONLY_SNAPSHOTS[$idx]}" "${OPTIONAL_READ_ONLY_PATHS[$idx]}" "${OPTIONAL_READ_ONLY_NAMES[$idx]}"
+  done
+}
+
 main() {
   require_command awk
   require_command cmp
@@ -886,38 +756,35 @@ main() {
   local contract_delta_path=""
   local surface_map_path=""
   local models_path=""
-  local project_type_code=""
   local prompt_arg=""
   local before_definition=""
   local before_requirements=""
   local before_contract_delta=""
+  local optional_snapshot_dir=""
 
   runtime_root="$(ensure_staged_command_runtime)"
+  source_class_repo_paths_lib "$runtime_root"
+  resolve_sync_repo_helper "$runtime_root"
+  resolve_sibling_lister_helper "$runtime_root"
   resolve_feature_path "$runtime_root" "$FEATURE_PATH_INPUT"
   resolve_project_root
   set_common_artifact_paths
   ensure_common_required_files "$runtime_root"
+  collect_in_flight_plan_sources "$runtime_root"
 
   definition_path="$runtime_root/$PROJECT_DEFINITION_FILE"
   requirements_path="$runtime_root/$REQUIREMENTS_EARS_FILE"
   contract_delta_path="$runtime_root/$FEATURE_CONTRACT_DELTA_FILE"
   models_path="$runtime_root/$MODELS_FILE"
 
-  project_type_code="$(resolve_project_type_code "$definition_path")"
   resolve_project_classes "$definition_path"
-
-  if [[ "$project_type_code" != "A" && "$project_type_code" != "B" && "$project_type_code" != "C" ]]; then
-    fail_project_type_undefined
-  fi
-
-  if [[ "$project_type_code" == "A" ]]; then
-    collect_type_a_targets "$definition_path" "$runtime_root"
-    select_target_repo
+  collect_surface_targets "$definition_path" "$runtime_root"
+  select_target_repo
+  TARGET_BLUEPRINT_FILE=""
+  if [[ -f "$runtime_root/$PROJECT_ROOT/project_stack_blueprint_${TARGET_REPO_CLASS}.md" ]]; then
     TARGET_BLUEPRINT_FILE="$runtime_root/$PROJECT_ROOT/project_stack_blueprint_${TARGET_REPO_CLASS}.md"
-  else
-    collect_ready_repo_targets "$definition_path"
-    select_target_repo
   fi
+  collect_optional_read_only_inputs "$runtime_root"
   configure_target_bindings
   ensure_target_support_files "$runtime_root"
 
@@ -932,12 +799,14 @@ main() {
   before_definition="$(mktemp)"
   before_requirements="$(mktemp)"
   before_contract_delta="$(mktemp)"
+  optional_snapshot_dir="$(mktemp -d)"
   cp "$definition_path" "$before_definition"
   cp "$requirements_path" "$before_requirements"
   cp "$contract_delta_path" "$before_contract_delta"
-  trap '[[ -n "${before_definition:-}" ]] && rm -f "$before_definition"; [[ -n "${before_requirements:-}" ]] && rm -f "$before_requirements"; [[ -n "${before_contract_delta:-}" ]] && rm -f "$before_contract_delta"' EXIT
+  snapshot_optional_read_only_inputs "$optional_snapshot_dir"
+  trap '[[ -n "${before_definition:-}" ]] && rm -f "$before_definition"; [[ -n "${before_requirements:-}" ]] && rm -f "$before_requirements"; [[ -n "${before_contract_delta:-}" ]] && rm -f "$before_contract_delta"; [[ -n "${optional_snapshot_dir:-}" ]] && rm -rf "$optional_snapshot_dir"' EXIT
 
-  prompt_arg="$(build_prompt "$runtime_root" "$project_type_code")"
+  prompt_arg="$(build_prompt "$runtime_root")"
 
   local cmd=("$MODEL_CMD" -m "$MODEL_MODEL")
   if [[ ${#MODEL_ARGS[@]} -gt 0 ]]; then
@@ -957,6 +826,7 @@ main() {
   ensure_file_unchanged "$before_definition" "$definition_path" "$PROJECT_DEFINITION_FILE"
   ensure_file_unchanged "$before_requirements" "$requirements_path" "$REQUIREMENTS_EARS_FILE"
   ensure_file_unchanged "$before_contract_delta" "$contract_delta_path" "$FEATURE_CONTRACT_DELTA_FILE"
+  ensure_optional_read_only_inputs_unchanged
   echo "Updated $PROJECT_SURFACE_MAP_FILE"
 }
 

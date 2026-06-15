@@ -1121,6 +1121,220 @@ run_feature_script() {
   "$command_path" --feature_path "$FEATURE_PATH"
 }
 
+read_deferred_attach_candidate_classes() {
+  local definition_path="$1"
+
+  awk '
+    BEGIN { in_block = 0; current_class = "" }
+    /^  class_repo_paths:[[:space:]]*$/ {
+      in_block = 1
+      next
+    }
+    in_block && /^[^ ]/ {
+      in_block = 0
+      current_class = ""
+      next
+    }
+    in_block && /^    [a-z][a-zA-Z_]*:[[:space:]]*$/ {
+      line = $0
+      sub(/^    /, "", line)
+      sub(/:[[:space:]]*$/, "", line)
+      current_class = line
+      next
+    }
+    in_block && current_class != "" && /^      state: / {
+      line = $0
+      sub(/^[[:space:]]*state:[[:space:]]*/, "", line)
+      gsub(/^["'\'']|["'\'']$/, "", line)
+      if (line != "ready") {
+        print current_class
+      }
+    }
+  ' "$definition_path"
+}
+
+read_ready_reconciliation_candidate_classes() {
+  local definition_path="$1"
+
+  awk '
+    BEGIN { in_block = 0; current_class = "" }
+    /^  class_repo_paths:[[:space:]]*$/ {
+      in_block = 1
+      next
+    }
+    in_block && /^[^ ]/ {
+      in_block = 0
+      current_class = ""
+      next
+    }
+    in_block && /^    [a-z][a-zA-Z_]*:[[:space:]]*$/ {
+      line = $0
+      sub(/^    /, "", line)
+      sub(/:[[:space:]]*$/, "", line)
+      current_class = line
+      next
+    }
+    in_block && current_class != "" && /^      state: / {
+      line = $0
+      sub(/^[[:space:]]*state:[[:space:]]*/, "", line)
+      gsub(/^["'\'']|["'\'']$/, "", line)
+      if (line == "ready") {
+        print current_class
+      }
+    }
+  ' "$definition_path"
+}
+
+read_blueprint_planned_repo_path() {
+  local blueprint_path="$1"
+
+  awk '
+    BEGIN { in_meta = 0 }
+    /^## 1\. Meta[[:space:]]*$/ {
+      in_meta = 1
+      next
+    }
+    in_meta && /^## / {
+      exit 0
+    }
+    in_meta && /^[[:space:]]*-[[:space:]]*planned_repo_path:[[:space:]]*/ {
+      line = $0
+      sub(/^[[:space:]]*-[[:space:]]*planned_repo_path:[[:space:]]*/, "", line)
+      sub(/[[:space:]]+\(planned\)[[:space:]]*$/, "", line)
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", line)
+      gsub(/^["'\'']|["'\'']$/, "", line)
+      if (line != "" && line != "[UNFILLED]") {
+        print line
+      }
+      exit 0
+    }
+  ' "$blueprint_path"
+}
+
+is_scannable_git_repo_path() {
+  local repo_path="$1"
+  [[ -d "$repo_path" && -e "$repo_path/.git" ]]
+}
+
+run_contract_reconciliation_once() {
+  local runtime_root="$1"
+  local class_name="$2"
+  local project_abs_path="$runtime_root/$PROJECT_PATH"
+  local marker_path="$project_abs_path/.contract_reconciled_$class_name"
+  local command_path="$runtime_root/.commands/project_contract_reconciliation.sh"
+
+  [[ -f "$marker_path" ]] && return 0
+  [[ -x "$command_path" ]] || die "Required script not found or not executable: .commands/project_contract_reconciliation.sh"
+
+  "$command_path" --path "$project_abs_path"
+  : >"$marker_path"
+}
+
+attempt_class_repo_attach() {
+  local runtime_root="$1"
+  local class_name="$2"
+  local repo_path="$3"
+  local helper_path="$runtime_root/common_libs/persist_class_repo_attach.sh"
+  local helper_output=""
+  local helper_rc=0
+
+  [[ -x "$helper_path" ]] || die "Required command lib not found or not executable: common_libs/persist_class_repo_attach.sh"
+
+  set +e
+  helper_output="$("$helper_path" "$runtime_root/$PROJECT_PATH" "$class_name" "$repo_path" 2>&1)"
+  helper_rc=$?
+  set -e
+
+  if [[ "$helper_rc" -ne 0 ]]; then
+    printf '%s\n' "$helper_output" >&2
+    return "$helper_rc"
+  fi
+
+  return 0
+}
+
+prompt_attach_deferred_class_repo() {
+  local runtime_root="$1"
+  local class_name="$2"
+  local planned_repo_path="$3"
+  local input_fd="$4"
+  local answer=""
+  local retry_answer=""
+
+  printf "Class '%s' blueprint declares planned repo path %s and a scannable repository exists there. Attach it and switch this class to repo-backed (policy C: repo becomes authoritative; blueprint is consulted only for subsystems absent from the repo)? [y/n/other path]" "$class_name" "$planned_repo_path" >&2
+  if ! IFS= read -r answer <&"$input_fd"; then
+    return 0
+  fi
+
+  answer="$(trim_value "$answer")"
+  case "$(to_lower "$answer")" in
+    y|Y|yes|YES)
+      if attempt_class_repo_attach "$runtime_root" "$class_name" "$planned_repo_path"; then
+        run_contract_reconciliation_once "$runtime_root" "$class_name"
+      fi
+      return 0
+      ;;
+    n|N|no|NO)
+      return 0
+      ;;
+  esac
+
+  if attempt_class_repo_attach "$runtime_root" "$class_name" "$answer"; then
+    run_contract_reconciliation_once "$runtime_root" "$class_name"
+    return 0
+  fi
+
+  printf "Enter alternate repo path for class '%s' or leave blank to skip: " "$class_name" >&2
+  if ! IFS= read -r retry_answer <&"$input_fd"; then
+    return 0
+  fi
+
+  retry_answer="$(trim_value "$retry_answer")"
+  [[ -n "$retry_answer" ]] || return 0
+  if attempt_class_repo_attach "$runtime_root" "$class_name" "$retry_answer"; then
+    run_contract_reconciliation_once "$runtime_root" "$class_name"
+  fi
+}
+
+maybe_prompt_for_deferred_class_repo_attaches() {
+  local runtime_root="$1"
+  local project_abs_path="$runtime_root/$PROJECT_PATH"
+  local definition_path="$project_abs_path/init_progress_definition.yaml"
+  local class_name=""
+  local blueprint_path=""
+  local planned_repo_path=""
+
+  [[ -f "$definition_path" ]] || return 0
+
+  exec 9<&0
+  while IFS= read -r class_name; do
+    [[ -n "$class_name" ]] || continue
+    blueprint_path="$project_abs_path/project_stack_blueprint_$class_name.md"
+    [[ -f "$blueprint_path" ]] || continue
+
+    planned_repo_path="$(read_blueprint_planned_repo_path "$blueprint_path")"
+    [[ -n "$planned_repo_path" ]] || continue
+    is_scannable_git_repo_path "$planned_repo_path" || continue
+
+    prompt_attach_deferred_class_repo "$runtime_root" "$class_name" "$planned_repo_path" 9
+  done < <(read_deferred_attach_candidate_classes "$definition_path")
+  exec 9<&-
+}
+
+reconcile_ready_classes_missing_markers() {
+  local runtime_root="$1"
+  local project_abs_path="$runtime_root/$PROJECT_PATH"
+  local definition_path="$project_abs_path/init_progress_definition.yaml"
+  local class_name=""
+
+  [[ -f "$definition_path" ]] || return 0
+
+  while IFS= read -r class_name; do
+    [[ -n "$class_name" ]] || continue
+    run_contract_reconciliation_once "$runtime_root" "$class_name"
+  done < <(read_ready_reconciliation_candidate_classes "$definition_path")
+}
+
 run_scanner_and_get_next_step() {
   local runtime_root="$1"
   local scanner_path="$runtime_root/.commands/init_progress_scanner.sh"
@@ -1302,6 +1516,8 @@ main() {
   fi
   resolve_project_path "$RUNTIME_ROOT" "$TARGET_PATH_INPUT"
   PROJECT_TYPE_CODE="$(extract_project_type_code_from_definition "$RUNTIME_ROOT/$PROJECT_PATH/init_progress_definition.yaml")"
+  maybe_prompt_for_deferred_class_repo_attaches "$RUNTIME_ROOT"
+  reconcile_ready_classes_missing_markers "$RUNTIME_ROOT"
 
   local requested_phase=""
   if [[ -n "$RESUME_STEP_INPUT" ]]; then
