@@ -46,7 +46,7 @@ you can manualy run scripts for different steps after asdlc folder init, check
 - `state: "deferred"` — no repo attached; planning skips this class for scan-dependent steps and resolves from blueprint or placeholder.
 - `state: "ready"` — repo is attached and scannable; planning scans this class. Recorded alongside `path` (absolute filesystem path) and `policy` (see below).
 
-At feature start, `project_add_feature_e2e.sh` checks every deferred class: if the blueprint's `planned_repo_path` now holds a scannable git repository, it prompts the operator to attach it, transitioning the class to `ready` and recording `policy: "C"`.
+At feature start, `project_add_feature_e2e.sh` prompts for every deferred class. Entering a valid repo path attaches it, transitions the class to `ready`, and records `policy: "C"`; leaving the prompt blank keeps the class deferred. The operator-provided path is the only attach source.
 
 ### Policy C — divergence semantics
 

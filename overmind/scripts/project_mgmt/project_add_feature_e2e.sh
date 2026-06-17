@@ -1185,37 +1185,6 @@ read_ready_reconciliation_candidate_classes() {
   ' "$definition_path"
 }
 
-read_blueprint_planned_repo_path() {
-  local blueprint_path="$1"
-
-  awk '
-    BEGIN { in_meta = 0 }
-    /^## 1\. Meta[[:space:]]*$/ {
-      in_meta = 1
-      next
-    }
-    in_meta && /^## / {
-      exit 0
-    }
-    in_meta && /^[[:space:]]*-[[:space:]]*planned_repo_path:[[:space:]]*/ {
-      line = $0
-      sub(/^[[:space:]]*-[[:space:]]*planned_repo_path:[[:space:]]*/, "", line)
-      sub(/[[:space:]]+\(planned\)[[:space:]]*$/, "", line)
-      gsub(/^[[:space:]]+|[[:space:]]+$/, "", line)
-      gsub(/^["'\'']|["'\'']$/, "", line)
-      if (line != "" && line != "[UNFILLED]") {
-        print line
-      }
-      exit 0
-    }
-  ' "$blueprint_path"
-}
-
-is_scannable_git_repo_path() {
-  local repo_path="$1"
-  [[ -d "$repo_path" && -e "$repo_path/.git" ]]
-}
-
 run_contract_reconciliation_once() {
   local runtime_root="$1"
   local class_name="$2"
@@ -1256,35 +1225,24 @@ attempt_class_repo_attach() {
 prompt_attach_deferred_class_repo() {
   local runtime_root="$1"
   local class_name="$2"
-  local planned_repo_path="$3"
-  local input_fd="$4"
+  local input_fd="$3"
   local answer=""
   local retry_answer=""
 
-  printf "Class '%s' blueprint declares planned repo path %s and a scannable repository exists there. Attach it and switch this class to repo-backed (policy C: repo becomes authoritative; blueprint is consulted only for subsystems absent from the repo)? [y/n/other path]" "$class_name" "$planned_repo_path" >&2
+  printf "Class '%s' is blueprint-only. If its repo already exists, enter a valid path to attach it (policy C: repo becomes authoritative; blueprint is consulted only for subsystems absent from the repo); leave blank to keep it deferred." "$class_name" >&2
   if ! IFS= read -r answer <&"$input_fd"; then
     return 0
   fi
 
   answer="$(trim_value "$answer")"
-  case "$(to_lower "$answer")" in
-    y|Y|yes|YES)
-      if attempt_class_repo_attach "$runtime_root" "$class_name" "$planned_repo_path"; then
-        run_contract_reconciliation_once "$runtime_root" "$class_name"
-      fi
-      return 0
-      ;;
-    n|N|no|NO)
-      return 0
-      ;;
-  esac
+  [[ -n "$answer" ]] || return 0
 
   if attempt_class_repo_attach "$runtime_root" "$class_name" "$answer"; then
     run_contract_reconciliation_once "$runtime_root" "$class_name"
     return 0
   fi
 
-  printf "Enter alternate repo path for class '%s' or leave blank to skip: " "$class_name" >&2
+  printf "Class '%s' is blueprint-only. If its repo already exists, enter a valid path to attach it (policy C: repo becomes authoritative; blueprint is consulted only for subsystems absent from the repo); leave blank to keep it deferred." "$class_name" >&2
   if ! IFS= read -r retry_answer <&"$input_fd"; then
     return 0
   fi
@@ -1301,22 +1259,13 @@ maybe_prompt_for_deferred_class_repo_attaches() {
   local project_abs_path="$runtime_root/$PROJECT_PATH"
   local definition_path="$project_abs_path/init_progress_definition.yaml"
   local class_name=""
-  local blueprint_path=""
-  local planned_repo_path=""
 
   [[ -f "$definition_path" ]] || return 0
 
   exec 9<&0
   while IFS= read -r class_name; do
     [[ -n "$class_name" ]] || continue
-    blueprint_path="$project_abs_path/project_stack_blueprint_$class_name.md"
-    [[ -f "$blueprint_path" ]] || continue
-
-    planned_repo_path="$(read_blueprint_planned_repo_path "$blueprint_path")"
-    [[ -n "$planned_repo_path" ]] || continue
-    is_scannable_git_repo_path "$planned_repo_path" || continue
-
-    prompt_attach_deferred_class_repo "$runtime_root" "$class_name" "$planned_repo_path" 9
+    prompt_attach_deferred_class_repo "$runtime_root" "$class_name" 9
   done < <(read_deferred_attach_candidate_classes "$definition_path")
   exec 9<&-
 }

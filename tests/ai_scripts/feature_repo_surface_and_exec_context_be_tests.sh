@@ -604,7 +604,6 @@ seed_backend_blueprint() {
 - class: backend
 - repo_name: backend-repo
 - service_name: backend-api
-- planned_repo_path: /planned/repos/backend-repo
 - group_id: com.acme.backend
 - last_updated: 2026-06-15
 

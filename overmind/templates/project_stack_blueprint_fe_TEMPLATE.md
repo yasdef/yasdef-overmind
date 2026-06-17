@@ -4,7 +4,6 @@
 - class: frontend
 - repo_name: [UNFILLED]
 - service_name: [UNFILLED]
-- planned_repo_path: [UNFILLED]
 - group_id_or_package_root: [UNFILLED]
 - last_updated: [UNFILLED]
 
@@ -55,4 +54,3 @@
 - folder_paths: [UNFILLED]
 - archetypes: [UNFILLED]
 - user_reachable_pattern: [UNFILLED]
-

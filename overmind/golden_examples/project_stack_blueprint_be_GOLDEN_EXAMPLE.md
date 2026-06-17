@@ -4,7 +4,6 @@
 - class: backend
 - repo_name: payments-backend
 - service_name: payments-api
-- planned_repo_path: /planned/repos/payments-backend (planned)
 - group_id: com.acme.payments
 - last_updated: 2026-04-26
 

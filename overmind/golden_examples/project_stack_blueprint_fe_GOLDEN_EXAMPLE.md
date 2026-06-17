@@ -4,7 +4,6 @@
 - class: frontend
 - repo_name: payments-frontend
 - service_name: payments-admin
-- planned_repo_path: /planned/repos/payments-frontend (planned)
 - group_id_or_package_root: src
 - last_updated: 2026-04-26
 
@@ -55,4 +54,3 @@
 - folder_paths: src, test
 - archetypes: UnitTest, ComponentTest, ContractTest, E2ETest
 - user_reachable_pattern: none
-

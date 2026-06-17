@@ -30,6 +30,6 @@ Divergence policy recorded at attach time.
 
 ### Lifecycle
 
-Classes start `"deferred"` (blueprint-backed) and transition to `"ready"` (repo-backed) independently. At feature start, `project_add_feature_e2e.sh` checks every deferred class: if the blueprint's `planned_repo_path` holds a scannable git repository, it prompts the operator to attach it and records `policy: "C"`.
+Classes start `"deferred"` (blueprint-backed) and transition to `"ready"` (repo-backed) independently. At feature start, `project_add_feature_e2e.sh` prompts for every deferred class; a valid operator-provided repo path attaches the class and records `policy: "C"`, while blank input leaves it deferred.
 
 `project_type_code` records how the project started and is not read by feature-phase steps.

@@ -686,7 +686,6 @@ seed_frontend_blueprint() {
 - class: frontend
 - repo_name: frontend-repo
 - service_name: frontend-app
-- planned_repo_path: /planned/repos/frontend-repo
 - group_id: acme.frontend
 - last_updated: 2026-06-15
 
@@ -707,7 +706,6 @@ seed_mobile_blueprint() {
 - class: mobile
 - repo_name: mobile-repo
 - service_name: mobile-app
-- planned_repo_path: /planned/repos/mobile-repo
 - group_id: acme.mobile
 - last_updated: 2026-06-15
 
@@ -727,7 +725,6 @@ seed_backend_blueprint_fe() {
 - class: backend
 - repo_name: backend-repo
 - service_name: backend-api
-- planned_repo_path: /planned/repos/backend-repo
 - group_id: com.acme.backend
 - last_updated: 2026-06-15
 
