@@ -34,8 +34,9 @@ Must not own:
 - Update only `<TARGET_IMPLEMENTATION_SLICES_ARTIFACT>`.
 - Do not modify input artifacts.
 
-## Project Type Branching
-- If project type is `A`, `B`, or `C`: generate implementation slices from the provided artifacts.
+## Scope Handling
+- Generate implementation slices from the prompt-provided artifacts for the feature's active repo classes.
+- Treat `project_type_code` as historical metadata only; do not branch slice generation on it.
 
 ## Output Format Baseline
 - Use the prompt-provided template as structure contract.

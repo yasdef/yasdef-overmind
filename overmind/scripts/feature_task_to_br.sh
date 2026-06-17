@@ -269,11 +269,6 @@ prompt_epic_story_source_file() {
   done
 }
 
-extract_project_type_code() {
-  local feature_br_path="$1"
-  extract_required_meta_from_feature_br "$feature_br_path" "project_type_code" "project type code"
-}
-
 extract_optional_meta_from_feature_br() {
   local feature_br_path="$1"
   local target_key="$2"
@@ -471,14 +466,13 @@ load_model_config() {
 
 build_prompt() {
   local repo_root="$1"
-  local project_type_code="$2"
-  local feature_id="$3"
-  local feature_title="$4"
-  local epic_story_source_file="$5"
-  local epic_story="$6"
-  local request_summary="$7"
-  local extra_context="$8"
-  local jira_source_names="${9:-}"
+  local feature_id="$2"
+  local feature_title="$3"
+  local epic_story_source_file="$4"
+  local epic_story="$5"
+  local request_summary="$6"
+  local extra_context="$7"
+  local jira_source_names="${8:-}"
   local gate_command="$HELPER_SCRIPT $FEATURE_BR_FILE"
 
   cat <<EOF
@@ -496,7 +490,6 @@ Hard constraints:
 
 Context:
 - Repository root: $repo_root
-- Project type code: $project_type_code
 - Runtime path bindings are authoritative for this invocation.
 - Feature artifact root: $FEATURE_PATH
 - Feature ID: $feature_id
@@ -554,7 +547,6 @@ main() {
   local feature_br_path="$repo_root/$FEATURE_BR_FILE"
   local user_input_path="$repo_root/$USER_INPUT_FILE"
   local models_path="$repo_root/$MODELS_FILE"
-  local project_type_code=""
   local prompt_arg=""
   local feature_id_input=""
   local feature_title_input=""
@@ -567,7 +559,6 @@ main() {
   local request_summary_input=""
   local extra_context_input=""
 
-  project_type_code="$(extract_project_type_code "$feature_br_path")"
   feature_id_input="$(extract_optional_meta_from_feature_br "$feature_br_path" "feature_id")"
   feature_title_input="$(extract_optional_meta_from_feature_br "$feature_br_path" "feature_title")"
 
@@ -605,7 +596,6 @@ main() {
 
   prompt_arg="$(build_prompt \
     "$repo_root" \
-    "$project_type_code" \
     "$feature_id_input" \
     "$feature_title_input" \
     "$epic_story_source_rel" \

@@ -467,7 +467,7 @@ OUT
 
   local codex_prompt=""
   codex_prompt="$(cat "$capture_dir/codex_prompt.txt")"
-  assert_contains "$codex_prompt" "Project type code: A"
+  assert_not_contains "$codex_prompt" "Project type code:"
   assert_contains "$codex_prompt" "Use the applicable surface maps as the starting index and primary source for feature-scoped repository/class context."
   assert_contains "$codex_prompt" "Inspect other available evidence only where needed to confirm current behavior or gaps"
   assert_contains "$codex_prompt" "Do not present non-code, planned, or derived evidence as already implemented code."

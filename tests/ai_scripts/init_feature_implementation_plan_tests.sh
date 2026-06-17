@@ -618,7 +618,7 @@ OUT
 
   local codex_prompt=""
   codex_prompt="$(cat "$capture_dir/codex_prompt.txt")"
-  assert_contains "$codex_prompt" "Project type code: A"
+  assert_not_contains "$codex_prompt" "Project type code:"
   assert_contains "$codex_prompt" "Use projects/p1/feature-a/implementation_slices.md as the authoritative execution-slice discovery input from Step 8.1."
 }
 

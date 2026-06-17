@@ -36,8 +36,9 @@ Must not own:
 - Do not modify input artifacts.
 - Do not create or modify unrelated files.
 
-## Project Type Branching
-- If project type is `A`, `B`, or `C`: produce the plan from implementation slices, requirements, technical requirements, and contract delta.
+## Scope Handling
+- Produce the implementation plan from implementation slices, requirements, technical requirements, and contract delta for the feature's active repo classes.
+- Treat `project_type_code` as historical metadata only; do not branch plan generation on it.
 
 ## Output Format Baseline
 - Use the prompt-provided template as the structure contract.

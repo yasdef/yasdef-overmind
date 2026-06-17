@@ -827,7 +827,7 @@ test_fails_when_active_surface_map_missing() {
   assert_contains "$out" "Required surface-map artifacts not found for active repo classes: frontend"
 }
 
-test_type_a_repo_scaffold_readiness_finding_is_supported() {
+test_deferred_class_repo_scaffold_readiness_finding_is_supported() {
   local repo_dir="$TMP_ROOT/repo-scaffold-readiness"
   local capture_dir="$TMP_ROOT/capture-scaffold-readiness"
   mkdir -p "$repo_dir" "$capture_dir"
@@ -837,8 +837,8 @@ test_type_a_repo_scaffold_readiness_finding_is_supported() {
   cat >"$repo_dir/asdlc/projects/p1/init_progress_definition.yaml" <<'OUT'
 meta_info:
   project_id: "p1"
-  project_type_code: "A"
-  project_type_label: "New project"
+  project_type_code: "B"
+  project_type_label: "Existing project with partial context"
   project_classes:
     - backend
     - frontend
@@ -926,7 +926,7 @@ test_prompt_includes_surface_maps_when_present
 test_in_flight_surface_map_row_emits_overlap_finding
 test_no_in_flight_surface_map_rows_adds_no_overlap_finding
 test_fails_when_active_surface_map_missing
-test_type_a_repo_scaffold_readiness_finding_is_supported
+test_deferred_class_repo_scaffold_readiness_finding_is_supported
 test_terminal_delivered_surface_finding_requires_resolution_notes
 test_delivered_surface_finding_requires_requirement_link
 
