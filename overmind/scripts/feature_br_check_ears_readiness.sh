@@ -8,6 +8,7 @@ FEATURE_BR_FILE=""
 PRODUCT_DIR=""
 USER_INPUT_HELPER=".helper/check_task_to_br_quality.sh"
 REPO_HELPER=".helper/check_business_context_filled_from_repo.sh"
+PROJECT_DEFINITION_FILE=""
 
 die() {
   echo "ERROR: $*" >&2
@@ -109,14 +110,15 @@ set_artifact_paths() {
 
 ensure_required_files() {
   local runtime_root="$1"
-  local project_type_code="${2:-}"
+  local has_ready_class_repo_paths="${2:-false}"
   local required_paths=(
     "$FEATURE_BR_FILE"
     "$USER_INPUT_HELPER"
+    "common_libs/class_repo_paths.sh"
   )
   local relative_path=""
 
-  if [[ "$project_type_code" != "A" ]]; then
+  if [[ "$has_ready_class_repo_paths" == "true" ]]; then
     required_paths+=("$REPO_HELPER")
   fi
 
@@ -125,6 +127,55 @@ ensure_required_files() {
       die "Required file not found: $relative_path"
     fi
   done
+}
+
+resolve_project_definition_file() {
+  local runtime_root="$1"
+  local project_path=""
+
+  case "$FEATURE_PATH" in
+  */*)
+    project_path="${FEATURE_PATH%/*}"
+    ;;
+  *)
+    die "Feature path must be under a project folder: $FEATURE_PATH"
+    ;;
+  esac
+
+  PROJECT_DEFINITION_FILE="$project_path/init_progress_definition.yaml"
+  [[ -f "$runtime_root/$PROJECT_DEFINITION_FILE" ]] || die "Required file not found: $PROJECT_DEFINITION_FILE"
+}
+
+source_class_repo_paths_lib() {
+  local runtime_root="$1"
+  local lib_path="$runtime_root/common_libs/class_repo_paths.sh"
+
+  [[ -f "$lib_path" ]] || die "Required command lib not found: common_libs/class_repo_paths.sh"
+  # shellcheck source=/dev/null
+  source "$lib_path"
+}
+
+has_ready_class_repo_paths() {
+  local definition_path="$1"
+  local parsed_entries=""
+  local entry=""
+  local class_name=""
+  local class_state=""
+  local class_path=""
+
+  if ! parsed_entries="$(class_repo_paths_extract_entries "$definition_path" 2>/dev/null)"; then
+    die "Failed to read meta_info.class_repo_paths from $PROJECT_DEFINITION_FILE."
+  fi
+
+  while IFS= read -r entry; do
+    [[ -n "$entry" ]] || continue
+    IFS='|' read -r class_name class_state class_path <<<"$entry"
+    if [[ "$class_state" == "ready" ]]; then
+      return 0
+    fi
+  done <<<"$parsed_entries"
+
+  return 1
 }
 
 extract_meta_value() {
@@ -269,15 +320,19 @@ main() {
   local feature_br_path=""
   local user_input_helper_path=""
   local repo_helper_path=""
-  local project_type_code=""
+  local ready_class_repo_paths="false"
 
   runtime_root="$(ensure_staged_command_runtime)"
   resolve_feature_path "$runtime_root" "$FEATURE_PATH_INPUT"
   set_artifact_paths
+  resolve_project_definition_file "$runtime_root"
+  source_class_repo_paths_lib "$runtime_root"
+  if has_ready_class_repo_paths "$runtime_root/$PROJECT_DEFINITION_FILE"; then
+    ready_class_repo_paths="true"
+  fi
 
   feature_br_path="$runtime_root/$FEATURE_BR_FILE"
-  project_type_code="$(extract_meta_value "$feature_br_path" "project_type_code" 2>/dev/null || true)"
-  ensure_required_files "$runtime_root" "$project_type_code"
+  ensure_required_files "$runtime_root" "$ready_class_repo_paths"
   user_input_helper_path="$runtime_root/$USER_INPUT_HELPER"
   repo_helper_path="$runtime_root/$REPO_HELPER"
 
@@ -286,8 +341,8 @@ main() {
     "$feature_br_path" \
     "User-input business-context check failed."
 
-  if [[ "$project_type_code" == "A" ]]; then
-    echo "Skipping repository business-context readiness gate for type A project."
+  if [[ "$ready_class_repo_paths" != "true" ]]; then
+    echo "Skipping repository business-context readiness gate: no class_repo_paths entries have state ready."
   else
     run_helper_gate \
       "$repo_helper_path" \
