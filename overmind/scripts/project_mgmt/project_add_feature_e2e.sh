@@ -1323,8 +1323,25 @@ map_scanner_step_to_phase() {
   local normalized_name
   normalized_name="$(to_lower "$scanner_step_name")"
 
+  case "$scanner_step_number" in
+    3) printf '%s' "3"; return 0 ;;
+    4) printf '%s' "5"; return 0 ;;
+    4.1) printf '%s' "4.1"; return 0 ;;
+    4.2) printf '%s' "4.2"; return 0 ;;
+    5) printf '%s' "5"; return 0 ;;
+    5.1) printf '%s' "5.1"; return 0 ;;
+    6) printf '%s' "6"; return 0 ;;
+    7) printf '%s' "7"; return 0 ;;
+    7.1) printf '%s' "7.1"; return 0 ;;
+    8) printf '%s' "8"; return 0 ;;
+    8.1) printf '%s' "8.1"; return 0 ;;
+    8.2) printf '%s' "8.2"; return 0 ;;
+    8.3) printf '%s' "8.3"; return 0 ;;
+    8.4) printf '%s' "8.4"; return 0 ;;
+  esac
+
   case "$normalized_name" in
-    *"initialize and enrich business requirements structuring"*) printf '%s' "4.1"; return 0 ;;
+    *"initialize and enrich business requirements structuring"*) printf '%s' "3"; return 0 ;;
     *"scan repo"* ) printf '%s' "4.1"; return 0 ;;
     *"task to br"* ) printf '%s' "4.1"; return 0 ;;
     *"business requirements clarification"* ) printf '%s' "4.2"; return 0 ;;
@@ -1342,23 +1359,7 @@ map_scanner_step_to_phase() {
     *"implementation plan semantic review"*) printf '%s' "8.4"; return 0 ;;
   esac
 
-  case "$scanner_step_number" in
-    3) printf '%s' "4.1" ;;
-    4) printf '%s' "5" ;;
-    4.1) printf '%s' "4.1" ;;
-    4.2) printf '%s' "4.2" ;;
-    5) printf '%s' "5" ;;
-    5.1) printf '%s' "5.1" ;;
-    6) printf '%s' "6" ;;
-    7) printf '%s' "7" ;;
-    7.1) printf '%s' "7.1" ;;
-    8) printf '%s' "8" ;;
-    8.1) printf '%s' "8.1" ;;
-    8.2) printf '%s' "8.2" ;;
-    8.3) printf '%s' "8.3" ;;
-    8.4) printf '%s' "8.4" ;;
-    *) return 1 ;;
-  esac
+  return 1
 }
 
 map_resume_to_phase() {

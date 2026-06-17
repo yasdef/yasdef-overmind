@@ -1121,6 +1121,40 @@ test_default_resume_uses_scanner_next_step() {
   assert_not_contains "$log_content" "feature_br_scaffold.sh --path projects/project-a"
 }
 
+test_scanner_step_3_resumes_scaffold_before_br_enrichment() {
+  local asdlc_root="$TMP_ROOT/asdlc-step-3-resume"
+  local log_file="$TMP_ROOT/asdlc-step-3-resume.log"
+  mkdir -p "$asdlc_root"
+  setup_workspace "$asdlc_root"
+
+  mkdir -p "$asdlc_root/projects/project-a/feature-alpha"
+  printf 'feature_path=projects/project-a/feature-alpha\n' >"$asdlc_root/projects/project-a/.project_add_feature_e2e_state.env"
+
+  local out=""
+  out="$(
+    cd "$asdlc_root" &&
+    {
+      printf '2\n'
+      printf '1\n'
+      printf 'y\n'
+      printf 'y\n'
+      printf 'n\n'
+    } | TEST_LOG_FILE="$log_file" TEST_SCANNER_NEXT_LINE="next step: 3 (Initialize and Enrich Business Requirements Structuring)" \
+      .commands/project_add_feature_e2e.sh --path projects/project-a 2>&1
+  )"
+
+  assert_contains "$out" "Selected unfinished feature: projects/project-a/feature-alpha"
+  assert_contains "$out" "Phase 3 (Initialize and Enrich BR Structuring (scaffold)) script 1/1"
+  assert_contains "$out" "Phase 4.1 (BR Enrichment Part 1) script 1/1"
+  assert_contains "$out" "Execution stopped: user denied phase progression at 4.2."
+
+  local log_content
+  log_content="$(read_log "$log_file")"
+  assert_contains "$log_content" "feature_br_scaffold.sh --path projects/project-a"
+  assert_contains "$log_content" "feature_task_to_br.sh --feature_path projects/project-a/feature-alpha"
+  assert_not_contains "$log_content" "feature_scan_repo_for_br.sh --feature_path projects/project-a/feature-alpha"
+}
+
 test_scanner_step_1_1_fails_with_stack_blueprint_guidance() {
   local asdlc_root="$TMP_ROOT/asdlc-step-1-1-prereq"
   local log_file="$TMP_ROOT/asdlc-step-1-1-prereq.log"
@@ -1891,6 +1925,7 @@ test_split_4_1_and_4_2_execute_in_order_with_messages
 test_phase_4_1_skips_repo_scan_when_no_ready_class_repo_paths
 test_type_a_phase_4_1_runs_repo_scan_when_class_repo_path_ready
 test_default_resume_uses_scanner_next_step
+test_scanner_step_3_resumes_scaffold_before_br_enrichment
 test_scanner_step_1_1_fails_with_stack_blueprint_guidance
 test_scanner_step_2_fails_with_common_contract_guidance
 test_future_pre_feature_scanner_step_fails_with_generic_guidance
