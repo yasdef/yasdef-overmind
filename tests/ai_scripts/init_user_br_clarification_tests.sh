@@ -43,12 +43,12 @@ setup_workspace() {
   cp "$RULE_SRC" "$repo_dir/asdlc/.rules/user_br_clarification_rule.md"
   chmod +x "$repo_dir/asdlc/.commands/feature_user_br_clarification.sh"
 
-  cat >"$repo_dir/asdlc/.helper/check_task_to_br_quality.sh" <<'OUT'
+  cat >"$repo_dir/asdlc/.helper/check_user_br_clarification_quality.sh" <<'OUT'
 #!/usr/bin/env bash
 set -euo pipefail
 exit 0
 OUT
-  chmod +x "$repo_dir/asdlc/.helper/check_task_to_br_quality.sh"
+  chmod +x "$repo_dir/asdlc/.helper/check_user_br_clarification_quality.sh"
 
   cat >"$repo_dir/asdlc/.setup/models.md" <<'OUT'
 user_br_clarification | codex | gpt-5.4 | --config | model_reasoning_effort='high'
@@ -165,6 +165,23 @@ test_fails_when_feature_summary_missing() {
   assert_contains "$out" "Required file not found: projects/p1/feature-a/feature_br_summary.md"
 }
 
+test_fails_when_missing_data_artifact_missing() {
+  local repo_dir="$TMP_ROOT/repo-missing-data"
+  mkdir -p "$repo_dir"
+  setup_workspace "$repo_dir"
+  rm -f "$repo_dir/asdlc/projects/p1/feature-a/missing_br_data.md"
+
+  local status=0
+  local out=""
+  set +e
+  out="$(cd "$repo_dir/asdlc" && .commands/feature_user_br_clarification.sh --feature_path "projects/p1/feature-a" 2>&1)"
+  status=$?
+  set -e
+
+  assert_nonzero_status "$status"
+  assert_contains "$out" "Required missing-data artifact not found: projects/p1/feature-a/missing_br_data.md"
+}
+
 test_processes_unresolved_items() {
   local repo_dir="$TMP_ROOT/repo-success"
   local capture_dir="$TMP_ROOT/capture-success"
@@ -181,6 +198,7 @@ test_processes_unresolved_items() {
 
   assert_contains "$out" "Processed projects/p1/feature-a/missing_br_data.md via user BR clarification."
   assert_file_exists "$capture_dir/codex_prompt.txt"
+  assert_contains "$(cat "$capture_dir/codex_prompt.txt")" "Gate helper command: .helper/check_user_br_clarification_quality.sh projects/p1/feature-a/feature_br_summary.md"
   assert_contains "$(cat "$repo_dir/asdlc/projects/p1/feature-a/missing_br_data.md")" "rised=true"
 }
 
@@ -215,6 +233,7 @@ OUT
 test_requires_feature_path_argument
 test_requires_staged_location
 test_fails_when_feature_summary_missing
+test_fails_when_missing_data_artifact_missing
 test_processes_unresolved_items
 test_skips_when_only_template_example_mentions_rised_false
 

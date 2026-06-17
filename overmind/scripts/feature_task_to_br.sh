@@ -507,7 +507,7 @@ Context:
 - Business request summary: $request_summary
 - Additional business context: $extra_context
 - Target artifact: $FEATURE_BR_FILE
-- Missing-data artifact: $MISSING_DATA_FILE
+- Required missing-data artifact: $MISSING_DATA_FILE (create or refresh it even when no unresolved business gaps remain)
 - Task-to-BR gate helper command: $gate_command
 
 Instruction artifacts:
@@ -627,6 +627,10 @@ main() {
 
   if [[ ! -f "$feature_br_path" ]]; then
     die "Model run did not produce required file: $FEATURE_BR_FILE"
+  fi
+
+  if [[ ! -f "$repo_root/$MISSING_DATA_FILE" ]]; then
+    die "Model run did not produce required file: $MISSING_DATA_FILE"
   fi
 
   echo "Updated $FEATURE_BR_FILE"

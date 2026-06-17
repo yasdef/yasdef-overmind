@@ -104,6 +104,7 @@ STAGED_HELPER_FILES=(
   "check_requirements_ears_review_quality.sh"
   "check_requirements_ears_quality.sh"
   "check_task_to_br_quality.sh"
+  "check_user_br_clarification_quality.sh"
 )
 STAGED_SETUP_FILES=(
   "external_sources.yaml"
@@ -701,6 +702,7 @@ test_first_init_machine_bootstraps_asdlc_workspace_with_local_template() {
   assert_contains "$(cat "$asdlc_root/.commands/feature_scan_repo_for_br.sh")" 'RULE_FILE=".rules/repo_br_scan_rule.md"'
   assert_contains "$(cat "$asdlc_root/.commands/feature_task_to_br.sh")" 'HELPER_SCRIPT=".helper/check_task_to_br_quality.sh"'
   assert_contains "$(cat "$asdlc_root/.commands/feature_user_br_clarification.sh")" 'RULE_FILE=".rules/user_br_clarification_rule.md"'
+  assert_contains "$(cat "$asdlc_root/.commands/feature_user_br_clarification.sh")" 'HELPER_SCRIPT=".helper/check_user_br_clarification_quality.sh"'
   assert_contains "$(cat "$asdlc_root/.commands/feature_br_check_ears_readiness.sh")" 'REPO_HELPER=".helper/check_business_context_filled_from_repo.sh"'
   assert_contains "$(cat "$asdlc_root/.commands/feature_br_to_ears.sh")" 'QUALITY_GATE_HELPER=".helper/check_requirements_ears_quality.sh"'
   assert_contains "$(cat "$asdlc_root/.commands/feature_requirements_ears_review.sh")" 'RULE_FILE=".rules/requirements_ears_review_rule.md"'
@@ -934,6 +936,7 @@ test_first_init_machine_update_mode_repairs_missing_commands_without_overwriting
   assert_contains "$(cat "$scan_repo_cmd_path")" 'RULE_FILE=".rules/repo_br_scan_rule.md"'
   assert_contains "$(cat "$task_to_br_cmd_path")" 'HELPER_SCRIPT=".helper/check_task_to_br_quality.sh"'
   assert_contains "$(cat "$user_br_clarification_cmd_path")" 'RULE_FILE=".rules/user_br_clarification_rule.md"'
+  assert_contains "$(cat "$user_br_clarification_cmd_path")" 'HELPER_SCRIPT=".helper/check_user_br_clarification_quality.sh"'
   assert_contains "$(cat "$br_check_ears_readiness_cmd_path")" 'REPO_HELPER=".helper/check_business_context_filled_from_repo.sh"'
   assert_contains "$(cat "$br_to_ears_cmd_path")" 'QUALITY_GATE_HELPER=".helper/check_requirements_ears_quality.sh"'
   assert_contains "$(cat "$feature_requirements_ears_review_cmd_path")" 'RULE_FILE=".rules/requirements_ears_review_rule.md"'
@@ -1141,6 +1144,7 @@ test_first_init_machine_update_mode_recreates_commands_directory_when_missing() 
   assert_contains "$(cat "$asdlc_root/.commands/feature_scan_repo_for_br.sh")" 'RULE_FILE=".rules/repo_br_scan_rule.md"'
   assert_contains "$(cat "$asdlc_root/.commands/feature_task_to_br.sh")" 'HELPER_SCRIPT=".helper/check_task_to_br_quality.sh"'
   assert_contains "$(cat "$asdlc_root/.commands/feature_user_br_clarification.sh")" 'RULE_FILE=".rules/user_br_clarification_rule.md"'
+  assert_contains "$(cat "$asdlc_root/.commands/feature_user_br_clarification.sh")" 'HELPER_SCRIPT=".helper/check_user_br_clarification_quality.sh"'
   assert_contains "$(cat "$asdlc_root/.commands/feature_br_check_ears_readiness.sh")" 'REPO_HELPER=".helper/check_business_context_filled_from_repo.sh"'
   assert_contains "$(cat "$asdlc_root/.commands/feature_br_to_ears.sh")" 'QUALITY_GATE_HELPER=".helper/check_requirements_ears_quality.sh"'
   assert_contains "$(cat "$asdlc_root/.commands/feature_requirements_ears_review.sh")" 'RULE_FILE=".rules/requirements_ears_review_rule.md"'
@@ -1184,6 +1188,7 @@ test_first_init_machine_update_mode_recreates_support_asset_directories_when_mis
   assert_contains "$out" "Update mode added file: $asdlc_root/.templates/common_contract_definition_TEMPLATE.md"
   assert_contains "$out" "Update mode added file: $asdlc_root/.golden_examples/feature_contract_delta_GOLDEN_EXAMPLE.md"
   assert_contains "$out" "Update mode added file: $asdlc_root/.helper/check_task_to_br_quality.sh"
+  assert_contains "$out" "Update mode added file: $asdlc_root/.helper/check_user_br_clarification_quality.sh"
   assert_contains "$out" "Update mode added file: $asdlc_root/.setup/models.md"
   assert_contains "$out" "Update mode added file: $asdlc_root/.templates/init_progress_definition_TEMPLATE.yaml"
   assert_contains "$out" "ASDLC workspace update completed: $asdlc_root"

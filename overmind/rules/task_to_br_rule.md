@@ -24,6 +24,7 @@ Task-to-BR decomposition contract for runtime BR artifacts
 12. Ambiguity triggers (for example: "fast", "better", "simple", "as needed", "TBD", "etc.") MUST be converted into explicit follow-up business questions and tracked as unresolved ledger items.
 13. Do not write generic placeholder FR/BR content. If a requirement/rule is not specific and traceable to user input, keep it `[UNFILLED]` and track the gap in `<MISSING_DATA_ARTIFACT>`.
 14. If the source is Jira, persist the fetched story/request text into `<CAPTURED_USER_INPUT_ARTIFACT>` before finishing so downstream phases retain the actual source narrative.
+15. Always create or refresh `<MISSING_DATA_ARTIFACT>`, even when no unresolved business gaps are found.
 
 ## Gate Command
 Run from repository root after each extraction round:
@@ -46,7 +47,7 @@ Exit codes:
      - `## 14. Assumptions -> ### Needs validation -> assumptions_needing_validation`
      - `## 15. Open Questions`
      - `### 5.3 Open scope boundaries -> unclear_scope_points`
-     into `missing_br_data.md` ledger with deterministic `rised_item_N` markers.
+     into `missing_br_data.md` ledger with deterministic `rised_item_N` markers and `rised=false`.
    - For every newly created `rised_item_N`, set `rised=false` (not yet discussed with user).
    - Set moved source BR values in `<TARGET_BR_ARTIFACT>` to `[UNFILLED]`.
    - Set `## 7. Loop Decision -> unresolved_after_stop` to a concise summary of unresolved business gaps.
@@ -57,6 +58,11 @@ Exit codes:
 6. If stopping without pass:
    - keep unresolved items clearly marked in `missing_br_data.md`
    - set `unresolved_after_stop` to a concise unresolved summary.
+7. If no unresolved gaps remain:
+   - keep `## 2. Missing Business Fields` as `- none`
+   - keep `## 3. Unresolved Items Ledger (Rised)` empty
+   - keep `## 6. Latest User Answers -> answers` as `[UNFILLED]`
+   - set `## 7. Loop Decision -> unresolved_after_stop` to `none`
 
 ## Deterministic Ledger Markers
 - Unresolved entries:
@@ -82,7 +88,8 @@ Exit codes:
 - `### Needs validation -> assumptions_needing_validation` has no unresolved non-`rised` value.
 - `## 15. Open Questions` has no unresolved non-`rised` value.
 - `### 5.3 Open scope boundaries -> unclear_scope_points` has no unresolved non-`rised` value.
-- If `missing_br_data.md` contains unresolved `rised_item_N` entries, `## 7. Loop Decision -> unresolved_after_stop` is filled.
+- If `missing_br_data.md` contains unresolved `rised_item_N` entries, each entry has `rised=false` or `rised=true`, and `## 7. Loop Decision -> unresolved_after_stop` is filled.
+- `missing_br_data.md` exists for every completed task-to-BR run.
 - FR/BR lines are concrete and input-traceable; generic/buzzword-only placeholders are not accepted.
 - Every populated value is business-readable and traceable to user input.
 

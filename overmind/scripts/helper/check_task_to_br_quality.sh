@@ -61,9 +61,6 @@ main() {
 
   local missing_data_path=""
   missing_data_path="$(dirname "$target_path")/missing_br_data.md"
-  if [[ ! -f "$missing_data_path" ]]; then
-    missing_data_path=""
-  fi
 
   local user_input_path=""
   user_input_path="$(dirname "$target_path")/user_br_input.md"
@@ -76,6 +73,12 @@ main() {
   if ! captured_user_input_has_story_content "$user_input_path"; then
     echo "business-context gate failed"
     echo "missing: user_br_input.md -> epic_or_story must contain actual source story/request content"
+    exit 1
+  fi
+
+  if [[ ! -f "$missing_data_path" ]]; then
+    echo "business-context gate failed"
+    echo "missing: missing_br_data.md must exist; create it with an empty unresolved ledger when no business gaps remain"
     exit 1
   fi
 
@@ -126,7 +129,8 @@ BEGIN {
   non_rised_open_questions_found = 0
   non_rised_scope_points_found = 0
   md_has_rised_items = 0
-  md_has_non_rised_items = 0
+  md_has_rised_true_items = 0
+  md_has_invalid_rised_items = 0
   md_in_unresolved_ledger = 0
   md_in_latest_answers = 0
   md_in_loop_decision = 0
@@ -244,9 +248,11 @@ END {
         md_has_rised_items = 1
         md_lowered = tolower(md_line)
         if (md_lowered ~ /rised[[:space:]]*=[[:space:]]*false/ || md_lowered ~ /rised:[[:space:]]*false/) {
-          md_has_non_rised_items = 1
+          # Valid pending clarification state for task-to-BR.
         } else if (md_lowered !~ /rised[[:space:]]*=[[:space:]]*true/ && md_lowered !~ /rised:[[:space:]]*true/) {
-          md_has_non_rised_items = 1
+          md_has_invalid_rised_items = 1
+        } else {
+          md_has_rised_true_items = 1
         }
       }
 
@@ -313,22 +319,22 @@ END {
   }
 
   if (non_rised_open_questions_found) {
-    add_missing("## 15. Open Questions -> non-rised unresolved items must be moved to missing_br_data.md and marked rised")
+    add_missing("## 15. Open Questions -> unresolved items must be moved to missing_br_data.md as rised_item_N with rised=false")
   }
 
   if (non_rised_assumptions_needing_validation_found) {
-    add_missing("### Needs validation -> non-rised assumptions_needing_validation must be moved to missing_br_data.md and marked rised")
+    add_missing("### Needs validation -> unresolved assumptions_needing_validation must be moved to missing_br_data.md as rised_item_N with rised=false")
   }
 
   if (non_rised_scope_points_found) {
-    add_missing("### 5.3 Open scope boundaries -> non-rised unclear_scope_points must be moved to missing_br_data.md and marked rised")
+    add_missing("### 5.3 Open scope boundaries -> unresolved unclear_scope_points must be moved to missing_br_data.md as rised_item_N with rised=false")
   }
 
   if (md_has_rised_items) {
-    if (md_has_non_rised_items) {
-      add_missing("missing_br_data.md -> unresolved ledger contains non-rised items; continue questioning until every rised_item_N is rised=true")
+    if (md_has_invalid_rised_items) {
+      add_missing("missing_br_data.md -> every unresolved ledger item must include rised=false or rised=true")
     }
-    if (!md_answers_found || is_unfilled(md_answers_value)) {
+    if (md_has_rised_true_items && (!md_answers_found || is_unfilled(md_answers_value))) {
       add_missing("missing_br_data.md -> unresolved rised items exist but ## 6. Latest User Answers -> answers is [UNFILLED]")
     }
     if (!md_unresolved_after_stop_found || is_unfilled(md_unresolved_after_stop_value)) {

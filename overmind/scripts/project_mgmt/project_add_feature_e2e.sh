@@ -1234,7 +1234,7 @@ prompt_attach_deferred_class_repo() {
   local answer=""
   local retry_answer=""
 
-  printf "Class '%s' is blueprint-only. If its repo already exists, enter a valid path to attach it (policy C: repo becomes authoritative; blueprint is consulted only for subsystems absent from the repo); leave blank to keep it deferred." "$class_name" >&2
+  printf "Class '%s' is blueprint-only. If its repo already exists, enter a valid path to attach it (policy C: repo becomes authoritative; blueprint is consulted only for subsystems absent from the repo); leave blank to keep it deferred.\n" "$class_name" >&2
   if ! IFS= read -r answer <&"$input_fd"; then
     return 0
   fi
@@ -1247,7 +1247,7 @@ prompt_attach_deferred_class_repo() {
     return 0
   fi
 
-  printf "Class '%s' is blueprint-only. If its repo already exists, enter a valid path to attach it (policy C: repo becomes authoritative; blueprint is consulted only for subsystems absent from the repo); leave blank to keep it deferred." "$class_name" >&2
+  printf "Class '%s' is blueprint-only. If its repo already exists, enter a valid path to attach it (policy C: repo becomes authoritative; blueprint is consulted only for subsystems absent from the repo); leave blank to keep it deferred.\n" "$class_name" >&2
   if ! IFS= read -r retry_answer <&"$input_fd"; then
     return 0
   fi

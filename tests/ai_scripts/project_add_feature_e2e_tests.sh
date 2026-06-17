@@ -636,6 +636,8 @@ test_deferred_class_prompt_invalid_path_reprompts_once_then_attaches() {
   )"
 
   assert_contains "$out" "Repo path is not a directory: $invalid_repo"
+  assert_contains "$out" $'leave blank to keep it deferred.\nERROR: Repo path is not a directory:'
+  assert_contains "$out" $'ERROR: Repo path is not a directory: '"$invalid_repo"$'\nClass '\''backend'\'' is blueprint-only.'
   assert_contains "$out" "Class 'backend' is blueprint-only."
   assert_equal "ready" "$(read_backend_definition_field "$asdlc_root/projects/project-a/init_progress_definition.yaml" "state")"
   assert_equal "$retry_repo" "$(read_backend_definition_field "$asdlc_root/projects/project-a/init_progress_definition.yaml" "path")"

@@ -119,6 +119,7 @@ STAGED_HELPER_FILES=(
   "check_requirements_ears_review_quality.sh"
   "check_requirements_ears_quality.sh"
   "check_task_to_br_quality.sh"
+  "check_user_br_clarification_quality.sh"
 )
 STAGED_SETUP_FILES=(
   "external_sources.yaml"

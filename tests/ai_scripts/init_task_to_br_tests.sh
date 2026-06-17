@@ -159,6 +159,22 @@ cat >"$feature_root/feature_br_summary.md" <<'DOC'
 - last_updated: 2026-04-06
 - ready_to_ears: false
 DOC
+if [[ "${TEST_OMIT_MISSING_DATA:-0}" != "1" ]]; then
+  cat >"$feature_root/missing_br_data.md" <<'DOC'
+# Missing Business Data
+
+## 2. Missing Business Fields
+- none
+
+## 3. Unresolved Items Ledger (Rised)
+
+## 6. Latest User Answers
+- answers: [UNFILLED]
+
+## 7. Loop Decision
+- unresolved_after_stop: none
+DOC
+fi
 OUT
   chmod +x "$repo_dir/bin/codex"
 }
@@ -227,12 +243,37 @@ test_updates_feature_with_user_input() {
     cd "$repo_dir/asdlc"
     printf "1\nepic_story_input.md\n" | \
       PATH="$repo_dir/bin:$PATH" TEST_CAPTURE_DIR="$capture_dir" TEST_FEATURE_ROOT="$repo_dir/asdlc/projects/p1/feature-a" \
-      .commands/feature_task_to_br.sh --feature_path "projects/p1/feature-a"
+      .commands/feature_task_to_br.sh --feature_path "projects/p1/feature-a" 2>&1
   )"
 
   assert_contains "$out" "Updated projects/p1/feature-a/feature_br_summary.md"
   assert_file_exists "$repo_dir/asdlc/projects/p1/feature-a/user_br_input.md"
+  assert_file_exists "$repo_dir/asdlc/projects/p1/feature-a/missing_br_data.md"
   assert_contains "$(cat "$capture_dir/codex_prompt.txt")" "Target artifact: projects/p1/feature-a/feature_br_summary.md"
+}
+
+test_fails_when_model_omits_missing_data_artifact() {
+  local repo_dir="$TMP_ROOT/repo-missing-data-omitted"
+  local capture_dir="$TMP_ROOT/capture-missing-data-omitted"
+  mkdir -p "$repo_dir" "$capture_dir"
+  setup_workspace "$repo_dir"
+  setup_codex_stub "$repo_dir"
+
+  local status=0
+  local out=""
+  set +e
+  out="$(
+    cd "$repo_dir/asdlc"
+    printf "1\nepic_story_input.md\n" | \
+      PATH="$repo_dir/bin:$PATH" TEST_CAPTURE_DIR="$capture_dir" TEST_FEATURE_ROOT="$repo_dir/asdlc/projects/p1/feature-a" \
+      TEST_OMIT_MISSING_DATA=1 \
+      .commands/feature_task_to_br.sh --feature_path "projects/p1/feature-a" 2>&1
+  )"
+  status=$?
+  set -e
+
+  assert_nonzero_status "$status"
+  assert_contains "$out" "Model run did not produce required file: projects/p1/feature-a/missing_br_data.md"
 }
 
 test_file_path_option_preserves_existing_behaviour() {
@@ -423,6 +464,20 @@ cat >"$feature_root/feature_br_summary.md" <<'DOC'
   type: api_spec
   locator: https://confluence.example.com/api-spec
 DOC
+cat >"$feature_root/missing_br_data.md" <<'DOC'
+# Missing Business Data
+
+## 2. Missing Business Fields
+- none
+
+## 3. Unresolved Items Ledger (Rised)
+
+## 6. Latest User Answers
+- answers: [UNFILLED]
+
+## 7. Loop Decision
+- unresolved_after_stop: none
+DOC
 OUT
   chmod +x "$repo_dir/bin/codex"
 
@@ -489,6 +544,20 @@ cat >"$feature_root/feature_br_summary.md" <<'DOC'
 ## 16. Linked Artifacts
 
 DOC
+cat >"$feature_root/missing_br_data.md" <<'DOC'
+# Missing Business Data
+
+## 2. Missing Business Fields
+- none
+
+## 3. Unresolved Items Ledger (Rised)
+
+## 6. Latest User Answers
+- answers: [UNFILLED]
+
+## 7. Loop Decision
+- unresolved_after_stop: none
+DOC
 OUT
   chmod +x "$repo_dir/bin/codex"
 
@@ -509,6 +578,7 @@ test_requires_feature_path_argument
 test_requires_staged_location
 test_fails_when_feature_summary_missing
 test_updates_feature_with_user_input
+test_fails_when_model_omits_missing_data_artifact
 test_file_path_option_preserves_existing_behaviour
 test_jira_mcp_option_with_matching_source
 test_jira_mcp_option_with_no_matching_source
