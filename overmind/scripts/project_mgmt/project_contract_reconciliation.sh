@@ -283,6 +283,7 @@ Hard constraints:
 - If the operator approves no corrections, leave $target_artifact_path unchanged.
 - Do not modify $project_definition_path.
 - Do not modify any attached repository source files.
+- When contract reconciliation is fully complete, end your final response with this exact last line: "Contract reconciliation phase is finished. Nothing else to do now; press Ctrl-C so orchestrator can start the next phase"
 
 Context:
 - Runtime root: $runtime_root

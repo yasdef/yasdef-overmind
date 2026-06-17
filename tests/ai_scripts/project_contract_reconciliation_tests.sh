@@ -255,6 +255,7 @@ test_runs_codex_with_contract_and_ready_repo_context_and_commits() {
   prompt="$(cat "$capture_dir/codex_prompt.txt")"
   assert_contains "$prompt" "Read the current documented contract from projects/p1/common_contract_definition.md"
   assert_contains "$prompt" "Write back only operator-approved corrections to projects/p1/common_contract_definition.md"
+  assert_contains "$prompt" 'When contract reconciliation is fully complete, end your final response with this exact last line: "Contract reconciliation phase is finished. Nothing else to do now; press Ctrl-C so orchestrator can start the next phase"'
   assert_contains "$prompt" "Current common contract definition: projects/p1/common_contract_definition.md"
   assert_contains "$prompt" "- backend: $backend_repo"
   assert_not_contains "$prompt" "- frontend: $frontend_repo"
