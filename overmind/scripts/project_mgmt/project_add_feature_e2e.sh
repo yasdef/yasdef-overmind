@@ -1188,6 +1188,7 @@ read_ready_reconciliation_candidate_classes() {
 run_contract_reconciliation_once() {
   local runtime_root="$1"
   local class_name="$2"
+  local input_fd="${3:-}"
   local project_abs_path="$runtime_root/$PROJECT_PATH"
   local marker_path="$project_abs_path/.contract_reconciled_$class_name"
   local command_path="$runtime_root/.commands/project_contract_reconciliation.sh"
@@ -1195,7 +1196,11 @@ run_contract_reconciliation_once() {
   [[ -f "$marker_path" ]] && return 0
   [[ -x "$command_path" ]] || die "Required script not found or not executable: .commands/project_contract_reconciliation.sh"
 
-  "$command_path" --path "$project_abs_path"
+  if [[ -n "$input_fd" ]]; then
+    "$command_path" --path "$project_abs_path" <&"$input_fd"
+  else
+    "$command_path" --path "$project_abs_path"
+  fi
   : >"$marker_path"
 }
 
@@ -1238,7 +1243,7 @@ prompt_attach_deferred_class_repo() {
   [[ -n "$answer" ]] || return 0
 
   if attempt_class_repo_attach "$runtime_root" "$class_name" "$answer"; then
-    run_contract_reconciliation_once "$runtime_root" "$class_name"
+    run_contract_reconciliation_once "$runtime_root" "$class_name" "$input_fd"
     return 0
   fi
 
@@ -1250,7 +1255,7 @@ prompt_attach_deferred_class_repo() {
   retry_answer="$(trim_value "$retry_answer")"
   [[ -n "$retry_answer" ]] || return 0
   if attempt_class_repo_attach "$runtime_root" "$class_name" "$retry_answer"; then
-    run_contract_reconciliation_once "$runtime_root" "$class_name"
+    run_contract_reconciliation_once "$runtime_root" "$class_name" "$input_fd"
   fi
 }
 

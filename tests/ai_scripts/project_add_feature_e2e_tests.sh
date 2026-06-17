@@ -374,6 +374,13 @@ while [[ $# -gt 0 ]]; do
 done
 
 printf '%s --path %s\n' "$(basename "$0")" "$project_path" >>"$log_file"
+if [[ "${TEST_RECONCILIATION_READ_STDIN:-0}" == "1" ]]; then
+  if IFS= read -r reconciliation_stdin; then
+    printf 'reconciliation stdin: %s\n' "$reconciliation_stdin" >>"$log_file"
+  else
+    printf 'reconciliation stdin: <eof>\n' >>"$log_file"
+  fi
+fi
 if [[ "${TEST_FAIL_RECONCILIATION:-0}" == "1" ]]; then
   echo "simulated reconciliation failure" >&2
   exit 17
@@ -683,6 +690,32 @@ test_deferred_class_attach_skips_reconciliation_when_marker_exists() {
   assert_contains "$out" "Class 'backend' is blueprint-only."
   assert_equal "ready" "$(read_backend_definition_field "$asdlc_root/projects/project-a/init_progress_definition.yaml" "state")"
   assert_not_contains "$(cat "$log_file")" "project_contract_reconciliation.sh"
+}
+
+test_deferred_class_reconciliation_inherits_prompt_input_stream() {
+  local asdlc_root="$TMP_ROOT/asdlc-attach-reconciliation-stdin"
+  local log_file="$TMP_ROOT/asdlc-attach-reconciliation-stdin.log"
+  local repo_path="$TMP_ROOT/reconciliation-stdin-backend-repo"
+  mkdir -p "$asdlc_root" "$repo_path"
+  setup_workspace "$asdlc_root"
+  setup_git_repo "$repo_path"
+  write_project_definition_with_backend_deferred "$asdlc_root/projects/project-a"
+  write_backend_blueprint "$asdlc_root/projects/project-a"
+
+  local out=""
+  out="$(
+    cd "$asdlc_root" &&
+    {
+      printf '%s\n' "$repo_path"
+      printf 'sentinel-from-prompt-stream\n'
+      printf 'y\n'
+    } | TEST_LOG_FILE="$log_file" TEST_RECONCILIATION_READ_STDIN=1 TEST_SCAFFOLD_FEATURE_REL="projects/project-a/feature-alpha" TEST_SCANNER_NEXT_LINE="next step: none" \
+      .commands/project_add_feature_e2e.sh --path projects/project-a 2>&1
+  )"
+
+  assert_contains "$out" "Class 'backend' is blueprint-only."
+  assert_equal "ready" "$(read_backend_definition_field "$asdlc_root/projects/project-a/init_progress_definition.yaml" "state")"
+  assert_contains "$(cat "$log_file")" "reconciliation stdin: sentinel-from-prompt-stream"
 }
 
 test_ready_class_without_reconciliation_marker_retries_on_next_run() {
@@ -1779,6 +1812,7 @@ test_deferred_class_prompt_without_blueprint_attaches_repo
 test_deferred_class_prompt_invalid_path_reprompts_once_then_attaches
 test_deferred_class_invalid_path_then_blank_leaves_class_deferred
 test_deferred_class_attach_skips_reconciliation_when_marker_exists
+test_deferred_class_reconciliation_inherits_prompt_input_stream
 test_ready_class_without_reconciliation_marker_retries_on_next_run
 test_attach_reconciliation_failure_does_not_prompt_for_another_path
 test_without_path_uses_only_project_in_workspace
