@@ -724,10 +724,10 @@ phase_scripts() {
       printf '%s\n' "feature_br_scaffold.sh"
       ;;
     4.1)
-      if [[ "$PROJECT_TYPE_CODE" == "A" ]]; then
-        printf '%s\n' "feature_task_to_br.sh"
-      else
+      if has_ready_class_repo_paths "$RUNTIME_ROOT/$PROJECT_PATH/init_progress_definition.yaml"; then
         printf '%s\n' "feature_scan_repo_for_br.sh" "feature_task_to_br.sh"
+      else
+        printf '%s\n' "feature_task_to_br.sh"
       fi
       ;;
     4.2)
@@ -1185,6 +1185,19 @@ read_ready_reconciliation_candidate_classes() {
   ' "$definition_path"
 }
 
+has_ready_class_repo_paths() {
+  local definition_path="$1"
+  local class_name=""
+
+  [[ -f "$definition_path" ]] || return 1
+
+  while IFS= read -r class_name; do
+    [[ -n "$class_name" ]] && return 0
+  done < <(read_ready_reconciliation_candidate_classes "$definition_path")
+
+  return 1
+}
+
 run_contract_reconciliation_once() {
   local runtime_root="$1"
   local class_name="$2"
@@ -1389,8 +1402,8 @@ run_phase_by_index() {
     return $?
   fi
 
-  if [[ "$phase_id" == "4.1" && "$PROJECT_TYPE_CODE" == "A" ]]; then
-    echo "Skipping repo scan in phase 4.1 for type A project: repo scan not applicable."
+  if [[ "$phase_id" == "4.1" ]] && ! has_ready_class_repo_paths "$runtime_root/$PROJECT_PATH/init_progress_definition.yaml"; then
+    echo "Skipping repo scan in phase 4.1: no class_repo_paths entries have state ready."
   fi
 
   while IFS= read -r script_name; do

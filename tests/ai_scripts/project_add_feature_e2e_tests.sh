@@ -955,8 +955,22 @@ test_scaffold_path_capture_falls_back_to_updated_line() {
 test_split_4_1_and_4_2_execute_in_order_with_messages() {
   local asdlc_root="$TMP_ROOT/asdlc-split-order"
   local log_file="$TMP_ROOT/asdlc-split-order.log"
+  local repo_path="$TMP_ROOT/asdlc-split-order-backend"
   mkdir -p "$asdlc_root"
   setup_workspace "$asdlc_root"
+  setup_git_repo "$repo_path"
+
+  cat >"$asdlc_root/projects/project-a/init_progress_definition.yaml" <<OUT
+meta_info:
+  project_type_code: "A"
+  class_repo_paths:
+    backend:
+      state: "ready"
+      path: "$repo_path"
+      policy: "C"
+steps: []
+OUT
+  : >"$asdlc_root/projects/project-a/.contract_reconciled_backend"
 
   local out=""
   out="$(
@@ -985,9 +999,9 @@ test_split_4_1_and_4_2_execute_in_order_with_messages() {
   assert_equal "$expected_log" "$(read_log "$log_file")"
 }
 
-test_type_a_phase_4_1_skips_repo_scan_and_runs_task_to_br() {
-  local asdlc_root="$TMP_ROOT/asdlc-type-a-skip-scan"
-  local log_file="$TMP_ROOT/asdlc-type-a-skip-scan.log"
+test_phase_4_1_skips_repo_scan_when_no_ready_class_repo_paths() {
+  local asdlc_root="$TMP_ROOT/asdlc-no-ready-skip-scan"
+  local log_file="$TMP_ROOT/asdlc-no-ready-skip-scan.log"
   mkdir -p "$asdlc_root"
   setup_workspace "$asdlc_root"
 
@@ -996,6 +1010,10 @@ test_type_a_phase_4_1_skips_repo_scan_and_runs_task_to_br() {
   cat >"$asdlc_root/projects/project-a/init_progress_definition.yaml" <<'OUT'
 meta_info:
   project_type_code: "A"
+  class_repo_paths:
+    backend:
+      state: "deferred"
+      path: ""
 steps: []
 OUT
 
@@ -1003,6 +1021,7 @@ OUT
   out="$(
     cd "$asdlc_root" &&
     {
+      printf '\n'
       printf '2\n'
       printf '1\n'
       printf 'y\n'
@@ -1011,7 +1030,7 @@ OUT
       .commands/project_add_feature_e2e.sh --path projects/project-a 2>&1
   )"
 
-  assert_contains "$out" "Skipping repo scan in phase 4.1 for type A project: repo scan not applicable."
+  assert_contains "$out" "Skipping repo scan in phase 4.1: no class_repo_paths entries have state ready."
   assert_contains "$out" "Phase 4.1 (BR Enrichment Part 1) script 1/1"
   assert_contains "$out" "Execution stopped: user denied phase progression at 4.2."
   assert_not_contains "$out" "Phase 4.1 (BR Enrichment Part 1) script 2/2"
@@ -1021,6 +1040,51 @@ OUT
   assert_contains "$log_content" "init_progress_scanner.sh --path projects/project-a/feature-alpha"
   assert_contains "$log_content" "feature_task_to_br.sh --feature_path projects/project-a/feature-alpha"
   assert_not_contains "$log_content" "feature_scan_repo_for_br.sh --feature_path projects/project-a/feature-alpha"
+}
+
+test_type_a_phase_4_1_runs_repo_scan_when_class_repo_path_ready() {
+  local asdlc_root="$TMP_ROOT/asdlc-type-a-ready-scan"
+  local log_file="$TMP_ROOT/asdlc-type-a-ready-scan.log"
+  local repo_path="$TMP_ROOT/type-a-ready-backend"
+  mkdir -p "$asdlc_root"
+  setup_workspace "$asdlc_root"
+  setup_git_repo "$repo_path"
+
+  mkdir -p "$asdlc_root/projects/project-a/feature-alpha"
+  printf 'feature_path=projects/project-a/feature-alpha\n' >"$asdlc_root/projects/project-a/.project_add_feature_e2e_state.env"
+  cat >"$asdlc_root/projects/project-a/init_progress_definition.yaml" <<OUT
+meta_info:
+  project_type_code: "A"
+  class_repo_paths:
+    backend:
+      state: "ready"
+      path: "$repo_path"
+      policy: "C"
+steps: []
+OUT
+  : >"$asdlc_root/projects/project-a/.contract_reconciled_backend"
+
+  local out=""
+  out="$(
+    cd "$asdlc_root" &&
+    {
+      printf '2\n'
+      printf '1\n'
+      printf 'y\n'
+      printf 'y\n'
+      printf 'n\n'
+    } | TEST_LOG_FILE="$log_file" TEST_SCANNER_NEXT_LINE="next step: 4.1 (Scan repo and apply task-to-BR update)" \
+      .commands/project_add_feature_e2e.sh --path projects/project-a 2>&1
+  )"
+
+  assert_not_contains "$out" "Skipping repo scan in phase 4.1"
+  assert_contains "$out" "Phase 4.1 (BR Enrichment Part 1) script 1/2"
+  assert_contains "$out" "Phase 4.1 (BR Enrichment Part 1) script 2/2"
+  assert_contains "$out" "Execution stopped: user denied phase progression at 4.2."
+
+  local expected_log
+  expected_log=$'init_progress_scanner.sh --path projects/project-a/feature-alpha\ninit_progress_scanner.sh --path projects/project-a/feature-alpha\nfeature_scan_repo_for_br.sh --feature_path projects/project-a/feature-alpha\nfeature_task_to_br.sh --feature_path projects/project-a/feature-alpha'
+  assert_equal "$expected_log" "$(read_log "$log_file")"
 }
 
 test_default_resume_uses_scanner_next_step() {
@@ -1824,7 +1888,8 @@ test_scaffold_first_run_persists_feature_path_and_calls_scanner
 test_scaffold_path_capture_accepts_prefixed_created_line
 test_scaffold_path_capture_falls_back_to_updated_line
 test_split_4_1_and_4_2_execute_in_order_with_messages
-test_type_a_phase_4_1_skips_repo_scan_and_runs_task_to_br
+test_phase_4_1_skips_repo_scan_when_no_ready_class_repo_paths
+test_type_a_phase_4_1_runs_repo_scan_when_class_repo_path_ready
 test_default_resume_uses_scanner_next_step
 test_scanner_step_1_1_fails_with_stack_blueprint_guidance
 test_scanner_step_2_fails_with_common_contract_guidance
