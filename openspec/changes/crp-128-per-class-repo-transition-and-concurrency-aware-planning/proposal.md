@@ -6,7 +6,7 @@ This CRP consolidates the June 2026 design review into one baseline: classes tra
 
 ## What Changes
 
-- **Per-class transition (D1):** at feature start, the e2e flow detects deferred classes whose blueprint `planned_repo_path` is now scannable and prompts the operator to attach (reusing `project_setup_update_project.sh` logic), defaulting policy to `C` with a one-line policy explanation. `project_type_code` is demoted to init-time bookkeeping.
+- **Per-class transition (D1):** at feature start, the e2e flow prompts the operator directly for every deferred class — enter a valid repo path to attach (reusing `project_setup_update_project.sh` logic), defaulting policy to `C` with a one-line policy explanation, or leave blank to keep the class deferred. A blueprint cannot know the operator's machine layout, so there is no blueprint-declared repo path and no auto-detection; the operator-provided path is the sole attach source. `project_type_code` is demoted to init-time bookkeeping.
 - **Per-class gating (D2):** steps `4.1` (Scan repo and apply task-to-BR update), `6` (Define Feature Contract Delta), and `7` (Analyze Repos And Prepare Repo Execution Context) gate on `class_repo_paths[<class>].state` instead of `project_type_code`; a per-class `policy` field is recorded at attach time (the list-shaped multi-repo hedge is deferred to the Python port — see design D9).
 - **Permanent evidence chain (D3):** the CRP-117 blueprint fallback generalizes from type-`A`-only to a permanent per-layer chain — repo scan → in-flight promises → blueprint `(planned)` → placeholder — demand-driven, one source per row, every source tagged. Blueprint citations carry the blueprint's `last_updated` date.
 - **Policy `C` divergence tagging (D5):** materialized-but-divergent layers resolve from repo silently with a passive `divergent_from_blueprint` row tag.
@@ -21,7 +21,7 @@ This CRP consolidates the June 2026 design review into one baseline: classes tra
 
 ### New Capabilities
 
-- `overmind-per-class-repo-transition`: The e2e flow SHALL detect, per deferred class at feature start, a scannable repository at the blueprint's `planned_repo_path` and SHALL offer an operator-confirmed attach with a one-line policy explanation, defaulting to policy `C`; feature steps SHALL gate on per-class repo state, never on `project_type_code`.
+- `overmind-per-class-repo-transition`: The e2e flow SHALL prompt the operator, per deferred class at feature start, for a repo path to attach with a one-line policy explanation, defaulting to policy `C`; an operator-provided path SHALL be the only attach source (no blueprint-declared path, no auto-detection) and a blank response SHALL keep the class deferred; feature steps SHALL gate on per-class repo state, never on `project_type_code`.
 - `overmind-permanent-evidence-resolution-chain`: Surface-map and planning evidence SHALL resolve per layer/row through repo scan → in-flight promises → blueprint → placeholder, demand-driven, one tagged source per row, for the life of the project; blueprint citations SHALL carry the blueprint's `last_updated` date.
 - `overmind-policy-c-divergence-tagging`: Under policy `C`, a layer materialized in the repo but divergent from the blueprint SHALL resolve from the repo without prompting and SHALL carry a passive `divergent_from_blueprint` tag.
 - `overmind-feature-promise-evidence-tier`: A sibling feature folder SHALL emit promise evidence if and only if it holds an `implementation_plan.md` (planning is serial, so any such sibling has finished planning); promise resolution SHALL be per-row — implemented steps from repo scan, the rest as promises — with no lifecycle-state or implementation-status analysis; step `8.2` (Prerequisite Gap Trace) SHALL support `scheduled_in_feature <feature-folder>/<step-id>`; repo scans SHALL synchronize the attached local repo's default branch from its configured upstream with `git pull --rebase` before reading it.
@@ -35,7 +35,7 @@ This CRP consolidates the June 2026 design review into one baseline: classes tra
 - `overmind-type-a-step-7-blueprint-fallback-evidence` (CRP-117): generalized from type-`A`-only transitional behavior to the permanent per-class, per-layer chain.
 - `overmind-prerequisite-gap-trace` (CRP-109): classification gains the cross-feature `scheduled_in_feature` category.
 - `overmind-feature-implementation-plan-worker-assignment` (CRP-107): cross-feature dependency hold markers and re-validation added (the readiness predicate stays the assignment-time gate only).
-- `overmind-feature-lightweight-step-orchestrator` (CRP-103/106/116): transition detection at feature start.
+- `overmind-feature-lightweight-step-orchestrator` (CRP-103/106/116): transition prompt at feature start.
 
 Per-capability spec deltas are intentionally not authored upfront; author them per tasks.md section as each section lands.
 

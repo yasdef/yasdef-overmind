@@ -12,7 +12,7 @@ Three structural limitations of the current pipeline drive this CRP:
 
 **Goals:**
 
-- Per-class blueprint→repo transition, detected at feature start, operator-confirmed.
+- Per-class blueprint→repo transition, operator-prompted at feature start.
 - A permanent, demand-driven, per-layer evidence resolution chain replacing project-type gating.
 - `B`/`C` redefined as divergence policies with enforceable semantics (`C` in phase 1, `B` in phase 2).
 - Concurrency-aware planning: merged truth vs promised truth, with committed feature plans as an evidence tier.
@@ -29,7 +29,9 @@ Three structural limitations of the current pipeline drive this CRP:
 
 ### D1 — Project type `A` is init-time bookkeeping; classes transition independently
 
-Each class transitions blueprint-backed → repo-backed on its own timeline. At feature start, the e2e flow checks every deferred class: if the blueprint's `planned_repo_path` now holds a scannable git repository, it prompts the operator to attach it (reusing `project_setup_update_project.sh` attach logic), defaulting the class policy to `C`. The prompt carries a one-line policy explanation ("repo becomes authoritative; blueprint consulted only for subsystems absent from the repo") so the choice is informed — and the operator's informed choice is the ratification; no additional review ceremony. `project_type_code` is demoted to a historical record of how the project started; feature steps stop reading it.
+Each class transitions blueprint-backed → repo-backed on its own timeline. At feature start, the e2e flow prompts the operator directly for every deferred class: enter a valid repo path to attach it (reusing `project_setup_update_project.sh` attach logic), defaulting the class policy to `C`, or leave it blank to keep the class deferred. A blueprint is authored at init and cannot know where the operator will later clone the repo on their machine, so the repo path is never recorded in the blueprint and there is no auto-detection — the operator-provided path is the sole attach source. The prompt carries a one-line policy explanation ("repo becomes authoritative; blueprint consulted only for subsystems absent from the repo") so the choice is informed — and the operator's informed choice is the ratification; no additional review ceremony. `project_type_code` is demoted to a historical record of how the project started; feature steps stop reading it.
+
+> Correction (see tasks.md §17a): the original D1 keyed the trigger off a blueprint `planned_repo_path` field that the e2e flow probed for a scannable git repo. That field is removed — a blueprint never knows the operator's machine layout — and replaced by the direct per-class prompt above. No fallback, no backward compatibility; policy stays `C` (Option A).
 
 ### D2 — Scan-dependent steps gate per class, never per project type
 
