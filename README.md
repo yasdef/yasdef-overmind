@@ -112,8 +112,15 @@ V-0.0.3
 - add cross-class transport section
 - add MCP as a source for type-A projects
 
-V-0.0.4 (current)
+V-0.0.4
 - multiple flow improvements and bug fixes
+
+V-0.0.5 (current)
+- per-class blueprint→repo transition: classes attach independently at feature start; `project_type_code` no longer drives feature-phase steps
+- permanent per-layer evidence chain (repo scan → in-flight promise → blueprint → placeholder) with dated blueprint citations
+- policy C divergence tagging when a materialized repo layer diverges from its blueprint
+- concurrency-aware planning: sibling-feature promises, cross-feature `#### Depends on:`, and assignment holds for unmerged dependencies
+- one-time contract reconciliation at first repo attach
 
 
 ## Staged Commands Input Contract
