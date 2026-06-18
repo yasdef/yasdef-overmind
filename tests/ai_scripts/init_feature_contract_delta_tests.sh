@@ -7,6 +7,8 @@ RULE_SRC="$SOURCE_ROOT/overmind/rules/feature_contract_delta_rule.md"
 TEMPLATE_SRC="$SOURCE_ROOT/overmind/templates/feature_contract_delta_TEMPLATE.md"
 GOLDEN_EXAMPLE_SRC="$SOURCE_ROOT/overmind/golden_examples/feature_contract_delta_GOLDEN_EXAMPLE.md"
 PEER_TRIGGER_HELPER_SRC="$SOURCE_ROOT/overmind/scripts/helper/check_cross_class_peer_trigger.sh"
+CLASS_REPO_PATHS_LIB_SRC="$SOURCE_ROOT/overmind/scripts/common_libs/class_repo_paths.sh"
+SIBLING_FEATURE_LISTER_SRC="$SOURCE_ROOT/overmind/scripts/common_libs/list_committed_sibling_features.sh"
 
 TMP_ROOT="$(mktemp -d)"
 trap 'rm -rf "$TMP_ROOT"' EXIT
@@ -75,14 +77,28 @@ setup_workspace_layout() {
     "$repo_dir/asdlc/.templates" \
     "$repo_dir/asdlc/.golden_examples" \
     "$repo_dir/asdlc/.setup" \
-    "$repo_dir/asdlc/projects/p1/feature-a"
+    "$repo_dir/asdlc/common_libs" \
+    "$repo_dir/asdlc/projects/p1/feature-a" \
+    "$repo_dir/repositories/backend" \
+    "$repo_dir/repositories/frontend"
 
   cp "$SCRIPT_SRC" "$repo_dir/asdlc/.commands/feature_contract_delta.sh"
   cp "$RULE_SRC" "$repo_dir/asdlc/.rules/feature_contract_delta_rule.md"
   cp "$TEMPLATE_SRC" "$repo_dir/asdlc/.templates/feature_contract_delta_TEMPLATE.md"
   cp "$GOLDEN_EXAMPLE_SRC" "$repo_dir/asdlc/.golden_examples/feature_contract_delta_GOLDEN_EXAMPLE.md"
   cp "$PEER_TRIGGER_HELPER_SRC" "$repo_dir/asdlc/.helper/check_cross_class_peer_trigger.sh"
-  chmod +x "$repo_dir/asdlc/.commands/feature_contract_delta.sh" "$repo_dir/asdlc/.helper/check_cross_class_peer_trigger.sh"
+  cp "$CLASS_REPO_PATHS_LIB_SRC" "$repo_dir/asdlc/common_libs/class_repo_paths.sh"
+  cp "$SIBLING_FEATURE_LISTER_SRC" "$repo_dir/asdlc/common_libs/list_committed_sibling_features.sh"
+  cat >"$repo_dir/asdlc/common_libs/sync_repo_to_default_branch.sh" <<'OUT'
+#!/usr/bin/env bash
+set -euo pipefail
+exit 0
+OUT
+  chmod +x \
+    "$repo_dir/asdlc/.commands/feature_contract_delta.sh" \
+    "$repo_dir/asdlc/.helper/check_cross_class_peer_trigger.sh" \
+    "$repo_dir/asdlc/common_libs/list_committed_sibling_features.sh" \
+    "$repo_dir/asdlc/common_libs/sync_repo_to_default_branch.sh"
 
   cat >"$repo_dir/asdlc/asdlc_metadata.yaml" <<'OUT'
 meta:
@@ -132,6 +148,24 @@ seed_common_contract_definition() {
 OUT
 }
 
+seed_project_definition() {
+  local repo_dir="$1"
+  cat >"$repo_dir/asdlc/projects/p1/init_progress_definition.yaml" <<EOF_DEF
+meta_info:
+  project_type_code: "A"
+  project_type_label: "New project"
+  class_repo_paths:
+    backend:
+      state: "ready"
+      path: "$repo_dir/repositories/backend"
+    frontend:
+      state: "deferred"
+      path: "$repo_dir/repositories/frontend"
+
+steps: []
+EOF_DEF
+}
+
 seed_feature_sources() {
   local repo_dir="$1"
   local feature_path="${2:-projects/p1/feature-a}"
@@ -162,6 +196,40 @@ EOF_BR
 - WHEN feature contract delta phase runs, THE System SHALL derive shared contract changes from EARS and baseline contracts.
 
 **Verification:** Integration test validates generated feature_contract_delta.md.
+OUT
+}
+
+seed_sibling_contract_delta() {
+  local repo_dir="$1"
+  local sibling_folder="$2"
+  mkdir -p "$repo_dir/asdlc/projects/p1/$sibling_folder"
+  cat >"$repo_dir/asdlc/projects/p1/$sibling_folder/implementation_plan.md" <<'OUT'
+# Implementation Plan
+
+### Step 2.1
+- [ ] Add sibling contract support
+OUT
+  cat >"$repo_dir/asdlc/projects/p1/$sibling_folder/feature_contract_delta.md" <<'OUT'
+# Feature Contract Delta
+
+## 1. Document Meta
+- feature_id: FEAT-SIBLING-001
+- delta_needed: true
+
+## 2. Delta Summary
+- impacted_tracks: backend, frontend
+OUT
+}
+
+seed_sibling_implementation_plan_only() {
+  local repo_dir="$1"
+  local sibling_folder="$2"
+  mkdir -p "$repo_dir/asdlc/projects/p1/$sibling_folder"
+  cat >"$repo_dir/asdlc/projects/p1/$sibling_folder/implementation_plan.md" <<'OUT'
+# Implementation Plan
+
+### Step 2.1
+- [ ] Add sibling work without contract delta
 OUT
 }
 
@@ -226,6 +294,7 @@ setup_git_workspace() {
   setup_workspace_layout "$repo_dir"
   setup_models_file "$repo_dir"
   write_quality_gate_stub "$repo_dir"
+  seed_project_definition "$repo_dir"
   seed_common_contract_definition "$repo_dir"
   seed_feature_sources "$repo_dir"
 }
@@ -410,16 +479,68 @@ test_runs_codex_and_commits_only_target_output() {
   assert_contains "$codex_args" "model_reasoning_effort='high'"
 
   local codex_prompt=""
+  local backend_repo_resolved=""
+  local frontend_repo_resolved=""
+  backend_repo_resolved="$(cd "$repo_dir/repositories/backend" && pwd -P)"
+  frontend_repo_resolved="$(cd "$repo_dir/repositories/frontend" && pwd -P)"
   codex_prompt="$(cat "$capture_dir/codex_prompt.txt")"
   assert_contains "$codex_prompt" ".rules/feature_contract_delta_rule.md"
   assert_contains "$codex_prompt" "Requirements EARS source: projects/p1/feature-a/requirements_ears.md"
   assert_contains "$codex_prompt" "Common contract baseline source: projects/p1/common_contract_definition.md"
   assert_contains "$codex_prompt" "Target artifact: projects/p1/feature-a/feature_contract_delta.md"
+  assert_contains "$codex_prompt" "Repositories to scan (meta_info.class_repo_paths with state=ready):"
+  assert_contains "$codex_prompt" "- backend: $backend_repo_resolved"
+  assert_not_contains "$codex_prompt" "- frontend: $frontend_repo_resolved"
+  assert_not_contains "$codex_prompt" "Project type code:"
 
   assert_equal "$br_before" "$(cat "$repo_dir/asdlc/projects/p1/feature-a/feature_br_summary.md")"
   assert_equal "$ears_before" "$(cat "$repo_dir/asdlc/projects/p1/feature-a/requirements_ears.md")"
   assert_equal "$common_before" "$(cat "$repo_dir/asdlc/projects/p1/common_contract_definition.md")"
   assert_file_exists "$repo_dir/asdlc/projects/p1/feature-a/feature_contract_delta.md"
+}
+
+test_no_ready_classes_still_writes_contract_delta() {
+  local repo_dir="$TMP_ROOT/repo-no-ready"
+  local capture_dir="$TMP_ROOT/capture-no-ready"
+  mkdir -p "$repo_dir" "$capture_dir"
+  setup_git_workspace "$repo_dir"
+  setup_codex_stub "$repo_dir"
+
+  cat >"$repo_dir/asdlc/projects/p1/init_progress_definition.yaml" <<EOF_DEF
+meta_info:
+  project_type_code: "C"
+  project_type_label: "Existing project with code-first context"
+  class_repo_paths:
+    backend:
+      state: "deferred"
+      path: "$repo_dir/repositories/backend"
+    frontend:
+      state: "deferred"
+      path: "$repo_dir/repositories/frontend"
+
+steps: []
+EOF_DEF
+
+  local out=""
+  out="$(
+    cd "$repo_dir/asdlc" &&
+    PATH="$repo_dir/bin:$PATH" TEST_CAPTURE_DIR="$capture_dir" .commands/feature_contract_delta.sh --feature_path "projects/p1/feature-a"
+  )"
+
+  assert_contains "$out" "Updated projects/p1/feature-a/feature_contract_delta.md"
+  assert_file_exists "$repo_dir/asdlc/projects/p1/feature-a/feature_contract_delta.md"
+
+  local prompt=""
+  local backend_repo_resolved=""
+  local frontend_repo_resolved=""
+  prompt="$(cat "$capture_dir/codex_prompt.txt")"
+  backend_repo_resolved="$(cd "$repo_dir/repositories/backend" && pwd -P)"
+  frontend_repo_resolved="$(cd "$repo_dir/repositories/frontend" && pwd -P)"
+  assert_contains "$prompt" "Repositories to scan (meta_info.class_repo_paths with state=ready):"
+  assert_contains "$prompt" "- none"
+  assert_not_contains "$prompt" "- backend: $backend_repo_resolved"
+  assert_not_contains "$prompt" "- frontend: $frontend_repo_resolved"
+  assert_not_contains "$prompt" "Project type code:"
 }
 
 test_skips_empty_commit_when_output_is_unchanged() {
@@ -483,6 +604,45 @@ test_prompt_binds_cross_class_peer_trigger_helper() {
   assert_contains "$prompt" "Cross-class peer trigger helper command: .helper/check_cross_class_peer_trigger.sh projects/p1/init_progress_definition.yaml"
   assert_not_contains "$prompt" "§5 Cross-Class Transport/Contract Approach mirror applies"
   assert_not_contains "$prompt" "§5 Cross-Class Transport/Contract Approach mirror does not apply"
+  assert_contains "$prompt" "- Pending sibling contract deltas:"
+  assert_contains "$prompt" "- none"
+}
+
+test_binds_pending_sibling_contract_delta_sources() {
+  local repo_dir="$TMP_ROOT/repo-pending-contract-delta"
+  local capture_dir="$TMP_ROOT/capture-pending-contract-delta"
+  mkdir -p "$repo_dir" "$capture_dir"
+  setup_git_workspace "$repo_dir"
+  seed_sibling_contract_delta "$repo_dir" "feature-z"
+  setup_codex_stub "$repo_dir"
+
+  cd "$repo_dir/asdlc" && PATH="$repo_dir/bin:$PATH" TEST_CAPTURE_DIR="$capture_dir" \
+    .commands/feature_contract_delta.sh --feature_path "projects/p1/feature-a" >/dev/null
+
+  local prompt=""
+  prompt="$(cat "$capture_dir/codex_prompt.txt")"
+  assert_contains "$prompt" "projects/p1/feature-z/feature_contract_delta.md"
+  assert_contains "$prompt" "Pending contract delta source: feature-z/feature_contract_delta.md"
+  assert_contains "$prompt" "Pending contract delta source labels are relative to projects/p1; open the matching read-only input at projects/p1/<folder>/feature_contract_delta.md."
+}
+
+test_excludes_sibling_plan_without_contract_delta() {
+  local repo_dir="$TMP_ROOT/repo-sibling-without-contract-delta"
+  local capture_dir="$TMP_ROOT/capture-sibling-without-contract-delta"
+  mkdir -p "$repo_dir" "$capture_dir"
+  setup_git_workspace "$repo_dir"
+  seed_sibling_implementation_plan_only "$repo_dir" "feature-no-delta"
+  setup_codex_stub "$repo_dir"
+
+  cd "$repo_dir/asdlc" && PATH="$repo_dir/bin:$PATH" TEST_CAPTURE_DIR="$capture_dir" \
+    .commands/feature_contract_delta.sh --feature_path "projects/p1/feature-a" >/dev/null
+
+  local prompt=""
+  prompt="$(cat "$capture_dir/codex_prompt.txt")"
+  assert_contains "$prompt" "- Pending sibling contract deltas:"
+  assert_contains "$prompt" "- none"
+  assert_not_contains "$prompt" "Pending contract delta source: feature-no-delta/feature_contract_delta.md"
+  assert_not_contains "$prompt" "projects/p1/feature-no-delta/feature_contract_delta.md"
 }
 
 test_missing_cross_class_peer_trigger_helper_fails_fast() {
@@ -511,9 +671,12 @@ test_fails_when_contract_delta_golden_example_missing
 test_fails_when_model_phase_missing
 test_does_not_run_quality_helper_directly
 test_runs_codex_and_commits_only_target_output
+test_no_ready_classes_still_writes_contract_delta
 test_skips_empty_commit_when_output_is_unchanged
 test_supports_absolute_feature_path
 test_prompt_binds_cross_class_peer_trigger_helper
+test_binds_pending_sibling_contract_delta_sources
+test_excludes_sibling_plan_without_contract_delta
 test_missing_cross_class_peer_trigger_helper_fails_fast
 
 echo "All feature contract delta initializer tests passed."

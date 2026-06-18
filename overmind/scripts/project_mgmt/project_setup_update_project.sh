@@ -3,6 +3,7 @@ set -euo pipefail
 
 ASDLC_PROJECTS_DIR_NAME="projects"
 PROJECT_DEFINITION_FILE_NAME="init_progress_definition.yaml"
+PERSIST_CLASS_REPO_ATTACH_SCRIPT="$(dirname "$0")/../common_libs/persist_class_repo_attach.sh"
 
 source "$(dirname "$0")/../common_libs/project_setup_common.sh"
 
@@ -220,6 +221,11 @@ prompt_repo_path_with_quit() {
       continue
     fi
 
+    if [[ ! -e "$repo_path/.git" ]]; then
+      echo "Repo path must contain .git: $repo_path" >&2
+      continue
+    fi
+
     if ! resolved_repo_path="$(resolve_repo_path "$repo_path")"; then
       echo "Failed to resolve repo path: $repo_path" >&2
       continue
@@ -268,62 +274,6 @@ assert_class_entry_is_deferred() {
     die "Unexpected assertion result for class '$class_name': $check_result"
     ;;
   esac
-}
-
-flip_class_to_ready() {
-  local definition_path="$1"
-  local class_name="$2"
-  local resolved_path="$3"
-  local escaped_path=""
-  local tmp_file=""
-
-  escaped_path="$(escape_yaml_double_quoted_value "$resolved_path")"
-
-  if ! tmp_file="$(mktemp)"; then
-    die "Failed to create temporary file for definition update."
-  fi
-
-  if ! awk -v target_class="$class_name" -v escaped_path="$escaped_path" '
-    BEGIN {
-      in_class_repo_paths = 0
-      in_target_class = 0
-      did_state = 0
-      did_path = 0
-    }
-    /^  class_repo_paths:[[:space:]]*$/ {
-      in_class_repo_paths = 1
-      print; next
-    }
-    in_class_repo_paths && /^[^ ]/ {
-      in_class_repo_paths = 0
-      in_target_class = 0
-      print; next
-    }
-    in_class_repo_paths && /^    [a-z][a-zA-Z_]*:[[:space:]]*$/ {
-      line = $0
-      sub(/^    /, "", line)
-      sub(/:[[:space:]]*$/, "", line)
-      in_target_class = (line == target_class) ? 1 : 0
-      print; next
-    }
-    in_target_class && /^      state: / && !did_state {
-      print "      state: \"ready\""
-      did_state = 1; next
-    }
-    in_target_class && /^      path: / && !did_path {
-      print "      path: \"" escaped_path "\""
-      did_path = 1; next
-    }
-    { print }
-  ' "$definition_path" >"$tmp_file"; then
-    rm -f "$tmp_file"
-    die "Failed to process definition update for class '$class_name': $definition_path"
-  fi
-
-  if ! mv "$tmp_file" "$definition_path"; then
-    rm -f "$tmp_file"
-    die "Failed to write updated definition: $definition_path"
-  fi
 }
 
 is_all_classes_ready() {
@@ -468,7 +418,8 @@ main() {
   local resolved_repo_path="$_RESOLVED_REPO_PATH"
 
   assert_class_entry_is_deferred "$definition_path" "$chosen_class"
-  flip_class_to_ready "$definition_path" "$chosen_class" "$resolved_repo_path"
+  [[ -x "$PERSIST_CLASS_REPO_ATTACH_SCRIPT" ]] || die "Required command lib not found or not executable: $PERSIST_CLASS_REPO_ATTACH_SCRIPT"
+  "$PERSIST_CLASS_REPO_ATTACH_SCRIPT" "$(dirname "$definition_path")" "$chosen_class" "$resolved_repo_path" >/dev/null
 
   echo "Repo path for class '$chosen_class' in project '$project_id' updated to: $resolved_repo_path" >&2
 

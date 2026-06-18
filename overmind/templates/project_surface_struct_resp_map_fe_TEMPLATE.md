@@ -25,6 +25,7 @@
 - key_components: [UNFILLED]
 - transport_layer: [UNFILLED]
 - user_reachable_surface: [UNFILLED]
+- divergent_from_blueprint: [OPTIONAL §<n>]
 
 ### 3.2 Component Layer
 - responsibility_summary: [UNFILLED]
@@ -32,6 +33,7 @@
 - key_components: [UNFILLED]
 - transport_layer: [UNFILLED]
 - user_reachable_surface: [UNFILLED]
+- divergent_from_blueprint: [OPTIONAL §<n>]
 
 ### 3.3 State / Data Layer
 - responsibility_summary: [UNFILLED]
@@ -39,6 +41,7 @@
 - key_components: [UNFILLED]
 - transport_layer: [UNFILLED]
 - user_reachable_surface: [UNFILLED]
+- divergent_from_blueprint: [OPTIONAL §<n>]
 
 ### 3.4 API Integration Layer
 - responsibility_summary: [UNFILLED]
@@ -46,6 +49,7 @@
 - key_components: [UNFILLED]
 - transport_layer: [UNFILLED]
 - user_reachable_surface: [UNFILLED]
+- divergent_from_blueprint: [OPTIONAL §<n>]
 
 ### 3.5 UX Behavior Layer
 - responsibility_summary: [UNFILLED]
@@ -53,6 +57,7 @@
 - key_components: [UNFILLED]
 - transport_layer: [UNFILLED]
 - user_reachable_surface: [UNFILLED]
+- divergent_from_blueprint: [OPTIONAL §<n>]
 
 ### 3.6 Platform / Runtime Layer
 - responsibility_summary: [UNFILLED]
@@ -60,6 +65,7 @@
 - key_components: [UNFILLED]
 - transport_layer: [UNFILLED]
 - user_reachable_surface: [UNFILLED]
+- divergent_from_blueprint: [OPTIONAL §<n>]
 
 #### Mobile-only: Native / Device Integration Layer
 > only for mobile repositories
@@ -68,6 +74,7 @@
 - key_components: [UNFILLED]
 - transport_layer: [UNFILLED]
 - user_reachable_surface: [UNFILLED]
+- divergent_from_blueprint: [OPTIONAL §<n>]
 
 #### Mobile-only: Local Storage / Offline / Sync Layer
 > only for mobile repositories
@@ -76,6 +83,7 @@
 - key_components: [UNFILLED]
 - transport_layer: [UNFILLED]
 - user_reachable_surface: [UNFILLED]
+- divergent_from_blueprint: [OPTIONAL §<n>]
 
 ### 3.7 Test Layer
 - responsibility_summary: [UNFILLED]
@@ -83,6 +91,7 @@
 - key_components: [UNFILLED]
 - transport_layer: [UNFILLED]
 - user_reachable_surface: [UNFILLED]
+- divergent_from_blueprint: [OPTIONAL §<n>]
 
 ### 3.8 Another Layer(s)
 > add as much new layers as needed based on same pattern and follow number convention

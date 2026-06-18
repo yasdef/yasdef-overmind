@@ -3,6 +3,7 @@ set -euo pipefail
 
 SOURCE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 SCRIPT_SRC="$SOURCE_ROOT/overmind/scripts/feature_br_check_ears_readiness.sh"
+CLASS_REPO_PATHS_LIB_SRC="$SOURCE_ROOT/overmind/scripts/common_libs/class_repo_paths.sh"
 
 TMP_ROOT="$(mktemp -d)"
 trap 'rm -rf "$TMP_ROOT"' EXIT
@@ -48,16 +49,44 @@ setup_workspace_layout() {
   mkdir -p \
     "$repo_dir/asdlc/.commands" \
     "$repo_dir/asdlc/.helper" \
+    "$repo_dir/asdlc/common_libs" \
     "$repo_dir/asdlc/projects/p1/feature-a"
 
   cp "$SCRIPT_SRC" "$repo_dir/asdlc/.commands/feature_br_check_ears_readiness.sh"
   chmod +x "$repo_dir/asdlc/.commands/feature_br_check_ears_readiness.sh"
+  cp "$CLASS_REPO_PATHS_LIB_SRC" "$repo_dir/asdlc/common_libs/class_repo_paths.sh"
+  chmod +x "$repo_dir/asdlc/common_libs/class_repo_paths.sh"
 
   cat >"$repo_dir/asdlc/asdlc_metadata.yaml" <<'OUT'
 meta:
   description: "test"
 projects:
 OUT
+}
+
+seed_project_definition() {
+  local repo_dir="$1"
+  local state="${2:-ready}"
+  local project_type_code="${3:-B}"
+  local repo_path="${4:-/tmp/test-ready-repo}"
+  local path_line='      path: ""'
+  local policy_line=""
+
+  if [[ "$state" == "ready" ]]; then
+    path_line="      path: \"$repo_path\""
+    policy_line='      policy: "C"'
+  fi
+
+  cat >"$repo_dir/asdlc/projects/p1/init_progress_definition.yaml" <<EOF
+meta_info:
+  project_type_code: "$project_type_code"
+  class_repo_paths:
+    backend:
+      state: "$state"
+$path_line
+$policy_line
+steps: []
+EOF
 }
 
 seed_feature_br_summary() {
@@ -139,6 +168,7 @@ OUT
 setup_git_workspace() {
   local repo_dir="$1"
   setup_workspace_layout "$repo_dir"
+  seed_project_definition "$repo_dir"
   seed_feature_br_summary "$repo_dir"
   write_helper_stubs "$repo_dir"
 }
@@ -216,11 +246,12 @@ test_fails_when_repo_helper_fails_after_user_helper_passes() {
   assert_contains "$(cat "$repo_dir/asdlc/projects/p1/feature-a/feature_br_summary.md")" "- ready_to_ears: false"
 }
 
-test_type_a_skips_repo_helper_and_still_marks_ready() {
-  local repo_dir="$TMP_ROOT/repo-type-a-success"
-  local capture_dir="$TMP_ROOT/capture-type-a-success"
+test_no_ready_class_repo_paths_skip_repo_helper_and_still_mark_ready() {
+  local repo_dir="$TMP_ROOT/repo-no-ready-success"
+  local capture_dir="$TMP_ROOT/capture-no-ready-success"
   mkdir -p "$repo_dir" "$capture_dir"
   setup_workspace_layout "$repo_dir"
+  seed_project_definition "$repo_dir" "deferred" "A"
   seed_feature_br_summary "$repo_dir" "projects/p1/feature-a" "A"
   seed_optional_artifacts "$repo_dir"
   write_helper_stubs "$repo_dir"
@@ -230,10 +261,36 @@ test_type_a_skips_repo_helper_and_still_marks_ready() {
     TEST_CAPTURE_DIR="$capture_dir" TEST_REPO_HELPER_FAIL=1 .commands/feature_br_check_ears_readiness.sh --feature_path "projects/p1/feature-a"
   )"
 
-  assert_contains "$out" "Skipping repository business-context readiness gate for type A project."
+  assert_contains "$out" "Skipping repository business-context readiness gate: no class_repo_paths entries have state ready."
   assert_contains "$out" "EARS readiness check passed."
   assert_equal "user" "$(cat "$capture_dir/helper_calls.log")"
   assert_contains "$(cat "$repo_dir/asdlc/projects/p1/feature-a/feature_br_summary.md")" "- ready_to_ears: true"
+}
+
+test_type_a_with_ready_class_repo_path_runs_repo_helper() {
+  local repo_dir="$TMP_ROOT/repo-type-a-ready-repo-helper"
+  local capture_dir="$TMP_ROOT/capture-type-a-ready-repo-helper"
+  mkdir -p "$repo_dir" "$capture_dir"
+  setup_workspace_layout "$repo_dir"
+  seed_project_definition "$repo_dir" "ready" "A" "/tmp/type-a-ready-repo"
+  seed_feature_br_summary "$repo_dir" "projects/p1/feature-a" "A"
+  seed_optional_artifacts "$repo_dir"
+  write_helper_stubs "$repo_dir"
+
+  local status=0
+  local out=""
+  set +e
+  out="$(
+    cd "$repo_dir/asdlc" &&
+    TEST_CAPTURE_DIR="$capture_dir" TEST_REPO_HELPER_FAIL=1 .commands/feature_br_check_ears_readiness.sh --feature_path "projects/p1/feature-a" 2>&1
+  )"
+  status=$?
+  set -e
+
+  assert_nonzero_status "$status"
+  assert_contains "$out" "Repository business-context check failed."
+  assert_equal $'user\nrepo' "$(cat "$capture_dir/helper_calls.log")"
+  assert_contains "$(cat "$repo_dir/asdlc/projects/p1/feature-a/feature_br_summary.md")" "- ready_to_ears: false"
 }
 
 test_success_updates_ready_to_ears_and_commits_feature_artifacts() {
@@ -289,7 +346,8 @@ test_requires_feature_path_argument
 test_requires_staged_command_location
 test_fails_when_user_input_helper_fails_and_does_not_run_repo_helper
 test_fails_when_repo_helper_fails_after_user_helper_passes
-test_type_a_skips_repo_helper_and_still_marks_ready
+test_no_ready_class_repo_paths_skip_repo_helper_and_still_mark_ready
+test_type_a_with_ready_class_repo_path_runs_repo_helper
 test_success_updates_ready_to_ears_and_commits_feature_artifacts
 test_success_supports_absolute_feature_path
 

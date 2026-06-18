@@ -189,7 +189,6 @@ END {
   require_key("meta", "class", "meta key")
   require_key("meta", "repo_name", "meta key")
   require_key("meta", "service_name", "meta key")
-  require_key("meta", "planned_repo_path", "meta key")
   require_key("meta", "last_updated", "meta key")
   if (("last_updated" in meta) && !is_unfilled(meta["last_updated"]) && meta["last_updated"] !~ /^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]$/) {
     fail_quality("last_updated must use YYYY-MM-DD format")

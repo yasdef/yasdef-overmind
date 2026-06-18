@@ -724,10 +724,10 @@ phase_scripts() {
       printf '%s\n' "feature_br_scaffold.sh"
       ;;
     4.1)
-      if [[ "$PROJECT_TYPE_CODE" == "A" ]]; then
-        printf '%s\n' "feature_task_to_br.sh"
-      else
+      if has_ready_class_repo_paths "$RUNTIME_ROOT/$PROJECT_PATH/init_progress_definition.yaml"; then
         printf '%s\n' "feature_scan_repo_for_br.sh" "feature_task_to_br.sh"
+      else
+        printf '%s\n' "feature_task_to_br.sh"
       fi
       ;;
     4.2)
@@ -1121,6 +1121,187 @@ run_feature_script() {
   "$command_path" --feature_path "$FEATURE_PATH"
 }
 
+read_deferred_attach_candidate_classes() {
+  local definition_path="$1"
+
+  awk '
+    BEGIN { in_block = 0; current_class = "" }
+    /^  class_repo_paths:[[:space:]]*$/ {
+      in_block = 1
+      next
+    }
+    in_block && /^[^ ]/ {
+      in_block = 0
+      current_class = ""
+      next
+    }
+    in_block && /^    [a-z][a-zA-Z_]*:[[:space:]]*$/ {
+      line = $0
+      sub(/^    /, "", line)
+      sub(/:[[:space:]]*$/, "", line)
+      current_class = line
+      next
+    }
+    in_block && current_class != "" && /^      state: / {
+      line = $0
+      sub(/^[[:space:]]*state:[[:space:]]*/, "", line)
+      gsub(/^["'\'']|["'\'']$/, "", line)
+      if (line != "ready") {
+        print current_class
+      }
+    }
+  ' "$definition_path"
+}
+
+read_ready_reconciliation_candidate_classes() {
+  local definition_path="$1"
+
+  awk '
+    BEGIN { in_block = 0; current_class = "" }
+    /^  class_repo_paths:[[:space:]]*$/ {
+      in_block = 1
+      next
+    }
+    in_block && /^[^ ]/ {
+      in_block = 0
+      current_class = ""
+      next
+    }
+    in_block && /^    [a-z][a-zA-Z_]*:[[:space:]]*$/ {
+      line = $0
+      sub(/^    /, "", line)
+      sub(/:[[:space:]]*$/, "", line)
+      current_class = line
+      next
+    }
+    in_block && current_class != "" && /^      state: / {
+      line = $0
+      sub(/^[[:space:]]*state:[[:space:]]*/, "", line)
+      gsub(/^["'\'']|["'\'']$/, "", line)
+      if (line == "ready") {
+        print current_class
+      }
+    }
+  ' "$definition_path"
+}
+
+has_ready_class_repo_paths() {
+  local definition_path="$1"
+  local class_name=""
+
+  [[ -f "$definition_path" ]] || return 1
+
+  while IFS= read -r class_name; do
+    [[ -n "$class_name" ]] && return 0
+  done < <(read_ready_reconciliation_candidate_classes "$definition_path")
+
+  return 1
+}
+
+run_contract_reconciliation_once() {
+  local runtime_root="$1"
+  local class_name="$2"
+  local input_fd="${3:-}"
+  local project_abs_path="$runtime_root/$PROJECT_PATH"
+  local marker_path="$project_abs_path/.contract_reconciled_$class_name"
+  local command_path="$runtime_root/.commands/project_contract_reconciliation.sh"
+
+  [[ -f "$marker_path" ]] && return 0
+  [[ -x "$command_path" ]] || die "Required script not found or not executable: .commands/project_contract_reconciliation.sh"
+
+  if [[ -n "$input_fd" ]]; then
+    "$command_path" --path "$project_abs_path" <&"$input_fd"
+  else
+    "$command_path" --path "$project_abs_path"
+  fi
+  : >"$marker_path"
+}
+
+attempt_class_repo_attach() {
+  local runtime_root="$1"
+  local class_name="$2"
+  local repo_path="$3"
+  local helper_path="$runtime_root/common_libs/persist_class_repo_attach.sh"
+  local helper_output=""
+  local helper_rc=0
+
+  [[ -x "$helper_path" ]] || die "Required command lib not found or not executable: common_libs/persist_class_repo_attach.sh"
+
+  set +e
+  helper_output="$("$helper_path" "$runtime_root/$PROJECT_PATH" "$class_name" "$repo_path" 2>&1)"
+  helper_rc=$?
+  set -e
+
+  if [[ "$helper_rc" -ne 0 ]]; then
+    printf '%s\n' "$helper_output" >&2
+    return "$helper_rc"
+  fi
+
+  return 0
+}
+
+prompt_attach_deferred_class_repo() {
+  local runtime_root="$1"
+  local class_name="$2"
+  local input_fd="$3"
+  local answer=""
+  local retry_answer=""
+
+  printf "Class '%s' is blueprint-only. If its repo already exists, enter a valid path to attach it (policy C: repo becomes authoritative; blueprint is consulted only for subsystems absent from the repo); leave blank to keep it deferred.\n" "$class_name" >&2
+  if ! IFS= read -r answer <&"$input_fd"; then
+    return 0
+  fi
+
+  answer="$(trim_value "$answer")"
+  [[ -n "$answer" ]] || return 0
+
+  if attempt_class_repo_attach "$runtime_root" "$class_name" "$answer"; then
+    run_contract_reconciliation_once "$runtime_root" "$class_name" "$input_fd"
+    return 0
+  fi
+
+  printf "Class '%s' is blueprint-only. If its repo already exists, enter a valid path to attach it (policy C: repo becomes authoritative; blueprint is consulted only for subsystems absent from the repo); leave blank to keep it deferred.\n" "$class_name" >&2
+  if ! IFS= read -r retry_answer <&"$input_fd"; then
+    return 0
+  fi
+
+  retry_answer="$(trim_value "$retry_answer")"
+  [[ -n "$retry_answer" ]] || return 0
+  if attempt_class_repo_attach "$runtime_root" "$class_name" "$retry_answer"; then
+    run_contract_reconciliation_once "$runtime_root" "$class_name" "$input_fd"
+  fi
+}
+
+maybe_prompt_for_deferred_class_repo_attaches() {
+  local runtime_root="$1"
+  local project_abs_path="$runtime_root/$PROJECT_PATH"
+  local definition_path="$project_abs_path/init_progress_definition.yaml"
+  local class_name=""
+
+  [[ -f "$definition_path" ]] || return 0
+
+  exec 9<&0
+  while IFS= read -r class_name; do
+    [[ -n "$class_name" ]] || continue
+    prompt_attach_deferred_class_repo "$runtime_root" "$class_name" 9
+  done < <(read_deferred_attach_candidate_classes "$definition_path")
+  exec 9<&-
+}
+
+reconcile_ready_classes_missing_markers() {
+  local runtime_root="$1"
+  local project_abs_path="$runtime_root/$PROJECT_PATH"
+  local definition_path="$project_abs_path/init_progress_definition.yaml"
+  local class_name=""
+
+  [[ -f "$definition_path" ]] || return 0
+
+  while IFS= read -r class_name; do
+    [[ -n "$class_name" ]] || continue
+    run_contract_reconciliation_once "$runtime_root" "$class_name"
+  done < <(read_ready_reconciliation_candidate_classes "$definition_path")
+}
+
 run_scanner_and_get_next_step() {
   local runtime_root="$1"
   local scanner_path="$runtime_root/.commands/init_progress_scanner.sh"
@@ -1142,8 +1323,25 @@ map_scanner_step_to_phase() {
   local normalized_name
   normalized_name="$(to_lower "$scanner_step_name")"
 
+  case "$scanner_step_number" in
+    3) printf '%s' "3"; return 0 ;;
+    4) printf '%s' "5"; return 0 ;;
+    4.1) printf '%s' "4.1"; return 0 ;;
+    4.2) printf '%s' "4.2"; return 0 ;;
+    5) printf '%s' "5"; return 0 ;;
+    5.1) printf '%s' "5.1"; return 0 ;;
+    6) printf '%s' "6"; return 0 ;;
+    7) printf '%s' "7"; return 0 ;;
+    7.1) printf '%s' "7.1"; return 0 ;;
+    8) printf '%s' "8"; return 0 ;;
+    8.1) printf '%s' "8.1"; return 0 ;;
+    8.2) printf '%s' "8.2"; return 0 ;;
+    8.3) printf '%s' "8.3"; return 0 ;;
+    8.4) printf '%s' "8.4"; return 0 ;;
+  esac
+
   case "$normalized_name" in
-    *"initialize and enrich business requirements structuring"*) printf '%s' "4.1"; return 0 ;;
+    *"initialize and enrich business requirements structuring"*) printf '%s' "3"; return 0 ;;
     *"scan repo"* ) printf '%s' "4.1"; return 0 ;;
     *"task to br"* ) printf '%s' "4.1"; return 0 ;;
     *"business requirements clarification"* ) printf '%s' "4.2"; return 0 ;;
@@ -1161,23 +1359,7 @@ map_scanner_step_to_phase() {
     *"implementation plan semantic review"*) printf '%s' "8.4"; return 0 ;;
   esac
 
-  case "$scanner_step_number" in
-    3) printf '%s' "4.1" ;;
-    4) printf '%s' "5" ;;
-    4.1) printf '%s' "4.1" ;;
-    4.2) printf '%s' "4.2" ;;
-    5) printf '%s' "5" ;;
-    5.1) printf '%s' "5.1" ;;
-    6) printf '%s' "6" ;;
-    7) printf '%s' "7" ;;
-    7.1) printf '%s' "7.1" ;;
-    8) printf '%s' "8" ;;
-    8.1) printf '%s' "8.1" ;;
-    8.2) printf '%s' "8.2" ;;
-    8.3) printf '%s' "8.3" ;;
-    8.4) printf '%s' "8.4" ;;
-    *) return 1 ;;
-  esac
+  return 1
 }
 
 map_resume_to_phase() {
@@ -1221,8 +1403,8 @@ run_phase_by_index() {
     return $?
   fi
 
-  if [[ "$phase_id" == "4.1" && "$PROJECT_TYPE_CODE" == "A" ]]; then
-    echo "Skipping repo scan in phase 4.1 for type A project: repo scan not applicable."
+  if [[ "$phase_id" == "4.1" ]] && ! has_ready_class_repo_paths "$runtime_root/$PROJECT_PATH/init_progress_definition.yaml"; then
+    echo "Skipping repo scan in phase 4.1: no class_repo_paths entries have state ready."
   fi
 
   while IFS= read -r script_name; do
@@ -1302,6 +1484,8 @@ main() {
   fi
   resolve_project_path "$RUNTIME_ROOT" "$TARGET_PATH_INPUT"
   PROJECT_TYPE_CODE="$(extract_project_type_code_from_definition "$RUNTIME_ROOT/$PROJECT_PATH/init_progress_definition.yaml")"
+  maybe_prompt_for_deferred_class_repo_attaches "$RUNTIME_ROOT"
+  reconcile_ready_classes_missing_markers "$RUNTIME_ROOT"
 
   local requested_phase=""
   if [[ -n "$RESUME_STEP_INPUT" ]]; then

@@ -3,6 +3,7 @@ set -euo pipefail
 
 SOURCE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 ASSIGN_SCRIPT_SRC="$SOURCE_ROOT/overmind/scripts/feature_assing_workers.sh"
+READINESS_HELPER_SRC="$SOURCE_ROOT/overmind/scripts/common_libs/check_implementation_plan_readiness.sh"
 
 TMP_ROOT="$(mktemp -d)"
 trap 'rm -rf "$TMP_ROOT"' EXIT
@@ -97,7 +98,7 @@ in_target == 1 && $0 ~ /^#### Assigned:[[:space:]]*/ {
 setup_workspace() {
   local asdlc_root="$1"
 
-  mkdir -p "$asdlc_root/.commands" "$asdlc_root/projects"
+  mkdir -p "$asdlc_root/.commands" "$asdlc_root/common_libs" "$asdlc_root/projects"
   cat >"$asdlc_root/asdlc_metadata.yaml" <<'EOF'
 meta:
   description: "test workspace"
@@ -106,6 +107,8 @@ EOF
 
   cp "$ASSIGN_SCRIPT_SRC" "$asdlc_root/.commands/feature_assing_workers.sh"
   chmod +x "$asdlc_root/.commands/feature_assing_workers.sh"
+  cp "$READINESS_HELPER_SRC" "$asdlc_root/common_libs/check_implementation_plan_readiness.sh"
+  chmod +x "$asdlc_root/common_libs/check_implementation_plan_readiness.sh"
 }
 
 create_project_and_feature() {
@@ -158,6 +161,65 @@ write_plan_three_steps() {
 - [ ] Plan and discuss the step
 - [ ] Implement mobile work
 - [ ] Review step implementation
+EOF
+}
+
+write_backend_worker_registry() {
+  local workers_path="$1"
+  cat >"$workers_path" <<'EOF'
+project_id: "p1"
+workers:
+  - uuid: "11111111-1111-1111-1111-111111111111"
+    class: "backend"
+    status: "active"
+    registered_at: "2026-01-01T00:00:00Z"
+EOF
+}
+
+write_backend_plan_with_dependency() {
+  local plan_path="$1"
+  local dependency="$2"
+  cat >"$plan_path" <<EOF
+# Implementation Plan
+
+### Step 1.1 Backend work [REQ-1]
+#### Repo: backend
+#### Depends on: $dependency
+#### Evidence: gap/TECH_REQ-1
+- [ ] Plan and discuss the step
+- [ ] Implement backend work
+- [ ] Review step implementation
+EOF
+}
+
+write_sibling_plan_step() {
+  local plan_path="$1"
+  local checklist_state="$2"
+  cat >"$plan_path" <<EOF
+# Implementation Plan
+
+### Step 2.1 Sibling prerequisite [REQ-2]
+#### Repo: backend
+#### Depends on: none
+#### Evidence: gap/TECH_REQ-2
+- [x] Plan and discuss the step
+- [$checklist_state] Implement sibling prerequisite
+- [x] Review step implementation
+EOF
+}
+
+write_sibling_plan_step_with_uppercase_checks() {
+  local plan_path="$1"
+  cat >"$plan_path" <<'EOF'
+# Implementation Plan
+
+### Step 2.1 Sibling prerequisite [REQ-2]
+#### Repo: backend
+#### Depends on: none
+#### Evidence: gap/TECH_REQ-2
+- [X] Plan and discuss the step
+- [X] Implement sibling prerequisite
+- [X] Review step implementation
 EOF
 }
 
@@ -428,11 +490,206 @@ EOF
   assert_equal "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb" "$(assignment_for_step "$plan_path" "1.1")"
 }
 
+test_incomplete_cross_feature_dependency_writes_hold() {
+  local asdlc_root="$TMP_ROOT/asdlc-cross-feature-hold"
+  setup_workspace "$asdlc_root"
+  local feature_dir=""
+  local sibling_dir=""
+  local plan_path=""
+  local out=""
+  local status=0
+
+  feature_dir="$(create_project_and_feature "$asdlc_root" "p1" "feature-a")"
+  sibling_dir="$asdlc_root/projects/p1/feature-z"
+  mkdir -p "$sibling_dir"
+  plan_path="$feature_dir/implementation_plan.md"
+  write_backend_plan_with_dependency "$plan_path" "feature-z/2.1"
+  write_sibling_plan_step "$sibling_dir/implementation_plan.md" " "
+  write_backend_worker_registry "$asdlc_root/projects/p1/workers.yaml"
+
+  set +e
+  out="$(
+    cd "$asdlc_root" &&
+    .commands/feature_assing_workers.sh --feature_path "projects/p1/feature-a" 2>&1
+  )"
+  status=$?
+  set -e
+
+  assert_nonzero_status "$status"
+  assert_contains "$out" "ERROR: assignment completed with class availability issues or dependency holds"
+  assert_equal "hold: depends on feature-z/2.1" "$(assignment_for_step "$plan_path" "1.1")"
+}
+
+test_dot_cross_feature_dependency_is_rejected() {
+  local asdlc_root="$TMP_ROOT/asdlc-cross-feature-dot"
+  setup_workspace "$asdlc_root"
+  local feature_dir=""
+  local plan_path=""
+  local out=""
+  local status=0
+
+  feature_dir="$(create_project_and_feature "$asdlc_root" "p1" "feature-a")"
+  plan_path="$feature_dir/implementation_plan.md"
+  write_backend_plan_with_dependency "$plan_path" "../2.1"
+  write_backend_worker_registry "$asdlc_root/projects/p1/workers.yaml"
+
+  set +e
+  out="$(
+    cd "$asdlc_root" &&
+    .commands/feature_assing_workers.sh --feature_path "projects/p1/feature-a" 2>&1
+  )"
+  status=$?
+  set -e
+
+  assert_nonzero_status "$status"
+  assert_contains "$out" "Implementation plan is not ready: step 1.1 has malformed cross-feature dependency ../2.1"
+}
+
+test_completed_cross_feature_dependency_assigns_worker() {
+  local asdlc_root="$TMP_ROOT/asdlc-cross-feature-complete"
+  setup_workspace "$asdlc_root"
+  local feature_dir=""
+  local sibling_dir=""
+  local plan_path=""
+  local out=""
+  local status=0
+
+  feature_dir="$(create_project_and_feature "$asdlc_root" "p1" "feature-a")"
+  sibling_dir="$asdlc_root/projects/p1/feature-z"
+  mkdir -p "$sibling_dir"
+  plan_path="$feature_dir/implementation_plan.md"
+  write_backend_plan_with_dependency "$plan_path" "feature-z/2.1"
+  write_sibling_plan_step "$sibling_dir/implementation_plan.md" "x"
+  write_backend_worker_registry "$asdlc_root/projects/p1/workers.yaml"
+
+  out="$(
+    cd "$asdlc_root" &&
+    .commands/feature_assing_workers.sh --feature_path "projects/p1/feature-a" 2>&1
+  )"
+  status=$?
+  if [[ "$status" -ne 0 ]]; then
+    echo "Expected success but command failed:" >&2
+    echo "$out" >&2
+    exit 1
+  fi
+
+  assert_contains "$out" "Updated projects/p1/feature-a/implementation_plan.md with worker assignments."
+  assert_equal "11111111-1111-1111-1111-111111111111" "$(assignment_for_step "$plan_path" "1.1")"
+}
+
+test_uppercase_completed_cross_feature_dependency_assigns_worker() {
+  local asdlc_root="$TMP_ROOT/asdlc-cross-feature-uppercase-complete"
+  setup_workspace "$asdlc_root"
+  local feature_dir=""
+  local sibling_dir=""
+  local plan_path=""
+  local out=""
+  local status=0
+
+  feature_dir="$(create_project_and_feature "$asdlc_root" "p1" "feature-a")"
+  sibling_dir="$asdlc_root/projects/p1/feature-z"
+  mkdir -p "$sibling_dir"
+  plan_path="$feature_dir/implementation_plan.md"
+  write_backend_plan_with_dependency "$plan_path" "feature-z/2.1"
+  write_sibling_plan_step_with_uppercase_checks "$sibling_dir/implementation_plan.md"
+  write_backend_worker_registry "$asdlc_root/projects/p1/workers.yaml"
+
+  out="$(
+    cd "$asdlc_root" &&
+    .commands/feature_assing_workers.sh --feature_path "projects/p1/feature-a" 2>&1
+  )"
+  status=$?
+  if [[ "$status" -ne 0 ]]; then
+    echo "Expected success with uppercase checked boxes but command failed:" >&2
+    echo "$out" >&2
+    exit 1
+  fi
+
+  assert_equal "11111111-1111-1111-1111-111111111111" "$(assignment_for_step "$plan_path" "1.1")"
+}
+
+test_rerun_flips_cross_feature_hold_to_assignment_after_dependency_completes() {
+  local asdlc_root="$TMP_ROOT/asdlc-cross-feature-rerun"
+  setup_workspace "$asdlc_root"
+  local feature_dir=""
+  local sibling_dir=""
+  local plan_path=""
+  local out=""
+  local status=0
+
+  feature_dir="$(create_project_and_feature "$asdlc_root" "p1" "feature-a")"
+  sibling_dir="$asdlc_root/projects/p1/feature-z"
+  mkdir -p "$sibling_dir"
+  plan_path="$feature_dir/implementation_plan.md"
+  write_backend_plan_with_dependency "$plan_path" "feature-z/2.1"
+  write_sibling_plan_step "$sibling_dir/implementation_plan.md" " "
+  write_backend_worker_registry "$asdlc_root/projects/p1/workers.yaml"
+
+  set +e
+  out="$(
+    cd "$asdlc_root" &&
+    .commands/feature_assing_workers.sh --feature_path "projects/p1/feature-a" 2>&1
+  )"
+  status=$?
+  set -e
+  assert_nonzero_status "$status"
+  assert_equal "hold: depends on feature-z/2.1" "$(assignment_for_step "$plan_path" "1.1")"
+
+  write_sibling_plan_step "$sibling_dir/implementation_plan.md" "x"
+  out="$(
+    cd "$asdlc_root" &&
+    .commands/feature_assing_workers.sh --feature_path "projects/p1/feature-a" 2>&1
+  )"
+  status=$?
+  if [[ "$status" -ne 0 ]]; then
+    echo "Expected rerun success but command failed:" >&2
+    echo "$out" >&2
+    exit 1
+  fi
+
+  assert_equal "11111111-1111-1111-1111-111111111111" "$(assignment_for_step "$plan_path" "1.1")"
+  assert_not_contains "$(cat "$plan_path")" "hold: depends on feature-z/2.1"
+}
+
+test_zero_sibling_plans_adds_no_cross_feature_holds() {
+  local asdlc_root="$TMP_ROOT/asdlc-zero-sibling"
+  setup_workspace "$asdlc_root"
+  local feature_dir=""
+  local plan_path=""
+  local out=""
+  local status=0
+
+  feature_dir="$(create_project_and_feature "$asdlc_root" "p1" "feature-a")"
+  plan_path="$feature_dir/implementation_plan.md"
+  write_backend_plan_with_dependency "$plan_path" "none"
+  write_backend_worker_registry "$asdlc_root/projects/p1/workers.yaml"
+
+  out="$(
+    cd "$asdlc_root" &&
+    .commands/feature_assing_workers.sh --feature_path "projects/p1/feature-a" 2>&1
+  )"
+  status=$?
+  if [[ "$status" -ne 0 ]]; then
+    echo "Expected success with zero sibling plans but command failed:" >&2
+    echo "$out" >&2
+    exit 1
+  fi
+
+  assert_equal "11111111-1111-1111-1111-111111111111" "$(assignment_for_step "$plan_path" "1.1")"
+  assert_not_contains "$(cat "$plan_path")" "hold: depends on"
+}
+
 test_missing_feature_path_argument_is_rejected
 test_invalid_or_missing_feature_path_is_rejected
 test_missing_or_malformed_implementation_plan_is_rejected
 test_missing_or_malformed_worker_registry_is_rejected
 test_assignments_are_class_strict_and_error_lines_are_written_for_unstaffed_class
 test_multi_worker_selection_retries_and_succeeds
+test_incomplete_cross_feature_dependency_writes_hold
+test_dot_cross_feature_dependency_is_rejected
+test_completed_cross_feature_dependency_assigns_worker
+test_uppercase_completed_cross_feature_dependency_assigns_worker
+test_rerun_flips_cross_feature_hold_to_assignment_after_dependency_completes
+test_zero_sibling_plans_adds_no_cross_feature_holds
 
 echo "All feature_assing_workers tests passed."

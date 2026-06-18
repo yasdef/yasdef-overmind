@@ -8,7 +8,7 @@ FEATURE_BR_FILE=""
 MISSING_DATA_FILE=""
 MODELS_FILE=".setup/models.md"
 RULE_FILE=".rules/user_br_clarification_rule.md"
-HELPER_SCRIPT=".helper/check_task_to_br_quality.sh"
+HELPER_SCRIPT=".helper/check_user_br_clarification_quality.sh"
 MODEL_PHASE="user_br_clarification"
 
 MODEL_CMD=""
@@ -280,8 +280,7 @@ main() {
 
   local missing_data_path="$repo_root/$MISSING_DATA_FILE"
   if [[ ! -f "$missing_data_path" ]]; then
-    echo "No missing-data artifact found at $MISSING_DATA_FILE; skipping user BR clarification."
-    exit 0
+    die "Required missing-data artifact not found: $MISSING_DATA_FILE. Run .commands/feature_task_to_br.sh for this feature before user BR clarification."
   fi
 
   if ! missing_data_has_non_rised_items "$missing_data_path"; then

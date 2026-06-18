@@ -36,8 +36,9 @@ Must not own:
 - Do not modify input artifacts.
 - Do not create or modify unrelated files.
 
-## Project Type Branching
-- If project type is `A`, `B`, or `C`: produce the plan from implementation slices, requirements, technical requirements, and contract delta.
+## Scope Handling
+- Produce the implementation plan from implementation slices, requirements, technical requirements, and contract delta for the feature's active repo classes.
+- Treat `project_type_code` as historical metadata only; do not branch plan generation on it.
 
 ## Output Format Baseline
 - Use the prompt-provided template as the structure contract.
@@ -45,7 +46,7 @@ Must not own:
 - Preserve step block structure exactly:
   - `### Step <major>.<minor> <title> [REQ-*] [NFR-*] ...`
   - `#### Repo: <backend|frontend|mobile>`
-  - `#### Depends on: <none|step ids>`
+  - `#### Depends on: <none|same-feature step ids|cross-feature refs>`
   - `#### Evidence: <gap/TECH_REQ-id, comp/component-slug, ...>`
   - `#### Preserved Surface: <none|operator-facing surface identity>`
   - optional `#### Assigned: <worker-uuid>`
@@ -69,6 +70,8 @@ Must not own:
 - Put shared contracts or common prerequisite work before dependent repo-specific work.
 - Allow backend, frontend, and mobile steps to proceed in parallel unless a real contract, payload, schema, state, or prerequisite dependency blocks parallel execution.
 - Every `#### Depends on:` edge must reflect a real dependency reason, not convenience ordering.
+- `#### Depends on:` entries containing `/` are cross-feature references and must use exactly `<feature-folder>/<step-id>`, for example `0003_customer_accounts/3.2`.
+- `#### Depends on:` entries without `/` remain same-feature step ids and must reference earlier steps in this plan.
 - Preserve useful thin slice boundaries from `<IMPLEMENTATION_SLICES_ARTIFACT>` by default.
 - When a slice preserves a required missing operator-facing surface, keep that surface explicit in at least one plan step after any reorder/split/merge transformation.
 - Supporting API/auth/contract/state/coordination work may surround preserved surfaces, but it never fulfills preserved-surface delivery by itself.

@@ -243,6 +243,7 @@ capture_dir="${TEST_CAPTURE_DIR:?TEST_CAPTURE_DIR must be set}"
 target_plan="${TARGET_PLAN_FILE:-projects/p1/feature-a/implementation_plan.md}"
 target_review="${TARGET_REVIEW_FILE:-projects/p1/feature-a/implementation_plan_semantic_review.md}"
 review_variant="${STUB_REVIEW_VARIANT:-missing-inbound}"
+feature_root="$(dirname "$target_plan")"
 
 printf '%s\n' "$@" >"$capture_dir/codex_args.txt"
 printf '%s' "${!#}" >"$capture_dir/codex_prompt.txt"
@@ -281,6 +282,69 @@ cat >"$target_plan" <<'PLAN'
 PLAN
 
 case "$review_variant" in
+  surface-map-driven)
+    if grep -R "(in-flight " "$feature_root"/project_surface_struct_resp_map_*.md >/dev/null 2>&1; then
+      cat >"$target_review" <<'REVIEW'
+# Implementation Plan Semantic Review
+
+## 1. Document Meta
+- feature_id: FEAT-SEM-001
+- feature_title: workspace-active-guard
+- source_implementation_plan: projects/p1/feature-a/implementation_plan.md
+- source_project_definition: projects/p1/init_progress_definition.yaml
+- source_requirements_ears: projects/p1/feature-a/requirements_ears.md
+- source_technical_requirements: projects/p1/feature-a/technical_requirements.md
+- review_status: complete
+- last_updated: 2026-04-11
+
+## 2. Review Guidance
+- completion_rule: Set review_status complete only when every finding is terminal (applied, rejected, postponed) or no_findings true.
+- user_question_format: Which finding numbers should I apply to implementation_plan.md? (examples: 1,3 | all | none | postpone 2 | reject 4)
+- allowed_finding_types: step_scope_overlap, technical_gap_mix, dependency_ordering, requirement_grouping, delivered_surface_consumption_unclear, repo_scaffold_readiness_unclear
+- allowed_severity: High, Medium, Low
+- allowed_states: added, applied, rejected, postponed
+
+## 3. Findings Ledger
+### Finding 1 - In-flight sibling owns workspace route surface
+- severity: Medium
+- finding_type: step_scope_overlap
+- state: postponed
+- target_steps: Step 1.2
+- related_requirements: REQ-1
+- related_evidence: project_surface_struct_resp_map_frontend.md row tagged (in-flight feature-z)
+- summary: Step 1.2 overlaps a surface-map row already promised by in-flight sibling feature-z.
+- rationale: The current plan and sibling promise may duplicate product surface ownership unless the operator intentionally keeps both.
+- recommendation: Decide whether to reuse the sibling promise, depend on it, or keep both with explicit ownership notes.
+- user_selection: postponed
+- plan_patch_summary: No implementation plan change in this pass.
+- resolution_notes: User postponed the overlap decision for later plan alignment.
+REVIEW
+    else
+      cat >"$target_review" <<'REVIEW'
+# Implementation Plan Semantic Review
+
+## 1. Document Meta
+- feature_id: FEAT-SEM-001
+- feature_title: workspace-active-guard
+- source_implementation_plan: projects/p1/feature-a/implementation_plan.md
+- source_project_definition: projects/p1/init_progress_definition.yaml
+- source_requirements_ears: projects/p1/feature-a/requirements_ears.md
+- source_technical_requirements: projects/p1/feature-a/technical_requirements.md
+- review_status: complete
+- last_updated: 2026-04-11
+
+## 2. Review Guidance
+- completion_rule: Set review_status complete only when every finding is terminal (applied, rejected, postponed) or no_findings true.
+- user_question_format: Which finding numbers should I apply to implementation_plan.md? (examples: 1,3 | all | none | postpone 2 | reject 4)
+- allowed_finding_types: step_scope_overlap, technical_gap_mix, dependency_ordering, requirement_grouping, delivered_surface_consumption_unclear, repo_scaffold_readiness_unclear
+- allowed_severity: High, Medium, Low
+- allowed_states: added, applied, rejected, postponed
+
+## 3. Findings Ledger
+- no_findings: true
+REVIEW
+    fi
+    ;;
   sibling-covered)
     cat >"$target_review" <<'REVIEW'
 # Implementation Plan Semantic Review
@@ -683,6 +747,63 @@ test_prompt_includes_surface_maps_when_present() {
   assert_contains "$codex_prompt" "projects/p1/feature-a/project_surface_struct_resp_map_frontend.md"
 }
 
+test_in_flight_surface_map_row_emits_overlap_finding() {
+  local repo_dir="$TMP_ROOT/repo-in-flight-overlap-finding"
+  local capture_dir="$TMP_ROOT/capture-in-flight-overlap-finding"
+  mkdir -p "$repo_dir" "$capture_dir"
+  setup_git_workspace "$repo_dir"
+  setup_codex_stub "$repo_dir"
+
+  local rule_text
+  rule_text="$(cat "$repo_dir/asdlc/.rules/implementation_plan_semantic_review_rule.md")"
+  assert_contains "$rule_text" 'Treat every read-only surface-map row tagged `(in-flight <feature-folder>)` as an in-flight sibling promise overlap'
+  assert_contains "$rule_text" "Use finding type \`step_scope_overlap\` for in-flight sibling promise overlaps"
+
+  cat >"$repo_dir/asdlc/projects/p1/feature-a/project_surface_struct_resp_map_frontend.md" <<'OUT'
+# Frontend Surface Map
+
+## Section 4
+- user_reachable_surface: /admin/workspace (in-flight feature-z)
+OUT
+
+  (
+    cd "$repo_dir/asdlc" &&
+    PATH="$repo_dir/bin:$PATH" TEST_CAPTURE_DIR="$capture_dir" STUB_REVIEW_VARIANT="surface-map-driven" \
+      .commands/feature_implementation_plan_semantic_review.sh --feature_path "projects/p1/feature-a"
+  ) >/dev/null
+
+  local review_artifact
+  review_artifact="$(cat "$repo_dir/asdlc/projects/p1/feature-a/implementation_plan_semantic_review.md")"
+  assert_contains "$review_artifact" "finding_type: step_scope_overlap"
+  assert_contains "$review_artifact" "overlaps a surface-map row already promised by in-flight sibling feature-z"
+  assert_contains "$review_artifact" "related_evidence: project_surface_struct_resp_map_frontend.md row tagged (in-flight feature-z)"
+}
+
+test_no_in_flight_surface_map_rows_adds_no_overlap_finding() {
+  local repo_dir="$TMP_ROOT/repo-no-in-flight-overlap-finding"
+  local capture_dir="$TMP_ROOT/capture-no-in-flight-overlap-finding"
+  mkdir -p "$repo_dir" "$capture_dir"
+  setup_git_workspace "$repo_dir"
+  setup_codex_stub "$repo_dir"
+  seed_surface_maps "$repo_dir"
+
+  local rule_text
+  rule_text="$(cat "$repo_dir/asdlc/.rules/implementation_plan_semantic_review_rule.md")"
+  assert_contains "$rule_text" 'Treat every read-only surface-map row tagged `(in-flight <feature-folder>)` as an in-flight sibling promise overlap'
+
+  (
+    cd "$repo_dir/asdlc" &&
+    PATH="$repo_dir/bin:$PATH" TEST_CAPTURE_DIR="$capture_dir" STUB_REVIEW_VARIANT="surface-map-driven" \
+      .commands/feature_implementation_plan_semantic_review.sh --feature_path "projects/p1/feature-a"
+  ) >/dev/null
+
+  local review_artifact
+  review_artifact="$(cat "$repo_dir/asdlc/projects/p1/feature-a/implementation_plan_semantic_review.md")"
+  assert_contains "$review_artifact" "- no_findings: true"
+  assert_not_contains "$review_artifact" "in-flight sibling"
+  assert_not_contains "$review_artifact" "finding_type: step_scope_overlap"
+}
+
 test_fails_when_active_surface_map_missing() {
   local repo_dir="$TMP_ROOT/repo-missing-active-map"
   local capture_dir="$TMP_ROOT/capture-missing-active-map"
@@ -706,7 +827,7 @@ test_fails_when_active_surface_map_missing() {
   assert_contains "$out" "Required surface-map artifacts not found for active repo classes: frontend"
 }
 
-test_type_a_repo_scaffold_readiness_finding_is_supported() {
+test_deferred_class_repo_scaffold_readiness_finding_is_supported() {
   local repo_dir="$TMP_ROOT/repo-scaffold-readiness"
   local capture_dir="$TMP_ROOT/capture-scaffold-readiness"
   mkdir -p "$repo_dir" "$capture_dir"
@@ -716,8 +837,8 @@ test_type_a_repo_scaffold_readiness_finding_is_supported() {
   cat >"$repo_dir/asdlc/projects/p1/init_progress_definition.yaml" <<'OUT'
 meta_info:
   project_id: "p1"
-  project_type_code: "A"
-  project_type_label: "New project"
+  project_type_code: "B"
+  project_type_label: "Existing project with partial context"
   project_classes:
     - backend
     - frontend
@@ -802,8 +923,10 @@ test_runs_with_absolute_feature_path
 test_missing_inbound_surface_emits_delivered_surface_finding
 test_sibling_inbound_surface_has_no_delivered_surface_finding
 test_prompt_includes_surface_maps_when_present
+test_in_flight_surface_map_row_emits_overlap_finding
+test_no_in_flight_surface_map_rows_adds_no_overlap_finding
 test_fails_when_active_surface_map_missing
-test_type_a_repo_scaffold_readiness_finding_is_supported
+test_deferred_class_repo_scaffold_readiness_finding_is_supported
 test_terminal_delivered_surface_finding_requires_resolution_notes
 test_delivered_surface_finding_requires_requirement_link
 

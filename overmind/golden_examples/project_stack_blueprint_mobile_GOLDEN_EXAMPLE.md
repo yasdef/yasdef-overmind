@@ -4,7 +4,6 @@
 - class: mobile
 - repo_name: payments-mobile
 - service_name: payments-app
-- planned_repo_path: /planned/repos/payments-mobile (planned)
 - group_id_or_package_root: app
 - last_updated: 2026-04-26
 
@@ -67,4 +66,3 @@
 - folder_paths: app/src/test, app/src/androidTest, ios/AppTests, ios/AppUITests
 - archetypes: UnitTest, UITest, ContractTest
 - user_reachable_pattern: none
-

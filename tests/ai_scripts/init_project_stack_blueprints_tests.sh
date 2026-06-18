@@ -156,7 +156,6 @@ valid)
 - class: backend
 - repo_name: sample-backend
 - service_name: sample-api
-- planned_repo_path: /planned/sample-backend (planned)
 - group_id: com.example.sample
 - last_updated: 2026-04-26
 
@@ -221,7 +220,6 @@ DOC
 - class: frontend
 - repo_name: sample-frontend
 - service_name: sample-web
-- planned_repo_path: /planned/sample-frontend (planned)
 - group_id_or_package_root: src
 - last_updated: 2026-04-26
 
@@ -284,7 +282,6 @@ revision)
 - class: backend
 - repo_name: sample-backend
 - service_name: sample-api
-- planned_repo_path: /planned/sample-backend (planned)
 - group_id: com.example.sample
 - last_updated: 2026-04-26
 
@@ -349,7 +346,6 @@ DOC
 - class: frontend
 - repo_name: sample-frontend
 - service_name: sample-web
-- planned_repo_path: /planned/sample-frontend (planned)
 - group_id_or_package_root: src
 - last_updated: 2026-04-26
 

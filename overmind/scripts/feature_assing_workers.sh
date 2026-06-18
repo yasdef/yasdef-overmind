@@ -227,31 +227,12 @@ ensure_worker_registry_contract() {
 parse_plan_repo_classes() {
   local plan_path="$1"
 
-  awk -v plan_path="$plan_path" '
-function fail_readiness(message) {
-  print "ERROR: Implementation plan is not ready: " message > "/dev/stderr"
-  exit 1
-}
-function finalize_step() {
-  if (!in_step) {
-    return
-  }
-  if (current_repo == "") {
-    fail_readiness("step " step_index " is missing #### Repo: metadata in " plan_path)
-  }
-}
+  awk '
 BEGIN {
   in_step = 0
-  saw_step = 0
-  step_index = 0
-  current_repo = ""
 }
 /^### Step[[:space:]]+/ {
-  finalize_step()
   in_step = 1
-  saw_step = 1
-  step_index++
-  current_repo = ""
   next
 }
 {
@@ -259,26 +240,13 @@ BEGIN {
     next
   }
   if ($0 ~ /^#### Repo:[[:space:]]*/) {
-    if (current_repo != "") {
-      fail_readiness("step " step_index " declares #### Repo: more than once in " plan_path)
-    }
-
     repo_value = tolower($0)
     sub(/^#### repo:[[:space:]]*/, "", repo_value)
     gsub(/[[:space:]]+$/, "", repo_value)
-    if (!(repo_value == "backend" || repo_value == "frontend" || repo_value == "mobile")) {
-      fail_readiness("step " step_index " has unsupported repo class in " plan_path ": " repo_value)
-    }
-
-    current_repo = repo_value
     seen[repo_value] = 1
   }
 }
 END {
-  finalize_step()
-  if (!saw_step) {
-    fail_readiness("expected at least one ### Step block in " plan_path)
-  }
   if (seen["backend"] == 1) {
     print "backend"
   }
@@ -505,21 +473,36 @@ resolve_class_assignments() {
 
 rewrite_plan_with_assignments() {
   local plan_path="$1"
-  local output_path="$2"
+  local feature_abs_path="$2"
+  local output_path="$3"
 
   awk \
     -v assign_backend="$ASSIGNMENT_BACKEND" \
     -v assign_frontend="$ASSIGNMENT_FRONTEND" \
     -v assign_mobile="$ASSIGNMENT_MOBILE" \
+    -v feature_abs_path="$feature_abs_path" \
     -v plan_path="$plan_path" '
+function trim(value) {
+  sub(/^[[:space:]]+/, "", value)
+  sub(/[[:space:]]+$/, "", value)
+  return value
+}
 function fail_readiness(message) {
   print "ERROR: Implementation plan is not ready: " message > "/dev/stderr"
   exit 1
+}
+function step_id_from_heading(line,    rest, parts) {
+  rest = line
+  sub(/^###[[:space:]]+Step[[:space:]]+/, "", rest)
+  split(rest, parts, /[[:space:]]+/)
+  return parts[1]
 }
 function reset_step_buffer() {
   line_count = 0
   insert_after = 0
   current_repo = ""
+  current_depends = ""
+  current_step_id = ""
 }
 function step_assignment_for_repo(repo_name) {
   if (repo_name == "backend") {
@@ -533,6 +516,79 @@ function step_assignment_for_repo(repo_name) {
   }
   return ""
 }
+function dependency_step_complete(sibling_plan_path, dependency_step_id,    line, found_step, checklist_count, incomplete_checklist, candidate_step_id, getline_status) {
+  found_step = 0
+  checklist_count = 0
+  incomplete_checklist = 0
+
+  while ((getline_status = (getline line < sibling_plan_path)) > 0) {
+    if (line ~ /^###[[:space:]]+Step[[:space:]]+/) {
+      if (found_step == 1) {
+        break
+      }
+      candidate_step_id = step_id_from_heading(line)
+      if (candidate_step_id == dependency_step_id) {
+        found_step = 1
+      }
+      continue
+    }
+
+    if (found_step != 1) {
+      continue
+    }
+
+    if (line ~ /^[[:space:]]*-[[:space:]]*\[[^]]+\]/) {
+      checklist_count++
+      if (line !~ /^[[:space:]]*-[[:space:]]*\[[xX]\]([[:space:]]|$)/) {
+        incomplete_checklist = 1
+      }
+    }
+  }
+  close(sibling_plan_path)
+
+  return (found_step == 1 && checklist_count > 0 && incomplete_checklist == 0)
+}
+function cross_dependency_hold(dep,    slash_index, feature_folder, dependency_step_id, sibling_plan_path) {
+  slash_index = index(dep, "/")
+  feature_folder = substr(dep, 1, slash_index - 1)
+  dependency_step_id = substr(dep, slash_index + 1)
+
+  if (feature_folder == "" || dependency_step_id == "" || dep !~ /^[A-Za-z0-9._-]+\/[0-9]+(\.[0-9]+)*$/) {
+    fail_readiness("step " current_step_id " has malformed cross-feature dependency " dep)
+  }
+  if (feature_folder == "." || feature_folder == "..") {
+    fail_readiness("step " current_step_id " has malformed cross-feature dependency " dep)
+  }
+
+  sibling_plan_path = feature_abs_path "/../" feature_folder "/implementation_plan.md"
+  if (!dependency_step_complete(sibling_plan_path, dependency_step_id)) {
+    return "hold: depends on " dep
+  }
+
+  return ""
+}
+function hold_assignment_for_depends(depends_value,    dep_parts, dep_count, i, dep, hold_value) {
+  depends_value = trim(depends_value)
+  if (depends_value == "" || tolower(depends_value) == "none") {
+    return ""
+  }
+
+  dep_count = split(depends_value, dep_parts, /,/)
+  for (i = 1; i <= dep_count; i++) {
+    dep = trim(dep_parts[i])
+    if (dep == "") {
+      continue
+    }
+    if (index(dep, "/") > 0) {
+      hold_value = cross_dependency_hold(dep)
+      if (hold_value != "") {
+        return hold_value
+      }
+    }
+  }
+
+  return ""
+}
 function flush_step(    i, insertion_index, assigned_value) {
   if (in_step == 0) {
     return
@@ -541,7 +597,10 @@ function flush_step(    i, insertion_index, assigned_value) {
     fail_readiness("step " step_index " is missing #### Repo: metadata in " plan_path)
   }
 
-  assigned_value = step_assignment_for_repo(current_repo)
+  assigned_value = hold_assignment_for_depends(current_depends)
+  if (assigned_value == "") {
+    assigned_value = step_assignment_for_repo(current_repo)
+  }
   if (assigned_value == "") {
     fail_readiness("step " step_index " has no resolved assignment mapping for repo class " current_repo)
   }
@@ -578,6 +637,7 @@ BEGIN {
   in_step = 1
   saw_step = 1
   step_index++
+  current_step_id = step_id_from_heading($0)
   line_count++
   lines[line_count] = $0
   next
@@ -599,6 +659,18 @@ BEGIN {
       fail_readiness("step " step_index " has unsupported repo class in " plan_path ": " repo_value)
     }
     current_repo = repo_value
+    line_count++
+    lines[line_count] = $0
+    next
+  }
+
+  if ($0 ~ /^#### Depends on:[[:space:]]*/) {
+    if (current_depends != "") {
+      fail_readiness("step " step_index " declares #### Depends on: more than once in " plan_path)
+    }
+    depends_value = $0
+    sub(/^#### Depends on:[[:space:]]*/, "", depends_value)
+    current_depends = trim(depends_value)
     line_count++
     lines[line_count] = $0
     next
@@ -649,6 +721,11 @@ main() {
   absolute_workers_path="$runtime_root/$WORKERS_FILE"
   ensure_worker_registry_contract "$absolute_workers_path"
 
+  local readiness_helper=""
+  readiness_helper="$runtime_root/common_libs/check_implementation_plan_readiness.sh"
+  [[ -x "$readiness_helper" ]] || die "Required helper not found: check_implementation_plan_readiness.sh"
+  "$readiness_helper" --feature_path "$runtime_root/$FEATURE_PATH"
+
   while IFS= read -r plan_class; do
     [[ -n "$plan_class" ]] && plan_classes+=("$plan_class")
   done < <(parse_plan_repo_classes "$absolute_plan_path")
@@ -662,9 +739,13 @@ main() {
     die "Failed to create temporary file for implementation plan rewrite."
   fi
 
-  if ! rewrite_plan_with_assignments "$absolute_plan_path" "$tmp_output_path"; then
+  if ! rewrite_plan_with_assignments "$absolute_plan_path" "$runtime_root/$FEATURE_PATH" "$tmp_output_path"; then
     rm -f "$tmp_output_path"
     exit 1
+  fi
+
+  if grep -Eq '^#### Assigned:[[:space:]]*hold: depends on [^[:space:]]+/[^[:space:]]+' "$tmp_output_path"; then
+    HAS_ASSIGNMENT_ERRORS="yes"
   fi
 
   if ! mv "$tmp_output_path" "$absolute_plan_path"; then
@@ -688,7 +769,7 @@ main() {
   done
 
   if [[ "$HAS_ASSIGNMENT_ERRORS" == "yes" ]]; then
-    echo "ERROR: assignment completed with class availability issues. Review #### Assigned lines in $IMPLEMENTATION_PLAN_FILE." >&2
+    echo "ERROR: assignment completed with class availability issues or dependency holds. Review #### Assigned lines in $IMPLEMENTATION_PLAN_FILE." >&2
     exit 1
   fi
 }

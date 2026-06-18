@@ -25,14 +25,17 @@ PROJECT_CLASSES=()
 APPLICABLE_REPO_CLASSES=()
 READONLY_INPUT_FILES=()
 READONLY_SNAPSHOTS=()
+SYNC_REPO_TO_DEFAULT_BRANCH=""
+LIST_COMMITTED_SIBLING_FEATURES=""
+IN_FLIGHT_FEATURE_FOLDERS=()
 
 die() {
   echo "ERROR: $*" >&2
   exit 1
 }
 
-fail_project_type_undefined() {
-  echo "unable to define project type" >&2
+fail_project_classes_undefined() {
+  echo "unable to define project classes" >&2
   exit 1
 }
 
@@ -293,37 +296,6 @@ BEGIN {
 ' "$definition_path"
 }
 
-project_type_label_for_code() {
-  case "$1" in
-    A) printf '%s' "New project" ;;
-    B) printf '%s' "Existing project with partial context" ;;
-    C) printf '%s' "Existing project with code-first context" ;;
-    *) return 1 ;;
-  esac
-}
-
-resolve_project_type_code() {
-  local definition_path="$1"
-  local project_type_code=""
-  local project_type_label=""
-  local expected_label=""
-
-  if ! project_type_code="$(extract_meta_scalar "$definition_path" "project_type_code" 2>/dev/null)"; then
-    fail_project_type_undefined
-  fi
-  if ! project_type_label="$(extract_meta_scalar "$definition_path" "project_type_label" 2>/dev/null)"; then
-    fail_project_type_undefined
-  fi
-  if ! expected_label="$(project_type_label_for_code "$project_type_code" 2>/dev/null)"; then
-    fail_project_type_undefined
-  fi
-  if [[ "$project_type_label" != "$expected_label" ]]; then
-    fail_project_type_undefined
-  fi
-
-  printf '%s' "$project_type_code"
-}
-
 resolve_project_classes() {
   local definition_path="$1"
   local parsed_classes=""
@@ -333,7 +305,7 @@ resolve_project_classes() {
   PROJECT_CLASSES=()
 
   if ! parsed_classes="$(extract_meta_project_classes "$definition_path" 2>/dev/null)"; then
-    fail_project_type_undefined
+    fail_project_classes_undefined
   fi
 
   while IFS= read -r class_name; do
@@ -348,13 +320,13 @@ resolve_project_classes() {
         fi
         ;;
       *)
-        fail_project_type_undefined
+        fail_project_classes_undefined
         ;;
     esac
   done <<<"$parsed_classes"
 
   if [[ ${#PROJECT_CLASSES[@]} -eq 0 ]]; then
-    fail_project_type_undefined
+    fail_project_classes_undefined
   fi
 }
 
@@ -403,13 +375,82 @@ ensure_required_files() {
   done
 }
 
+source_class_repo_paths_lib() {
+  local runtime_root="$1"
+  local lib_path="$runtime_root/common_libs/class_repo_paths.sh"
+  [[ -f "$lib_path" ]] || die "Required command lib not found: common_libs/class_repo_paths.sh"
+  # shellcheck source=/dev/null
+  source "$lib_path"
+}
+
+resolve_sync_repo_helper() {
+  local runtime_root="$1"
+  SYNC_REPO_TO_DEFAULT_BRANCH="$runtime_root/common_libs/sync_repo_to_default_branch.sh"
+  [[ -x "$SYNC_REPO_TO_DEFAULT_BRANCH" ]] || die "Required command lib not found or not executable: common_libs/sync_repo_to_default_branch.sh"
+}
+
+resolve_sibling_lister_helper() {
+  local runtime_root="$1"
+  LIST_COMMITTED_SIBLING_FEATURES="$runtime_root/common_libs/list_committed_sibling_features.sh"
+  [[ -x "$LIST_COMMITTED_SIBLING_FEATURES" ]] || die "Required command lib not found or not executable: common_libs/list_committed_sibling_features.sh"
+}
+
+collect_in_flight_plan_sources() {
+  local runtime_root="$1"
+  local feature_abs_path="$runtime_root/$FEATURE_PATH"
+  local sibling_features=""
+  local sibling_folder=""
+
+  IN_FLIGHT_FEATURE_FOLDERS=()
+
+  if ! sibling_features="$("$LIST_COMMITTED_SIBLING_FEATURES" --feature_path "$feature_abs_path" 2>&1)"; then
+    echo "$sibling_features" >&2
+    exit 1
+  fi
+
+  while IFS= read -r sibling_folder; do
+    sibling_folder="$(trim_value "$sibling_folder")"
+    [[ -n "$sibling_folder" ]] || continue
+    IN_FLIGHT_FEATURE_FOLDERS+=("$sibling_folder")
+  done <<<"$sibling_features"
+}
+
+sync_ready_supported_repo_paths() {
+  local definition_path="$1"
+  local entry=""
+  local resolved_path=""
+  local ready_paths=""
+
+  if ! ready_paths="$(class_repo_paths_collect_ready_paths "$definition_path" "backend,frontend,mobile" 2>&1)"; then
+    die "$ready_paths"
+  fi
+
+  while IFS= read -r entry; do
+    [[ -n "$entry" ]] || continue
+    IFS='|' read -r _class_name resolved_path <<<"$entry"
+    "$SYNC_REPO_TO_DEFAULT_BRANCH" "$resolved_path"
+  done <<<"$ready_paths"
+}
+
 prepare_readonly_inputs() {
+  local runtime_root="$1"
+  local sibling_folder=""
+  local relative_path=""
+
   READONLY_INPUT_FILES=(
     "$PROJECT_DEFINITION_FILE"
     "$REQUIREMENTS_EARS_FILE"
     "$TECHNICAL_REQUIREMENTS_FILE"
     "$IMPLEMENTATION_SLICES_FILE"
   )
+
+  if [[ ${#IN_FLIGHT_FEATURE_FOLDERS[@]} -gt 0 ]]; then
+    for sibling_folder in "${IN_FLIGHT_FEATURE_FOLDERS[@]}"; do
+      relative_path="$PROJECT_ROOT/$sibling_folder/implementation_plan.md"
+      [[ -f "$runtime_root/$relative_path" ]] || die "Required in-flight plan source not found: $relative_path"
+      READONLY_INPUT_FILES+=("$relative_path")
+    done
+  fi
 }
 
 load_model_config() {
@@ -486,19 +527,33 @@ render_repo_class_list() {
   done
 }
 
+render_in_flight_context_lines() {
+  local sibling_folder=""
+
+  if [[ ${#IN_FLIGHT_FEATURE_FOLDERS[@]} -eq 0 ]]; then
+    return 0
+  fi
+
+  printf '\n%s\n' "- In-flight promise evidence:"
+  for sibling_folder in "${IN_FLIGHT_FEATURE_FOLDERS[@]}"; do
+    printf '%s\n' "- In-flight plan source: $sibling_folder/implementation_plan.md"
+  done
+}
+
 build_prompt() {
   local runtime_root="$1"
-  local project_type_code="$2"
   local quality_command="$QUALITY_GATE_HELPER $PREREQUISITE_GAPS_FILE $REQUIREMENTS_EARS_FILE $TECHNICAL_REQUIREMENTS_FILE"
   local failure_msg=""
   local success_msg=""
   local repo_class_list=""
   local readonly_lines=""
+  local in_flight_context_lines=""
 
   failure_msg="$(failure_line)"
   success_msg="$(success_line)"
   repo_class_list="$(render_repo_class_list)"
   readonly_lines="$(render_readonly_input_lines)"
+  in_flight_context_lines="$(render_in_flight_context_lines)"
 
   cat <<EOF
 Run Step 8.2 prerequisite gap trace for this feature.
@@ -515,6 +570,8 @@ $readonly_lines
 - Derive externally-invocable prerequisites per EARS requirement using the class taxonomy in $RULE_FILE.
 - Use $TECHNICAL_REQUIREMENTS_FILE user_reachable_surface subfields as the ground truth for present_in_repo status.
 - Use $IMPLEMENTATION_SLICES_FILE as the ground truth for scheduled_in_slices status.
+- Use prompt-bound sibling implementation_plan.md sources as the ground truth for scheduled_in_feature <feature-folder>/<step-id> status.
+- If a missing prerequisite is covered by a sibling plan step, set status to scheduled_in_feature <feature-folder>/<step-id>, cite the sibling plan step in evidence, and keep slice_ref as none.
 - Any unmet prerequisite must be resolved before this phase can pass the quality gate.
 - Draft $PREREQUISITE_GAPS_FILE before running any quality gate command.
 - Use this quality gate command before finalizing: $quality_command
@@ -529,12 +586,12 @@ Context:
 - ASDLC workspace root: $runtime_root
 - Project root: $PROJECT_ROOT
 - Feature root: $FEATURE_PATH
-- Project type code: $project_type_code
 - Active repo classes for this run: $repo_class_list
 - Project definition source: $PROJECT_DEFINITION_FILE
 - Requirements source: $REQUIREMENTS_EARS_FILE
 - Technical requirements source: $TECHNICAL_REQUIREMENTS_FILE
 - Implementation slices source: $IMPLEMENTATION_SLICES_FILE
+- Sibling plan sources:${in_flight_context_lines:- none}
 - Target artifact: $PREREQUISITE_GAPS_FILE
 - Rule file: $RULE_FILE
 - Template file: $PREREQUISITE_GAPS_TEMPLATE_FILE
@@ -587,28 +644,27 @@ main() {
   local definition_path=""
   local models_path=""
   local output_path=""
-  local project_type_code=""
   local prompt_arg=""
 
   runtime_root="$(ensure_staged_command_runtime)"
+  source_class_repo_paths_lib "$runtime_root"
+  resolve_sync_repo_helper "$runtime_root"
+  resolve_sibling_lister_helper "$runtime_root"
   resolve_feature_path "$runtime_root" "$FEATURE_PATH_INPUT"
   resolve_project_root
   set_artifact_paths
   ensure_required_files "$runtime_root"
+  collect_in_flight_plan_sources "$runtime_root"
 
   definition_path="$runtime_root/$PROJECT_DEFINITION_FILE"
   models_path="$runtime_root/$MODELS_FILE"
   output_path="$runtime_root/$PREREQUISITE_GAPS_FILE"
 
-  project_type_code="$(resolve_project_type_code "$definition_path")"
   resolve_project_classes "$definition_path"
 
-  if [[ "$project_type_code" != "A" && "$project_type_code" != "B" && "$project_type_code" != "C" ]]; then
-    fail_project_type_undefined
-  fi
-
   collect_supported_repo_classes
-  prepare_readonly_inputs
+  sync_ready_supported_repo_paths "$definition_path"
+  prepare_readonly_inputs "$runtime_root"
 
   load_model_config "$models_path" "$MODEL_PHASE"
   if [[ "$MODEL_CMD" != "codex" ]]; then
@@ -619,7 +675,7 @@ main() {
   snapshot_readonly_inputs "$runtime_root"
   trap 'cleanup_snapshots' EXIT
 
-  prompt_arg="$(build_prompt "$runtime_root" "$project_type_code")"
+  prompt_arg="$(build_prompt "$runtime_root")"
 
   local cmd=("$MODEL_CMD" -m "$MODEL_MODEL")
   if [[ ${#MODEL_ARGS[@]} -gt 0 ]]; then

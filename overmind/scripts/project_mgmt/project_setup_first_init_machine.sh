@@ -6,6 +6,7 @@ UPDATE_PROJECT_SCRIPT="overmind/scripts/project_mgmt/project_setup_update_projec
 INIT_PROGRESS_SCANNER_SCRIPT="overmind/scripts/project_mgmt/init_progress_scanner.sh"
 INIT_PROJECT_STACK_BLUEPRINTS_SCRIPT="overmind/scripts/init_project_stack_blueprints.sh"
 INIT_COMMON_CONTRACT_DEFINITION_SCRIPT="overmind/scripts/init_common_contract_definition.sh"
+PROJECT_CONTRACT_RECONCILIATION_SCRIPT="overmind/scripts/project_mgmt/project_contract_reconciliation.sh"
 FEATURE_BR_SCAFFOLD_SCRIPT="overmind/scripts/feature_br_scaffold.sh"
 PROJECT_ADD_FEATURE_E2E_SCRIPT="overmind/scripts/project_mgmt/project_add_feature_e2e.sh"
 REGISTER_WORKER_SCRIPT="overmind/scripts/project_mgmt/project_register_worker.sh"
@@ -118,6 +119,7 @@ STAGED_HELPER_FILES=(
   "check_requirements_ears_review_quality.sh"
   "check_requirements_ears_quality.sh"
   "check_task_to_br_quality.sh"
+  "check_user_br_clarification_quality.sh"
 )
 STAGED_SETUP_FILES=(
   "external_sources.yaml"
@@ -128,7 +130,12 @@ STAGED_SETUP_FILES_PRESERVE_IF_EXISTS=(
   "models.md"
 )
 STAGED_COMMAND_LIB_FILES=(
+  "class_repo_paths.sh"
+  "check_implementation_plan_readiness.sh"
+  "list_committed_sibling_features.sh"
+  "persist_class_repo_attach.sh"
   "project_setup_common.sh"
+  "sync_repo_to_default_branch.sh"
 )
 
 die() {
@@ -561,6 +568,10 @@ stage_command_libs() {
       die "Failed to stage command lib: $COMMON_LIBS_SOURCE_DIR/$source_file_name"
     fi
 
+    if ! chmod +x "$target_path"; then
+      die "Failed to set executable permission on staged command lib: $target_path"
+    fi
+
     if [[ "$announce_added" == "yes" && "$existed_before" == "no" ]]; then
       log_update_mode_added_file "$target_path"
     fi
@@ -584,6 +595,7 @@ stage_commands() {
   stage_command_script "$repo_root" "$INIT_PROGRESS_SCANNER_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
   stage_command_script "$repo_root" "$INIT_PROJECT_STACK_BLUEPRINTS_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
   stage_command_script "$repo_root" "$INIT_COMMON_CONTRACT_DEFINITION_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
+  stage_command_script "$repo_root" "$PROJECT_CONTRACT_RECONCILIATION_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
   stage_command_script "$repo_root" "$REGISTER_WORKER_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
   stage_command_script "$repo_root" "$FEATURE_BR_SCAFFOLD_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
   stage_command_script "$repo_root" "$PROJECT_ADD_FEATURE_E2E_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"

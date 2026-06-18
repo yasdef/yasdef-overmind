@@ -138,6 +138,72 @@ test_passes_with_all_resolved() {
   assert_contains "$out" "quality gate passed"
 }
 
+test_passes_when_scheduled_in_feature_has_evidence() {
+  local repo_dir="$TMP_ROOT/repo-scheduled-in-feature"
+  mkdir -p "$repo_dir/projects/p1/feature-a"
+  setup_repo_with_helper "$repo_dir"
+
+  cat >"$repo_dir/projects/p1/feature-a/prerequisite_gaps.md" <<'OUT'
+# Prerequisite Gaps
+
+## 2. Prerequisite Trace
+
+### Requirement: REQ-4
+- requirement_summary: Operator authentication starts from an admin login surface.
+- prerequisites: see entries below
+
+#### Prerequisite: Admin login page
+- status: scheduled_in_feature feature-z/2.1
+- surface_kind: required_missing_user_reachable_surface
+- surface_identity: Admin login page
+- evidence: feature-z/implementation_plan.md step 2.1 adds /admin/login route and Admin login page.
+- slice_ref: none
+OUT
+
+  local result
+  result="$(run_helper "$repo_dir" "projects/p1/feature-a/prerequisite_gaps.md")"
+  local status
+  status="$(printf '%s\n' "$result" | head -n1)"
+  local out
+  out="$(printf '%s\n' "$result" | tail -n +2)"
+
+  assert_equal "0" "$status"
+  assert_contains "$out" "quality gate passed"
+}
+
+test_passes_when_scheduled_in_feature_has_extra_separator_space() {
+  local repo_dir="$TMP_ROOT/repo-scheduled-in-feature-space"
+  mkdir -p "$repo_dir/projects/p1/feature-a"
+  setup_repo_with_helper "$repo_dir"
+
+  cat >"$repo_dir/projects/p1/feature-a/prerequisite_gaps.md" <<'OUT'
+# Prerequisite Gaps
+
+## 2. Prerequisite Trace
+
+### Requirement: REQ-4
+- requirement_summary: Operator authentication starts from an admin login surface.
+- prerequisites: see entries below
+
+#### Prerequisite: Admin login page
+- status: scheduled_in_feature  feature-z/2.1
+- surface_kind: required_missing_user_reachable_surface
+- surface_identity: Admin login page
+- evidence: feature-z/implementation_plan.md step 2.1 adds /admin/login route and Admin login page.
+- slice_ref: none
+OUT
+
+  local result
+  result="$(run_helper "$repo_dir" "projects/p1/feature-a/prerequisite_gaps.md")"
+  local status
+  status="$(printf '%s\n' "$result" | head -n1)"
+  local out
+  out="$(printf '%s\n' "$result" | tail -n +2)"
+
+  assert_equal "0" "$status"
+  assert_contains "$out" "quality gate passed"
+}
+
 test_fails_when_entry_has_unmet_status() {
   local repo_dir="$TMP_ROOT/repo-unmet"
   mkdir -p "$repo_dir/projects/p1/feature-a"
@@ -555,6 +621,8 @@ OUT
 }
 
 test_passes_with_all_resolved
+test_passes_when_scheduled_in_feature_has_evidence
+test_passes_when_scheduled_in_feature_has_extra_separator_space
 test_fails_when_entry_has_unmet_status
 test_fails_when_present_in_repo_missing_evidence
 test_fails_when_scheduled_in_slices_missing_slice_ref

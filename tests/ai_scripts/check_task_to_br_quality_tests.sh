@@ -3,6 +3,7 @@ set -euo pipefail
 
 SOURCE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 HELPER_SRC="$SOURCE_ROOT/overmind/scripts/helper/check_task_to_br_quality.sh"
+USER_CLARIFICATION_HELPER_SRC="$SOURCE_ROOT/overmind/scripts/helper/check_user_br_clarification_quality.sh"
 
 TMP_ROOT="$(mktemp -d)"
 trap 'rm -rf "$TMP_ROOT"' EXIT
@@ -48,6 +49,33 @@ setup_repo_with_helper() {
 - request_summary: Invoice approval visibility
 - additional_business_context: [UNFILLED]
 OUT
+  write_empty_missing_data "$repo_dir"
+}
+
+write_empty_missing_data() {
+  local repo_dir="$1"
+
+  cat >"$repo_dir/overmind/product/missing_br_data.md" <<'OUT'
+# Missing Business Data
+
+## 2. Missing Business Fields
+- none
+
+## 3. Unresolved Items Ledger (Rised)
+
+## 6. Latest User Answers
+- answers: [UNFILLED]
+
+## 7. Loop Decision
+- unresolved_after_stop: none
+OUT
+}
+
+setup_repo_with_user_clarification_helper() {
+  local repo_dir="$1"
+  setup_repo_with_helper "$repo_dir"
+  cp "$USER_CLARIFICATION_HELPER_SRC" "$repo_dir/overmind/scripts/helper/check_user_br_clarification_quality.sh"
+  chmod +x "$repo_dir/overmind/scripts/helper/check_user_br_clarification_quality.sh"
 }
 
 write_complete_summary() {
@@ -104,6 +132,26 @@ test_helper_passes_when_required_fields_fr_and_br_exist() {
 
   assert_contains "$out" "business-context gate passed"
 }
+
+test_helper_fails_when_missing_data_artifact_is_missing() {
+  local repo_dir="$TMP_ROOT/repo-helper-missing-data-artifact"
+  mkdir -p "$repo_dir"
+  setup_repo_with_helper "$repo_dir"
+  write_complete_summary "$repo_dir"
+  rm -f "$repo_dir/overmind/product/missing_br_data.md"
+
+  local status=0
+  local out=""
+  set +e
+  out="$(cd "$repo_dir" && overmind/scripts/helper/check_task_to_br_quality.sh 2>&1)"
+  status=$?
+  set -e
+
+  assert_equal "1" "$status"
+  assert_contains "$out" "business-context gate failed"
+  assert_contains "$out" "missing: missing_br_data.md must exist; create it with an empty unresolved ledger when no business gaps remain"
+}
+
 
 test_helper_fails_with_exit_code_1_when_required_business_goal_is_missing() {
   local repo_dir="$TMP_ROOT/repo-helper-missing-business-goal"
@@ -298,7 +346,7 @@ OUT
 
   assert_equal "1" "$status"
   assert_contains "$out" "business-context gate failed"
-  assert_contains "$out" "missing: ## 15. Open Questions -> non-rised unresolved items must be moved to missing_br_data.md and marked rised"
+  assert_contains "$out" "missing: ## 15. Open Questions -> unresolved items must be moved to missing_br_data.md as rised_item_N with rised=false"
 }
 
 test_helper_fails_when_assumptions_needing_validation_have_non_rised_value() {
@@ -351,7 +399,7 @@ OUT
 
   assert_equal "1" "$status"
   assert_contains "$out" "business-context gate failed"
-  assert_contains "$out" "missing: ### Needs validation -> non-rised assumptions_needing_validation must be moved to missing_br_data.md and marked rised"
+  assert_contains "$out" "missing: ### Needs validation -> unresolved assumptions_needing_validation must be moved to missing_br_data.md as rised_item_N with rised=false"
 }
 
 test_helper_fails_when_unclear_scope_points_have_non_rised_value() {
@@ -400,7 +448,7 @@ OUT
 
   assert_equal "1" "$status"
   assert_contains "$out" "business-context gate failed"
-  assert_contains "$out" "missing: ### 5.3 Open scope boundaries -> non-rised unclear_scope_points must be moved to missing_br_data.md and marked rised"
+  assert_contains "$out" "missing: ### 5.3 Open scope boundaries -> unresolved unclear_scope_points must be moved to missing_br_data.md as rised_item_N with rised=false"
 }
 
 test_helper_passes_when_rised_markers_are_present() {
@@ -513,7 +561,7 @@ OUT
   assert_contains "$out" "missing: missing_br_data.md -> unresolved rised items exist but ## 7. Loop Decision -> unresolved_after_stop is [UNFILLED]"
 }
 
-test_helper_fails_when_missing_data_has_non_rised_items() {
+test_helper_passes_when_missing_data_has_non_rised_items_with_loop_decision() {
   local repo_dir="$TMP_ROOT/repo-helper-missing-data-non-rised-items"
   mkdir -p "$repo_dir"
   setup_repo_with_helper "$repo_dir"
@@ -525,7 +573,34 @@ test_helper_fails_when_missing_data_has_non_rised_items() {
 - rised_item_1: source=## 15. Open Questions -> critical_questions; rised=false; unresolved_item=Is legal approval required for cross-region invoice routing?
 
 ## 6. Latest User Answers
-- answers: This was recorded in ## 7. Business Rules and Decision Logic - BR-1.
+- answers: [UNFILLED]
+
+## 7. Loop Decision
+- unresolved_after_stop: Pending legal policy clarification from business owner.
+OUT
+
+  local out
+  out="$(
+    cd "$repo_dir" &&
+    overmind/scripts/helper/check_task_to_br_quality.sh
+  )"
+
+  assert_contains "$out" "business-context gate passed"
+}
+
+test_helper_fails_when_missing_data_rised_item_has_no_state() {
+  local repo_dir="$TMP_ROOT/repo-helper-missing-data-invalid-rised-state"
+  mkdir -p "$repo_dir"
+  setup_repo_with_helper "$repo_dir"
+  write_complete_summary "$repo_dir"
+  cat >"$repo_dir/overmind/product/missing_br_data.md" <<'OUT'
+# Missing Business Data
+
+## 3. Unresolved Items Ledger (Rised)
+- rised_item_1: source=## 15. Open Questions -> critical_questions; unresolved_item=Is legal approval required for cross-region invoice routing?
+
+## 6. Latest User Answers
+- answers: [UNFILLED]
 
 ## 7. Loop Decision
 - unresolved_after_stop: Pending legal policy clarification from business owner.
@@ -540,7 +615,7 @@ OUT
 
   assert_equal "1" "$status"
   assert_contains "$out" "business-context gate failed"
-  assert_contains "$out" "missing: missing_br_data.md -> unresolved ledger contains non-rised items; continue questioning until every rised_item_N is rised=true"
+  assert_contains "$out" "missing: missing_br_data.md -> every unresolved ledger item must include rised=false or rised=true"
 }
 
 test_helper_passes_when_missing_data_rised_items_have_loop_fields_filled() {
@@ -599,6 +674,64 @@ OUT
   assert_contains "$out" "business-context gate passed"
 }
 
+test_user_clarification_helper_fails_when_missing_data_has_non_rised_items() {
+  local repo_dir="$TMP_ROOT/repo-user-clarification-helper-non-rised"
+  mkdir -p "$repo_dir"
+  setup_repo_with_user_clarification_helper "$repo_dir"
+  write_complete_summary "$repo_dir"
+  cat >"$repo_dir/overmind/product/missing_br_data.md" <<'OUT'
+# Missing Business Data
+
+## 3. Unresolved Items Ledger (Rised)
+- rised_item_1: source=## 15. Open Questions -> critical_questions; rised=false; unresolved_item=Is legal approval required for cross-region invoice routing?
+
+## 6. Latest User Answers
+- answers: [UNFILLED]
+
+## 7. Loop Decision
+- unresolved_after_stop: Pending legal policy clarification from business owner.
+OUT
+
+  local status=0
+  local out=""
+  set +e
+  out="$(cd "$repo_dir" && overmind/scripts/helper/check_user_br_clarification_quality.sh 2>&1)"
+  status=$?
+  set -e
+
+  assert_equal "1" "$status"
+  assert_contains "$out" "business-context gate failed"
+  assert_contains "$out" "missing: missing_br_data.md -> unresolved user BR clarification items remain; continue until every rised_item_N is rised=true"
+}
+
+test_user_clarification_helper_passes_when_all_missing_data_items_are_rised_true() {
+  local repo_dir="$TMP_ROOT/repo-user-clarification-helper-rised"
+  mkdir -p "$repo_dir"
+  setup_repo_with_user_clarification_helper "$repo_dir"
+  write_complete_summary "$repo_dir"
+  cat >"$repo_dir/overmind/product/missing_br_data.md" <<'OUT'
+# Missing Business Data
+
+## 3. Unresolved Items Ledger (Rised)
+- rised_item_1: source=## 15. Open Questions -> critical_questions; rised=true; unresolved_item=Is legal approval required for cross-region invoice routing?
+
+## 6. Latest User Answers
+- answers: This was recorded in ## 7. Business Rules and Decision Logic - BR-1.
+
+## 7. Loop Decision
+- unresolved_after_stop: Pending legal policy clarification from business owner.
+OUT
+
+  local out
+  out="$(
+    cd "$repo_dir" &&
+    overmind/scripts/helper/check_user_br_clarification_quality.sh
+  )"
+
+  assert_contains "$out" "business-context gate passed"
+}
+
+
 test_helper_returns_exit_code_2_for_missing_target_file() {
   local repo_dir="$TMP_ROOT/repo-helper-missing-target"
   mkdir -p "$repo_dir"
@@ -648,6 +781,7 @@ OUT
 }
 
 test_helper_passes_when_required_fields_fr_and_br_exist
+test_helper_fails_when_missing_data_artifact_is_missing
 test_helper_fails_with_exit_code_1_when_required_business_goal_is_missing
 test_helper_fails_with_exit_code_1_when_no_populated_fr_exists
 test_helper_fails_with_exit_code_1_when_no_populated_br_exists
@@ -657,9 +791,12 @@ test_helper_fails_when_unclear_scope_points_have_non_rised_value
 test_helper_passes_when_rised_markers_are_present
 test_helper_fails_when_missing_data_has_rised_items_and_answers_unfilled
 test_helper_fails_when_missing_data_has_rised_items_and_unresolved_after_stop_unfilled
-test_helper_fails_when_missing_data_has_non_rised_items
+test_helper_passes_when_missing_data_has_non_rised_items_with_loop_decision
+test_helper_fails_when_missing_data_rised_item_has_no_state
 test_helper_passes_when_missing_data_rised_items_have_loop_fields_filled
 test_helper_passes_when_missing_data_has_multiple_answer_pointers
+test_user_clarification_helper_fails_when_missing_data_has_non_rised_items
+test_user_clarification_helper_passes_when_all_missing_data_items_are_rised_true
 test_helper_returns_exit_code_2_for_missing_target_file
 test_helper_fails_when_captured_user_input_story_content_is_missing
 

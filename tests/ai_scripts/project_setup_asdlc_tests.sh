@@ -9,6 +9,7 @@ COMMON_LIBS_SRC="$SOURCE_ROOT/overmind/scripts/common_libs"
 OPTION_4_HELPER_SRC="$SOURCE_ROOT/overmind/scripts/project_mgmt/init_progress_scanner.sh"
 INIT_PROJECT_STACK_BLUEPRINTS_SRC="$SOURCE_ROOT/overmind/scripts/init_project_stack_blueprints.sh"
 OPTION_5_HELPER_SRC="$SOURCE_ROOT/overmind/scripts/init_common_contract_definition.sh"
+PROJECT_CONTRACT_RECONCILIATION_SRC="$SOURCE_ROOT/overmind/scripts/project_mgmt/project_contract_reconciliation.sh"
 REGISTER_WORKER_SRC="$SOURCE_ROOT/overmind/scripts/project_mgmt/project_register_worker.sh"
 OPTION_6_HELPER_SRC="$SOURCE_ROOT/overmind/scripts/feature_br_scaffold.sh"
 PROJECT_ADD_FEATURE_E2E_SRC="$SOURCE_ROOT/overmind/scripts/project_mgmt/project_add_feature_e2e.sh"
@@ -103,6 +104,7 @@ STAGED_HELPER_FILES=(
   "check_requirements_ears_review_quality.sh"
   "check_requirements_ears_quality.sh"
   "check_task_to_br_quality.sh"
+  "check_user_br_clarification_quality.sh"
 )
 STAGED_SETUP_FILES=(
   "external_sources.yaml"
@@ -471,11 +473,17 @@ setup_repo_layout() {
   cp "$OPTION_2_HELPER_SRC" "$repo_dir/overmind/scripts/project_mgmt/project_setup_add_new_project.sh"
   cp "$OPTION_3_HELPER_SRC" "$repo_dir/overmind/scripts/project_mgmt/project_setup_update_project.sh"
   cp "$COMMON_LIBS_SRC/project_setup_common.sh" "$repo_dir/overmind/scripts/common_libs/project_setup_common.sh"
+  cp "$COMMON_LIBS_SRC/class_repo_paths.sh" "$repo_dir/overmind/scripts/common_libs/class_repo_paths.sh"
+  cp "$COMMON_LIBS_SRC/check_implementation_plan_readiness.sh" "$repo_dir/overmind/scripts/common_libs/check_implementation_plan_readiness.sh"
+  cp "$COMMON_LIBS_SRC/list_committed_sibling_features.sh" "$repo_dir/overmind/scripts/common_libs/list_committed_sibling_features.sh"
+  cp "$COMMON_LIBS_SRC/persist_class_repo_attach.sh" "$repo_dir/overmind/scripts/common_libs/persist_class_repo_attach.sh"
+  cp "$COMMON_LIBS_SRC/sync_repo_to_default_branch.sh" "$repo_dir/overmind/scripts/common_libs/sync_repo_to_default_branch.sh"
   cp "$OPTION_4_HELPER_SRC" "$repo_dir/overmind/scripts/project_mgmt/init_progress_scanner.sh"
   cp "$INIT_PROJECT_STACK_BLUEPRINTS_SRC" "$repo_dir/overmind/scripts/init_project_stack_blueprints.sh"
   cp "$PROJECT_ADD_FEATURE_E2E_SRC" "$repo_dir/overmind/scripts/project_mgmt/project_add_feature_e2e.sh"
   cp "$REGISTER_WORKER_SRC" "$repo_dir/overmind/scripts/project_mgmt/project_register_worker.sh"
   cp "$OPTION_5_HELPER_SRC" "$repo_dir/overmind/scripts/init_common_contract_definition.sh"
+  cp "$PROJECT_CONTRACT_RECONCILIATION_SRC" "$repo_dir/overmind/scripts/project_mgmt/project_contract_reconciliation.sh"
   cp "$OPTION_6_HELPER_SRC" "$repo_dir/overmind/scripts/feature_br_scaffold.sh"
   cp "$OPTION_7_HELPER_SRC" "$repo_dir/overmind/scripts/feature_scan_repo_for_br.sh"
   cp "$OPTION_8_HELPER_SRC" "$repo_dir/overmind/scripts/feature_task_to_br.sh"
@@ -505,6 +513,7 @@ setup_repo_layout() {
   chmod +x "$repo_dir/overmind/scripts/project_mgmt/project_add_feature_e2e.sh"
   chmod +x "$repo_dir/overmind/scripts/project_mgmt/project_register_worker.sh"
   chmod +x "$repo_dir/overmind/scripts/init_common_contract_definition.sh"
+  chmod +x "$repo_dir/overmind/scripts/project_mgmt/project_contract_reconciliation.sh"
   chmod +x "$repo_dir/overmind/scripts/feature_br_scaffold.sh"
   chmod +x "$repo_dir/overmind/scripts/feature_scan_repo_for_br.sh"
   chmod +x "$repo_dir/overmind/scripts/feature_task_to_br.sh"
@@ -574,6 +583,16 @@ test_first_init_machine_bootstraps_asdlc_workspace_with_local_template() {
   assert_dir_exists "$asdlc_root/.setup"
   assert_dir_exists "$asdlc_root/common_libs"
   assert_file_exists "$asdlc_root/common_libs/project_setup_common.sh"
+  assert_file_exists "$asdlc_root/common_libs/class_repo_paths.sh"
+  assert_file_exists "$asdlc_root/common_libs/check_implementation_plan_readiness.sh"
+  assert_file_exists "$asdlc_root/common_libs/list_committed_sibling_features.sh"
+  assert_file_exists "$asdlc_root/common_libs/persist_class_repo_attach.sh"
+  assert_file_exists "$asdlc_root/common_libs/sync_repo_to_default_branch.sh"
+  assert_file_executable "$asdlc_root/common_libs/class_repo_paths.sh"
+  assert_file_executable "$asdlc_root/common_libs/check_implementation_plan_readiness.sh"
+  assert_file_executable "$asdlc_root/common_libs/list_committed_sibling_features.sh"
+  assert_file_executable "$asdlc_root/common_libs/persist_class_repo_attach.sh"
+  assert_file_executable "$asdlc_root/common_libs/sync_repo_to_default_branch.sh"
   assert_file_exists "$asdlc_root/asdlc_metadata.yaml"
   assert_file_exists "$asdlc_root/quickrun.md"
   assert_file_exists "$asdlc_root/.templates/init_progress_definition_TEMPLATE.yaml"
@@ -582,6 +601,7 @@ test_first_init_machine_bootstraps_asdlc_workspace_with_local_template() {
   assert_file_exists "$asdlc_root/.commands/init_progress_scanner.sh"
   assert_file_exists "$asdlc_root/.commands/init_project_stack_blueprints.sh"
   assert_file_exists "$asdlc_root/.commands/init_common_contract_definition.sh"
+  assert_file_exists "$asdlc_root/.commands/project_contract_reconciliation.sh"
   assert_file_exists "$asdlc_root/.commands/project_register_worker.sh"
   assert_file_exists "$asdlc_root/.commands/feature_br_scaffold.sh"
   assert_file_exists "$asdlc_root/.commands/project_add_feature_e2e.sh"
@@ -604,6 +624,7 @@ test_first_init_machine_bootstraps_asdlc_workspace_with_local_template() {
   assert_file_executable "$asdlc_root/.commands/init_progress_scanner.sh"
   assert_file_executable "$asdlc_root/.commands/init_project_stack_blueprints.sh"
   assert_file_executable "$asdlc_root/.commands/init_common_contract_definition.sh"
+  assert_file_executable "$asdlc_root/.commands/project_contract_reconciliation.sh"
   assert_file_executable "$asdlc_root/.commands/project_register_worker.sh"
   assert_file_executable "$asdlc_root/.commands/feature_br_scaffold.sh"
   assert_file_executable "$asdlc_root/.commands/project_add_feature_e2e.sh"
@@ -681,6 +702,7 @@ test_first_init_machine_bootstraps_asdlc_workspace_with_local_template() {
   assert_contains "$(cat "$asdlc_root/.commands/feature_scan_repo_for_br.sh")" 'RULE_FILE=".rules/repo_br_scan_rule.md"'
   assert_contains "$(cat "$asdlc_root/.commands/feature_task_to_br.sh")" 'HELPER_SCRIPT=".helper/check_task_to_br_quality.sh"'
   assert_contains "$(cat "$asdlc_root/.commands/feature_user_br_clarification.sh")" 'RULE_FILE=".rules/user_br_clarification_rule.md"'
+  assert_contains "$(cat "$asdlc_root/.commands/feature_user_br_clarification.sh")" 'HELPER_SCRIPT=".helper/check_user_br_clarification_quality.sh"'
   assert_contains "$(cat "$asdlc_root/.commands/feature_br_check_ears_readiness.sh")" 'REPO_HELPER=".helper/check_business_context_filled_from_repo.sh"'
   assert_contains "$(cat "$asdlc_root/.commands/feature_br_to_ears.sh")" 'QUALITY_GATE_HELPER=".helper/check_requirements_ears_quality.sh"'
   assert_contains "$(cat "$asdlc_root/.commands/feature_requirements_ears_review.sh")" 'RULE_FILE=".rules/requirements_ears_review_rule.md"'
@@ -740,6 +762,7 @@ test_first_init_machine_update_mode_repairs_missing_commands_without_overwriting
   local stack_blueprints_cmd_path="$asdlc_root/.commands/init_project_stack_blueprints.sh"
   local feature_orchestrator_cmd_path="$asdlc_root/.commands/project_add_feature_e2e.sh"
   local common_contract_cmd_path="$asdlc_root/.commands/init_common_contract_definition.sh"
+  local contract_reconciliation_cmd_path="$asdlc_root/.commands/project_contract_reconciliation.sh"
   local register_worker_cmd_path="$asdlc_root/.commands/project_register_worker.sh"
   local feature_br_cmd_path="$asdlc_root/.commands/feature_br_scaffold.sh"
   local scan_repo_cmd_path="$asdlc_root/.commands/feature_scan_repo_for_br.sh"
@@ -757,6 +780,11 @@ test_first_init_machine_update_mode_repairs_missing_commands_without_overwriting
   local implementation_plan_semantic_review_cmd_path="$asdlc_root/.commands/feature_implementation_plan_semantic_review.sh"
   local assign_workers_cmd_path="$asdlc_root/.commands/feature_assing_workers.sh"
   local common_lib_path="$asdlc_root/common_libs/project_setup_common.sh"
+  local class_repo_paths_lib_path="$asdlc_root/common_libs/class_repo_paths.sh"
+  local readiness_lib_path="$asdlc_root/common_libs/check_implementation_plan_readiness.sh"
+  local sibling_lister_lib_path="$asdlc_root/common_libs/list_committed_sibling_features.sh"
+  local attach_lib_path="$asdlc_root/common_libs/persist_class_repo_attach.sh"
+  local sync_repo_lib_path="$asdlc_root/common_libs/sync_repo_to_default_branch.sh"
   local stale_rule_path="$asdlc_root/.rules/repo_br_scan_rule.md"
   local stale_legacy_template_path="$asdlc_root/templates/init_progress_definition_TEMPLATE.yaml"
   local stale_golden_example_path="$asdlc_root/.golden_examples/step_state_GOLDEN_EXAMPLE.md"
@@ -792,6 +820,7 @@ test_first_init_machine_update_mode_repairs_missing_commands_without_overwriting
     "$stack_blueprints_cmd_path" \
     "$feature_orchestrator_cmd_path" \
     "$common_contract_cmd_path" \
+    "$contract_reconciliation_cmd_path" \
     "$register_worker_cmd_path" \
     "$feature_br_cmd_path" \
     "$scan_repo_cmd_path" \
@@ -822,6 +851,7 @@ test_first_init_machine_update_mode_repairs_missing_commands_without_overwriting
   assert_contains "$out" "Update mode added file: $stack_blueprints_cmd_path"
   assert_contains "$out" "Update mode added file: $feature_orchestrator_cmd_path"
   assert_contains "$out" "Update mode added file: $common_contract_cmd_path"
+  assert_contains "$out" "Update mode added file: $contract_reconciliation_cmd_path"
   assert_contains "$out" "Update mode added file: $register_worker_cmd_path"
   assert_contains "$out" "Update mode added file: $feature_br_cmd_path"
   assert_contains "$out" "Update mode added file: $scan_repo_cmd_path"
@@ -840,12 +870,23 @@ test_first_init_machine_update_mode_repairs_missing_commands_without_overwriting
   assert_contains "$out" "Update mode added file: $assign_workers_cmd_path"
   assert_contains "$out" "ASDLC workspace update completed: $asdlc_root"
   assert_file_exists "$common_lib_path"
+  assert_file_exists "$class_repo_paths_lib_path"
+  assert_file_exists "$readiness_lib_path"
+  assert_file_exists "$sibling_lister_lib_path"
+  assert_file_exists "$attach_lib_path"
+  assert_file_exists "$sync_repo_lib_path"
+  assert_file_executable "$class_repo_paths_lib_path"
+  assert_file_executable "$readiness_lib_path"
+  assert_file_executable "$sibling_lister_lib_path"
+  assert_file_executable "$attach_lib_path"
+  assert_file_executable "$sync_repo_lib_path"
   assert_file_exists "$add_cmd_path"
   assert_file_exists "$update_cmd_path"
   assert_file_exists "$scanner_cmd_path"
   assert_file_exists "$stack_blueprints_cmd_path"
   assert_file_exists "$feature_orchestrator_cmd_path"
   assert_file_exists "$common_contract_cmd_path"
+  assert_file_exists "$contract_reconciliation_cmd_path"
   assert_file_exists "$register_worker_cmd_path"
   assert_file_exists "$feature_br_cmd_path"
   assert_file_exists "$scan_repo_cmd_path"
@@ -867,6 +908,7 @@ test_first_init_machine_update_mode_repairs_missing_commands_without_overwriting
   assert_file_executable "$stack_blueprints_cmd_path"
   assert_file_executable "$feature_orchestrator_cmd_path"
   assert_file_executable "$common_contract_cmd_path"
+  assert_file_executable "$contract_reconciliation_cmd_path"
   assert_file_executable "$register_worker_cmd_path"
   assert_file_executable "$feature_br_cmd_path"
   assert_file_executable "$scan_repo_cmd_path"
@@ -894,6 +936,7 @@ test_first_init_machine_update_mode_repairs_missing_commands_without_overwriting
   assert_contains "$(cat "$scan_repo_cmd_path")" 'RULE_FILE=".rules/repo_br_scan_rule.md"'
   assert_contains "$(cat "$task_to_br_cmd_path")" 'HELPER_SCRIPT=".helper/check_task_to_br_quality.sh"'
   assert_contains "$(cat "$user_br_clarification_cmd_path")" 'RULE_FILE=".rules/user_br_clarification_rule.md"'
+  assert_contains "$(cat "$user_br_clarification_cmd_path")" 'HELPER_SCRIPT=".helper/check_user_br_clarification_quality.sh"'
   assert_contains "$(cat "$br_check_ears_readiness_cmd_path")" 'REPO_HELPER=".helper/check_business_context_filled_from_repo.sh"'
   assert_contains "$(cat "$br_to_ears_cmd_path")" 'QUALITY_GATE_HELPER=".helper/check_requirements_ears_quality.sh"'
   assert_contains "$(cat "$feature_requirements_ears_review_cmd_path")" 'RULE_FILE=".rules/requirements_ears_review_rule.md"'
@@ -1027,6 +1070,7 @@ test_first_init_machine_update_mode_recreates_commands_directory_when_missing() 
   assert_contains "$out" "Update mode added file: $asdlc_root/.commands/project_setup_update_project.sh"
   assert_contains "$out" "Update mode added file: $asdlc_root/.commands/init_progress_scanner.sh"
   assert_contains "$out" "Update mode added file: $asdlc_root/.commands/init_common_contract_definition.sh"
+  assert_contains "$out" "Update mode added file: $asdlc_root/.commands/project_contract_reconciliation.sh"
   assert_contains "$out" "Update mode added file: $asdlc_root/.commands/project_register_worker.sh"
   assert_contains "$out" "Update mode added file: $asdlc_root/.commands/feature_br_scaffold.sh"
   assert_contains "$out" "Update mode added file: $asdlc_root/.commands/project_add_feature_e2e.sh"
@@ -1050,6 +1094,7 @@ test_first_init_machine_update_mode_recreates_commands_directory_when_missing() 
   assert_file_exists "$asdlc_root/.commands/project_setup_update_project.sh"
   assert_file_exists "$asdlc_root/.commands/init_progress_scanner.sh"
   assert_file_exists "$asdlc_root/.commands/init_common_contract_definition.sh"
+  assert_file_exists "$asdlc_root/.commands/project_contract_reconciliation.sh"
   assert_file_exists "$asdlc_root/.commands/project_register_worker.sh"
   assert_file_exists "$asdlc_root/.commands/feature_br_scaffold.sh"
   assert_file_exists "$asdlc_root/.commands/project_add_feature_e2e.sh"
@@ -1071,6 +1116,7 @@ test_first_init_machine_update_mode_recreates_commands_directory_when_missing() 
   assert_file_executable "$asdlc_root/.commands/project_setup_update_project.sh"
   assert_file_executable "$asdlc_root/.commands/init_progress_scanner.sh"
   assert_file_executable "$asdlc_root/.commands/init_common_contract_definition.sh"
+  assert_file_executable "$asdlc_root/.commands/project_contract_reconciliation.sh"
   assert_file_executable "$asdlc_root/.commands/project_register_worker.sh"
   assert_file_executable "$asdlc_root/.commands/feature_br_scaffold.sh"
   assert_file_executable "$asdlc_root/.commands/project_add_feature_e2e.sh"
@@ -1098,6 +1144,7 @@ test_first_init_machine_update_mode_recreates_commands_directory_when_missing() 
   assert_contains "$(cat "$asdlc_root/.commands/feature_scan_repo_for_br.sh")" 'RULE_FILE=".rules/repo_br_scan_rule.md"'
   assert_contains "$(cat "$asdlc_root/.commands/feature_task_to_br.sh")" 'HELPER_SCRIPT=".helper/check_task_to_br_quality.sh"'
   assert_contains "$(cat "$asdlc_root/.commands/feature_user_br_clarification.sh")" 'RULE_FILE=".rules/user_br_clarification_rule.md"'
+  assert_contains "$(cat "$asdlc_root/.commands/feature_user_br_clarification.sh")" 'HELPER_SCRIPT=".helper/check_user_br_clarification_quality.sh"'
   assert_contains "$(cat "$asdlc_root/.commands/feature_br_check_ears_readiness.sh")" 'REPO_HELPER=".helper/check_business_context_filled_from_repo.sh"'
   assert_contains "$(cat "$asdlc_root/.commands/feature_br_to_ears.sh")" 'QUALITY_GATE_HELPER=".helper/check_requirements_ears_quality.sh"'
   assert_contains "$(cat "$asdlc_root/.commands/feature_requirements_ears_review.sh")" 'RULE_FILE=".rules/requirements_ears_review_rule.md"'
@@ -1141,6 +1188,7 @@ test_first_init_machine_update_mode_recreates_support_asset_directories_when_mis
   assert_contains "$out" "Update mode added file: $asdlc_root/.templates/common_contract_definition_TEMPLATE.md"
   assert_contains "$out" "Update mode added file: $asdlc_root/.golden_examples/feature_contract_delta_GOLDEN_EXAMPLE.md"
   assert_contains "$out" "Update mode added file: $asdlc_root/.helper/check_task_to_br_quality.sh"
+  assert_contains "$out" "Update mode added file: $asdlc_root/.helper/check_user_br_clarification_quality.sh"
   assert_contains "$out" "Update mode added file: $asdlc_root/.setup/models.md"
   assert_contains "$out" "Update mode added file: $asdlc_root/.templates/init_progress_definition_TEMPLATE.yaml"
   assert_contains "$out" "ASDLC workspace update completed: $asdlc_root"

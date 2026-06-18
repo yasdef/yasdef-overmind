@@ -4,7 +4,6 @@
 - class: backend
 - repo_name: [UNFILLED]
 - service_name: [UNFILLED]
-- planned_repo_path: [UNFILLED]
 - group_id: [UNFILLED]
 - last_updated: [UNFILLED]
 

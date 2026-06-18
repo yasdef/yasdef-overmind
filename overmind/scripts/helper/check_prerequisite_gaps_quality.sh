@@ -60,6 +60,11 @@ function is_none(v) {
   return (v == "none")
 }
 
+function is_scheduled_in_feature(v) {
+  v = trim(v)
+  return (v ~ "^scheduled_in_feature[[:space:]]+[^/[:space:]]+/[^[:space:]]+$")
+}
+
 function looks_like_surface_identity(v, lower_v) {
   lower_v = tolower(trim(v))
   if (lower_v ~ /(route|page|screen|shell|login|sign-in|signin|workspace|entry|portal|console|ui|view|lookup|search|dashboard|form|command|cli|job|endpoint|tool|http|post |get |put |patch |delete |deep link|deeplink)/) return 1
@@ -116,13 +121,20 @@ function flush_prereq(    s, sk, si, e, sr) {
     } else {
       all_slice_refs[sr] = current_req SUBSEP current_prereq
     }
+  } else if (is_scheduled_in_feature(s)) {
+    if (is_unfilled(e)) {
+      fail_quality("prerequisite \"" current_prereq "\" in requirement " current_req " (" s ") is missing evidence")
+    }
+    if (!is_unfilled(sr) && sr != "none") {
+      fail_quality("prerequisite \"" current_prereq "\" in requirement " current_req " (" s ") must use slice_ref: none")
+    }
   } else {
     fail_quality("prerequisite \"" current_prereq "\" in requirement " current_req " has invalid status: \"" s "\"")
   }
 
   if (sk == "required_missing_user_reachable_surface") {
-    if (s != "unmet" && s != "scheduled_in_slices") {
-      fail_quality("prerequisite \"" current_prereq "\" in requirement " current_req " uses required_missing_user_reachable_surface but status is not unmet/scheduled_in_slices")
+    if (s != "unmet" && s != "scheduled_in_slices" && !is_scheduled_in_feature(s)) {
+      fail_quality("prerequisite \"" current_prereq "\" in requirement " current_req " uses required_missing_user_reachable_surface but status is not unmet/scheduled_in_slices/scheduled_in_feature")
     }
     if (is_unfilled(si) || is_none(si)) {
       fail_quality("prerequisite \"" current_prereq "\" in requirement " current_req " (required_missing_user_reachable_surface) is missing surface_identity")

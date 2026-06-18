@@ -7,6 +7,7 @@ RULE_SRC="$SOURCE_ROOT/overmind/rules/common_contract_definition_rule.md"
 TEMPLATE_SRC="$SOURCE_ROOT/overmind/templates/common_contract_definition_TEMPLATE.md"
 GOLDEN_SRC="$SOURCE_ROOT/overmind/golden_examples/common_contract_definition_GOLDEN_EXAMPLE.md"
 PEER_TRIGGER_HELPER_SRC="$SOURCE_ROOT/overmind/scripts/helper/check_cross_class_peer_trigger.sh"
+CLASS_REPO_PATHS_LIB_SRC="$SOURCE_ROOT/overmind/scripts/common_libs/class_repo_paths.sh"
 
 STACK_BLUEPRINT_BE_GOLDEN_SRC="$SOURCE_ROOT/overmind/golden_examples/project_stack_blueprint_be_GOLDEN_EXAMPLE.md"
 STACK_BLUEPRINT_FE_GOLDEN_SRC="$SOURCE_ROOT/overmind/golden_examples/project_stack_blueprint_fe_GOLDEN_EXAMPLE.md"
@@ -67,12 +68,13 @@ setup_repo_layout() {
 
 setup_staged_workspace() {
   local asdlc_root="$1"
-  mkdir -p "$asdlc_root/.commands" "$asdlc_root/.rules" "$asdlc_root/.templates" "$asdlc_root/.golden_examples" "$asdlc_root/.setup" "$asdlc_root/.helper" "$asdlc_root/projects"
+  mkdir -p "$asdlc_root/.commands" "$asdlc_root/.rules" "$asdlc_root/.templates" "$asdlc_root/.golden_examples" "$asdlc_root/.setup" "$asdlc_root/.helper" "$asdlc_root/common_libs" "$asdlc_root/projects"
   cp "$SCRIPT_SRC" "$asdlc_root/.commands/init_common_contract_definition.sh"
   cp "$RULE_SRC" "$asdlc_root/.rules/common_contract_definition_rule.md"
   cp "$TEMPLATE_SRC" "$asdlc_root/.templates/common_contract_definition_TEMPLATE.md"
   cp "$GOLDEN_SRC" "$asdlc_root/.golden_examples/common_contract_definition_GOLDEN_EXAMPLE.md"
   cp "$PEER_TRIGGER_HELPER_SRC" "$asdlc_root/.helper/check_cross_class_peer_trigger.sh"
+  cp "$CLASS_REPO_PATHS_LIB_SRC" "$asdlc_root/common_libs/class_repo_paths.sh"
   chmod +x "$asdlc_root/.commands/init_common_contract_definition.sh" "$asdlc_root/.helper/check_cross_class_peer_trigger.sh"
 
   cat >"$asdlc_root/asdlc_metadata.yaml" <<'OUT'

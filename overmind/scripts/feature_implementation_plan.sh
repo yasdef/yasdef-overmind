@@ -33,8 +33,8 @@ die() {
   exit 1
 }
 
-fail_project_type_undefined() {
-  echo "unable to define project type" >&2
+fail_project_classes_undefined() {
+  echo "unable to define project classes" >&2
   exit 1
 }
 
@@ -299,37 +299,6 @@ BEGIN {
 ' "$definition_path"
 }
 
-project_type_label_for_code() {
-  case "$1" in
-    A) printf '%s' "New project" ;;
-    B) printf '%s' "Existing project with partial context" ;;
-    C) printf '%s' "Existing project with code-first context" ;;
-    *) return 1 ;;
-  esac
-}
-
-resolve_project_type_code() {
-  local definition_path="$1"
-  local project_type_code=""
-  local project_type_label=""
-  local expected_label=""
-
-  if ! project_type_code="$(extract_meta_scalar "$definition_path" "project_type_code" 2>/dev/null)"; then
-    fail_project_type_undefined
-  fi
-  if ! project_type_label="$(extract_meta_scalar "$definition_path" "project_type_label" 2>/dev/null)"; then
-    fail_project_type_undefined
-  fi
-  if ! expected_label="$(project_type_label_for_code "$project_type_code" 2>/dev/null)"; then
-    fail_project_type_undefined
-  fi
-  if [[ "$project_type_label" != "$expected_label" ]]; then
-    fail_project_type_undefined
-  fi
-
-  printf '%s' "$project_type_code"
-}
-
 resolve_project_classes() {
   local definition_path="$1"
   local parsed_classes=""
@@ -339,7 +308,7 @@ resolve_project_classes() {
   PROJECT_CLASSES=()
 
   if ! parsed_classes="$(extract_meta_project_classes "$definition_path" 2>/dev/null)"; then
-    fail_project_type_undefined
+    fail_project_classes_undefined
   fi
 
   while IFS= read -r class_name; do
@@ -354,13 +323,13 @@ resolve_project_classes() {
         fi
         ;;
       *)
-        fail_project_type_undefined
+        fail_project_classes_undefined
         ;;
     esac
   done <<<"$parsed_classes"
 
   if [[ ${#PROJECT_CLASSES[@]} -eq 0 ]]; then
-    fail_project_type_undefined
+    fail_project_classes_undefined
   fi
 }
 
@@ -498,7 +467,6 @@ render_repo_class_list() {
 
 build_prompt() {
   local runtime_root="$1"
-  local project_type_code="$2"
   local quality_command="$QUALITY_GATE_HELPER $IMPLEMENTATION_PLAN_FILE"
   local failure_msg=""
   local success_msg=""
@@ -541,7 +509,6 @@ Context:
 - ASDLC workspace root: $runtime_root
 - Project root: $PROJECT_ROOT
 - Feature root: $FEATURE_PATH
-- Project type code: $project_type_code
 - Active repo classes for this run: $repo_class_list
 - Project definition source: $PROJECT_DEFINITION_FILE
 - Requirements source: $REQUIREMENTS_EARS_FILE
@@ -601,7 +568,6 @@ main() {
   local definition_path=""
   local models_path=""
   local output_path=""
-  local project_type_code=""
   local prompt_arg=""
 
   runtime_root="$(ensure_staged_command_runtime)"
@@ -614,12 +580,7 @@ main() {
   models_path="$runtime_root/$MODELS_FILE"
   output_path="$runtime_root/$IMPLEMENTATION_PLAN_FILE"
 
-  project_type_code="$(resolve_project_type_code "$definition_path")"
   resolve_project_classes "$definition_path"
-
-  if [[ "$project_type_code" != "A" && "$project_type_code" != "B" && "$project_type_code" != "C" ]]; then
-    fail_project_type_undefined
-  fi
 
   collect_supported_repo_classes
   prepare_readonly_inputs
@@ -633,7 +594,7 @@ main() {
   snapshot_readonly_inputs "$runtime_root"
   trap 'cleanup_snapshots' EXIT
 
-  prompt_arg="$(build_prompt "$runtime_root" "$project_type_code")"
+  prompt_arg="$(build_prompt "$runtime_root")"
 
   local cmd=("$MODEL_CMD" -m "$MODEL_MODEL")
   if [[ ${#MODEL_ARGS[@]} -gt 0 ]]; then

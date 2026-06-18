@@ -520,6 +520,38 @@ test_fails_when_dependency_points_to_later_step() {
   assert_contains "$out" "depends on unknown or later step 1.4"
 }
 
+test_accepts_cross_feature_dependency_reference() {
+  local repo_dir="$TMP_ROOT/repo-cross-feature-dependency"
+  setup_valid_fixture "$repo_dir"
+  perl -0pi -e 's/#### Depends on: 1\.1/#### Depends on: 0003_customer_accounts\/3.2/' "$repo_dir/projects/p1/feature-a/implementation_plan.md"
+
+  local result=""
+  result="$(run_helper "$repo_dir" "projects/p1/feature-a/implementation_plan.md")"
+  local status=""
+  status="$(printf '%s\n' "$result" | head -n1)"
+  local out=""
+  out="$(printf '%s\n' "$result" | tail -n +2)"
+
+  assert_equal "0" "$status"
+  assert_contains "$out" "quality gate passed"
+}
+
+test_fails_when_cross_feature_dependency_uses_dot_folder() {
+  local repo_dir="$TMP_ROOT/repo-cross-feature-dot-dependency"
+  setup_valid_fixture "$repo_dir"
+  perl -0pi -e 's/#### Depends on: 1\.1/#### Depends on: ..\/3.2/' "$repo_dir/projects/p1/feature-a/implementation_plan.md"
+
+  local result=""
+  result="$(run_helper "$repo_dir" "projects/p1/feature-a/implementation_plan.md")"
+  local status=""
+  status="$(printf '%s\n' "$result" | head -n1)"
+  local out=""
+  out="$(printf '%s\n' "$result" | tail -n +2)"
+
+  assert_equal "1" "$status"
+  assert_contains "$out" "invalid cross-feature dependency ../3.2"
+}
+
 test_fails_when_requirement_reference_is_unknown() {
   local repo_dir="$TMP_ROOT/repo-unknown-req"
   setup_valid_fixture "$repo_dir"
@@ -1055,6 +1087,8 @@ test_passes_with_valid_shared_plan
 test_fails_when_technical_requirements_is_missing
 test_fails_when_repo_header_is_missing
 test_fails_when_dependency_points_to_later_step
+test_accepts_cross_feature_dependency_reference
+test_fails_when_cross_feature_dependency_uses_dot_folder
 test_fails_when_requirement_reference_is_unknown
 test_fails_when_step_heading_has_no_requirement_links
 test_fails_when_requirement_has_no_related_step

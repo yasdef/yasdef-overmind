@@ -30,7 +30,11 @@ Read this file fully before producing output.
   - semantically weak dependency or ordering choices,
   - requirement grouping that obscures distinct delivery slices,
   - newly delivered user-reachable surfaces with unclear inbound operator reachability.
-  - Type A repo scaffold readiness that is unclear for a class represented in the plan.
+  - surface-map rows tagged `(in-flight <feature-folder>)` that overlap current-plan delivery.
+  - deferred-class repo scaffold readiness that is unclear for a class represented in the plan.
+- Treat every read-only surface-map row tagged `(in-flight <feature-folder>)` as an in-flight sibling promise overlap that must be raised as a product-fit finding.
+- Use finding type `step_scope_overlap` for in-flight sibling promise overlaps, cite the tagged surface-map row in `related_evidence`, and name the sibling feature folder in the summary or rationale.
+- In-flight sibling promise overlap findings do not hard-block; users may apply, reject, or postpone them with resolution notes through the existing finding workflow.
 - For each newly delivered user-reachable surface, apply this four-step access-path heuristic:
   1. identify the delivered surface in the implementation plan,
   2. inspect applicable surface maps for existing inbound affordances,
@@ -43,7 +47,7 @@ Read this file fully before producing output.
   - isolation can be intentional.
 - Do not invent new navigation requirements unless justified by `requirements_ears.md` or explicit operator confirmation recorded in the review artifact.
 - For `delivered_surface_consumption_unclear`, link the finding to at least one `REQ-*` or `NFR-*` id in `related_requirements` so the judgment remains anchored to required behavior.
-- For Type A only, use `repo_scaffold_readiness_unclear` when a planned repo class has implementation steps but project metadata does not show a ready repo path and the plan does not explicitly account for scaffold creation, verification, or parallel ownership.
+- Use `repo_scaffold_readiness_unclear` when a planned repo class has implementation steps but project metadata does not show a ready repo path and the plan does not explicitly account for scaffold creation, verification, or parallel ownership.
 
 ## Allowed Finding Types
 Every finding must use one `finding_type` from:
@@ -85,7 +89,7 @@ Use one `state` per finding:
 - Prefer adding a new valid step only when the selected finding represents independently executable work, prerequisite work, repo-scaffold/readiness work, or work that cannot be cleanly attached to an existing step without weakening the step boundary.
 - Keep the patch proportional to the selected findings; do not create extra steps solely for tidier wording.
 
-## Type A Scaffold Readiness Guidance
+## Deferred-Class Scaffold Readiness Guidance
 - Resolve selected `repo_scaffold_readiness_unclear` findings inside the normal implementation-plan structure.
 - Prefer adding concrete readiness bullets to an existing repo-owned step when that step already covers setup, scaffold, or repo-readiness work for the affected class.
 - Add a new repo-owned scaffold/readiness step only when scaffold/readiness is a separate prerequisite or cannot be cleanly represented in an existing step.

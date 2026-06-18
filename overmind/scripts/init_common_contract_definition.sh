@@ -119,6 +119,14 @@ ensure_required_files() {
   done
 }
 
+source_class_repo_paths_lib() {
+  local runtime_root="$1"
+  local lib_path="$runtime_root/common_libs/class_repo_paths.sh"
+  [[ -f "$lib_path" ]] || die "Required command lib not found: common_libs/class_repo_paths.sh"
+  # shellcheck source=/dev/null
+  source "$lib_path"
+}
+
 resolve_project_root() {
   local input_path="$1"
   local runtime_root="$2"
@@ -234,97 +242,6 @@ END {
 ' "$definition_path"
 }
 
-extract_meta_class_repo_path_entries() {
-  local definition_path="$1"
-
-  awk '
-function trim(v) {
-  sub(/^[[:space:]]+/, "", v)
-  sub(/[[:space:]]+$/, "", v)
-  return v
-}
-function strip_quotes(v) {
-  v = trim(v)
-  if ((v ~ /^".*"$/) || (v ~ /^'\''.*'\''$/)) {
-    v = substr(v, 2, length(v) - 2)
-  }
-  return trim(v)
-}
-function flush_entry() {
-  if (current_class != "") {
-    print current_class "|" current_state "|" current_path
-  }
-  current_class = ""
-  current_state = ""
-  current_path = ""
-}
-BEGIN {
-  in_meta = 0
-  in_paths = 0
-  current_class = ""
-  current_state = ""
-  current_path = ""
-}
-/^meta_info:[[:space:]]*$/ {
-  in_meta = 1
-  next
-}
-/^steps:[[:space:]]*$/ {
-  if (in_meta == 1) {
-    flush_entry()
-    exit 0
-  }
-}
-{
-  if (in_meta == 0) {
-    next
-  }
-
-  if (in_paths == 0) {
-    if ($0 ~ /^[[:space:]]{2}class_repo_paths:[[:space:]]*\{\}[[:space:]]*$/) {
-      exit 0
-    }
-    if ($0 ~ /^[[:space:]]{2}class_repo_paths:[[:space:]]*$/) {
-      in_paths = 1
-      next
-    }
-    next
-  }
-
-  if ($0 ~ /^[[:space:]]{2}[A-Za-z0-9_.-]+:[[:space:]]*$/) {
-    flush_entry()
-    exit 0
-  }
-
-  if ($0 ~ /^[[:space:]]{4}[A-Za-z0-9_.-]+:[[:space:]]*$/) {
-    flush_entry()
-    line = $0
-    sub(/^[[:space:]]{4}/, "", line)
-    sub(/:[[:space:]]*$/, "", line)
-    current_class = trim(line)
-    next
-  }
-
-  if (current_class != "" && $0 ~ /^[[:space:]]{6}state:[[:space:]]*/) {
-    line = $0
-    sub(/^[[:space:]]{6}state:[[:space:]]*/, "", line)
-    current_state = strip_quotes(line)
-    next
-  }
-
-  if (current_class != "" && $0 ~ /^[[:space:]]{6}path:[[:space:]]*/) {
-    line = $0
-    sub(/^[[:space:]]{6}path:[[:space:]]*/, "", line)
-    current_path = strip_quotes(line)
-    next
-  }
-}
-END {
-  flush_entry()
-}
-' "$definition_path"
-}
-
 collect_usable_repo_paths() {
   local definition_path="$1"
   local parsed_entries=""
@@ -339,7 +256,7 @@ collect_usable_repo_paths() {
   REPO_PATHS=()
   REPO_CONTEXT_LINES=()
 
-  if ! parsed_entries="$(extract_meta_class_repo_path_entries "$definition_path" 2>/dev/null)"; then
+  if ! parsed_entries="$(class_repo_paths_extract_entries "$definition_path" 2>/dev/null)"; then
     die "Failed to read meta_info.class_repo_paths from $definition_path."
   fi
 
@@ -661,6 +578,7 @@ main() {
 
   resolve_runtime_root
   repo_root="$RUNTIME_ROOT"
+  source_class_repo_paths_lib "$repo_root"
   resolve_project_root "$PROJECT_PATH_INPUT" "$repo_root"
   project_definition_path="$PROJECT_ROOT/$PROJECT_DEFINITION_FILE"
   validate_project_folder_contract "$project_definition_path"

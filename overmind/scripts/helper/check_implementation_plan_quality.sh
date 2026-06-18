@@ -605,6 +605,25 @@ function validate_previous_step(    depends_value, dep_parts, dep_count, dep, re
         fail_quality("step " current_step " has empty dependency entry")
         continue
       }
+      if (index(dep, "/") > 0) {
+        if (dep !~ /^[A-Za-z0-9._-]+\/[0-9]+(\.[0-9]+)*$/) {
+          fail_quality("step " current_step " has invalid cross-feature dependency " dep)
+          continue
+        }
+        slash_index = index(dep, "/")
+        feature_folder = substr(dep, 1, slash_index - 1)
+        if (feature_folder == "." || feature_folder == "..") {
+          fail_quality("step " current_step " has invalid cross-feature dependency " dep)
+          continue
+        }
+        ref_key = current_step SUBSEP dep
+        if (ref_key in seen_dependency_refs) {
+          fail_quality("step " current_step " repeats dependency " dep)
+          continue
+        }
+        seen_dependency_refs[ref_key] = 1
+        continue
+      }
       if (!(dep in seen_steps)) {
         fail_quality("step " current_step " depends on unknown or later step " dep)
         continue
