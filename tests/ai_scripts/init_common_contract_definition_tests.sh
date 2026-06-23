@@ -161,6 +161,9 @@ cat >"$target_file" <<'DOC'
 ## 5. Known Risks / Uncertainties
 - uncertainty_1: formal schema governance for breaking changes is not yet documented.
 DOC
+if [[ "${TEST_COMMON_CONTRACT_WRITE_UNEXPECTED:-0}" == "1" ]]; then
+  printf 'unexpected initialization output\n' >"$(dirname "$target_file")/unexpected-initialization.txt"
+fi
 OUT
   chmod +x "$root_dir/bin/codex"
 }
@@ -198,6 +201,16 @@ meta_info:
 
 steps: []
 EOF2
+}
+
+setup_project_git() {
+  local project_dir="$1"
+
+  git -C "$project_dir" init -q
+  git -C "$project_dir" config user.name "Test User"
+  git -C "$project_dir" config user.email "test@example.com"
+  git -C "$project_dir" add -- init_progress_definition.yaml
+  git -C "$project_dir" commit -qm "Initialize project definition"
 }
 
 write_valid_stack_blueprints() {
@@ -424,6 +437,7 @@ test_runs_codex_with_project_scoped_output_and_repo_context() {
   write_staged_quality_gate_stub "$asdlc_root"
   setup_codex_stub "$asdlc_root"
   write_project_definition "$project_dir" "ready" "$backend_repo" "ready" "$frontend_repo"
+  setup_project_git "$project_dir"
 
   local out=""
   out="$({
@@ -457,6 +471,9 @@ test_runs_codex_with_project_scoped_output_and_repo_context() {
   assert_contains "$codex_prompt" "- backend: $backend_repo"
   assert_contains "$codex_prompt" "- frontend: $frontend_repo"
   assert_contains "$codex_prompt" "Repository root: $asdlc_root"
+  assert_contains "$out" "Committed project initialization baseline."
+  assert_equal "Finalize project initialization baseline" "$(git -C "$project_dir" log -1 --format=%s)"
+  assert_equal "" "$(git -C "$project_dir" status --porcelain)"
 }
 
 test_type_a_runs_with_read_only_stack_blueprint_context() {
@@ -470,6 +487,7 @@ test_type_a_runs_with_read_only_stack_blueprint_context() {
   write_staged_quality_gate_stub "$asdlc_root"
   setup_codex_stub "$asdlc_root"
   write_project_definition "$project_dir" "deferred" "" "deferred" "" "A"
+  setup_project_git "$project_dir"
   write_valid_stack_blueprints "$project_dir"
 
   local out=""
@@ -491,6 +509,46 @@ test_type_a_runs_with_read_only_stack_blueprint_context() {
   assert_contains "$codex_prompt" "- frontend: $project_dir/project_stack_blueprint_frontend.md"
   assert_contains "$codex_prompt" "Do not treat stack blueprints as API contract schemas"
   assert_contains "$codex_prompt" "Do not modify stack blueprint files."
+  assert_equal "Finalize project initialization baseline" "$(git -C "$project_dir" log -1 --format=%s)"
+  local committed_paths=""
+  committed_paths="$(git -C "$project_dir" show --format= --name-only HEAD)"
+  assert_contains "$committed_paths" "common_contract_definition.md"
+  assert_contains "$committed_paths" "project_stack_blueprint_backend.md"
+  assert_contains "$committed_paths" "project_stack_blueprint_frontend.md"
+  assert_equal "" "$(git -C "$project_dir" status --porcelain)"
+}
+
+test_baseline_validation_blocks_unexpected_output_before_commit() {
+  local workspace="$TMP_ROOT/workspace-unexpected-baseline-output"
+  local asdlc_root="$workspace/asdlc"
+  local project_dir="$asdlc_root/projects/sample-project"
+  local capture_dir="$TMP_ROOT/capture-unexpected-baseline-output"
+  local backend_repo="$TMP_ROOT/backend-repo-unexpected-baseline"
+  mkdir -p "$project_dir" "$capture_dir" "$backend_repo"
+  setup_staged_workspace "$asdlc_root"
+  setup_staged_models_file "$asdlc_root"
+  write_staged_quality_gate_stub "$asdlc_root"
+  setup_codex_stub "$asdlc_root"
+  write_project_definition "$project_dir" "ready" "$backend_repo" "deferred" ""
+  setup_project_git "$project_dir"
+
+  local out=""
+  local status=0
+  set +e
+  out="$(
+    cd "$TMP_ROOT" &&
+    PATH="$asdlc_root/bin:$PATH" TEST_CAPTURE_DIR="$capture_dir" \
+      TARGET_COMMON_CONTRACT_FILE="$project_dir/common_contract_definition.md" TEST_COMMON_CONTRACT_WRITE_UNEXPECTED=1 \
+      "$asdlc_root/.commands/init_common_contract_definition.sh" --path "$project_dir" 2>&1
+  )"
+  status=$?
+  set -e
+
+  assert_nonzero_status "$status"
+  assert_contains "$out" "Project initialization created unexpected changes; baseline was not committed:"
+  assert_contains "$out" "unexpected-initialization.txt"
+  assert_equal "Initialize project definition" "$(git -C "$project_dir" log -1 --format=%s)"
+  assert_contains "$(git -C "$project_dir" status --porcelain)" "?? unexpected-initialization.txt"
 }
 
 test_type_a_fails_if_model_modifies_read_only_blueprint() {
@@ -536,6 +594,7 @@ test_prompt_binds_cross_class_peer_trigger_helper() {
   write_staged_quality_gate_stub "$asdlc_root"
   setup_codex_stub "$asdlc_root"
   write_project_definition "$project_dir" "ready" "$backend_repo" "ready" "$frontend_repo"
+  setup_project_git "$project_dir"
 
   cd "$TMP_ROOT" && PATH="$asdlc_root/bin:$PATH" TEST_CAPTURE_DIR="$capture_dir" \
     TARGET_COMMON_CONTRACT_FILE="$project_dir/common_contract_definition.md" \
@@ -581,6 +640,7 @@ test_fails_when_path_points_to_project_subfolder
 test_fails_when_path_points_to_other_asdlc_workspace_project
 test_runs_codex_with_project_scoped_output_and_repo_context
 test_type_a_runs_with_read_only_stack_blueprint_context
+test_baseline_validation_blocks_unexpected_output_before_commit
 test_type_a_fails_if_model_modifies_read_only_blueprint
 test_prompt_binds_cross_class_peer_trigger_helper
 test_missing_cross_class_peer_trigger_helper_fails_fast

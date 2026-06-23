@@ -50,6 +50,7 @@ STAGED_RULE_FILES=(
   "task_to_br_rule.md"
   "technical_requirements_rule.md"
   "user_br_clarification_rule.md"
+  "project_contract_reconciliation_rule.md"
 )
 STAGED_TEMPLATE_FILES=(
   "common_contract_definition_TEMPLATE.md"

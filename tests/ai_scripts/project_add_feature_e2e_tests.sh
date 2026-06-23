@@ -358,12 +358,17 @@ set -euo pipefail
 
 log_file="${TEST_LOG_FILE:?TEST_LOG_FILE must be set}"
 project_path=""
+classes=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --path)
       shift
       project_path="${1:-}"
+      ;;
+    --class)
+      shift
+      classes="${classes:+$classes,}${1:-}"
       ;;
     *)
       echo "unknown arg: $1" >&2
@@ -373,7 +378,7 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
-printf '%s --path %s\n' "$(basename "$0")" "$project_path" >>"$log_file"
+printf '%s --path %s --class %s\n' "$(basename "$0")" "$project_path" "$classes" >>"$log_file"
 if [[ "${TEST_RECONCILIATION_READ_STDIN:-0}" == "1" ]]; then
   if IFS= read -r reconciliation_stdin; then
     printf 'reconciliation stdin: %s\n' "$reconciliation_stdin" >>"$log_file"
@@ -384,6 +389,12 @@ fi
 if [[ "${TEST_FAIL_RECONCILIATION:-0}" == "1" ]]; then
   echo "simulated reconciliation failure" >&2
   exit 17
+fi
+if [[ "${TEST_RECONCILIATION_WRITE_CONTRACT:-0}" == "1" ]]; then
+  printf '# Reconciled common contract\n' >"$project_path/common_contract_definition.md"
+fi
+if [[ "${TEST_RECONCILIATION_WRITE_UNEXPECTED:-0}" == "1" ]]; then
+  printf 'unexpected reconciliation output\n' >"$project_path/reconciliation-unexpected.txt"
 fi
 OUT
   chmod +x "$asdlc_root/.commands/project_contract_reconciliation.sh"
@@ -794,6 +805,210 @@ test_attach_reconciliation_failure_does_not_prompt_for_another_path() {
   assert_equal "ready" "$(read_backend_definition_field "$asdlc_root/projects/project-a/init_progress_definition.yaml" "state")"
   assert_equal "$selected_repo" "$(read_backend_definition_field "$asdlc_root/projects/project-a/init_progress_definition.yaml" "path")"
   assert_file_not_exists "$asdlc_root/projects/project-a/.contract_reconciled_backend"
+}
+
+test_reconciliation_runs_after_all_class_attaches() {
+  # D10 Part A: reconciliation runs once after the whole attach loop, so a
+  # reconciliation failure cannot stop a later class from attaching first.
+  local asdlc_root="$TMP_ROOT/asdlc-attach-before-reconcile"
+  local log_file="$TMP_ROOT/asdlc-attach-before-reconcile.log"
+  local backend_repo="$TMP_ROOT/before-reconcile-backend-repo"
+  local frontend_repo="$TMP_ROOT/before-reconcile-frontend-repo"
+  mkdir -p "$asdlc_root" "$backend_repo" "$frontend_repo"
+  setup_workspace "$asdlc_root"
+  setup_git_repo "$backend_repo"
+  setup_git_repo "$frontend_repo"
+  write_project_definition_with_backend_and_frontend_deferred "$asdlc_root/projects/project-a"
+  write_backend_blueprint "$asdlc_root/projects/project-a"
+
+  local out=""
+  local status=0
+  set +e
+  out="$(
+    cd "$asdlc_root" &&
+    {
+      printf '%s\n' "$backend_repo"
+      printf '%s\n' "$frontend_repo"
+    } | TEST_LOG_FILE="$log_file" TEST_FAIL_RECONCILIATION=1 TEST_SCAFFOLD_FEATURE_REL="projects/project-a/feature-alpha" TEST_SCANNER_NEXT_LINE="next step: none" \
+      .commands/project_add_feature_e2e.sh --path projects/project-a 2>&1
+  )"
+  status=$?
+  set -e
+
+  assert_nonzero_status "$status"
+  assert_contains "$out" "simulated reconciliation failure"
+  assert_equal "ready" "$(read_class_definition_field "$asdlc_root/projects/project-a/init_progress_definition.yaml" "backend" "state")"
+  assert_equal "ready" "$(read_class_definition_field "$asdlc_root/projects/project-a/init_progress_definition.yaml" "frontend" "state")"
+}
+
+test_multiple_attaches_reconcile_in_single_session() {
+  # D10/item-1: all newly-attached classes are reconciled in one session, and each
+  # gets its marker; already-reconciled classes are never reprocessed.
+  local asdlc_root="$TMP_ROOT/asdlc-single-session"
+  local log_file="$TMP_ROOT/asdlc-single-session.log"
+  local backend_repo="$TMP_ROOT/single-session-backend-repo"
+  local frontend_repo="$TMP_ROOT/single-session-frontend-repo"
+  mkdir -p "$asdlc_root" "$backend_repo" "$frontend_repo"
+  setup_workspace "$asdlc_root"
+  setup_git_repo "$backend_repo"
+  setup_git_repo "$frontend_repo"
+  write_project_definition_with_backend_and_frontend_deferred "$asdlc_root/projects/project-a"
+  write_backend_blueprint "$asdlc_root/projects/project-a"
+
+  local out=""
+  out="$(
+    cd "$asdlc_root" &&
+    {
+      printf '%s\n' "$backend_repo"
+      printf '%s\n' "$frontend_repo"
+    } | TEST_LOG_FILE="$log_file" TEST_SCAFFOLD_FEATURE_REL="projects/project-a/feature-alpha" TEST_SCANNER_NEXT_LINE="next step: none" \
+      .commands/project_add_feature_e2e.sh --path projects/project-a 2>&1
+  )"
+
+  local recon_calls=0
+  recon_calls="$(grep -c "project_contract_reconciliation.sh --path" "$log_file" || true)"
+  assert_equal "1" "$recon_calls"
+  assert_contains "$(cat "$log_file")" "--class backend,frontend"
+  assert_file_exists "$asdlc_root/projects/project-a/.contract_reconciled_backend"
+  assert_file_exists "$asdlc_root/projects/project-a/.contract_reconciled_frontend"
+}
+
+test_reconciliation_requires_clean_project_worktree_before_attach() {
+  local asdlc_root="$TMP_ROOT/asdlc-reconciliation-clean-baseline"
+  local log_file="$TMP_ROOT/asdlc-reconciliation-clean-baseline.log"
+  local repo_path="$TMP_ROOT/clean-baseline-backend-repo"
+  local project_path="$asdlc_root/projects/project-a"
+  mkdir -p "$asdlc_root" "$repo_path"
+  setup_workspace "$asdlc_root"
+  setup_git_repo "$repo_path"
+  write_project_definition_with_backend_deferred "$project_path"
+  write_backend_blueprint "$project_path"
+  printf '# Initial common contract\n' >"$project_path/common_contract_definition.md"
+  setup_git_repo "$project_path"
+  printf 'unrelated local work\n' >"$project_path/operator-notes.md"
+
+  local out=""
+  local status=0
+  set +e
+  out="$(
+    cd "$asdlc_root" &&
+    {
+      printf '%s\n' "$repo_path"
+    } | TEST_LOG_FILE="$log_file" TEST_SCAFFOLD_FEATURE_REL="projects/project-a/feature-alpha" TEST_SCANNER_NEXT_LINE="next step: none" \
+      .commands/project_add_feature_e2e.sh --path projects/project-a 2>&1
+  )"
+  status=$?
+  set -e
+
+  assert_nonzero_status "$status"
+  assert_contains "$out" "Project worktree must be clean before repo attachment and contract reconciliation: projects/project-a"
+  assert_equal "deferred" "$(read_backend_definition_field "$project_path/init_progress_definition.yaml" "state")"
+  assert_not_contains "$(read_log "$log_file")" "project_contract_reconciliation.sh"
+}
+
+test_commit_reconciliation_unit_commits_only_owned_paths() {
+  local asdlc_root="$TMP_ROOT/asdlc-reconciliation-commit-unit"
+  local log_file="$TMP_ROOT/asdlc-reconciliation-commit-unit.log"
+  local repo_path="$TMP_ROOT/commit-unit-backend-repo"
+  local project_path="$asdlc_root/projects/project-a"
+  mkdir -p "$asdlc_root" "$repo_path"
+  setup_workspace "$asdlc_root"
+  setup_git_repo "$repo_path"
+  write_project_definition_with_backend_deferred "$project_path"
+  write_backend_blueprint "$project_path"
+  printf '# Initial common contract\n' >"$project_path/common_contract_definition.md"
+  printf 'tracked operator notes\n' >"$project_path/operator-notes.md"
+  setup_git_repo "$project_path"
+
+  local out=""
+  out="$(
+    cd "$asdlc_root" &&
+    {
+      printf '%s\n' "$repo_path"
+      printf 'y\n'
+    } | TEST_LOG_FILE="$log_file" TEST_RECONCILIATION_WRITE_CONTRACT=1 \
+      TEST_SCAFFOLD_FEATURE_REL="projects/project-a/feature-alpha" TEST_SCANNER_NEXT_LINE="next step: none" \
+      .commands/project_add_feature_e2e.sh --path projects/project-a 2>&1
+  )"
+
+  assert_contains "$out" "Committed reconciliation results for projects/project-a"
+  assert_equal "Reconcile contract and attach repos" "$(git -C "$project_path" log -1 --format=%s)"
+
+  local committed_paths=""
+  committed_paths="$(git -C "$project_path" show --format= --name-only HEAD)"
+  assert_contains "$committed_paths" "init_progress_definition.yaml"
+  assert_contains "$committed_paths" "common_contract_definition.md"
+  assert_contains "$committed_paths" ".contract_reconciled_backend"
+  assert_not_contains "$committed_paths" "operator-notes.md"
+}
+
+test_commit_reconciliation_unit_blocks_on_unexpected_dirty_output() {
+  local asdlc_root="$TMP_ROOT/asdlc-reconciliation-unexpected-output"
+  local log_file="$TMP_ROOT/asdlc-reconciliation-unexpected-output.log"
+  local repo_path="$TMP_ROOT/unexpected-output-backend-repo"
+  local project_path="$asdlc_root/projects/project-a"
+  mkdir -p "$asdlc_root" "$repo_path"
+  setup_workspace "$asdlc_root"
+  setup_git_repo "$repo_path"
+  write_project_definition_with_backend_deferred "$project_path"
+  write_backend_blueprint "$project_path"
+  printf '# Initial common contract\n' >"$project_path/common_contract_definition.md"
+  setup_git_repo "$project_path"
+
+  local out=""
+  local status=0
+  set +e
+  out="$(
+    cd "$asdlc_root" &&
+    {
+      printf '%s\n' "$repo_path"
+      printf 'y\n'
+    } | TEST_LOG_FILE="$log_file" TEST_RECONCILIATION_WRITE_CONTRACT=1 TEST_RECONCILIATION_WRITE_UNEXPECTED=1 \
+      TEST_SCAFFOLD_FEATURE_REL="projects/project-a/feature-alpha" TEST_SCANNER_NEXT_LINE="next step: none" \
+      .commands/project_add_feature_e2e.sh --path projects/project-a 2>&1
+  )"
+  status=$?
+  set -e
+
+  assert_nonzero_status "$status"
+  assert_contains "$out" "ERROR: Reconciliation created unexpected changes; completion markers were removed:"
+  assert_contains "$out" "reconciliation-unexpected.txt"
+  assert_equal "Initial commit" "$(git -C "$project_path" log -1 --format=%s)"
+  assert_file_not_exists "$project_path/.contract_reconciled_backend"
+  assert_contains "$(git -C "$project_path" status --porcelain)" "?? reconciliation-unexpected.txt"
+  assert_not_contains "$(read_log "$log_file")" "feature_br_scaffold.sh"
+}
+
+test_declined_reconciliation_commit_stops_before_feature_workflow() {
+  local asdlc_root="$TMP_ROOT/asdlc-reconciliation-decline"
+  local log_file="$TMP_ROOT/asdlc-reconciliation-decline.log"
+  local repo_path="$TMP_ROOT/decline-backend-repo"
+  local project_path="$asdlc_root/projects/project-a"
+  mkdir -p "$asdlc_root" "$repo_path"
+  setup_workspace "$asdlc_root"
+  setup_git_repo "$repo_path"
+  write_project_definition_with_backend_deferred "$project_path"
+  write_backend_blueprint "$project_path"
+  printf '# Initial common contract\n' >"$project_path/common_contract_definition.md"
+  setup_git_repo "$project_path"
+
+  local out=""
+  out="$(
+    cd "$asdlc_root" &&
+    {
+      printf '%s\n' "$repo_path"
+      printf 'n\n'
+    } | TEST_LOG_FILE="$log_file" TEST_RECONCILIATION_WRITE_CONTRACT=1 \
+      TEST_SCAFFOLD_FEATURE_REL="projects/project-a/feature-alpha" TEST_SCANNER_NEXT_LINE="next step: none" \
+      .commands/project_add_feature_e2e.sh --path projects/project-a 2>&1
+  )"
+
+  assert_contains "$out" "Leaving reconciliation results uncommitted at operator request."
+  assert_contains "$out" "Execution stopped: reconciliation results were not committed."
+  assert_equal "Initial commit" "$(git -C "$project_path" log -1 --format=%s)"
+  assert_file_exists "$project_path/.contract_reconciled_backend"
+  assert_contains "$(git -C "$project_path" status --porcelain)" "common_contract_definition.md"
+  assert_not_contains "$(read_log "$log_file")" "feature_br_scaffold.sh"
 }
 
 test_without_path_uses_only_project_in_workspace() {
@@ -1915,6 +2130,12 @@ test_deferred_class_attach_skips_reconciliation_when_marker_exists
 test_deferred_class_reconciliation_inherits_prompt_input_stream
 test_ready_class_without_reconciliation_marker_retries_on_next_run
 test_attach_reconciliation_failure_does_not_prompt_for_another_path
+test_reconciliation_runs_after_all_class_attaches
+test_multiple_attaches_reconcile_in_single_session
+test_reconciliation_requires_clean_project_worktree_before_attach
+test_commit_reconciliation_unit_commits_only_owned_paths
+test_commit_reconciliation_unit_blocks_on_unexpected_dirty_output
+test_declined_reconciliation_commit_stops_before_feature_workflow
 test_without_path_uses_only_project_in_workspace
 test_without_path_prompts_for_project_when_multiple_exist
 test_without_path_can_finish_when_multiple_projects_exist

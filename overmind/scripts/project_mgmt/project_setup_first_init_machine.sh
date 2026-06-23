@@ -66,6 +66,7 @@ STAGED_RULE_FILES=(
   "technical_requirements_rule.md"
   "user_br_clarification_rule.md"
   "prerequisite_gaps_rule.md"
+  "project_contract_reconciliation_rule.md"
 )
 STAGED_TEMPLATE_FILES=(
   "common_contract_definition_TEMPLATE.md"
