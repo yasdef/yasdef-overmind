@@ -49,7 +49,7 @@ sequenceDiagram
     Note over PO,FE: Concurrency: committed sibling plans are read as promises (in-flight evidence tier).<br/>All repo scans read the default branch only — accepted work must be merged before the next feature plans against it.
     par PO track
       PO->>PO: 3. BR scaffold → feature_br_summary.md
-      PO->>PO: 4.1 Scan repo + task-to-BR → user_br_input.md
+      PO->>PO: 4.1 Scan repo + overmind-task-to-br skill → user_br_input.md
       Note over PO: Per-class gating: classes with state ready are scanned, deferred classes skipped, no-op when no class is ready.
       loop Until ready_to_ears
         PO->>PO: 4.2 BR clarification

@@ -13,20 +13,6 @@ PROJECT_CONTRACT_RECONCILIATION_SRC="$SOURCE_ROOT/overmind/scripts/project_mgmt/
 REGISTER_WORKER_SRC="$SOURCE_ROOT/overmind/scripts/project_mgmt/project_register_worker.sh"
 OPTION_6_HELPER_SRC="$SOURCE_ROOT/overmind/scripts/feature_br_scaffold.sh"
 PROJECT_ADD_FEATURE_E2E_SRC="$SOURCE_ROOT/overmind/scripts/project_mgmt/project_add_feature_e2e.sh"
-OPTION_7_HELPER_SRC="$SOURCE_ROOT/overmind/scripts/feature_scan_repo_for_br.sh"
-OPTION_8_HELPER_SRC="$SOURCE_ROOT/overmind/scripts/feature_task_to_br.sh"
-OPTION_9_HELPER_SRC="$SOURCE_ROOT/overmind/scripts/feature_user_br_clarification.sh"
-OPTION_10_HELPER_SRC="$SOURCE_ROOT/overmind/scripts/feature_br_check_ears_readiness.sh"
-OPTION_11_HELPER_SRC="$SOURCE_ROOT/overmind/scripts/feature_br_to_ears.sh"
-OPTION_12_HELPER_SRC="$SOURCE_ROOT/overmind/scripts/feature_requirements_ears_review.sh"
-OPTION_13_HELPER_SRC="$SOURCE_ROOT/overmind/scripts/feature_contract_delta.sh"
-OPTION_14_HELPER_SRC="$SOURCE_ROOT/overmind/scripts/feature_repo_surface_and_exec_context.sh"
-FEATURE_SURFACE_MAP_MCP_PLACEHOLDER_ENRICHMENT_SRC="$SOURCE_ROOT/overmind/scripts/feature_surface_map_mcp_placeholder_enrichment.sh"
-OPTION_15_HELPER_SRC="$SOURCE_ROOT/overmind/scripts/feature_technical_requirements.sh"
-FEATURE_IMPLEMENTATION_SLICES_SRC="$SOURCE_ROOT/overmind/scripts/feature_implementation_slices.sh"
-FEATURE_PREREQUISITE_GAPS_SRC="$SOURCE_ROOT/overmind/scripts/feature_prerequisite_gaps.sh"
-OPTION_16_HELPER_SRC="$SOURCE_ROOT/overmind/scripts/feature_implementation_plan.sh"
-OPTION_17_HELPER_SRC="$SOURCE_ROOT/overmind/scripts/feature_implementation_plan_semantic_review.sh"
 OPTION_18_HELPER_SRC="$SOURCE_ROOT/overmind/scripts/feature_assing_workers.sh"
 TEMPLATE_SRC="$SOURCE_ROOT/overmind/templates/init_progress_definition_TEMPLATE.yaml"
 RULES_DIR_SRC="$SOURCE_ROOT/overmind/rules"
@@ -34,78 +20,68 @@ TEMPLATES_DIR_SRC="$SOURCE_ROOT/overmind/templates"
 GOLDEN_EXAMPLES_DIR_SRC="$SOURCE_ROOT/overmind/golden_examples"
 HELPER_DIR_SRC="$SOURCE_ROOT/overmind/scripts/helper"
 SETUP_DIR_SRC="$SOURCE_ROOT/overmind/setup"
+OVERMIND_CLI_BUNDLE_REL_PATH="packages/asdlc-coordinator/dist/overmind.js"
+SKILL_SOURCE_REL_PATH="packages/installer/_data/skills/overmind-task-to-br"
+SKILL_SOURCE_DIR_SRC="$SOURCE_ROOT/$SKILL_SOURCE_REL_PATH"
+REPO_BR_SCAN_SKILL_SOURCE_REL_PATH="packages/installer/_data/skills/overmind-repo-br-scan"
+REPO_BR_SCAN_SKILL_SOURCE_DIR_SRC="$SOURCE_ROOT/$REPO_BR_SCAN_SKILL_SOURCE_REL_PATH"
+BR_CLARIFICATION_SKILL_SOURCE_REL_PATH="packages/installer/_data/skills/overmind-br-clarification"
+BR_CLARIFICATION_SKILL_SOURCE_DIR_SRC="$SOURCE_ROOT/$BR_CLARIFICATION_SKILL_SOURCE_REL_PATH"
+REQUIREMENTS_EARS_SKILL_SOURCE_REL_PATH="packages/installer/_data/skills/overmind-requirements-ears"
+REQUIREMENTS_EARS_SKILL_SOURCE_DIR_SRC="$SOURCE_ROOT/$REQUIREMENTS_EARS_SKILL_SOURCE_REL_PATH"
+EARS_REVIEW_SKILL_SOURCE_REL_PATH="packages/installer/_data/skills/overmind-ears-review"
+EARS_REVIEW_SKILL_SOURCE_DIR_SRC="$SOURCE_ROOT/$EARS_REVIEW_SKILL_SOURCE_REL_PATH"
+CONTRACT_DELTA_SKILL_SOURCE_REL_PATH="packages/installer/_data/skills/overmind-contract-delta"
+CONTRACT_DELTA_SKILL_SOURCE_DIR_SRC="$SOURCE_ROOT/$CONTRACT_DELTA_SKILL_SOURCE_REL_PATH"
+SURFACE_MAP_SKILL_SOURCE_REL_PATH="packages/installer/_data/skills/overmind-surface-map"
+SURFACE_MAP_SKILL_SOURCE_DIR_SRC="$SOURCE_ROOT/$SURFACE_MAP_SKILL_SOURCE_REL_PATH"
+SURFACE_MAP_ENRICH_SKILL_SOURCE_REL_PATH="packages/installer/_data/skills/overmind-surface-map-enrich"
+SURFACE_MAP_ENRICH_SKILL_SOURCE_DIR_SRC="$SOURCE_ROOT/$SURFACE_MAP_ENRICH_SKILL_SOURCE_REL_PATH"
+TECHNICAL_REQUIREMENTS_SKILL_SOURCE_REL_PATH="packages/installer/_data/skills/overmind-technical-requirements"
+TECHNICAL_REQUIREMENTS_SKILL_SOURCE_DIR_SRC="$SOURCE_ROOT/$TECHNICAL_REQUIREMENTS_SKILL_SOURCE_REL_PATH"
+IMPLEMENTATION_SLICES_SKILL_SOURCE_REL_PATH="packages/installer/_data/skills/overmind-implementation-slices"
+IMPLEMENTATION_SLICES_SKILL_SOURCE_DIR_SRC="$SOURCE_ROOT/$IMPLEMENTATION_SLICES_SKILL_SOURCE_REL_PATH"
+PREREQUISITE_GAPS_SKILL_SOURCE_REL_PATH="packages/installer/_data/skills/overmind-prerequisite-gaps"
+PREREQUISITE_GAPS_SKILL_SOURCE_DIR_SRC="$SOURCE_ROOT/$PREREQUISITE_GAPS_SKILL_SOURCE_REL_PATH"
+IMPLEMENTATION_PLAN_SKILL_SOURCE_REL_PATH="packages/installer/_data/skills/overmind-implementation-plan"
+IMPLEMENTATION_PLAN_SKILL_SOURCE_DIR_SRC="$SOURCE_ROOT/$IMPLEMENTATION_PLAN_SKILL_SOURCE_REL_PATH"
+PLAN_SEMANTIC_REVIEW_SKILL_SOURCE_REL_PATH="packages/installer/_data/skills/overmind-plan-semantic-review"
+PLAN_SEMANTIC_REVIEW_SKILL_SOURCE_DIR_SRC="$SOURCE_ROOT/$PLAN_SEMANTIC_REVIEW_SKILL_SOURCE_REL_PATH"
+SKILL_RUNNER_DIRS=(
+  ".codex"
+  ".claude"
+)
 STAGED_RULE_FILES=(
-  "br_to_ears.md"
   "common_contract_definition_rule.md"
-  "feature_contract_delta_rule.md"
-  "implementation_slices_rule.md"
-  "implementation_plan_rule.md"
-  "implementation_plan_semantic_review_rule.md"
-  "prerequisite_gaps_rule.md"
   "project_stack_blueprint_rule.md"
-  "requirements_ears_review_rule.md"
-  "repo_br_scan_rule.md"
-  "feature_repo_surface_and_exec_context_rule.md"
-  "feature_surface_map_mcp_placeholder_enrichment_rule.md"
   "task_to_br_rule.md"
-  "technical_requirements_rule.md"
-  "user_br_clarification_rule.md"
   "project_contract_reconciliation_rule.md"
 )
 STAGED_TEMPLATE_FILES=(
   "common_contract_definition_TEMPLATE.md"
   "feature_br_summary_TEMPLATE.md"
-  "feature_contract_delta_TEMPLATE.md"
-  "implementation_slices_TEMPLATE.md"
-  "implementation_plan_TEMPLATE.md"
-  "implementation_plan_semantic_review_TEMPLATE.md"
   "init_progress_definition_TEMPLATE.yaml"
   "missing_br_data_TEMPLATE.md"
-  "prerequisite_gaps_TEMPLATE.md"
   "project_stack_blueprint_be_TEMPLATE.md"
   "project_stack_blueprint_fe_TEMPLATE.md"
   "project_stack_blueprint_mobile_TEMPLATE.md"
-  "project_surface_struct_resp_map_be_TEMPLATE.md"
-  "project_surface_struct_resp_map_fe_TEMPLATE.md"
   "requirements_ears_review_TEMPLATE.md"
   "reqirements_ears_TEMPLATE.md"
-  "technical_requirements_TEMPLATE.md"
 )
 STAGED_GOLDEN_EXAMPLE_FILES=(
   "common_contract_definition_GOLDEN_EXAMPLE.md"
   "feature_br_summary_GOLDEN_EXAMPLE.md"
-  "feature_contract_delta_GOLDEN_EXAMPLE.md"
-  "implementation_slices_GOLDEN_EXAMPLE.md"
-  "implementation_plan_GOLDEN_EXAMPLE.md"
-  "implementation_plan_semantic_review_GOLDEN_EXAMPLE.md"
   "missing_br_data_GOLDEN_EXAMPLE.md"
-  "prerequisite_gaps_GOLDEN_EXAMPLE.md"
   "project_stack_blueprint_be_GOLDEN_EXAMPLE.md"
   "project_stack_blueprint_fe_GOLDEN_EXAMPLE.md"
   "project_stack_blueprint_mobile_GOLDEN_EXAMPLE.md"
-  "project_surface_struct_resp_map_be_GOLDEN_EXAMPLE.md"
-  "project_surface_struct_resp_map_fe_GOLDEN_EXAMPLE.md"
   "requirements_ears_review_GOLDEN_EXAMPLE.md"
   "reqirements_ears_GOLDEN_EXAMPLE.md"
-  "technical_requirements_GOLDEN_EXAMPLE.md"
 )
 STAGED_HELPER_FILES=(
-  "check_business_context_filled_from_repo.sh"
   "check_common_contract_definition_quality.sh"
   "check_cross_class_peer_trigger.sh"
-  "check_feature_contract_delta_quality.sh"
-  "check_feature_technical_requirements_quality.sh"
-  "check_implementation_slices_quality.sh"
-  "check_implementation_plan_quality.sh"
-  "check_implementation_plan_semantic_review_quality.sh"
-  "check_prerequisite_gaps_quality.sh"
   "check_project_stack_blueprint_quality.sh"
-  "check_feature_repo_surface_and_exec_context_be_quality.sh"
-  "check_feature_repo_surface_and_exec_context_fe_quality.sh"
-  "check_requirements_ears_review_quality.sh"
-  "check_requirements_ears_quality.sh"
-  "check_task_to_br_quality.sh"
-  "check_user_br_clarification_quality.sh"
 )
 STAGED_SETUP_FILES=(
   "external_sources.yaml"
@@ -334,49 +310,195 @@ assert_support_assets_except_setup_match_repo_sources() {
   assert_file_not_exists "$asdlc_root/.helper/check_project_tech_summary_be_quality.sh"
 }
 
+assert_staged_overmind_cli_matches_repo_source() {
+  local repo_dir="$1"
+  local asdlc_root="$2"
+  local staged_cli_path="$asdlc_root/.overmind/overmind.js"
+
+  assert_dir_exists "$asdlc_root/.overmind"
+  assert_file_exists "$staged_cli_path"
+  assert_file_executable "$staged_cli_path"
+  assert_file_content_equal "$repo_dir/$OVERMIND_CLI_BUNDLE_REL_PATH" "$staged_cli_path"
+}
+
+assert_runner_skills_installed() {
+  local repo_dir="$1"
+  local asdlc_root="$2"
+  local runner_dir=""
+  local skill_dir=""
+
+  for runner_dir in "${SKILL_RUNNER_DIRS[@]}"; do
+    skill_dir="$asdlc_root/$runner_dir/skills/overmind-task-to-br"
+    assert_dir_exists "$skill_dir"
+    assert_dir_exists "$skill_dir/assets"
+    assert_file_exists "$skill_dir/SKILL.md"
+    assert_file_content_equal \
+      "$repo_dir/$SKILL_SOURCE_REL_PATH/SKILL.md" \
+      "$skill_dir/SKILL.md"
+    assert_file_exists "$skill_dir/assets/feature_br_summary_TEMPLATE.md"
+    assert_file_not_exists "$skill_dir/overmind.js"
+
+    skill_dir="$asdlc_root/$runner_dir/skills/overmind-repo-br-scan"
+    assert_dir_exists "$skill_dir"
+    assert_dir_exists "$skill_dir/assets"
+    assert_file_exists "$skill_dir/SKILL.md"
+    assert_file_content_equal \
+      "$repo_dir/$REPO_BR_SCAN_SKILL_SOURCE_REL_PATH/SKILL.md" \
+      "$skill_dir/SKILL.md"
+    assert_file_not_exists "$skill_dir/overmind.js"
+
+    skill_dir="$asdlc_root/$runner_dir/skills/overmind-br-clarification"
+    assert_dir_exists "$skill_dir"
+    assert_dir_exists "$skill_dir/assets"
+    assert_file_exists "$skill_dir/SKILL.md"
+    assert_file_content_equal \
+      "$repo_dir/$BR_CLARIFICATION_SKILL_SOURCE_REL_PATH/SKILL.md" \
+      "$skill_dir/SKILL.md"
+    assert_file_exists "$skill_dir/assets/feature_br_summary_TEMPLATE.md"
+    assert_file_not_exists "$skill_dir/overmind.js"
+
+    skill_dir="$asdlc_root/$runner_dir/skills/overmind-requirements-ears"
+    assert_dir_exists "$skill_dir"
+    assert_dir_exists "$skill_dir/assets"
+    assert_file_exists "$skill_dir/SKILL.md"
+    assert_file_content_equal \
+      "$repo_dir/$REQUIREMENTS_EARS_SKILL_SOURCE_REL_PATH/SKILL.md" \
+      "$skill_dir/SKILL.md"
+    assert_file_exists "$skill_dir/assets/reqirements_ears_TEMPLATE.md"
+    assert_file_exists "$skill_dir/assets/reqirements_ears_GOLDEN_EXAMPLE.md"
+    assert_file_not_exists "$skill_dir/overmind.js"
+
+    skill_dir="$asdlc_root/$runner_dir/skills/overmind-ears-review"
+    assert_dir_exists "$skill_dir"
+    assert_dir_exists "$skill_dir/assets"
+    assert_file_exists "$skill_dir/SKILL.md"
+    assert_file_content_equal \
+      "$repo_dir/$EARS_REVIEW_SKILL_SOURCE_REL_PATH/SKILL.md" \
+      "$skill_dir/SKILL.md"
+    assert_file_exists "$skill_dir/assets/requirements_ears_review_TEMPLATE.md"
+    assert_file_exists "$skill_dir/assets/requirements_ears_review_GOLDEN_EXAMPLE.md"
+    assert_file_not_exists "$skill_dir/overmind.js"
+
+    skill_dir="$asdlc_root/$runner_dir/skills/overmind-contract-delta"
+    assert_dir_exists "$skill_dir"
+    assert_dir_exists "$skill_dir/assets"
+    assert_file_exists "$skill_dir/SKILL.md"
+    assert_file_content_equal \
+      "$repo_dir/$CONTRACT_DELTA_SKILL_SOURCE_REL_PATH/SKILL.md" \
+      "$skill_dir/SKILL.md"
+    assert_file_exists "$skill_dir/assets/feature_contract_delta_TEMPLATE.md"
+    assert_file_exists "$skill_dir/assets/feature_contract_delta_GOLDEN_EXAMPLE.md"
+    assert_file_not_exists "$skill_dir/overmind.js"
+
+    skill_dir="$asdlc_root/$runner_dir/skills/overmind-surface-map"
+    assert_dir_exists "$skill_dir"
+    assert_dir_exists "$skill_dir/assets"
+    assert_file_exists "$skill_dir/SKILL.md"
+    assert_file_content_equal \
+      "$repo_dir/$SURFACE_MAP_SKILL_SOURCE_REL_PATH/SKILL.md" \
+      "$skill_dir/SKILL.md"
+    assert_file_exists "$skill_dir/assets/project_surface_struct_resp_map_be_TEMPLATE.md"
+    assert_file_exists "$skill_dir/assets/project_surface_struct_resp_map_fe_TEMPLATE.md"
+    assert_file_exists "$skill_dir/assets/project_surface_struct_resp_map_be_GOLDEN_EXAMPLE.md"
+    assert_file_exists "$skill_dir/assets/project_surface_struct_resp_map_fe_GOLDEN_EXAMPLE.md"
+    assert_file_not_exists "$skill_dir/overmind.js"
+
+    skill_dir="$asdlc_root/$runner_dir/skills/overmind-surface-map-enrich"
+    assert_dir_exists "$skill_dir"
+    assert_file_not_exists "$skill_dir/assets"
+    assert_file_exists "$skill_dir/SKILL.md"
+    assert_file_content_equal \
+      "$repo_dir/$SURFACE_MAP_ENRICH_SKILL_SOURCE_REL_PATH/SKILL.md" \
+      "$skill_dir/SKILL.md"
+    assert_file_not_exists "$skill_dir/overmind.js"
+
+    skill_dir="$asdlc_root/$runner_dir/skills/overmind-technical-requirements"
+    assert_dir_exists "$skill_dir"
+    assert_dir_exists "$skill_dir/assets"
+    assert_file_exists "$skill_dir/SKILL.md"
+    assert_file_content_equal \
+      "$repo_dir/$TECHNICAL_REQUIREMENTS_SKILL_SOURCE_REL_PATH/SKILL.md" \
+      "$skill_dir/SKILL.md"
+    assert_file_exists "$skill_dir/assets/technical_requirements_TEMPLATE.md"
+    assert_file_exists "$skill_dir/assets/technical_requirements_GOLDEN_EXAMPLE.md"
+    assert_file_not_exists "$skill_dir/overmind.js"
+
+    skill_dir="$asdlc_root/$runner_dir/skills/overmind-implementation-slices"
+    assert_dir_exists "$skill_dir"
+    assert_dir_exists "$skill_dir/assets"
+    assert_file_exists "$skill_dir/SKILL.md"
+    assert_file_content_equal \
+      "$repo_dir/$IMPLEMENTATION_SLICES_SKILL_SOURCE_REL_PATH/SKILL.md" \
+      "$skill_dir/SKILL.md"
+    assert_file_exists "$skill_dir/assets/implementation_slices_TEMPLATE.md"
+    assert_file_exists "$skill_dir/assets/implementation_slices_GOLDEN_EXAMPLE.md"
+    assert_file_not_exists "$skill_dir/overmind.js"
+
+    skill_dir="$asdlc_root/$runner_dir/skills/overmind-prerequisite-gaps"
+    assert_dir_exists "$skill_dir"
+    assert_dir_exists "$skill_dir/assets"
+    assert_file_exists "$skill_dir/SKILL.md"
+    assert_file_content_equal "$repo_dir/$PREREQUISITE_GAPS_SKILL_SOURCE_REL_PATH/SKILL.md" "$skill_dir/SKILL.md"
+    assert_file_exists "$skill_dir/assets/prerequisite_gaps_TEMPLATE.md"
+    assert_file_exists "$skill_dir/assets/prerequisite_gaps_GOLDEN_EXAMPLE.md"
+    assert_file_not_exists "$skill_dir/overmind.js"
+
+    skill_dir="$asdlc_root/$runner_dir/skills/overmind-implementation-plan"
+    assert_dir_exists "$skill_dir"
+    assert_dir_exists "$skill_dir/assets"
+    assert_file_exists "$skill_dir/SKILL.md"
+    assert_file_content_equal "$repo_dir/$IMPLEMENTATION_PLAN_SKILL_SOURCE_REL_PATH/SKILL.md" "$skill_dir/SKILL.md"
+    assert_file_exists "$skill_dir/assets/implementation_plan_TEMPLATE.md"
+    assert_file_exists "$skill_dir/assets/implementation_plan_GOLDEN_EXAMPLE.md"
+    assert_file_not_exists "$skill_dir/overmind.js"
+
+    skill_dir="$asdlc_root/$runner_dir/skills/overmind-plan-semantic-review"
+    assert_dir_exists "$skill_dir"
+    assert_dir_exists "$skill_dir/assets"
+    assert_file_exists "$skill_dir/SKILL.md"
+    assert_file_content_equal "$repo_dir/$PLAN_SEMANTIC_REVIEW_SKILL_SOURCE_REL_PATH/SKILL.md" "$skill_dir/SKILL.md"
+    assert_file_exists "$skill_dir/assets/implementation_plan_semantic_review_TEMPLATE.md"
+    assert_file_exists "$skill_dir/assets/implementation_plan_semantic_review_GOLDEN_EXAMPLE.md"
+    assert_file_not_exists "$skill_dir/overmind.js"
+  done
+
+  assert_file_not_exists "$asdlc_root/.templates/feature_contract_delta_TEMPLATE.md"
+  assert_file_not_exists "$asdlc_root/.golden_examples/feature_contract_delta_GOLDEN_EXAMPLE.md"
+  assert_file_not_exists "$asdlc_root/.commands/feature_repo_surface_and_exec_context.sh"
+  assert_file_not_exists "$asdlc_root/.rules/feature_repo_surface_and_exec_context_rule.md"
+  assert_file_not_exists "$asdlc_root/.templates/project_surface_struct_resp_map_be_TEMPLATE.md"
+  assert_file_not_exists "$asdlc_root/.templates/project_surface_struct_resp_map_fe_TEMPLATE.md"
+  assert_file_not_exists "$asdlc_root/.golden_examples/project_surface_struct_resp_map_be_GOLDEN_EXAMPLE.md"
+  assert_file_not_exists "$asdlc_root/.golden_examples/project_surface_struct_resp_map_fe_GOLDEN_EXAMPLE.md"
+  assert_file_not_exists "$asdlc_root/.helper/check_feature_repo_surface_and_exec_context_be_quality.sh"
+  assert_file_not_exists "$asdlc_root/.helper/check_feature_repo_surface_and_exec_context_fe_quality.sh"
+  assert_file_not_exists "$asdlc_root/.commands/feature_technical_requirements.sh"
+  assert_file_not_exists "$asdlc_root/.rules/technical_requirements_rule.md"
+  assert_file_not_exists "$asdlc_root/.templates/technical_requirements_TEMPLATE.md"
+  assert_file_not_exists "$asdlc_root/.golden_examples/technical_requirements_GOLDEN_EXAMPLE.md"
+  assert_file_not_exists "$asdlc_root/.helper/check_feature_technical_requirements_quality.sh"
+  assert_file_not_exists "$asdlc_root/.commands/feature_implementation_slices.sh"
+  assert_file_not_exists "$asdlc_root/.rules/implementation_slices_rule.md"
+  assert_file_not_exists "$asdlc_root/.templates/implementation_slices_TEMPLATE.md"
+  assert_file_not_exists "$asdlc_root/.golden_examples/implementation_slices_GOLDEN_EXAMPLE.md"
+  assert_file_not_exists "$asdlc_root/.helper/check_implementation_slices_quality.sh"
+  assert_file_not_exists "$asdlc_root/.commands/feature_prerequisite_gaps.sh"
+  assert_file_not_exists "$asdlc_root/.rules/prerequisite_gaps_rule.md"
+  assert_file_not_exists "$asdlc_root/.templates/prerequisite_gaps_TEMPLATE.md"
+  assert_file_not_exists "$asdlc_root/.golden_examples/prerequisite_gaps_GOLDEN_EXAMPLE.md"
+  assert_file_not_exists "$asdlc_root/.helper/check_prerequisite_gaps_quality.sh"
+  assert_file_not_exists "$asdlc_root/.commands/feature_implementation_plan.sh"
+  assert_file_not_exists "$asdlc_root/.rules/implementation_plan_rule.md"
+  assert_file_not_exists "$asdlc_root/.templates/implementation_plan_TEMPLATE.md"
+  assert_file_not_exists "$asdlc_root/.golden_examples/implementation_plan_GOLDEN_EXAMPLE.md"
+  assert_file_not_exists "$asdlc_root/.helper/check_implementation_plan_quality.sh"
+  assert_file_exists "$asdlc_root/common_libs/list_committed_sibling_features.sh"
+  assert_file_exists "$asdlc_root/.helper/check_cross_class_peer_trigger.sh"
+}
+
 assert_feature_requirements_and_plan_commands_use_staged_runtime_assets() {
   local asdlc_root="$1"
-  local technical_requirements_cmd_path="$asdlc_root/.commands/feature_technical_requirements.sh"
-  local mcp_placeholder_enrichment_cmd_path="$asdlc_root/.commands/feature_surface_map_mcp_placeholder_enrichment.sh"
-  local implementation_slices_cmd_path="$asdlc_root/.commands/feature_implementation_slices.sh"
-  local prerequisite_gaps_cmd_path="$asdlc_root/.commands/feature_prerequisite_gaps.sh"
-  local implementation_plan_cmd_path="$asdlc_root/.commands/feature_implementation_plan.sh"
-  local implementation_plan_semantic_review_cmd_path="$asdlc_root/.commands/feature_implementation_plan_semantic_review.sh"
   local assign_workers_cmd_path="$asdlc_root/.commands/feature_assing_workers.sh"
-
-  assert_contains "$(cat "$technical_requirements_cmd_path")" 'MODELS_FILE=".setup/models.md"'
-  assert_contains "$(cat "$technical_requirements_cmd_path")" 'RULE_FILE=".rules/technical_requirements_rule.md"'
-  assert_contains "$(cat "$technical_requirements_cmd_path")" 'TECHNICAL_REQUIREMENTS_TEMPLATE_FILE=".templates/technical_requirements_TEMPLATE.md"'
-  assert_contains "$(cat "$technical_requirements_cmd_path")" 'TECHNICAL_REQUIREMENTS_GOLDEN_EXAMPLE_FILE=".golden_examples/technical_requirements_GOLDEN_EXAMPLE.md"'
-  assert_contains "$(cat "$technical_requirements_cmd_path")" 'QUALITY_GATE_HELPER=".helper/check_feature_technical_requirements_quality.sh"'
-
-  assert_contains "$(cat "$mcp_placeholder_enrichment_cmd_path")" 'EXTERNAL_SOURCES_FILE=".setup/external_sources.yaml"'
-  assert_contains "$(cat "$mcp_placeholder_enrichment_cmd_path")" 'MODELS_FILE=".setup/models.md"'
-  assert_contains "$(cat "$mcp_placeholder_enrichment_cmd_path")" 'RULE_FILE=".rules/feature_surface_map_mcp_placeholder_enrichment_rule.md"'
-  assert_contains "$(cat "$mcp_placeholder_enrichment_cmd_path")" 'BACKEND_QUALITY_GATE_HELPER=".helper/check_feature_repo_surface_and_exec_context_be_quality.sh"'
-  assert_contains "$(cat "$mcp_placeholder_enrichment_cmd_path")" 'FRONTEND_MOBILE_QUALITY_GATE_HELPER=".helper/check_feature_repo_surface_and_exec_context_fe_quality.sh"'
-
-  assert_contains "$(cat "$implementation_slices_cmd_path")" 'MODELS_FILE=".setup/models.md"'
-  assert_contains "$(cat "$implementation_slices_cmd_path")" 'RULE_FILE=".rules/implementation_slices_rule.md"'
-  assert_contains "$(cat "$implementation_slices_cmd_path")" 'IMPLEMENTATION_SLICES_TEMPLATE_FILE=".templates/implementation_slices_TEMPLATE.md"'
-  assert_contains "$(cat "$implementation_slices_cmd_path")" 'IMPLEMENTATION_SLICES_GOLDEN_EXAMPLE_FILE=".golden_examples/implementation_slices_GOLDEN_EXAMPLE.md"'
-  assert_contains "$(cat "$implementation_slices_cmd_path")" 'QUALITY_GATE_HELPER=".helper/check_implementation_slices_quality.sh"'
-
-  assert_contains "$(cat "$prerequisite_gaps_cmd_path")" 'MODELS_FILE=".setup/models.md"'
-  assert_contains "$(cat "$prerequisite_gaps_cmd_path")" 'RULE_FILE=".rules/prerequisite_gaps_rule.md"'
-  assert_contains "$(cat "$prerequisite_gaps_cmd_path")" 'QUALITY_GATE_HELPER=".helper/check_prerequisite_gaps_quality.sh"'
-
-  assert_contains "$(cat "$implementation_plan_cmd_path")" 'MODELS_FILE=".setup/models.md"'
-  assert_contains "$(cat "$implementation_plan_cmd_path")" 'RULE_FILE=".rules/implementation_plan_rule.md"'
-  assert_contains "$(cat "$implementation_plan_cmd_path")" 'IMPLEMENTATION_PLAN_TEMPLATE_FILE=".templates/implementation_plan_TEMPLATE.md"'
-  assert_contains "$(cat "$implementation_plan_cmd_path")" 'IMPLEMENTATION_PLAN_GOLDEN_EXAMPLE_FILE=".golden_examples/implementation_plan_GOLDEN_EXAMPLE.md"'
-  assert_contains "$(cat "$implementation_plan_cmd_path")" 'QUALITY_GATE_HELPER=".helper/check_implementation_plan_quality.sh"'
-
-  assert_contains "$(cat "$implementation_plan_semantic_review_cmd_path")" 'MODELS_FILE=".setup/models.md"'
-  assert_contains "$(cat "$implementation_plan_semantic_review_cmd_path")" 'RULE_FILE=".rules/implementation_plan_semantic_review_rule.md"'
-  assert_contains "$(cat "$implementation_plan_semantic_review_cmd_path")" 'REVIEW_TEMPLATE_FILE=".templates/implementation_plan_semantic_review_TEMPLATE.md"'
-  assert_contains "$(cat "$implementation_plan_semantic_review_cmd_path")" 'REVIEW_GOLDEN_EXAMPLE_FILE=".golden_examples/implementation_plan_semantic_review_GOLDEN_EXAMPLE.md"'
-  assert_contains "$(cat "$implementation_plan_semantic_review_cmd_path")" 'QUALITY_GATE_HELPER=".helper/check_implementation_plan_semantic_review_quality.sh"'
 
   assert_contains "$(cat "$assign_workers_cmd_path")" 'Missing required argument: --feature_path <asdlc/projects/<project-id>/<feature-folder>>.'
   assert_contains "$(cat "$assign_workers_cmd_path")" 'ERROR: no active worker available for class'
@@ -486,26 +608,32 @@ setup_repo_layout() {
   cp "$OPTION_5_HELPER_SRC" "$repo_dir/overmind/scripts/init_common_contract_definition.sh"
   cp "$PROJECT_CONTRACT_RECONCILIATION_SRC" "$repo_dir/overmind/scripts/project_mgmt/project_contract_reconciliation.sh"
   cp "$OPTION_6_HELPER_SRC" "$repo_dir/overmind/scripts/feature_br_scaffold.sh"
-  cp "$OPTION_7_HELPER_SRC" "$repo_dir/overmind/scripts/feature_scan_repo_for_br.sh"
-  cp "$OPTION_8_HELPER_SRC" "$repo_dir/overmind/scripts/feature_task_to_br.sh"
-  cp "$OPTION_9_HELPER_SRC" "$repo_dir/overmind/scripts/feature_user_br_clarification.sh"
-  cp "$OPTION_10_HELPER_SRC" "$repo_dir/overmind/scripts/feature_br_check_ears_readiness.sh"
-  cp "$OPTION_11_HELPER_SRC" "$repo_dir/overmind/scripts/feature_br_to_ears.sh"
-  cp "$OPTION_12_HELPER_SRC" "$repo_dir/overmind/scripts/feature_requirements_ears_review.sh"
-  cp "$OPTION_13_HELPER_SRC" "$repo_dir/overmind/scripts/feature_contract_delta.sh"
-  cp "$OPTION_14_HELPER_SRC" "$repo_dir/overmind/scripts/feature_repo_surface_and_exec_context.sh"
-  cp "$FEATURE_SURFACE_MAP_MCP_PLACEHOLDER_ENRICHMENT_SRC" "$repo_dir/overmind/scripts/feature_surface_map_mcp_placeholder_enrichment.sh"
-  cp "$OPTION_15_HELPER_SRC" "$repo_dir/overmind/scripts/feature_technical_requirements.sh"
-  cp "$FEATURE_IMPLEMENTATION_SLICES_SRC" "$repo_dir/overmind/scripts/feature_implementation_slices.sh"
-  cp "$FEATURE_PREREQUISITE_GAPS_SRC" "$repo_dir/overmind/scripts/feature_prerequisite_gaps.sh"
-  cp "$OPTION_16_HELPER_SRC" "$repo_dir/overmind/scripts/feature_implementation_plan.sh"
-  cp "$OPTION_17_HELPER_SRC" "$repo_dir/overmind/scripts/feature_implementation_plan_semantic_review.sh"
   cp "$OPTION_18_HELPER_SRC" "$repo_dir/overmind/scripts/feature_assing_workers.sh"
   cp -R "$RULES_DIR_SRC" "$repo_dir/overmind/rules"
   cp -R "$TEMPLATES_DIR_SRC" "$repo_dir/overmind/templates"
   cp -R "$GOLDEN_EXAMPLES_DIR_SRC" "$repo_dir/overmind/golden_examples"
   cp -R "$HELPER_DIR_SRC" "$repo_dir/overmind/scripts/helper"
   cp -R "$SETUP_DIR_SRC" "$repo_dir/overmind/setup"
+  mkdir -p "$repo_dir/packages/asdlc-coordinator/dist"
+  cat >"$repo_dir/$OVERMIND_CLI_BUNDLE_REL_PATH" <<'OUT'
+#!/usr/bin/env node
+console.log("stub overmind");
+OUT
+  chmod +x "$repo_dir/$OVERMIND_CLI_BUNDLE_REL_PATH"
+  mkdir -p "$repo_dir/$(dirname "$SKILL_SOURCE_REL_PATH")"
+  cp -R "$SKILL_SOURCE_DIR_SRC" "$repo_dir/$SKILL_SOURCE_REL_PATH"
+  cp -R "$REPO_BR_SCAN_SKILL_SOURCE_DIR_SRC" "$repo_dir/$REPO_BR_SCAN_SKILL_SOURCE_REL_PATH"
+  cp -R "$BR_CLARIFICATION_SKILL_SOURCE_DIR_SRC" "$repo_dir/$BR_CLARIFICATION_SKILL_SOURCE_REL_PATH"
+  cp -R "$REQUIREMENTS_EARS_SKILL_SOURCE_DIR_SRC" "$repo_dir/$REQUIREMENTS_EARS_SKILL_SOURCE_REL_PATH"
+  cp -R "$EARS_REVIEW_SKILL_SOURCE_DIR_SRC" "$repo_dir/$EARS_REVIEW_SKILL_SOURCE_REL_PATH"
+  cp -R "$CONTRACT_DELTA_SKILL_SOURCE_DIR_SRC" "$repo_dir/$CONTRACT_DELTA_SKILL_SOURCE_REL_PATH"
+  cp -R "$SURFACE_MAP_SKILL_SOURCE_DIR_SRC" "$repo_dir/$SURFACE_MAP_SKILL_SOURCE_REL_PATH"
+  cp -R "$SURFACE_MAP_ENRICH_SKILL_SOURCE_DIR_SRC" "$repo_dir/$SURFACE_MAP_ENRICH_SKILL_SOURCE_REL_PATH"
+  cp -R "$TECHNICAL_REQUIREMENTS_SKILL_SOURCE_DIR_SRC" "$repo_dir/$TECHNICAL_REQUIREMENTS_SKILL_SOURCE_REL_PATH"
+  cp -R "$IMPLEMENTATION_SLICES_SKILL_SOURCE_DIR_SRC" "$repo_dir/$IMPLEMENTATION_SLICES_SKILL_SOURCE_REL_PATH"
+  cp -R "$PREREQUISITE_GAPS_SKILL_SOURCE_DIR_SRC" "$repo_dir/$PREREQUISITE_GAPS_SKILL_SOURCE_REL_PATH"
+  cp -R "$IMPLEMENTATION_PLAN_SKILL_SOURCE_DIR_SRC" "$repo_dir/$IMPLEMENTATION_PLAN_SKILL_SOURCE_REL_PATH"
+  cp -R "$PLAN_SEMANTIC_REVIEW_SKILL_SOURCE_DIR_SRC" "$repo_dir/$PLAN_SEMANTIC_REVIEW_SKILL_SOURCE_REL_PATH"
   chmod +x "$repo_dir/overmind/scripts/project_mgmt/project_setup_first_init_machine.sh"
   chmod +x "$repo_dir/overmind/scripts/project_mgmt/project_setup_add_new_project.sh"
   chmod +x "$repo_dir/overmind/scripts/project_mgmt/project_setup_update_project.sh"
@@ -516,20 +644,6 @@ setup_repo_layout() {
   chmod +x "$repo_dir/overmind/scripts/init_common_contract_definition.sh"
   chmod +x "$repo_dir/overmind/scripts/project_mgmt/project_contract_reconciliation.sh"
   chmod +x "$repo_dir/overmind/scripts/feature_br_scaffold.sh"
-  chmod +x "$repo_dir/overmind/scripts/feature_scan_repo_for_br.sh"
-  chmod +x "$repo_dir/overmind/scripts/feature_task_to_br.sh"
-  chmod +x "$repo_dir/overmind/scripts/feature_user_br_clarification.sh"
-  chmod +x "$repo_dir/overmind/scripts/feature_br_check_ears_readiness.sh"
-  chmod +x "$repo_dir/overmind/scripts/feature_br_to_ears.sh"
-  chmod +x "$repo_dir/overmind/scripts/feature_requirements_ears_review.sh"
-  chmod +x "$repo_dir/overmind/scripts/feature_contract_delta.sh"
-  chmod +x "$repo_dir/overmind/scripts/feature_repo_surface_and_exec_context.sh"
-  chmod +x "$repo_dir/overmind/scripts/feature_surface_map_mcp_placeholder_enrichment.sh"
-  chmod +x "$repo_dir/overmind/scripts/feature_technical_requirements.sh"
-  chmod +x "$repo_dir/overmind/scripts/feature_implementation_slices.sh"
-  chmod +x "$repo_dir/overmind/scripts/feature_prerequisite_gaps.sh"
-  chmod +x "$repo_dir/overmind/scripts/feature_implementation_plan.sh"
-  chmod +x "$repo_dir/overmind/scripts/feature_implementation_plan_semantic_review.sh"
   chmod +x "$repo_dir/overmind/scripts/feature_assing_workers.sh"
   find "$repo_dir/overmind/scripts/helper" -maxdepth 1 -type f -exec chmod +x {} +
 }
@@ -582,6 +696,8 @@ test_first_init_machine_bootstraps_asdlc_workspace_with_local_template() {
   assert_dir_exists "$asdlc_root/.golden_examples"
   assert_dir_exists "$asdlc_root/.helper"
   assert_dir_exists "$asdlc_root/.setup"
+  assert_staged_overmind_cli_matches_repo_source "$repo_dir" "$asdlc_root"
+  assert_runner_skills_installed "$repo_dir" "$asdlc_root"
   assert_dir_exists "$asdlc_root/common_libs"
   assert_file_exists "$asdlc_root/common_libs/project_setup_common.sh"
   assert_file_exists "$asdlc_root/common_libs/class_repo_paths.sh"
@@ -606,19 +722,16 @@ test_first_init_machine_bootstraps_asdlc_workspace_with_local_template() {
   assert_file_exists "$asdlc_root/.commands/project_register_worker.sh"
   assert_file_exists "$asdlc_root/.commands/feature_br_scaffold.sh"
   assert_file_exists "$asdlc_root/.commands/project_add_feature_e2e.sh"
-  assert_file_exists "$asdlc_root/.commands/feature_scan_repo_for_br.sh"
-  assert_file_exists "$asdlc_root/.commands/feature_task_to_br.sh"
-  assert_file_exists "$asdlc_root/.commands/feature_user_br_clarification.sh"
-  assert_file_exists "$asdlc_root/.commands/feature_br_check_ears_readiness.sh"
-  assert_file_exists "$asdlc_root/.commands/feature_br_to_ears.sh"
-  assert_file_exists "$asdlc_root/.commands/feature_requirements_ears_review.sh"
-  assert_file_exists "$asdlc_root/.commands/feature_contract_delta.sh"
-  assert_file_exists "$asdlc_root/.commands/feature_repo_surface_and_exec_context.sh"
-  assert_file_exists "$asdlc_root/.commands/feature_surface_map_mcp_placeholder_enrichment.sh"
-  assert_file_exists "$asdlc_root/.commands/feature_technical_requirements.sh"
-  assert_file_exists "$asdlc_root/.commands/feature_implementation_slices.sh"
-  assert_file_exists "$asdlc_root/.commands/feature_implementation_plan.sh"
-  assert_file_exists "$asdlc_root/.commands/feature_implementation_plan_semantic_review.sh"
+  assert_file_not_exists "$asdlc_root/.commands/feature_user_br_clarification.sh"
+  assert_file_not_exists "$asdlc_root/.commands/feature_br_check_ears_readiness.sh"
+  assert_file_not_exists "$asdlc_root/.commands/feature_br_to_ears.sh"
+  assert_file_not_exists "$asdlc_root/.commands/feature_requirements_ears_review.sh"
+  assert_file_not_exists "$asdlc_root/.commands/feature_contract_delta.sh"
+  assert_file_not_exists "$asdlc_root/.commands/feature_repo_surface_and_exec_context.sh"
+  assert_file_not_exists "$asdlc_root/.commands/feature_surface_map_mcp_placeholder_enrichment.sh"
+  assert_file_not_exists "$asdlc_root/.commands/feature_technical_requirements.sh"
+  assert_file_not_exists "$asdlc_root/.commands/feature_implementation_slices.sh"
+  assert_file_not_exists "$asdlc_root/.commands/feature_implementation_plan_semantic_review.sh"
   assert_file_exists "$asdlc_root/.commands/feature_assing_workers.sh"
   assert_file_executable "$asdlc_root/.commands/project_setup_add_new_project.sh"
   assert_file_executable "$asdlc_root/.commands/project_setup_update_project.sh"
@@ -629,23 +742,7 @@ test_first_init_machine_bootstraps_asdlc_workspace_with_local_template() {
   assert_file_executable "$asdlc_root/.commands/project_register_worker.sh"
   assert_file_executable "$asdlc_root/.commands/feature_br_scaffold.sh"
   assert_file_executable "$asdlc_root/.commands/project_add_feature_e2e.sh"
-  assert_file_executable "$asdlc_root/.commands/feature_scan_repo_for_br.sh"
-  assert_file_executable "$asdlc_root/.commands/feature_task_to_br.sh"
-  assert_file_executable "$asdlc_root/.commands/feature_user_br_clarification.sh"
-  assert_file_executable "$asdlc_root/.commands/feature_br_check_ears_readiness.sh"
-  assert_file_executable "$asdlc_root/.commands/feature_br_to_ears.sh"
-  assert_file_executable "$asdlc_root/.commands/feature_requirements_ears_review.sh"
-  assert_file_executable "$asdlc_root/.commands/feature_contract_delta.sh"
-  assert_file_executable "$asdlc_root/.commands/feature_repo_surface_and_exec_context.sh"
-  assert_file_executable "$asdlc_root/.commands/feature_surface_map_mcp_placeholder_enrichment.sh"
-  assert_file_executable "$asdlc_root/.commands/feature_technical_requirements.sh"
-  assert_file_executable "$asdlc_root/.commands/feature_implementation_slices.sh"
-  assert_file_executable "$asdlc_root/.commands/feature_implementation_plan.sh"
-  assert_file_executable "$asdlc_root/.commands/feature_implementation_plan_semantic_review.sh"
   assert_file_executable "$asdlc_root/.commands/feature_assing_workers.sh"
-  assert_contains "$(cat "$asdlc_root/.commands/feature_surface_map_mcp_placeholder_enrichment.sh")" 'RULE_FILE=".rules/feature_surface_map_mcp_placeholder_enrichment_rule.md"'
-  assert_contains "$(cat "$asdlc_root/.commands/feature_surface_map_mcp_placeholder_enrichment.sh")" 'MODELS_FILE=".setup/models.md"'
-  assert_contains "$(cat "$asdlc_root/.setup/models.md")" 'feature_surface_map_mcp_placeholder_enrichment'
   assert_file_content_equal \
     "$repo_dir/overmind/templates/init_progress_definition_TEMPLATE.yaml" \
     "$asdlc_root/.templates/init_progress_definition_TEMPLATE.yaml"
@@ -663,9 +760,12 @@ test_first_init_machine_bootstraps_asdlc_workspace_with_local_template() {
   assert_contains "$quickrun" "## 2. Create EARS Requirements"
   assert_contains "$quickrun" 'Project path example: `projects/<project-id>`'
   assert_contains "$quickrun" 'Feature path example: `projects/<project-id>/<feature-folder>`'
+  assert_contains "$quickrun" 'Task-to-BR gates run through the staged CLI at `.overmind/overmind.js`.'
+  assert_contains "$quickrun" '`overmind-plan-semantic-review` skills are staged for supported runners'
   assert_contains "$quickrun" 'Successful scanner runs persist `projects/<project-id>/step_state_<feature-folder>.md`; stdout remains the canonical machine-consumable output.'
   assert_contains "$quickrun" ".commands/project_add_feature_e2e.sh"
   assert_contains "$quickrun" ".commands/project_add_feature_e2e.sh --path projects/<project-id>"
+  assert_contains "$quickrun" 'During phase 4.1, the orchestrator starts a Codex repo-br-scan session (when a class repo is ready) followed by a task-to-BR session using the installed skills; when `user_br_input.md` is missing, Codex asks for a local story file or Jira ticket. During phase 4.2, the orchestrator starts the BR-clarification skill and then runs the deterministic readiness check. During phase 5, the orchestrator starts the requirements-EARS skill. During optional phase 5.1, the orchestrator starts the EARS-review skill. During phase 6, it syncs ready repositories and starts the contract-delta skill.'
   assert_contains "$quickrun" '.commands/project_add_feature_e2e.sh --resume 4.2'
   assert_contains "$quickrun" ".commands/project_add_feature_e2e.sh --path projects/<project-id> --resume 8.2"
   assert_contains "$quickrun" '.project_add_feature_e2e_state.env'
@@ -677,21 +777,34 @@ test_first_init_machine_bootstraps_asdlc_workspace_with_local_template() {
   assert_contains "$quickrun" ".commands/init_project_stack_blueprints.sh --path projects/<project-id>"
   assert_contains "$quickrun" "projects/<project-id>/workers.yaml"
   assert_contains "$quickrun" ".commands/feature_br_scaffold.sh --path projects/<project-id>"
-  assert_contains "$quickrun" ".commands/feature_scan_repo_for_br.sh --feature_path projects/<project-id>/<feature-folder>"
-  assert_contains "$quickrun" ".commands/feature_task_to_br.sh --feature_path projects/<project-id>/<feature-folder>"
-  assert_contains "$quickrun" ".commands/feature_user_br_clarification.sh --feature_path projects/<project-id>/<feature-folder>"
-  assert_contains "$quickrun" ".commands/feature_br_check_ears_readiness.sh --feature_path projects/<project-id>/<feature-folder>"
-  assert_contains "$quickrun" ".commands/feature_br_to_ears.sh --feature_path projects/<project-id>/<feature-folder>"
-  assert_contains "$quickrun" ".commands/feature_requirements_ears_review.sh --feature_path projects/<project-id>/<feature-folder>"
-  assert_contains "$quickrun" ".commands/feature_contract_delta.sh --feature_path projects/<project-id>/<feature-folder>"
-  assert_contains "$quickrun" ".commands/feature_repo_surface_and_exec_context.sh --feature_path projects/<project-id>/<feature-folder>"
-  assert_contains "$quickrun" "Optionally enrich unresolved surface-map placeholders from configured knowledge-base MCP sources (Step 7.1):"
-  assert_contains "$quickrun" ".commands/feature_surface_map_mcp_placeholder_enrichment.sh --feature_path projects/<project-id>/<feature-folder>"
-  assert_contains "$quickrun" ".commands/feature_technical_requirements.sh --feature_path projects/<project-id>/<feature-folder>"
-  assert_contains "$quickrun" ".commands/feature_implementation_slices.sh --feature_path projects/<project-id>/<feature-folder>"
-  assert_contains "$quickrun" ".commands/feature_implementation_plan.sh --feature_path projects/<project-id>/<feature-folder>"
-  assert_contains "$quickrun" "Optionally run implementation-plan semantic review (Step 8.3):"
-  assert_contains "$quickrun" ".commands/feature_implementation_plan_semantic_review.sh --feature_path projects/<project-id>/<feature-folder>"
+  assert_contains "$quickrun" "node .overmind/overmind.js context br-clarification projects/<project-id>/<feature-folder>"
+  assert_contains "$quickrun" "node .overmind/overmind.js gate br-clarification projects/<project-id>/<feature-folder>"
+  assert_contains "$quickrun" "node .overmind/overmind.js readiness br-clarification projects/<project-id>/<feature-folder>"
+  assert_contains "$quickrun" "node .overmind/overmind.js context requirements-ears projects/<project-id>/<feature-folder>"
+  assert_contains "$quickrun" "node .overmind/overmind.js gate requirements-ears projects/<project-id>/<feature-folder>"
+  assert_contains "$quickrun" "node .overmind/overmind.js context ears-review projects/<project-id>/<feature-folder>"
+  assert_contains "$quickrun" "node .overmind/overmind.js gate ears-review projects/<project-id>/<feature-folder>"
+  assert_contains "$quickrun" "node .overmind/overmind.js context contract-delta projects/<project-id>/<feature-folder>"
+  assert_contains "$quickrun" "node .overmind/overmind.js gate contract-delta projects/<project-id>/<feature-folder>"
+  assert_contains "$quickrun" "node .overmind/overmind.js context surface-map projects/<project-id>/<feature-folder> --class <backend|frontend|mobile>"
+  assert_contains "$quickrun" "node .overmind/overmind.js gate surface-map projects/<project-id>/<feature-folder> --class <backend|frontend|mobile>"
+  assert_contains "$quickrun" "Optionally enrich unresolved surface-map placeholders from configured knowledge-base MCP sources (Step 7.1)"
+  assert_contains "$quickrun" "node .overmind/overmind.js context surface-map-enrich projects/<project-id>/<feature-folder>"
+  assert_contains "$quickrun" "node .overmind/overmind.js context technical-requirements projects/<project-id>/<feature-folder>"
+  assert_contains "$quickrun" "node .overmind/overmind.js gate technical-requirements projects/<project-id>/<feature-folder>"
+  assert_contains "$quickrun" "node .overmind/overmind.js context implementation-slices projects/<project-id>/<feature-folder>"
+  assert_contains "$quickrun" "node .overmind/overmind.js gate implementation-slices projects/<project-id>/<feature-folder>"
+  assert_contains "$quickrun" "node .overmind/overmind.js context prerequisite-gaps projects/<project-id>/<feature-folder>"
+  assert_contains "$quickrun" "node .overmind/overmind.js gate prerequisite-gaps projects/<project-id>/<feature-folder>"
+  assert_contains "$quickrun" "node .overmind/overmind.js context implementation-plan projects/<project-id>/<feature-folder>"
+  assert_contains "$quickrun" "node .overmind/overmind.js gate implementation-plan projects/<project-id>/<feature-folder>"
+  assert_contains "$quickrun" "Optionally run implementation-plan semantic review (Step 8.4) through the installed"
+  assert_contains "$quickrun" "node .overmind/overmind.js context plan-semantic-review projects/<project-id>/<feature-folder>"
+  assert_contains "$quickrun" "node .overmind/overmind.js gate plan-semantic-review projects/<project-id>/<feature-folder>"
+  assert_file_not_exists "$asdlc_root/.rules/implementation_plan_semantic_review_rule.md"
+  assert_file_not_exists "$asdlc_root/.templates/implementation_plan_semantic_review_TEMPLATE.md"
+  assert_file_not_exists "$asdlc_root/.golden_examples/implementation_plan_semantic_review_GOLDEN_EXAMPLE.md"
+  assert_file_not_exists "$asdlc_root/.helper/check_implementation_plan_semantic_review_quality.sh"
   assert_contains "$quickrun" ".commands/feature_assing_workers.sh --feature_path projects/<project-id>/<feature-folder>"
   assert_contains "$quickrun" 'This command writes `#### Assigned:` for every plan step with a class-matched worker UUID or `ERROR: no active worker available for class <class>`.'
   assert_contains "$quickrun" ".commands/init_progress_scanner.sh --path projects/<project-id>/<feature-folder>"
@@ -700,23 +813,14 @@ test_first_init_machine_bootstraps_asdlc_workspace_with_local_template() {
   assert_contains "$metadata" "meta:"
   assert_contains "$metadata" "projects:"
   assert_contains "$(cat "$asdlc_root/.commands/feature_br_scaffold.sh")" 'TEMPLATE_FILE=".templates/feature_br_summary_TEMPLATE.md"'
-  assert_contains "$(cat "$asdlc_root/.commands/feature_scan_repo_for_br.sh")" 'RULE_FILE=".rules/repo_br_scan_rule.md"'
-  assert_contains "$(cat "$asdlc_root/.commands/feature_task_to_br.sh")" 'HELPER_SCRIPT=".helper/check_task_to_br_quality.sh"'
-  assert_contains "$(cat "$asdlc_root/.commands/feature_user_br_clarification.sh")" 'RULE_FILE=".rules/user_br_clarification_rule.md"'
-  assert_contains "$(cat "$asdlc_root/.commands/feature_user_br_clarification.sh")" 'HELPER_SCRIPT=".helper/check_user_br_clarification_quality.sh"'
-  assert_contains "$(cat "$asdlc_root/.commands/feature_br_check_ears_readiness.sh")" 'REPO_HELPER=".helper/check_business_context_filled_from_repo.sh"'
-  assert_contains "$(cat "$asdlc_root/.commands/feature_br_to_ears.sh")" 'QUALITY_GATE_HELPER=".helper/check_requirements_ears_quality.sh"'
-  assert_contains "$(cat "$asdlc_root/.commands/feature_requirements_ears_review.sh")" 'RULE_FILE=".rules/requirements_ears_review_rule.md"'
-  assert_contains "$(cat "$asdlc_root/.commands/feature_requirements_ears_review.sh")" 'REVIEW_TEMPLATE_FILE=".templates/requirements_ears_review_TEMPLATE.md"'
-  assert_contains "$(cat "$asdlc_root/.commands/feature_requirements_ears_review.sh")" 'REVIEW_GOLDEN_EXAMPLE_FILE=".golden_examples/requirements_ears_review_GOLDEN_EXAMPLE.md"'
-  assert_contains "$(cat "$asdlc_root/.commands/feature_requirements_ears_review.sh")" 'QUALITY_GATE_HELPER=".helper/check_requirements_ears_review_quality.sh"'
-  assert_contains "$(cat "$asdlc_root/.commands/feature_contract_delta.sh")" 'RULE_FILE=".rules/feature_contract_delta_rule.md"'
-  assert_contains "$(cat "$asdlc_root/.commands/feature_contract_delta.sh")" 'FEATURE_CONTRACT_TEMPLATE_FILE=".templates/feature_contract_delta_TEMPLATE.md"'
-  assert_contains "$(cat "$asdlc_root/.commands/feature_contract_delta.sh")" 'FEATURE_CONTRACT_GOLDEN_EXAMPLE_FILE=".golden_examples/feature_contract_delta_GOLDEN_EXAMPLE.md"'
-  assert_contains "$(cat "$asdlc_root/.commands/feature_contract_delta.sh")" 'QUALITY_GATE_HELPER=".helper/check_feature_contract_delta_quality.sh"'
-  assert_contains "$(cat "$asdlc_root/.commands/feature_repo_surface_and_exec_context.sh")" 'RULE_FILE=".rules/feature_repo_surface_and_exec_context_rule.md"'
-  assert_contains "$(cat "$asdlc_root/.commands/feature_repo_surface_and_exec_context.sh")" 'BACKEND_QUALITY_GATE_HELPER=".helper/check_feature_repo_surface_and_exec_context_be_quality.sh"'
-  assert_contains "$(cat "$asdlc_root/.commands/feature_repo_surface_and_exec_context.sh")" 'FRONTEND_MOBILE_QUALITY_GATE_HELPER=".helper/check_feature_repo_surface_and_exec_context_fe_quality.sh"'
+  assert_file_not_exists "$asdlc_root/.rules/user_br_clarification_rule.md"
+  assert_file_not_exists "$asdlc_root/.rules/br_to_ears.md"
+  assert_file_not_exists "$asdlc_root/.rules/requirements_ears_review_rule.md"
+  assert_file_not_exists "$asdlc_root/.helper/check_user_br_clarification_quality.sh"
+  assert_file_not_exists "$asdlc_root/.helper/check_requirements_ears_quality.sh"
+  assert_file_not_exists "$asdlc_root/.helper/check_requirements_ears_review_quality.sh"
+  assert_file_not_exists "$asdlc_root/.rules/feature_contract_delta_rule.md"
+  assert_file_not_exists "$asdlc_root/.helper/check_feature_contract_delta_quality.sh"
   assert_feature_requirements_and_plan_commands_use_staged_runtime_assets "$asdlc_root"
   assert_support_assets_match_repo_sources "$repo_dir" "$asdlc_root"
 }
@@ -746,6 +850,32 @@ test_first_init_machine_fails_when_template_source_missing() {
   fi
 }
 
+test_first_init_machine_fails_when_overmind_cli_bundle_source_missing() {
+  local repo_dir="$TMP_ROOT/repo-first-init-missing-overmind-cli-bundle"
+  mkdir -p "$repo_dir"
+  setup_git_repo_with_identity "$repo_dir"
+  rm -f "$repo_dir/$OVERMIND_CLI_BUNDLE_REL_PATH"
+
+  local bootstrap_parent="$TMP_ROOT/asdlc-home-missing-overmind-cli-bundle"
+  local status=0
+  local out=""
+  set +e
+  out="$(
+    cd "$repo_dir" &&
+    printf '%s\n' "$bootstrap_parent" | overmind/scripts/project_mgmt/project_setup_first_init_machine.sh 2>&1
+  )"
+  status=$?
+  set -e
+
+  assert_nonzero_status "$status"
+  assert_contains "$out" "Required Overmind CLI bundle not found: $OVERMIND_CLI_BUNDLE_REL_PATH"
+  assert_contains "$out" "Run npm install and npm run build from the repository root before ASDLC setup/update."
+  if [[ -e "$bootstrap_parent/asdlc" ]]; then
+    echo "Assertion failed: asdlc workspace should not be created when Overmind CLI bundle is missing" >&2
+    exit 1
+  fi
+}
+
 test_first_init_machine_update_mode_repairs_missing_commands_without_overwriting_existing_files() {
   local repo_dir="$TMP_ROOT/repo-first-init-update-mode-repair"
   mkdir -p "$repo_dir"
@@ -766,20 +896,33 @@ test_first_init_machine_update_mode_repairs_missing_commands_without_overwriting
   local contract_reconciliation_cmd_path="$asdlc_root/.commands/project_contract_reconciliation.sh"
   local register_worker_cmd_path="$asdlc_root/.commands/project_register_worker.sh"
   local feature_br_cmd_path="$asdlc_root/.commands/feature_br_scaffold.sh"
-  local scan_repo_cmd_path="$asdlc_root/.commands/feature_scan_repo_for_br.sh"
-  local task_to_br_cmd_path="$asdlc_root/.commands/feature_task_to_br.sh"
-  local user_br_clarification_cmd_path="$asdlc_root/.commands/feature_user_br_clarification.sh"
-  local br_check_ears_readiness_cmd_path="$asdlc_root/.commands/feature_br_check_ears_readiness.sh"
-  local br_to_ears_cmd_path="$asdlc_root/.commands/feature_br_to_ears.sh"
-  local feature_requirements_ears_review_cmd_path="$asdlc_root/.commands/feature_requirements_ears_review.sh"
-  local feature_contract_delta_cmd_path="$asdlc_root/.commands/feature_contract_delta.sh"
-  local repo_surface_context_cmd_path="$asdlc_root/.commands/feature_repo_surface_and_exec_context.sh"
-  local mcp_placeholder_enrichment_cmd_path="$asdlc_root/.commands/feature_surface_map_mcp_placeholder_enrichment.sh"
+  local feature_contract_delta_rule_path="$asdlc_root/.rules/feature_contract_delta_rule.md"
+  local feature_contract_delta_helper_path="$asdlc_root/.helper/check_feature_contract_delta_quality.sh"
+  local feature_contract_delta_flat_template_path="$asdlc_root/.templates/feature_contract_delta_TEMPLATE.md"
+  local feature_contract_delta_flat_golden_path="$asdlc_root/.golden_examples/feature_contract_delta_GOLDEN_EXAMPLE.md"
+  local repo_surface_context_rule_path="$asdlc_root/.rules/feature_repo_surface_and_exec_context_rule.md"
+  local stale_mcp_enrichment_rule_path="$asdlc_root/.rules/feature_surface_map_mcp_placeholder_enrichment_rule.md"
+  local repo_surface_be_flat_template_path="$asdlc_root/.templates/project_surface_struct_resp_map_be_TEMPLATE.md"
+  local repo_surface_fe_flat_template_path="$asdlc_root/.templates/project_surface_struct_resp_map_fe_TEMPLATE.md"
+  local repo_surface_be_flat_golden_path="$asdlc_root/.golden_examples/project_surface_struct_resp_map_be_GOLDEN_EXAMPLE.md"
+  local repo_surface_fe_flat_golden_path="$asdlc_root/.golden_examples/project_surface_struct_resp_map_fe_GOLDEN_EXAMPLE.md"
+  local repo_surface_be_helper_path="$asdlc_root/.helper/check_feature_repo_surface_and_exec_context_be_quality.sh"
+  local repo_surface_fe_helper_path="$asdlc_root/.helper/check_feature_repo_surface_and_exec_context_fe_quality.sh"
   local feature_technical_requirements_cmd_path="$asdlc_root/.commands/feature_technical_requirements.sh"
   local feature_implementation_slices_cmd_path="$asdlc_root/.commands/feature_implementation_slices.sh"
-  local repository_implementation_plan_cmd_path="$asdlc_root/.commands/feature_implementation_plan.sh"
+  local implementation_slices_rule_path="$asdlc_root/.rules/implementation_slices_rule.md"
+  local implementation_slices_template_path="$asdlc_root/.templates/implementation_slices_TEMPLATE.md"
+  local implementation_slices_golden_path="$asdlc_root/.golden_examples/implementation_slices_GOLDEN_EXAMPLE.md"
+  local implementation_slices_helper_path="$asdlc_root/.helper/check_implementation_slices_quality.sh"
+  local prerequisite_gaps_cmd_path="$asdlc_root/.commands/feature_prerequisite_gaps.sh"
+  local prerequisite_gaps_rule_path="$asdlc_root/.rules/prerequisite_gaps_rule.md"
+  local prerequisite_gaps_template_path="$asdlc_root/.templates/prerequisite_gaps_TEMPLATE.md"
+  local prerequisite_gaps_golden_path="$asdlc_root/.golden_examples/prerequisite_gaps_GOLDEN_EXAMPLE.md"
+  local prerequisite_gaps_helper_path="$asdlc_root/.helper/check_prerequisite_gaps_quality.sh"
+  local implementation_plan_cmd_path="$asdlc_root/.commands/feature_implementation_plan.sh"
   local implementation_plan_semantic_review_cmd_path="$asdlc_root/.commands/feature_implementation_plan_semantic_review.sh"
   local assign_workers_cmd_path="$asdlc_root/.commands/feature_assing_workers.sh"
+  local overmind_cli_path="$asdlc_root/.overmind/overmind.js"
   local common_lib_path="$asdlc_root/common_libs/project_setup_common.sh"
   local class_repo_paths_lib_path="$asdlc_root/common_libs/class_repo_paths.sh"
   local readiness_lib_path="$asdlc_root/common_libs/check_implementation_plan_readiness.sh"
@@ -787,9 +930,13 @@ test_first_init_machine_update_mode_repairs_missing_commands_without_overwriting
   local attach_lib_path="$asdlc_root/common_libs/persist_class_repo_attach.sh"
   local sync_repo_lib_path="$asdlc_root/common_libs/sync_repo_to_default_branch.sh"
   local stale_rule_path="$asdlc_root/.rules/repo_br_scan_rule.md"
+  local stale_br_to_ears_rule_path="$asdlc_root/.rules/br_to_ears.md"
+  local stale_requirements_ears_helper_path="$asdlc_root/.helper/check_requirements_ears_quality.sh"
+  local stale_requirements_ears_review_rule_path="$asdlc_root/.rules/requirements_ears_review_rule.md"
+  local stale_requirements_ears_review_helper_path="$asdlc_root/.helper/check_requirements_ears_review_quality.sh"
   local stale_legacy_template_path="$asdlc_root/templates/init_progress_definition_TEMPLATE.yaml"
   local stale_golden_example_path="$asdlc_root/.golden_examples/step_state_GOLDEN_EXAMPLE.md"
-  local stale_helper_path="$asdlc_root/.helper/check_task_to_br_quality.sh"
+  local stale_helper_path="$asdlc_root/.helper/obsolete_helper.sh"
   local stale_setup_models_path="$asdlc_root/.setup/models.md"
   local sentinel_project_dir="$asdlc_root/projects/preserved-project"
   local sentinel_project_file="$sentinel_project_dir/keep.txt"
@@ -798,6 +945,39 @@ test_first_init_machine_update_mode_repairs_missing_commands_without_overwriting
   echo "keep" >"$sentinel_project_file"
   printf '\n# local customization marker\n' >>"$add_cmd_path"
   echo "stale rule" >"$stale_rule_path"
+  echo "stale rule" >"$stale_br_to_ears_rule_path"
+  echo "stale rule" >"$stale_requirements_ears_review_rule_path"
+  echo "stale helper" >"$stale_requirements_ears_helper_path"
+  echo "stale helper" >"$stale_requirements_ears_review_helper_path"
+  echo "stale rule" >"$feature_contract_delta_rule_path"
+  echo "stale helper" >"$feature_contract_delta_helper_path"
+  echo "stale template" >"$feature_contract_delta_flat_template_path"
+  echo "stale golden example" >"$feature_contract_delta_flat_golden_path"
+  echo "stale rule" >"$repo_surface_context_rule_path"
+  echo "stale rule" >"$stale_mcp_enrichment_rule_path"
+  echo "stale template" >"$repo_surface_be_flat_template_path"
+  echo "stale template" >"$repo_surface_fe_flat_template_path"
+  echo "stale golden example" >"$repo_surface_be_flat_golden_path"
+  echo "stale golden example" >"$repo_surface_fe_flat_golden_path"
+  echo "stale helper" >"$repo_surface_be_helper_path"
+  echo "stale helper" >"$repo_surface_fe_helper_path"
+  echo "stale command" >"$feature_technical_requirements_cmd_path"
+  echo "stale rule" >"$asdlc_root/.rules/technical_requirements_rule.md"
+  echo "stale template" >"$asdlc_root/.templates/technical_requirements_TEMPLATE.md"
+  echo "stale golden" >"$asdlc_root/.golden_examples/technical_requirements_GOLDEN_EXAMPLE.md"
+  echo "stale helper" >"$asdlc_root/.helper/check_feature_technical_requirements_quality.sh"
+  echo "stale command" >"$feature_implementation_slices_cmd_path"
+  echo "stale rule" >"$implementation_slices_rule_path"
+  echo "stale template" >"$implementation_slices_template_path"
+  echo "stale golden" >"$implementation_slices_golden_path"
+  echo "stale helper" >"$implementation_slices_helper_path"
+  echo "stale command" >"$prerequisite_gaps_cmd_path"
+  echo "stale rule" >"$prerequisite_gaps_rule_path"
+  echo "stale template" >"$prerequisite_gaps_template_path"
+  echo "stale golden" >"$prerequisite_gaps_golden_path"
+  echo "stale helper" >"$prerequisite_gaps_helper_path"
+  echo "stale command" >"$implementation_plan_cmd_path"
+  echo "stale command" >"$implementation_plan_semantic_review_cmd_path"
   mkdir -p "$(dirname "$stale_legacy_template_path")"
   echo "stale legacy template" >"$stale_legacy_template_path"
   echo "stale visible template" >"$template_path"
@@ -814,6 +994,7 @@ test_first_init_machine_update_mode_repairs_missing_commands_without_overwriting
   setup_models_before="$(cat "$stale_setup_models_path")"
 
   rm -f "$common_lib_path"
+  rm -f "$overmind_cli_path"
 
   rm -f \
     "$update_cmd_path" \
@@ -824,19 +1005,6 @@ test_first_init_machine_update_mode_repairs_missing_commands_without_overwriting
     "$contract_reconciliation_cmd_path" \
     "$register_worker_cmd_path" \
     "$feature_br_cmd_path" \
-    "$scan_repo_cmd_path" \
-    "$task_to_br_cmd_path" \
-    "$user_br_clarification_cmd_path" \
-    "$br_check_ears_readiness_cmd_path" \
-    "$br_to_ears_cmd_path" \
-    "$feature_requirements_ears_review_cmd_path" \
-    "$feature_contract_delta_cmd_path" \
-    "$repo_surface_context_cmd_path" \
-    "$mcp_placeholder_enrichment_cmd_path" \
-    "$feature_technical_requirements_cmd_path" \
-    "$feature_implementation_slices_cmd_path" \
-    "$repository_implementation_plan_cmd_path" \
-    "$implementation_plan_semantic_review_cmd_path" \
     "$assign_workers_cmd_path"
 
   local out=""
@@ -855,21 +1023,10 @@ test_first_init_machine_update_mode_repairs_missing_commands_without_overwriting
   assert_contains "$out" "Update mode added file: $contract_reconciliation_cmd_path"
   assert_contains "$out" "Update mode added file: $register_worker_cmd_path"
   assert_contains "$out" "Update mode added file: $feature_br_cmd_path"
-  assert_contains "$out" "Update mode added file: $scan_repo_cmd_path"
-  assert_contains "$out" "Update mode added file: $task_to_br_cmd_path"
-  assert_contains "$out" "Update mode added file: $user_br_clarification_cmd_path"
-  assert_contains "$out" "Update mode added file: $br_check_ears_readiness_cmd_path"
-  assert_contains "$out" "Update mode added file: $br_to_ears_cmd_path"
-  assert_contains "$out" "Update mode added file: $feature_requirements_ears_review_cmd_path"
-  assert_contains "$out" "Update mode added file: $feature_contract_delta_cmd_path"
-  assert_contains "$out" "Update mode added file: $repo_surface_context_cmd_path"
-  assert_contains "$out" "Update mode added file: $mcp_placeholder_enrichment_cmd_path"
-  assert_contains "$out" "Update mode added file: $feature_technical_requirements_cmd_path"
-  assert_contains "$out" "Update mode added file: $feature_implementation_slices_cmd_path"
-  assert_contains "$out" "Update mode added file: $repository_implementation_plan_cmd_path"
-  assert_contains "$out" "Update mode added file: $implementation_plan_semantic_review_cmd_path"
   assert_contains "$out" "Update mode added file: $assign_workers_cmd_path"
+  assert_contains "$out" "Update mode added file: $overmind_cli_path"
   assert_contains "$out" "ASDLC workspace update completed: $asdlc_root"
+  assert_staged_overmind_cli_matches_repo_source "$repo_dir" "$asdlc_root"
   assert_file_exists "$common_lib_path"
   assert_file_exists "$class_repo_paths_lib_path"
   assert_file_exists "$readiness_lib_path"
@@ -890,19 +1047,38 @@ test_first_init_machine_update_mode_repairs_missing_commands_without_overwriting
   assert_file_exists "$contract_reconciliation_cmd_path"
   assert_file_exists "$register_worker_cmd_path"
   assert_file_exists "$feature_br_cmd_path"
-  assert_file_exists "$scan_repo_cmd_path"
-  assert_file_exists "$task_to_br_cmd_path"
-  assert_file_exists "$user_br_clarification_cmd_path"
-  assert_file_exists "$br_check_ears_readiness_cmd_path"
-  assert_file_exists "$br_to_ears_cmd_path"
-  assert_file_exists "$feature_requirements_ears_review_cmd_path"
-  assert_file_exists "$feature_contract_delta_cmd_path"
-  assert_file_exists "$repo_surface_context_cmd_path"
-  assert_file_exists "$mcp_placeholder_enrichment_cmd_path"
-  assert_file_exists "$feature_technical_requirements_cmd_path"
-  assert_file_exists "$feature_implementation_slices_cmd_path"
-  assert_file_exists "$repository_implementation_plan_cmd_path"
-  assert_file_exists "$implementation_plan_semantic_review_cmd_path"
+  assert_file_not_exists "$asdlc_root/.commands/feature_user_br_clarification.sh"
+  assert_file_not_exists "$asdlc_root/.commands/feature_br_check_ears_readiness.sh"
+  assert_file_not_exists "$feature_contract_delta_rule_path"
+  assert_file_not_exists "$feature_contract_delta_helper_path"
+  assert_file_not_exists "$feature_contract_delta_flat_template_path"
+  assert_file_not_exists "$feature_contract_delta_flat_golden_path"
+  assert_file_not_exists "$repo_surface_context_rule_path"
+  assert_file_not_exists "$stale_mcp_enrichment_rule_path"
+  assert_file_not_exists "$repo_surface_be_flat_template_path"
+  assert_file_not_exists "$repo_surface_fe_flat_template_path"
+  assert_file_not_exists "$repo_surface_be_flat_golden_path"
+  assert_file_not_exists "$repo_surface_fe_flat_golden_path"
+  assert_file_not_exists "$repo_surface_be_helper_path"
+  assert_file_not_exists "$repo_surface_fe_helper_path"
+  assert_file_not_exists "$asdlc_root/.commands/feature_surface_map_mcp_placeholder_enrichment.sh"
+  assert_file_not_exists "$feature_technical_requirements_cmd_path"
+  assert_file_not_exists "$asdlc_root/.rules/technical_requirements_rule.md"
+  assert_file_not_exists "$asdlc_root/.templates/technical_requirements_TEMPLATE.md"
+  assert_file_not_exists "$asdlc_root/.golden_examples/technical_requirements_GOLDEN_EXAMPLE.md"
+  assert_file_not_exists "$asdlc_root/.helper/check_feature_technical_requirements_quality.sh"
+  assert_file_not_exists "$feature_implementation_slices_cmd_path"
+  assert_file_not_exists "$implementation_slices_rule_path"
+  assert_file_not_exists "$implementation_slices_template_path"
+  assert_file_not_exists "$implementation_slices_golden_path"
+  assert_file_not_exists "$implementation_slices_helper_path"
+  assert_file_not_exists "$prerequisite_gaps_cmd_path"
+  assert_file_not_exists "$prerequisite_gaps_rule_path"
+  assert_file_not_exists "$prerequisite_gaps_template_path"
+  assert_file_not_exists "$prerequisite_gaps_golden_path"
+  assert_file_not_exists "$prerequisite_gaps_helper_path"
+  assert_file_not_exists "$implementation_plan_cmd_path"
+  assert_file_not_exists "$implementation_plan_semantic_review_cmd_path"
   assert_file_exists "$assign_workers_cmd_path"
   assert_file_executable "$update_cmd_path"
   assert_file_executable "$scanner_cmd_path"
@@ -912,19 +1088,6 @@ test_first_init_machine_update_mode_repairs_missing_commands_without_overwriting
   assert_file_executable "$contract_reconciliation_cmd_path"
   assert_file_executable "$register_worker_cmd_path"
   assert_file_executable "$feature_br_cmd_path"
-  assert_file_executable "$scan_repo_cmd_path"
-  assert_file_executable "$task_to_br_cmd_path"
-  assert_file_executable "$user_br_clarification_cmd_path"
-  assert_file_executable "$br_check_ears_readiness_cmd_path"
-  assert_file_executable "$br_to_ears_cmd_path"
-  assert_file_executable "$feature_requirements_ears_review_cmd_path"
-  assert_file_executable "$feature_contract_delta_cmd_path"
-  assert_file_executable "$repo_surface_context_cmd_path"
-  assert_file_executable "$mcp_placeholder_enrichment_cmd_path"
-  assert_file_executable "$feature_technical_requirements_cmd_path"
-  assert_file_executable "$feature_implementation_slices_cmd_path"
-  assert_file_executable "$repository_implementation_plan_cmd_path"
-  assert_file_executable "$implementation_plan_semantic_review_cmd_path"
   assert_file_executable "$assign_workers_cmd_path"
   assert_equal "$metadata_before" "$(cat "$metadata_path")"
   assert_equal "$add_cmd_before" "$(cat "$add_cmd_path")"
@@ -934,23 +1097,10 @@ test_first_init_machine_update_mode_repairs_missing_commands_without_overwriting
   assert_contains "$(cat "$register_worker_cmd_path")" "ASDLC_PROJECTS_DIR_DEFAULT=\"$asdlc_root/projects\""
   assert_contains "$(cat "$assign_workers_cmd_path")" "ASDLC_PROJECTS_DIR_DEFAULT=\"$asdlc_root/projects\""
   assert_contains "$(cat "$feature_br_cmd_path")" 'TEMPLATE_FILE=".templates/feature_br_summary_TEMPLATE.md"'
-  assert_contains "$(cat "$scan_repo_cmd_path")" 'RULE_FILE=".rules/repo_br_scan_rule.md"'
-  assert_contains "$(cat "$task_to_br_cmd_path")" 'HELPER_SCRIPT=".helper/check_task_to_br_quality.sh"'
-  assert_contains "$(cat "$user_br_clarification_cmd_path")" 'RULE_FILE=".rules/user_br_clarification_rule.md"'
-  assert_contains "$(cat "$user_br_clarification_cmd_path")" 'HELPER_SCRIPT=".helper/check_user_br_clarification_quality.sh"'
-  assert_contains "$(cat "$br_check_ears_readiness_cmd_path")" 'REPO_HELPER=".helper/check_business_context_filled_from_repo.sh"'
-  assert_contains "$(cat "$br_to_ears_cmd_path")" 'QUALITY_GATE_HELPER=".helper/check_requirements_ears_quality.sh"'
-  assert_contains "$(cat "$feature_requirements_ears_review_cmd_path")" 'RULE_FILE=".rules/requirements_ears_review_rule.md"'
-  assert_contains "$(cat "$feature_requirements_ears_review_cmd_path")" 'REVIEW_TEMPLATE_FILE=".templates/requirements_ears_review_TEMPLATE.md"'
-  assert_contains "$(cat "$feature_requirements_ears_review_cmd_path")" 'REVIEW_GOLDEN_EXAMPLE_FILE=".golden_examples/requirements_ears_review_GOLDEN_EXAMPLE.md"'
-  assert_contains "$(cat "$feature_requirements_ears_review_cmd_path")" 'QUALITY_GATE_HELPER=".helper/check_requirements_ears_review_quality.sh"'
-  assert_contains "$(cat "$feature_contract_delta_cmd_path")" 'RULE_FILE=".rules/feature_contract_delta_rule.md"'
-  assert_contains "$(cat "$feature_contract_delta_cmd_path")" 'FEATURE_CONTRACT_TEMPLATE_FILE=".templates/feature_contract_delta_TEMPLATE.md"'
-  assert_contains "$(cat "$feature_contract_delta_cmd_path")" 'FEATURE_CONTRACT_GOLDEN_EXAMPLE_FILE=".golden_examples/feature_contract_delta_GOLDEN_EXAMPLE.md"'
-  assert_contains "$(cat "$feature_contract_delta_cmd_path")" 'QUALITY_GATE_HELPER=".helper/check_feature_contract_delta_quality.sh"'
-  assert_contains "$(cat "$repo_surface_context_cmd_path")" 'RULE_FILE=".rules/feature_repo_surface_and_exec_context_rule.md"'
-  assert_contains "$(cat "$repo_surface_context_cmd_path")" 'BACKEND_QUALITY_GATE_HELPER=".helper/check_feature_repo_surface_and_exec_context_be_quality.sh"'
-  assert_contains "$(cat "$repo_surface_context_cmd_path")" 'FRONTEND_MOBILE_QUALITY_GATE_HELPER=".helper/check_feature_repo_surface_and_exec_context_fe_quality.sh"'
+  assert_file_not_exists "$stale_br_to_ears_rule_path"
+  assert_file_not_exists "$stale_requirements_ears_helper_path"
+  assert_file_not_exists "$stale_requirements_ears_review_rule_path"
+  assert_file_not_exists "$stale_requirements_ears_review_helper_path"
   assert_feature_requirements_and_plan_commands_use_staged_runtime_assets "$asdlc_root"
   assert_file_not_exists "$stale_golden_example_path"
   assert_support_assets_except_setup_match_repo_sources "$repo_dir" "$asdlc_root"
@@ -989,8 +1139,10 @@ OUT
   quickrun="$(cat "$quickrun_path")"
   assert_not_contains "$quickrun" "legacy quickrun content"
   assert_contains "$quickrun" "## 3. Continue Toward Implementation"
+  assert_contains "$quickrun" '`overmind-plan-semantic-review` skills are staged for supported runners'
   assert_contains "$quickrun" ".commands/project_add_feature_e2e.sh"
   assert_contains "$quickrun" ".commands/project_add_feature_e2e.sh --path projects/<project-id>"
+  assert_contains "$quickrun" 'During phase 4.1, the orchestrator starts a Codex repo-br-scan session (when a class repo is ready) followed by a task-to-BR session using the installed skills; when `user_br_input.md` is missing, Codex asks for a local story file or Jira ticket. During phase 4.2, the orchestrator starts the BR-clarification skill and then runs the deterministic readiness check. During phase 5, the orchestrator starts the requirements-EARS skill. During optional phase 5.1, the orchestrator starts the EARS-review skill. During phase 6, it syncs ready repositories and starts the contract-delta skill.'
   assert_contains "$quickrun" '.commands/project_add_feature_e2e.sh --resume 4.2'
   assert_contains "$quickrun" ".commands/project_add_feature_e2e.sh --path projects/<project-id> --resume 8.2"
   assert_contains "$quickrun" 'If `--path` is omitted, the script auto-selects the only project under `projects/`'
@@ -998,17 +1150,25 @@ OUT
   assert_contains "$quickrun" "asks whether to start a new feature or continue one of the unfinished features"
   assert_contains "$quickrun" ".commands/project_register_worker.sh --path projects/<project-id>"
   assert_contains "$quickrun" "projects/<project-id>/workers.yaml"
-  assert_contains "$quickrun" ".commands/feature_requirements_ears_review.sh --feature_path projects/<project-id>/<feature-folder>"
-  assert_contains "$quickrun" "Optionally enrich unresolved surface-map placeholders from configured knowledge-base MCP sources (Step 7.1):"
-  assert_contains "$quickrun" ".commands/feature_surface_map_mcp_placeholder_enrichment.sh --feature_path projects/<project-id>/<feature-folder>"
-  assert_contains "$quickrun" ".commands/feature_technical_requirements.sh --feature_path projects/<project-id>/<feature-folder>"
-  assert_contains "$quickrun" ".commands/feature_implementation_slices.sh --feature_path projects/<project-id>/<feature-folder>"
-  assert_contains "$quickrun" ".commands/feature_implementation_plan.sh --feature_path projects/<project-id>/<feature-folder>"
-  assert_contains "$quickrun" "Optionally run implementation-plan semantic review (Step 8.3):"
-  assert_contains "$quickrun" ".commands/feature_implementation_plan_semantic_review.sh --feature_path projects/<project-id>/<feature-folder>"
+  assert_contains "$quickrun" "node .overmind/overmind.js context requirements-ears projects/<project-id>/<feature-folder>"
+  assert_contains "$quickrun" "node .overmind/overmind.js gate requirements-ears projects/<project-id>/<feature-folder>"
+  assert_contains "$quickrun" "node .overmind/overmind.js context ears-review projects/<project-id>/<feature-folder>"
+  assert_contains "$quickrun" "node .overmind/overmind.js gate ears-review projects/<project-id>/<feature-folder>"
+  assert_contains "$quickrun" "Optionally enrich unresolved surface-map placeholders from configured knowledge-base MCP sources (Step 7.1)"
+  assert_contains "$quickrun" "node .overmind/overmind.js context surface-map-enrich projects/<project-id>/<feature-folder>"
+  assert_contains "$quickrun" "node .overmind/overmind.js context technical-requirements projects/<project-id>/<feature-folder>"
+  assert_contains "$quickrun" "node .overmind/overmind.js gate technical-requirements projects/<project-id>/<feature-folder>"
+  assert_contains "$quickrun" "node .overmind/overmind.js context implementation-slices projects/<project-id>/<feature-folder>"
+  assert_contains "$quickrun" "node .overmind/overmind.js gate implementation-slices projects/<project-id>/<feature-folder>"
+  assert_contains "$quickrun" "node .overmind/overmind.js context prerequisite-gaps projects/<project-id>/<feature-folder>"
+  assert_contains "$quickrun" "node .overmind/overmind.js gate prerequisite-gaps projects/<project-id>/<feature-folder>"
+  assert_contains "$quickrun" "node .overmind/overmind.js context implementation-plan projects/<project-id>/<feature-folder>"
+  assert_contains "$quickrun" "node .overmind/overmind.js gate implementation-plan projects/<project-id>/<feature-folder>"
+  assert_contains "$quickrun" "node .overmind/overmind.js context plan-semantic-review projects/<project-id>/<feature-folder>"
+  assert_contains "$quickrun" "node .overmind/overmind.js gate plan-semantic-review projects/<project-id>/<feature-folder>"
   assert_contains "$quickrun" ".commands/feature_assing_workers.sh --feature_path projects/<project-id>/<feature-folder>"
   assert_contains "$quickrun" 'This command writes `#### Assigned:` for every plan step with a class-matched worker UUID or `ERROR: no active worker available for class <class>`.'
-  assert_contains "$quickrun" ".commands/feature_repo_surface_and_exec_context.sh --feature_path projects/<project-id>/<feature-folder>"
+  assert_contains "$quickrun" "node .overmind/overmind.js gate surface-map projects/<project-id>/<feature-folder> --class <backend|frontend|mobile>"
   assert_contains "$quickrun" 'step_state_<feature-folder>.md'
 }
 
@@ -1075,19 +1235,6 @@ test_first_init_machine_update_mode_recreates_commands_directory_when_missing() 
   assert_contains "$out" "Update mode added file: $asdlc_root/.commands/project_register_worker.sh"
   assert_contains "$out" "Update mode added file: $asdlc_root/.commands/feature_br_scaffold.sh"
   assert_contains "$out" "Update mode added file: $asdlc_root/.commands/project_add_feature_e2e.sh"
-  assert_contains "$out" "Update mode added file: $asdlc_root/.commands/feature_scan_repo_for_br.sh"
-  assert_contains "$out" "Update mode added file: $asdlc_root/.commands/feature_task_to_br.sh"
-  assert_contains "$out" "Update mode added file: $asdlc_root/.commands/feature_user_br_clarification.sh"
-  assert_contains "$out" "Update mode added file: $asdlc_root/.commands/feature_br_check_ears_readiness.sh"
-  assert_contains "$out" "Update mode added file: $asdlc_root/.commands/feature_br_to_ears.sh"
-  assert_contains "$out" "Update mode added file: $asdlc_root/.commands/feature_requirements_ears_review.sh"
-  assert_contains "$out" "Update mode added file: $asdlc_root/.commands/feature_contract_delta.sh"
-  assert_contains "$out" "Update mode added file: $asdlc_root/.commands/feature_repo_surface_and_exec_context.sh"
-  assert_contains "$out" "Update mode added file: $asdlc_root/.commands/feature_surface_map_mcp_placeholder_enrichment.sh"
-  assert_contains "$out" "Update mode added file: $asdlc_root/.commands/feature_technical_requirements.sh"
-  assert_contains "$out" "Update mode added file: $asdlc_root/.commands/feature_implementation_slices.sh"
-  assert_contains "$out" "Update mode added file: $asdlc_root/.commands/feature_implementation_plan.sh"
-  assert_contains "$out" "Update mode added file: $asdlc_root/.commands/feature_implementation_plan_semantic_review.sh"
   assert_contains "$out" "Update mode added file: $asdlc_root/.commands/feature_assing_workers.sh"
   assert_contains "$out" "ASDLC workspace update completed: $asdlc_root"
   assert_dir_exists "$asdlc_root/.commands"
@@ -1099,19 +1246,16 @@ test_first_init_machine_update_mode_recreates_commands_directory_when_missing() 
   assert_file_exists "$asdlc_root/.commands/project_register_worker.sh"
   assert_file_exists "$asdlc_root/.commands/feature_br_scaffold.sh"
   assert_file_exists "$asdlc_root/.commands/project_add_feature_e2e.sh"
-  assert_file_exists "$asdlc_root/.commands/feature_scan_repo_for_br.sh"
-  assert_file_exists "$asdlc_root/.commands/feature_task_to_br.sh"
-  assert_file_exists "$asdlc_root/.commands/feature_user_br_clarification.sh"
-  assert_file_exists "$asdlc_root/.commands/feature_br_check_ears_readiness.sh"
-  assert_file_exists "$asdlc_root/.commands/feature_br_to_ears.sh"
-  assert_file_exists "$asdlc_root/.commands/feature_requirements_ears_review.sh"
-  assert_file_exists "$asdlc_root/.commands/feature_contract_delta.sh"
-  assert_file_exists "$asdlc_root/.commands/feature_repo_surface_and_exec_context.sh"
-  assert_file_exists "$asdlc_root/.commands/feature_surface_map_mcp_placeholder_enrichment.sh"
-  assert_file_exists "$asdlc_root/.commands/feature_technical_requirements.sh"
-  assert_file_exists "$asdlc_root/.commands/feature_implementation_slices.sh"
-  assert_file_exists "$asdlc_root/.commands/feature_implementation_plan.sh"
-  assert_file_exists "$asdlc_root/.commands/feature_implementation_plan_semantic_review.sh"
+  assert_file_not_exists "$asdlc_root/.commands/feature_user_br_clarification.sh"
+  assert_file_not_exists "$asdlc_root/.commands/feature_br_check_ears_readiness.sh"
+  assert_file_not_exists "$asdlc_root/.commands/feature_br_to_ears.sh"
+  assert_file_not_exists "$asdlc_root/.commands/feature_requirements_ears_review.sh"
+  assert_file_not_exists "$asdlc_root/.commands/feature_contract_delta.sh"
+  assert_file_not_exists "$asdlc_root/.commands/feature_repo_surface_and_exec_context.sh"
+  assert_file_not_exists "$asdlc_root/.commands/feature_surface_map_mcp_placeholder_enrichment.sh"
+  assert_file_not_exists "$asdlc_root/.commands/feature_technical_requirements.sh"
+  assert_file_not_exists "$asdlc_root/.commands/feature_implementation_slices.sh"
+  assert_file_not_exists "$asdlc_root/.commands/feature_implementation_plan_semantic_review.sh"
   assert_file_exists "$asdlc_root/.commands/feature_assing_workers.sh"
   assert_file_executable "$asdlc_root/.commands/project_setup_add_new_project.sh"
   assert_file_executable "$asdlc_root/.commands/project_setup_update_project.sh"
@@ -1121,19 +1265,6 @@ test_first_init_machine_update_mode_recreates_commands_directory_when_missing() 
   assert_file_executable "$asdlc_root/.commands/project_register_worker.sh"
   assert_file_executable "$asdlc_root/.commands/feature_br_scaffold.sh"
   assert_file_executable "$asdlc_root/.commands/project_add_feature_e2e.sh"
-  assert_file_executable "$asdlc_root/.commands/feature_scan_repo_for_br.sh"
-  assert_file_executable "$asdlc_root/.commands/feature_task_to_br.sh"
-  assert_file_executable "$asdlc_root/.commands/feature_user_br_clarification.sh"
-  assert_file_executable "$asdlc_root/.commands/feature_br_check_ears_readiness.sh"
-  assert_file_executable "$asdlc_root/.commands/feature_br_to_ears.sh"
-  assert_file_executable "$asdlc_root/.commands/feature_requirements_ears_review.sh"
-  assert_file_executable "$asdlc_root/.commands/feature_contract_delta.sh"
-  assert_file_executable "$asdlc_root/.commands/feature_repo_surface_and_exec_context.sh"
-  assert_file_executable "$asdlc_root/.commands/feature_surface_map_mcp_placeholder_enrichment.sh"
-  assert_file_executable "$asdlc_root/.commands/feature_technical_requirements.sh"
-  assert_file_executable "$asdlc_root/.commands/feature_implementation_slices.sh"
-  assert_file_executable "$asdlc_root/.commands/feature_implementation_plan.sh"
-  assert_file_executable "$asdlc_root/.commands/feature_implementation_plan_semantic_review.sh"
   assert_file_executable "$asdlc_root/.commands/feature_assing_workers.sh"
   assert_contains "$(cat "$asdlc_root/.commands/project_setup_add_new_project.sh")" "ASDLC_PROJECTS_DIR_DEFAULT=\"$asdlc_root/projects\""
   assert_contains "$(cat "$asdlc_root/.commands/project_setup_update_project.sh")" "ASDLC_PROJECTS_DIR_DEFAULT=\"$asdlc_root/projects\""
@@ -1142,23 +1273,6 @@ test_first_init_machine_update_mode_recreates_commands_directory_when_missing() 
   assert_contains "$(cat "$asdlc_root/.commands/project_register_worker.sh")" "ASDLC_PROJECTS_DIR_DEFAULT=\"$asdlc_root/projects\""
   assert_contains "$(cat "$asdlc_root/.commands/feature_assing_workers.sh")" "ASDLC_PROJECTS_DIR_DEFAULT=\"$asdlc_root/projects\""
   assert_contains "$(cat "$asdlc_root/.commands/feature_br_scaffold.sh")" 'TEMPLATE_FILE=".templates/feature_br_summary_TEMPLATE.md"'
-  assert_contains "$(cat "$asdlc_root/.commands/feature_scan_repo_for_br.sh")" 'RULE_FILE=".rules/repo_br_scan_rule.md"'
-  assert_contains "$(cat "$asdlc_root/.commands/feature_task_to_br.sh")" 'HELPER_SCRIPT=".helper/check_task_to_br_quality.sh"'
-  assert_contains "$(cat "$asdlc_root/.commands/feature_user_br_clarification.sh")" 'RULE_FILE=".rules/user_br_clarification_rule.md"'
-  assert_contains "$(cat "$asdlc_root/.commands/feature_user_br_clarification.sh")" 'HELPER_SCRIPT=".helper/check_user_br_clarification_quality.sh"'
-  assert_contains "$(cat "$asdlc_root/.commands/feature_br_check_ears_readiness.sh")" 'REPO_HELPER=".helper/check_business_context_filled_from_repo.sh"'
-  assert_contains "$(cat "$asdlc_root/.commands/feature_br_to_ears.sh")" 'QUALITY_GATE_HELPER=".helper/check_requirements_ears_quality.sh"'
-  assert_contains "$(cat "$asdlc_root/.commands/feature_requirements_ears_review.sh")" 'RULE_FILE=".rules/requirements_ears_review_rule.md"'
-  assert_contains "$(cat "$asdlc_root/.commands/feature_requirements_ears_review.sh")" 'REVIEW_TEMPLATE_FILE=".templates/requirements_ears_review_TEMPLATE.md"'
-  assert_contains "$(cat "$asdlc_root/.commands/feature_requirements_ears_review.sh")" 'REVIEW_GOLDEN_EXAMPLE_FILE=".golden_examples/requirements_ears_review_GOLDEN_EXAMPLE.md"'
-  assert_contains "$(cat "$asdlc_root/.commands/feature_requirements_ears_review.sh")" 'QUALITY_GATE_HELPER=".helper/check_requirements_ears_review_quality.sh"'
-  assert_contains "$(cat "$asdlc_root/.commands/feature_contract_delta.sh")" 'RULE_FILE=".rules/feature_contract_delta_rule.md"'
-  assert_contains "$(cat "$asdlc_root/.commands/feature_contract_delta.sh")" 'FEATURE_CONTRACT_TEMPLATE_FILE=".templates/feature_contract_delta_TEMPLATE.md"'
-  assert_contains "$(cat "$asdlc_root/.commands/feature_contract_delta.sh")" 'FEATURE_CONTRACT_GOLDEN_EXAMPLE_FILE=".golden_examples/feature_contract_delta_GOLDEN_EXAMPLE.md"'
-  assert_contains "$(cat "$asdlc_root/.commands/feature_contract_delta.sh")" 'QUALITY_GATE_HELPER=".helper/check_feature_contract_delta_quality.sh"'
-  assert_contains "$(cat "$asdlc_root/.commands/feature_repo_surface_and_exec_context.sh")" 'RULE_FILE=".rules/feature_repo_surface_and_exec_context_rule.md"'
-  assert_contains "$(cat "$asdlc_root/.commands/feature_repo_surface_and_exec_context.sh")" 'BACKEND_QUALITY_GATE_HELPER=".helper/check_feature_repo_surface_and_exec_context_be_quality.sh"'
-  assert_contains "$(cat "$asdlc_root/.commands/feature_repo_surface_and_exec_context.sh")" 'FRONTEND_MOBILE_QUALITY_GATE_HELPER=".helper/check_feature_repo_surface_and_exec_context_fe_quality.sh"'
   assert_feature_requirements_and_plan_commands_use_staged_runtime_assets "$asdlc_root"
 }
 
@@ -1185,11 +1299,8 @@ test_first_init_machine_update_mode_recreates_support_asset_directories_when_mis
   )"
 
   assert_contains "$out" "asdlc folder already exists, switch to update mode"
-  assert_contains "$out" "Update mode added file: $asdlc_root/.rules/br_to_ears.md"
   assert_contains "$out" "Update mode added file: $asdlc_root/.templates/common_contract_definition_TEMPLATE.md"
-  assert_contains "$out" "Update mode added file: $asdlc_root/.golden_examples/feature_contract_delta_GOLDEN_EXAMPLE.md"
-  assert_contains "$out" "Update mode added file: $asdlc_root/.helper/check_task_to_br_quality.sh"
-  assert_contains "$out" "Update mode added file: $asdlc_root/.helper/check_user_br_clarification_quality.sh"
+  assert_contains "$out" "Update mode added file: $asdlc_root/.golden_examples/common_contract_definition_GOLDEN_EXAMPLE.md"
   assert_contains "$out" "Update mode added file: $asdlc_root/.setup/models.md"
   assert_contains "$out" "Update mode added file: $asdlc_root/.templates/init_progress_definition_TEMPLATE.yaml"
   assert_contains "$out" "ASDLC workspace update completed: $asdlc_root"
@@ -1198,6 +1309,62 @@ test_first_init_machine_update_mode_recreates_support_asset_directories_when_mis
   assert_file_content_equal \
     "$repo_dir/overmind/templates/init_progress_definition_TEMPLATE.yaml" \
     "$asdlc_root/.templates/init_progress_definition_TEMPLATE.yaml"
+}
+
+test_first_init_machine_update_mode_repairs_missing_runner_skill_folder() {
+  local repo_dir="$TMP_ROOT/repo-first-init-update-mode-repair-runner-skill"
+  mkdir -p "$repo_dir"
+  setup_git_repo_with_identity "$repo_dir"
+
+  local bootstrap_parent="$TMP_ROOT/asdlc-home-update-mode-repair-runner-skill"
+  local asdlc_root=""
+  asdlc_root="$(bootstrap_asdlc_workspace "$repo_dir" "$bootstrap_parent")"
+
+  assert_runner_skills_installed "$repo_dir" "$asdlc_root"
+
+  local codex_skill_dir="$asdlc_root/.codex/skills/overmind-task-to-br"
+  local overmind_cli_path="$asdlc_root/.overmind/overmind.js"
+
+  # Remove one supported runner skill folder; keep the shared CLI in place.
+  rm -rf "$codex_skill_dir"
+  assert_file_exists "$overmind_cli_path"
+
+  local out=""
+  out="$(
+    cd "$repo_dir" &&
+    printf '%s\n' "$bootstrap_parent" | overmind/scripts/project_mgmt/project_setup_first_init_machine.sh
+  )"
+
+  assert_contains "$out" "asdlc folder already exists, switch to update mode"
+  assert_contains "$out" "Update mode added file: $codex_skill_dir"
+  assert_contains "$out" "ASDLC workspace update completed: $asdlc_root"
+  assert_runner_skills_installed "$repo_dir" "$asdlc_root"
+  assert_staged_overmind_cli_matches_repo_source "$repo_dir" "$asdlc_root"
+}
+
+test_first_init_machine_fails_when_skill_source_missing() {
+  local repo_dir="$TMP_ROOT/repo-first-init-missing-skill-source"
+  mkdir -p "$repo_dir"
+  setup_git_repo_with_identity "$repo_dir"
+  rm -rf "$repo_dir/$SKILL_SOURCE_REL_PATH"
+
+  local bootstrap_parent="$TMP_ROOT/asdlc-home-missing-skill-source"
+  local status=0
+  local out=""
+  set +e
+  out="$(
+    cd "$repo_dir" &&
+    printf '%s\n' "$bootstrap_parent" | overmind/scripts/project_mgmt/project_setup_first_init_machine.sh 2>&1
+  )"
+  status=$?
+  set -e
+
+  assert_nonzero_status "$status"
+  assert_contains "$out" "Required packaged skill source not found: $SKILL_SOURCE_REL_PATH"
+  if [[ -e "$bootstrap_parent/asdlc" ]]; then
+    echo "Assertion failed: asdlc workspace should not be created when packaged skill source is missing" >&2
+    exit 1
+  fi
 }
 
 test_first_init_machine_fails_when_asdlc_exists_without_metadata() {
@@ -1695,11 +1862,14 @@ test_update_project_requires_staged_command_location() {
 
 test_first_init_machine_bootstraps_asdlc_workspace_with_local_template
 test_first_init_machine_fails_when_template_source_missing
+test_first_init_machine_fails_when_overmind_cli_bundle_source_missing
 test_first_init_machine_update_mode_repairs_missing_commands_without_overwriting_existing_files
 test_first_init_machine_update_mode_refreshes_quickrun_guide
 test_first_init_machine_update_mode_preserves_existing_external_sources_yaml
 test_first_init_machine_update_mode_recreates_commands_directory_when_missing
 test_first_init_machine_update_mode_recreates_support_asset_directories_when_missing
+test_first_init_machine_update_mode_repairs_missing_runner_skill_folder
+test_first_init_machine_fails_when_skill_source_missing
 test_first_init_machine_fails_when_asdlc_exists_without_metadata
 test_add_new_project_creates_record_workspace_and_class_repo_metadata_from_staged_command
 test_add_new_project_does_not_require_git_repository

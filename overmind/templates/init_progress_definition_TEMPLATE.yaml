@@ -111,7 +111,7 @@ steps:
       - file: "user_br_input.md"
         special_folder: "/product"
     finished_only_if_conditions_meet:
-      - condition: "feature_task_to_br.sh output is captured in user_br_input.md for this feature."
+      - condition: "The overmind-task-to-br skill output is captured in user_br_input.md for this feature."
       - condition: "user_br_input.md retains the actual source story/request content used during task-to-BR extraction."
       - condition: "Classes with class_repo_paths.<class>.state: 'ready' are scanned for repository context; classes with state: 'deferred' are skipped."
       - condition: "The step is a no-op when no class has state: 'ready'."

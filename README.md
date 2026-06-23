@@ -13,8 +13,8 @@ This repository contains the standalone Overmind project. The original extractio
 0. Read this carefully:
 - ⚠️ This is pre-alpha — things may break. Use at your own risk. Take precautions before integrating this repo into your project!
 1. clone `yasdef-overmind` to your local machine
-2. run `overmind/scripts/project_mgmt/project_setup_first_init_machine.sh` to establish and set up the asdlc folder for future project work - you need to provide the place where exactly the asdlc folder will exist in your system,
-after this script finishes, the staged ASDLC commands live under your generated `asdlc/` workspace; later updates can be pulled from this repo and re-applied by running the same setup script again
+2. run `npm install` and `npm run build` from the repo root, then run `overmind/scripts/project_mgmt/project_setup_first_init_machine.sh` to establish and set up the asdlc folder for future project work - you need to provide the place where exactly the asdlc folder will exist in your system,
+after this script finishes, the staged ASDLC commands live under your generated `asdlc/` workspace, the shared gate/context CLI is staged at `.overmind/overmind.js`, and packaged Overmind skills are staged into the supported `.codex/skills/` and `.claude/skills/` runner directories; later updates can be pulled from this repo and re-applied by running the same setup script again
 3. in asdlc folder run `.commands/project_setup_add_new_project.sh` to create a new project. This creates `projects/<project-id>/`, seeds `init_progress_definition.yaml`, initializes that project folder as its own git repository, and creates the first commit. On this step you may provide paths to project repos, for example backend and frontend (if they exist), if it's a completely new project you may optionally configure per-class stack guidance sources in `init_progress_definition.yaml`; if absent, the system falls back to model proposals during stack blueprint authoring. You can always add or change this info later in projects/<project_id>/init_progress_definition.yaml (see meta_info part).
 3-a. it's possible to setup MCP server for stack blueprint authoring and MCP placeholder enrichment. To do this, first set knowledgebase mcp to your codex cli (see codex docs), second - after asdlc directory will be established - add this MCP to .setup/external_sources.yaml
 4. finish required project-level init before feature work:
@@ -136,19 +136,6 @@ Scripts working on **project level** require:
 
 Scripts working on **feature level** require:
 - `--feature_path <asdlc/projects/<project-id>/<feature-folder>>`
-- `feature_scan_repo_for_br.sh`
-- `feature_task_to_br.sh`
-- `feature_user_br_clarification.sh`
-- `feature_br_check_ears_readiness.sh`
-- `feature_br_to_ears.sh`
-- `feature_requirements_ears_review.sh`
-- `feature_contract_delta.sh`
-- `feature_repo_surface_and_exec_context.sh`
-- `feature_technical_requirements.sh`
-- `feature_implementation_slices.sh`
-- `feature_prerequisite_gaps.sh`
-- `feature_implementation_plan.sh`
-- `feature_implementation_plan_semantic_review.sh`
 - `feature_assing_workers.sh`
 
 Feature-level exception:
@@ -169,6 +156,11 @@ Project worker data lives in:
 - Each newly created ASDLC project folder under `projects/<project-id>/` is initialized as its own git repository with an initial commit containing `init_progress_definition.yaml`.
 - Quality helper scripts live under `overmind/scripts/helper/`.
 - Script tests are in `tests/ai_scripts/`.
+- Task-to-BR runs through the installed `overmind-task-to-br` skill backed by `.overmind/overmind.js`, not a staged shell command. The CLI owns deterministic capture of `user_br_input.md` via `node .overmind/overmind.js capture task-to-br <feature-path> --source-file <path>` or `--jira <ticket>` before context/gate. Jira capture records the ticket marker; the skill/context step owns MCP fetch and persistence of fetched story text.
+- BR clarification runs through the installed `overmind-br-clarification` skill backed by `node .overmind/overmind.js context br-clarification <feature-path>` and `node .overmind/overmind.js gate br-clarification <feature-path>`. EARS readiness is deterministic: `node .overmind/overmind.js readiness br-clarification <feature-path>`.
+- BR-to-EARS runs through the installed `overmind-requirements-ears` skill backed by `node .overmind/overmind.js context requirements-ears <feature-path>` and `node .overmind/overmind.js gate requirements-ears <feature-path>`.
+- EARS review runs through the installed `overmind-ears-review` skill backed by `node .overmind/overmind.js context ears-review <feature-path>` and `node .overmind/overmind.js gate ears-review <feature-path>`.
+- ASDLC setup/update requires the built bundle at `packages/asdlc-coordinator/dist/overmind.js`; run `npm install` and `npm run build` before `overmind/scripts/project_mgmt/project_setup_first_init_machine.sh`.
 - example of external_sources configuraqtion for knowledge base MCP
 ```
 sources:
@@ -180,7 +172,7 @@ sources:
 ## Scripts
 
 - `overmind/scripts/project_mgmt/project_setup_first_init_machine.sh`
-  Bootstraps or updates ASDLC workspace under `<selected_parent>/asdlc`. In update mode, it repairs missing staged commands, refreshes `quickrun.md`, and synchronizes only whitelisted support assets (`.rules`, `.templates`, `.golden_examples`, `.helper`, `.setup`).
+  Bootstraps or updates ASDLC workspace under `<selected_parent>/asdlc`. Stages the shared CLI `.overmind/overmind.js` plus every packaged Overmind skill into the supported runner skill directories `.codex/skills/` and `.claude/skills/`. In update mode, it repairs missing staged commands, repairs missing or stale runner skill folders from canonical source, refreshes `quickrun.md`, and synchronizes only whitelisted support assets (`.rules`, `.templates`, `.golden_examples`, `.helper`, `.setup`).
 
 - `overmind/scripts/project_mgmt/project_setup_add_new_project.sh`
   Staged command (`<asdlc>/.commands/project_setup_add_new_project.sh`) that creates a new project record + project folder, seeds `init_progress_definition.yaml`, initializes `projects/<project-id>/` as a git repository, and creates the first commit.
@@ -203,50 +195,47 @@ sources:
 - `overmind/scripts/project_mgmt/project_add_feature_e2e.sh`
   Staged command (`<asdlc>/.commands/project_add_feature_e2e.sh --path <asdlc/projects/<project-id>> [--resume <step>]`) that discovers unfinished project feature folders first, asks whether to start a new feature or continue one of the unfinished features, keeps `projects/<project-id>/.project_add_feature_e2e_state.env` only as a last-selected cache, runs `init_progress_scanner.sh` for the selected feature, and orchestrates confirmed execution through Implementation Plan Semantic Review.
 
-- `overmind/scripts/feature_task_to_br.sh`
-  Staged command (`<asdlc>/.commands/feature_task_to_br.sh --feature_path <.../feature-folder>`) that captures business input and generates/updates BR artifacts.
+- `packages/installer/_data/skills/overmind-task-to-br/SKILL.md`
+  Installed skill that drives task-to-BR via `node .overmind/overmind.js capture task-to-br <feature-path> ...`, `node .overmind/overmind.js context task-to-br <feature-path>`, and `node .overmind/overmind.js gate task-to-br <feature-path>`.
 
-- `overmind/scripts/feature_user_br_clarification.sh`
-  Staged command (`<asdlc>/.commands/feature_user_br_clarification.sh --feature_path <.../feature-folder>`) for isolated BR clarification loop updates.
+- `packages/installer/_data/skills/overmind-br-clarification/SKILL.md`
+  Installed skill that drives BR clarification via `node .overmind/overmind.js context br-clarification <feature-path>` and `node .overmind/overmind.js gate br-clarification <feature-path>`.
 
-- `overmind/scripts/feature_scan_repo_for_br.sh`
-  Staged command (`<asdlc>/.commands/feature_scan_repo_for_br.sh --feature_path <.../feature-folder>`) that enriches BR context from ready repository paths for project types `B/C`.
+- `node .overmind/overmind.js readiness br-clarification <feature-path>`
+  Deterministic CLI readiness transition that validates BR clarification and repo scan preconditions, then toggles `ready_to_ears`.
 
-- `overmind/scripts/feature_br_check_ears_readiness.sh`
-  Staged command (`<asdlc>/.commands/feature_br_check_ears_readiness.sh --feature_path <.../feature-folder>`) that validates BR readiness and toggles `ready_to_ears`.
+- `packages/installer/_data/skills/overmind-requirements-ears/SKILL.md`
+  Installed skill that drives BR-to-EARS via `node .overmind/overmind.js context requirements-ears <feature-path>` and `node .overmind/overmind.js gate requirements-ears <feature-path>`.
 
-- `overmind/scripts/feature_br_to_ears.sh`
-  Staged command (`<asdlc>/.commands/feature_br_to_ears.sh --feature_path <.../feature-folder>`) that converts BR summary into `requirements_ears.md`.
+- `packages/installer/_data/skills/overmind-ears-review/SKILL.md`
+  Installed skill that drives optional EARS review via `node .overmind/overmind.js context ears-review <feature-path>` and `node .overmind/overmind.js gate ears-review <feature-path>`.
 
-- `overmind/scripts/feature_requirements_ears_review.sh`
-  Staged command (`<asdlc>/.commands/feature_requirements_ears_review.sh --feature_path <.../feature-folder>`) that optionally reviews `requirements_ears.md` against `user_br_input.md`, updates EARS when the user accepts changes, and records findings in `requirements_ears_review.md`.
+- `packages/installer/_data/skills/overmind-contract-delta/SKILL.md`
+  Installed skill that creates `feature_contract_delta.md` through `node .overmind/overmind.js context contract-delta <feature-path>` and `node .overmind/overmind.js gate contract-delta <feature-path>`; the transitional phase-6 launcher runs `sync contract-delta` before starting the skill session.
 
-- `overmind/scripts/feature_contract_delta.sh`
-  Staged command (`<asdlc>/.commands/feature_contract_delta.sh --feature_path <.../feature-folder>`) that creates `feature_contract_delta.md` from `requirements_ears.md` plus project `common_contract_definition.md`.
-
-- `overmind/scripts/feature_repo_surface_and_exec_context.sh`
-  Staged command (`<asdlc>/.commands/feature_repo_surface_and_exec_context.sh --feature_path <.../feature-folder>`) that generates one class-specific surface map per run:
+- `packages/installer/_data/skills/overmind-surface-map/SKILL.md`
+  Installed per-class skill that generates one class-specific surface map per run through `node .overmind/overmind.js context surface-map <feature-path> --class <backend|frontend|mobile>` and `node .overmind/overmind.js gate surface-map <feature-path> --class <backend|frontend|mobile>`; the transitional phase-7 class loop selects a pending class and runs `sync surface-map --class <class>` before starting the skill session. Output is one of:
   - `project_surface_struct_resp_map_backend.md`
   - `project_surface_struct_resp_map_frontend.md`
   - `project_surface_struct_resp_map_mobile.md`
 
-- `overmind/scripts/feature_surface_map_mcp_placeholder_enrichment.sh`
-  Staged command (`<asdlc>/.commands/feature_surface_map_mcp_placeholder_enrichment.sh --feature_path <.../feature-folder>`) that optionally runs MCP placeholder enrichment, finds unresolved surface-map placeholders, asks a configured knowledge-base MCP source for candidate replacements, applies only user-confirmed replacements, and commits changed surface maps.
+- `packages/installer/_data/skills/overmind-surface-map-enrich/SKILL.md`
+  Optional step 7.1 skill that enriches surface-map placeholder fields using a configured knowledge-base MCP source. The skill assembles context with `node .overmind/overmind.js context surface-map-enrich <feature-path>` and validates each modified class with `node .overmind/overmind.js gate surface-map <feature-path> --class <backend|frontend|mobile>`.
 
-- `overmind/scripts/feature_technical_requirements.sh`
-  Staged command (`<asdlc>/.commands/feature_technical_requirements.sh --feature_path <.../feature-folder>`) that generates one shared `technical_requirements.md` for the feature from `requirements_ears.md`, `common_contract_definition.md`, and targeted evidence selected via the per-class surface maps.
+- `packages/installer/_data/skills/overmind-technical-requirements/SKILL.md`
+  Installed Step 8 skill that generates one shared `technical_requirements.md` from `requirements_ears.md`, `common_contract_definition.md`, and applicable per-class surface maps. It assembles bindings with `node .overmind/overmind.js context technical-requirements <feature-path>` and validates with `node .overmind/overmind.js gate technical-requirements <feature-path>`.
 
-- `overmind/scripts/feature_implementation_slices.sh`
-  Staged command (`<asdlc>/.commands/feature_implementation_slices.sh --feature_path <.../feature-folder>`) that runs implementation slice planning and generates one shared `implementation_slices.md` artifact from `requirements_ears.md`, `technical_requirements.md`, `feature_contract_delta.md`, and relevant surface-map artifacts.
+- `packages/installer/_data/skills/overmind-implementation-slices/SKILL.md`
+  Installed runner skill for Step 8.1. It uses `node .overmind/overmind.js context implementation-slices <feature-path>` and the model-invoked `gate implementation-slices` command to generate one shared `implementation_slices.md` from the bound read-only feature inputs.
 
-- `overmind/scripts/feature_prerequisite_gaps.sh`
-  Staged command (`<asdlc>/.commands/feature_prerequisite_gaps.sh --feature_path <.../feature-folder>`) that runs prerequisite gap trace and generates `prerequisite_gaps.md` from `requirements_ears.md`, `technical_requirements.md`, `implementation_slices.md`, and bound sibling `implementation_plan.md` promise sources. For each EARS requirement, it derives externally-invocable prerequisites and classifies each as `present_in_repo`, `scheduled_in_slices`, `scheduled_in_feature <feature-folder>/<step-id>`, or `unmet`. The quality gate rejects any `unmet` entry.
+- `overmind-prerequisite-gaps` skill
+  Installed under `.codex/skills/` and `.claude/skills/`. It runs prerequisite gap trace using `node .overmind/overmind.js context prerequisite-gaps <feature-path>` and validates `prerequisite_gaps.md` with the corresponding gate command. It reads requirements, technical requirements, implementation slices, and bound sibling implementation plans while writing only `prerequisite_gaps.md`.
 
-- `overmind/scripts/feature_implementation_plan.sh`
-  Staged command (`<asdlc>/.commands/feature_implementation_plan.sh --feature_path <.../feature-folder>`) that runs Implementation Plan and generates one shared `implementation_plan.md` for the feature using `prerequisite_gaps.md`, `implementation_slices.md`, `requirements_ears.md`, `technical_requirements.md`, and `feature_contract_delta.md`.
+- `overmind-implementation-plan` skill
+  Installed under `.codex/skills/` and `.claude/skills/`. It assembles Step 8.3 bindings with `node .overmind/overmind.js context implementation-plan <feature-path>` and validates the shared `implementation_plan.md` with `node .overmind/overmind.js gate implementation-plan <feature-path>`.
 
-- `overmind/scripts/feature_implementation_plan_semantic_review.sh`
-  Staged command (`<asdlc>/.commands/feature_implementation_plan_semantic_review.sh --feature_path <.../feature-folder>`) that optionally runs Implementation Plan Semantic Review, including Type A repo-scaffold-readiness suggestions, asks the user which finding numbers to apply, updates `implementation_plan.md`, and records decisions in `implementation_plan_semantic_review.md`.
+- `overmind-plan-semantic-review` skill
+  Installed under `.codex/skills/` and `.claude/skills/`. It assembles Step 8.4 bindings with `node .overmind/overmind.js context plan-semantic-review <feature-path>`, validates the review ledger with `node .overmind/overmind.js gate plan-semantic-review <feature-path>`, and revalidates plan changes with the implementation-plan gate. It asks which findings to apply, updates `implementation_plan.md`, and records decisions in `implementation_plan_semantic_review.md`.
 
 - `overmind/scripts/feature_assing_workers.sh`
   Staged command (`<asdlc>/.commands/feature_assing_workers.sh --feature_path <.../feature-folder>`) that requires a ready parseable `implementation_plan.md`, resolves active workers strictly by step repo class, asks for one class worker when multiple are available, and writes deterministic `#### Assigned:` values (worker UUID or class-scoped error message) on every step.

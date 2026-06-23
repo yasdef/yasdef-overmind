@@ -1,5 +1,7 @@
 # Implementation Plan - Overmind VS Code Extension
 
+> **Partially superseded (2026-07-03).** This plan predates the e2e orchestrator migration: script-launching steps (Run Scanner action, Create Feature / Continue E2E terminal actions, script allow-list work) target `.commands/*.sh` scripts that the migration deletes in favor of `overmind status/run/scaffold/project reconcile` and the in-process coordinator core. Do not restart implementation from this plan; consult the mapping in `design_docs/e2e_orchestrator_migration/03_target_architecture.md ### Supersession of the extension design docs`. Full revision of this plan is scheduled in `design_docs/e2e_orchestrator_migration/04_migration_plan.md ## Slice 5 — Cleanup + extension enablement`.
+
 Use one shared implementation plan for the whole extension. Keep v1 read-only and defer mutation until dashboard behavior is stable.
 
 ### Step 1.1 Scaffold VS Code Extension Project [Requirement 1] [NFR 1]
@@ -113,10 +115,22 @@ Use one shared implementation plan for the whole extension. Keep v1 read-only an
 - [ ] List scripts that should become Webview form-driven.
 - [ ] Identify required inputs, validation rules, outputs, and failure modes.
 - [ ] Decide whether each action should keep terminal mode or receive a non-interactive script contract.
+- [ ] Record that task-to-BR capture already has a non-interactive shared-core contract: `overmind capture task-to-br`.
 - [ ] Do not add new script flags until requirements are explicit.
 - [ ] Capture accepted script contract changes in future Overmind artifacts.
 
-### Step 4.2 Add Guided Webview Forms [Requirement 8] [NFR 2]
+### Step 4.2 Add Task-To-BR Capture Form [Requirement 10] [NFR 2]
+#### Repo: extension
+#### Depends on: 4.1
+#### Evidence: comp/task-to-br-capture-core, sig-003
+#### Preserved Surface: canonical `user_br_input.md` file contract
+- [ ] Add feature-level capture action when `user_br_input.md` is missing or the operator chooses to recapture.
+- [ ] Let the operator choose exactly one source: local `.txt`/`.md` file inside the feature folder or Jira ticket.
+- [ ] Validate Webview inputs before calling the extension host.
+- [ ] Call the shared core capture primitive (`overmind capture task-to-br` or imported core API) instead of rendering `user_br_input.md` in Webview code.
+- [ ] Refresh feature state and show capture errors from the core without mutating unrelated files.
+
+### Step 4.3 Add Guided Webview Forms [Requirement 8] [NFR 2]
 #### Repo: extension
 #### Depends on: 4.1
 #### Evidence: gap/Requirement-8, comp/webview-dashboard

@@ -1,13 +1,25 @@
 ## ADDED Requirements
 
-### Requirement: Gate invocation contract
+### Requirement: CLI invocation contract
 
-The `asdlc-coordinator` package SHALL provide an `overmind-gate` CLI invoked as `overmind-gate <step> <path>`, where `<step>` selects a registered validator and `<path>` is the target artifact (absolute, or relative to the workspace root). The CLI SHALL dispatch to the validator registered for `<step>`.
+The `asdlc-coordinator` package SHALL provide a single `overmind` CLI with three subcommands. `overmind capture <step> <feature_path>` selects a registered capture writer for `<step>` and writes the step-owned input capture artifact. `overmind context <step> <feature_path>` selects a registered context builder for `<step>` and assembles that step's dynamic context for `<feature_path>`. `overmind gate <step> <path>` selects a registered validator for `<step>` and validates the target artifact at `<path>` (absolute, or relative to the workspace root).
 
-#### Scenario: Dispatch to a registered validator
+#### Scenario: Capture dispatches to a registered writer
 
-- **WHEN** `overmind-gate task-to-br <feature-path>` is run and a validator is registered for `task-to-br`
+- **WHEN** `overmind capture task-to-br <feature-path> --source-file <path>` or `--jira <ticket>` is run and a capture writer is registered for `task-to-br`
+- **THEN** the `task-to-br` capture writer creates `<feature-path>/user_br_input.md` and exits `0`
+- **AND** Jira capture records a `jira:<ticket>` source marker for the later context/skill MCP fetch instead of fetching Jira content inside the capture command
+- **AND** invalid capture arguments print an error and exit non-zero
+
+#### Scenario: Gate dispatches to a registered validator
+
+- **WHEN** `overmind gate task-to-br <feature-path>` is run and a validator is registered for `task-to-br`
 - **THEN** the `task-to-br` validator runs against the artifacts at `<feature-path>` and the CLI exits with that validator's status
+
+#### Scenario: Context dispatches to a registered builder
+
+- **WHEN** `overmind context task-to-br <feature-path>` is run and a context builder is registered for `task-to-br`
+- **THEN** the builder prints the assembled context block to stdout and exits `0`; an unknown step or missing path prints an error and exits non-zero
 
 ### Requirement: Exit-code protocol
 

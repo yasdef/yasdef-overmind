@@ -78,24 +78,22 @@ The review should perform a required four-step check for every newly delivered u
 
 ### 3. Concrete implementation steps
 
-1. Update `overmind/rules/implementation_plan_semantic_review_rule.md` to add a new finding type: `delivered_surface_consumption_unclear`.
-2. Add the explicit four-step delivered-surface heuristic to that rule.
-3. Require the semantic review prompt to receive these read-only inputs when applicable:
+1. Keep `delivered_surface_consumption_unclear` and the four-step delivered-surface heuristic in `packages/installer/_data/skills/overmind-plan-semantic-review/SKILL.md`.
+2. Require the semantic review prompt to receive these read-only inputs when applicable:
    - `prerequisite_gaps.md`
    - backend/frontend/mobile surface-map artifacts for active repo classes
-4. Update `overmind/templates/implementation_plan_semantic_review_TEMPLATE.md` so this finding type is allowed and documented as a product-fit finding.
-5. Update the semantic review golden example to include both valid outcomes:
+3. Keep the semantic-review template and golden example under the skill's `assets/` directory, including both valid outcomes:
    - `applied` when an inbound affordance must be added,
    - `rejected` when the surface is intentionally isolated.
-6. Update `overmind/scripts/feature_implementation_plan_semantic_review.sh` so the required inputs are actually bound into the review context.
-7. Add tests proving:
+4. Bind required inputs through `node .overmind/overmind.js context plan-semantic-review <feature-path>`.
+5. Add tests proving:
    - a new route with no inbound edge produces the finding,
    - a route with a sibling inbound-affordance step does not,
    - terminal state is rejected when `resolution_notes` is empty for this finding type.
 
 ### 4. Risks / what NOT to do
 
-- Do not move this into `check_implementation_plan_quality.sh` as a hard-fail rule.
+- Do not move this into the `implementation-plan` gate as a hard-fail rule.
 - Do not assume every isolated surface is wrong.
 - Do not let the reviewer invent fake navigation requirements that are not justified by `requirements_ears.md` or operator confirmation.
 - Do not allow `delivered_surface_consumption_unclear` to reach a terminal state without non-empty `resolution_notes`.
@@ -137,7 +135,7 @@ The signal should say "coordination may be needed here". It must not mean "a coo
 
 ### 3. Concrete implementation steps
 
-1. Update `overmind/rules/technical_requirements_rule.md` so section 6 supports zero-or-more typed `planning_signal` blocks.
+1. Update `packages/installer/_data/skills/overmind-technical-requirements/SKILL.md ## Planning Signal Contract` so section 6 supports zero-or-more typed `planning_signal` blocks.
 2. Start with one supported signal type:
    - `cross_repo_contract_lock`
 3. Define a strict block schema in section 6 with fields such as:
@@ -149,16 +147,16 @@ The signal should say "coordination may be needed here". It must not mean "a coo
    - `must_precede`
    - `output_requirements`
    - `source_evidence`
-4. Update `overmind/templates/technical_requirements_TEMPLATE.md` and the golden example to show:
+4. Update `packages/installer/_data/skills/overmind-technical-requirements/assets/technical_requirements_TEMPLATE.md` and `packages/installer/_data/skills/overmind-technical-requirements/assets/technical_requirements_GOLDEN_EXAMPLE.md` to show:
    - one valid populated signal block,
    - one valid empty-path case when no signal is needed.
-5. Update `overmind/scripts/helper/check_feature_technical_requirements_quality.sh` to validate only structural correctness:
+5. Update `packages/asdlc-coordinator/src/validate/technical-requirements.ts` to validate only structural correctness:
    - unique ids,
    - required fields present,
    - evidence tokens resolve,
    - repo names are valid for the active project classes.
 6. Keep section 6 explicitly optional. When no signal is needed, require only a simple empty marker line.
-7. Add tests for:
+7. Add coverage in `packages/asdlc-coordinator/test/technical-requirements-validator.test.ts` for:
    - valid signal block,
    - empty-path case,
    - invalid evidence token,
@@ -203,10 +201,10 @@ Coordination work, API work, and state work may be added around it, but they mus
 ### 3. Concrete implementation steps
 
 1. Make sure prerequisite-gap output clearly distinguishes required missing `user_reachable_surface` items from transport-only or internal execution gaps.
-2. Update `overmind/rules/implementation_slices_rule.md` so each required missing operator-facing surface is preserved by at least one feature-delivery slice.
-3. Update `overmind/rules/implementation_plan_rule.md` so the same required missing surface is preserved by at least one implementation-plan step until delivered.
-4. Update `overmind/scripts/helper/check_implementation_slices_quality.sh` to verify that unresolved required operator-facing surfaces from upstream artifacts remain represented in slice output.
-5. Update `overmind/scripts/helper/check_implementation_plan_quality.sh` to verify the same preservation at plan level.
+2. Update `packages/installer/_data/skills/overmind-implementation-slices/SKILL.md` so each required missing operator-facing surface is preserved by at least one feature-delivery slice.
+3. Update the inlined `overmind-implementation-plan` skill rule so the same required missing surface is preserved by at least one implementation-plan step until delivered.
+4. Update `packages/asdlc-coordinator/src/validate/implementation-slices.ts` to verify that unresolved required operator-facing surfaces from upstream artifacts remain represented in slice output.
+5. Update the TypeScript `implementation-plan` gate to verify the same preservation at plan level.
 6. Add end-to-end tests around cases like:
    - missing login surface,
    - missing protected shell,
@@ -258,7 +256,7 @@ The absence of a coordination slice must remain valid when repo-local delivery c
 
 ### 3. Concrete implementation steps
 
-1. Update `overmind/rules/implementation_slices_rule.md` so slice generation may emit an optional coordination slice kind for justified contract-lock work.
+1. Update `packages/installer/_data/skills/overmind-implementation-slices/SKILL.md` so slice generation may emit an optional coordination slice kind for justified contract-lock work.
 2. Keep coordination slices separate from ordinary feature-delivery slices in the artifact structure so they remain visible but do not replace feature delivery.
 3. Define clear emission criteria in the rule:
    - real ambiguity,
@@ -268,7 +266,7 @@ The absence of a coordination slice must remain valid when repo-local delivery c
 4. Update `overmind/templates/implementation_slices_TEMPLATE.md` and the golden example to show both valid paths:
    - with a coordination slice,
    - without one.
-5. Update `overmind/rules/implementation_plan_rule.md` so the plan may lift a justified coordination slice into a plan step only when downstream work is actually blocked by that artifact.
+5. Update the inlined `overmind-implementation-plan` skill rule so the plan may lift a justified coordination slice into a plan step only when downstream work is actually blocked by that artifact.
 6. Update the slice and plan quality helpers to validate coordination artifacts only when they are present. Their absence must remain valid.
 7. Add tests proving both scenarios:
    - a feature where coordination work is emitted and correctly wired,

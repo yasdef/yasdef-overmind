@@ -1,5 +1,7 @@
 # Technical Requirements - Overmind VS Code Extension
 
+> **Partially superseded (2026-07-03).** This document predates the e2e orchestrator migration: references to `.commands/*.sh`, `init_progress_scanner.sh`, and terminal-launched script actions are replaced by `overmind` CLI verbs and the in-process coordinator core (`workspace/` + `sequencing/`). Before implementing, consult the mapping in `design_docs/e2e_orchestrator_migration/03_target_architecture.md ### Supersession of the extension design docs`. Full revision of this document is scheduled in `design_docs/e2e_orchestrator_migration/04_migration_plan.md ## Slice 5 — Cleanup + extension enablement`.
+
 ## 1. Document Meta
 - feature_id: overmind-vscode-extension
 - feature_title: Local VS Code operator dashboard for ASDLC workspaces
@@ -8,12 +10,12 @@
 - source_common_contract_definition: none
 - source_surface_map_artifacts: none
 - analyzed_repo_classes: extension, filesystem, shell-runtime
-- last_updated: 2026-05-24
+- last_updated: 2026-06-24
 - confidence_level: medium
 
 ## 2. Feature Scope and Inputs
 - feature_summary: Build a VS Code extension that provides a local operator UI over an ASDLC workspace, starting with read-only project/feature readiness and evolving toward safe script-driven workflow actions.
-- included_behavior: Workspace detection, filesystem scanner, readiness model, Webview dashboard, artifact opening, refresh, terminal-launched script actions, and future guided forms.
+- included_behavior: Workspace detection, filesystem scanner, readiness model, Webview dashboard, artifact opening, refresh, terminal-launched script actions, future guided forms, and task-to-BR source capture through the shared Overmind core.
 - excluded_behavior: Cloud backend, multi-user synchronization, replacing Overmind shell scripts, authoritative state storage outside ASDLC files, direct implementation-worker execution.
 
 ## 3. Target Architecture
@@ -141,6 +143,15 @@ ASDLC Workspace
 - evidence: `requirements_ears.md` Requirement 9
 - gap_to_close: Enforce scanner/action boundaries in module design.
 
+### Requirement: Requirement 10
+- requirement_summary: Capture task-to-BR story input through a guided UI.
+- transport_layer: Webview form validates local story file or Jira ticket, then calls the shared `asdlc-coordinator` capture primitive.
+- user_reachable_surface: Task-to-BR capture form on a feature detail view.
+- gap_status: not_implemented
+- repo_impact: extension, asdlc-coordinator
+- evidence: `requirements_ears.md` Requirement 10
+- gap_to_close: Add form UI and extension-host action that calls `overmind capture task-to-br` or the core API, then refreshes feature state.
+
 ## 6. Impacted Components
 
 ### Component: extension-scaffold
@@ -180,9 +191,9 @@ ASDLC Workspace
 - repo: extension
 - component_kind: ui
 - relevant_paths: `src/webview/`, `media/`
-- requirement_refs: Requirement 2, Requirement 3, Requirement 4, Requirement 5, Requirement 6, Requirement 8
+- requirement_refs: Requirement 2, Requirement 3, Requirement 4, Requirement 5, Requirement 6, Requirement 8, Requirement 10
 - current_state: Missing.
-- required_behavior: Render project list, feature list, readiness cards, artifact links, refresh action, and future forms.
+- required_behavior: Render project list, feature list, readiness cards, artifact links, refresh action, and future forms including task-to-BR capture.
 - gap_to_close: Build simple responsive Webview with message bridge to extension host.
 - dependency_notes: Must avoid direct filesystem access; all data comes from extension messages.
 - evidence: Product direction from conversation.
@@ -191,9 +202,9 @@ ASDLC Workspace
 - repo: extension
 - component_kind: service
 - relevant_paths: `src/actions/actionController.ts`, `src/actions/scriptRunner.ts`
-- requirement_refs: Requirement 7, Requirement 8, Requirement 9, NFR 2
+- requirement_refs: Requirement 7, Requirement 8, Requirement 9, Requirement 10, NFR 2
 - current_state: Missing.
-- required_behavior: Validate requested action, confirm mutating operations, construct safe script commands, and launch terminal.
+- required_behavior: Validate requested action, confirm mutating operations, construct safe script/core commands, call approved non-interactive core actions, and launch terminal for interactive scripts.
 - gap_to_close: Implement allow-listed actions for scanner refresh and later mutating scripts.
 - dependency_notes: Mutating actions should remain disabled until v3.
 - evidence: Future path v2-v4.
@@ -208,6 +219,17 @@ ASDLC Workspace
 - gap_to_close: Identify required non-interactive contracts only when v4 is started.
 - dependency_notes: Do not add script flags before the requirement is explicit.
 - evidence: AGENTS.md constraint says not to add new CLI flags unless explicitly requested.
+
+### Component: task-to-br-capture-core
+- repo: asdlc-coordinator
+- component_kind: service
+- relevant_paths: `packages/asdlc-coordinator/src/capture/task-to-br.ts`
+- requirement_refs: Requirement 8, Requirement 9, Requirement 10
+- current_state: Core capture primitive exists as `overmind capture task-to-br`.
+- required_behavior: Given a feature path and exactly one explicit source (`--source-file` inside the feature folder or `--jira` ticket), write `user_br_input.md` in the canonical format. Local-file capture embeds the story text; Jira capture records a `jira:<ticket>` source marker for the later task skill/context MCP fetch.
+- gap_to_close: Extension-host action must call this core primitive instead of rendering `user_br_input.md` itself.
+- dependency_notes: Enables the future guided Webview capture form without duplicating workflow mutation logic.
+- evidence: Task-to-BR migration decision.
 
 ## 7. Dashboard Data Contract
 
@@ -265,6 +287,16 @@ ASDLC Workspace
 - must_precede: Guided form replacement for interactive scripts
 - output_requirements: v3 script actions use terminal launch; v4 forms require explicit non-interactive script contracts.
 - source_evidence: Requirement 7, Requirement 8
+
+### Planning Signal: core-capture-boundary
+- signal_id: sig-003
+- signal_type: source_of_truth_boundary
+- owner_repo: asdlc-coordinator
+- consumer_repos: extension
+- required_artifact: `overmind capture task-to-br` / capture core API
+- must_precede: Task-to-BR guided capture Webview form
+- output_requirements: Extension UI collects source-file/Jira input, but canonical `user_br_input.md` rendering stays in the shared core; Jira fetch and persistence stay in the task skill/context flow.
+- source_evidence: Requirement 10
 
 ## 10. Known Risks / Uncertainties
 - risk_1: BA/PO users may still find VS Code intimidating; mitigate with a single dashboard command and minimal visible technical concepts.

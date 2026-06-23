@@ -6,6 +6,33 @@ OPTION_1_HELPER_SRC="$SOURCE_ROOT/overmind/scripts/project_mgmt/project_setup_fi
 OPTION_2_HELPER_SRC="$SOURCE_ROOT/overmind/scripts/project_mgmt/project_setup_add_new_project.sh"
 OPTION_3_HELPER_SRC="$SOURCE_ROOT/overmind/scripts/project_mgmt/project_setup_update_project.sh"
 COMMON_LIBS_SRC="$SOURCE_ROOT/overmind/scripts/common_libs"
+OVERMIND_CLI_BUNDLE_REL_PATH="packages/asdlc-coordinator/dist/overmind.js"
+SKILL_SOURCE_REL_PATH="packages/installer/_data/skills/overmind-task-to-br"
+SKILL_SOURCE_DIR_SRC="$SOURCE_ROOT/$SKILL_SOURCE_REL_PATH"
+REPO_BR_SCAN_SKILL_SOURCE_REL_PATH="packages/installer/_data/skills/overmind-repo-br-scan"
+REPO_BR_SCAN_SKILL_SOURCE_DIR_SRC="$SOURCE_ROOT/$REPO_BR_SCAN_SKILL_SOURCE_REL_PATH"
+BR_CLARIFICATION_SKILL_SOURCE_REL_PATH="packages/installer/_data/skills/overmind-br-clarification"
+BR_CLARIFICATION_SKILL_SOURCE_DIR_SRC="$SOURCE_ROOT/$BR_CLARIFICATION_SKILL_SOURCE_REL_PATH"
+REQUIREMENTS_EARS_SKILL_SOURCE_REL_PATH="packages/installer/_data/skills/overmind-requirements-ears"
+REQUIREMENTS_EARS_SKILL_SOURCE_DIR_SRC="$SOURCE_ROOT/$REQUIREMENTS_EARS_SKILL_SOURCE_REL_PATH"
+EARS_REVIEW_SKILL_SOURCE_REL_PATH="packages/installer/_data/skills/overmind-ears-review"
+EARS_REVIEW_SKILL_SOURCE_DIR_SRC="$SOURCE_ROOT/$EARS_REVIEW_SKILL_SOURCE_REL_PATH"
+CONTRACT_DELTA_SKILL_SOURCE_REL_PATH="packages/installer/_data/skills/overmind-contract-delta"
+CONTRACT_DELTA_SKILL_SOURCE_DIR_SRC="$SOURCE_ROOT/$CONTRACT_DELTA_SKILL_SOURCE_REL_PATH"
+SURFACE_MAP_SKILL_SOURCE_REL_PATH="packages/installer/_data/skills/overmind-surface-map"
+SURFACE_MAP_SKILL_SOURCE_DIR_SRC="$SOURCE_ROOT/$SURFACE_MAP_SKILL_SOURCE_REL_PATH"
+SURFACE_MAP_ENRICH_SKILL_SOURCE_REL_PATH="packages/installer/_data/skills/overmind-surface-map-enrich"
+SURFACE_MAP_ENRICH_SKILL_SOURCE_DIR_SRC="$SOURCE_ROOT/$SURFACE_MAP_ENRICH_SKILL_SOURCE_REL_PATH"
+TECHNICAL_REQUIREMENTS_SKILL_SOURCE_REL_PATH="packages/installer/_data/skills/overmind-technical-requirements"
+TECHNICAL_REQUIREMENTS_SKILL_SOURCE_DIR_SRC="$SOURCE_ROOT/$TECHNICAL_REQUIREMENTS_SKILL_SOURCE_REL_PATH"
+IMPLEMENTATION_SLICES_SKILL_SOURCE_REL_PATH="packages/installer/_data/skills/overmind-implementation-slices"
+IMPLEMENTATION_SLICES_SKILL_SOURCE_DIR_SRC="$SOURCE_ROOT/$IMPLEMENTATION_SLICES_SKILL_SOURCE_REL_PATH"
+PREREQUISITE_GAPS_SKILL_SOURCE_REL_PATH="packages/installer/_data/skills/overmind-prerequisite-gaps"
+PREREQUISITE_GAPS_SKILL_SOURCE_DIR_SRC="$SOURCE_ROOT/$PREREQUISITE_GAPS_SKILL_SOURCE_REL_PATH"
+IMPLEMENTATION_PLAN_SKILL_SOURCE_REL_PATH="packages/installer/_data/skills/overmind-implementation-plan"
+IMPLEMENTATION_PLAN_SKILL_SOURCE_DIR_SRC="$SOURCE_ROOT/$IMPLEMENTATION_PLAN_SKILL_SOURCE_REL_PATH"
+PLAN_SEMANTIC_REVIEW_SKILL_SOURCE_REL_PATH="packages/installer/_data/skills/overmind-plan-semantic-review"
+PLAN_SEMANTIC_REVIEW_SKILL_SOURCE_DIR_SRC="$SOURCE_ROOT/$PLAN_SEMANTIC_REVIEW_SKILL_SOURCE_REL_PATH"
 
 TMP_ROOT="$(mktemp -d)"
 TMP_ROOT="$(cd "$TMP_ROOT" && pwd -P)"
@@ -101,27 +128,34 @@ setup_repo_layout() {
   cp "$SOURCE_ROOT/overmind/scripts/project_mgmt/project_add_feature_e2e.sh" "$repo_dir/overmind/scripts/project_mgmt/project_add_feature_e2e.sh"
   cp "$SOURCE_ROOT/overmind/scripts/project_mgmt/project_register_worker.sh" "$repo_dir/overmind/scripts/project_mgmt/project_register_worker.sh"
   cp "$SOURCE_ROOT/overmind/scripts/init_common_contract_definition.sh" "$repo_dir/overmind/scripts/init_common_contract_definition.sh"
+  cp "$SOURCE_ROOT/overmind/scripts/project_mgmt/project_contract_reconciliation.sh" "$repo_dir/overmind/scripts/project_mgmt/project_contract_reconciliation.sh"
   cp "$SOURCE_ROOT/overmind/scripts/feature_br_scaffold.sh" "$repo_dir/overmind/scripts/feature_br_scaffold.sh"
-  cp "$SOURCE_ROOT/overmind/scripts/feature_scan_repo_for_br.sh" "$repo_dir/overmind/scripts/feature_scan_repo_for_br.sh"
-  cp "$SOURCE_ROOT/overmind/scripts/feature_task_to_br.sh" "$repo_dir/overmind/scripts/feature_task_to_br.sh"
-  cp "$SOURCE_ROOT/overmind/scripts/feature_user_br_clarification.sh" "$repo_dir/overmind/scripts/feature_user_br_clarification.sh"
-  cp "$SOURCE_ROOT/overmind/scripts/feature_br_check_ears_readiness.sh" "$repo_dir/overmind/scripts/feature_br_check_ears_readiness.sh"
-  cp "$SOURCE_ROOT/overmind/scripts/feature_br_to_ears.sh" "$repo_dir/overmind/scripts/feature_br_to_ears.sh"
-  cp "$SOURCE_ROOT/overmind/scripts/feature_requirements_ears_review.sh" "$repo_dir/overmind/scripts/feature_requirements_ears_review.sh"
-  cp "$SOURCE_ROOT/overmind/scripts/feature_contract_delta.sh" "$repo_dir/overmind/scripts/feature_contract_delta.sh"
-  cp "$SOURCE_ROOT/overmind/scripts/feature_repo_surface_and_exec_context.sh" "$repo_dir/overmind/scripts/feature_repo_surface_and_exec_context.sh"
-  cp "$SOURCE_ROOT/overmind/scripts/feature_surface_map_mcp_placeholder_enrichment.sh" "$repo_dir/overmind/scripts/feature_surface_map_mcp_placeholder_enrichment.sh"
-  cp "$SOURCE_ROOT/overmind/scripts/feature_technical_requirements.sh" "$repo_dir/overmind/scripts/feature_technical_requirements.sh"
-  cp "$SOURCE_ROOT/overmind/scripts/feature_implementation_slices.sh" "$repo_dir/overmind/scripts/feature_implementation_slices.sh"
-  cp "$SOURCE_ROOT/overmind/scripts/feature_prerequisite_gaps.sh" "$repo_dir/overmind/scripts/feature_prerequisite_gaps.sh"
-  cp "$SOURCE_ROOT/overmind/scripts/feature_implementation_plan.sh" "$repo_dir/overmind/scripts/feature_implementation_plan.sh"
-  cp "$SOURCE_ROOT/overmind/scripts/feature_implementation_plan_semantic_review.sh" "$repo_dir/overmind/scripts/feature_implementation_plan_semantic_review.sh"
   cp "$SOURCE_ROOT/overmind/scripts/feature_assing_workers.sh" "$repo_dir/overmind/scripts/feature_assing_workers.sh"
   cp -R "$SOURCE_ROOT/overmind/rules" "$repo_dir/overmind/rules"
   cp -R "$SOURCE_ROOT/overmind/templates" "$repo_dir/overmind/templates"
   cp -R "$SOURCE_ROOT/overmind/golden_examples" "$repo_dir/overmind/golden_examples"
   cp -R "$SOURCE_ROOT/overmind/scripts/helper" "$repo_dir/overmind/scripts/helper"
   cp -R "$SOURCE_ROOT/overmind/setup" "$repo_dir/overmind/setup"
+  mkdir -p "$repo_dir/packages/asdlc-coordinator/dist"
+  cat >"$repo_dir/$OVERMIND_CLI_BUNDLE_REL_PATH" <<'OUT'
+#!/usr/bin/env node
+console.log("stub overmind");
+OUT
+  chmod +x "$repo_dir/$OVERMIND_CLI_BUNDLE_REL_PATH"
+  mkdir -p "$repo_dir/$(dirname "$SKILL_SOURCE_REL_PATH")"
+  cp -R "$SKILL_SOURCE_DIR_SRC" "$repo_dir/$SKILL_SOURCE_REL_PATH"
+  cp -R "$REPO_BR_SCAN_SKILL_SOURCE_DIR_SRC" "$repo_dir/$REPO_BR_SCAN_SKILL_SOURCE_REL_PATH"
+  cp -R "$BR_CLARIFICATION_SKILL_SOURCE_DIR_SRC" "$repo_dir/$BR_CLARIFICATION_SKILL_SOURCE_REL_PATH"
+  cp -R "$REQUIREMENTS_EARS_SKILL_SOURCE_DIR_SRC" "$repo_dir/$REQUIREMENTS_EARS_SKILL_SOURCE_REL_PATH"
+  cp -R "$EARS_REVIEW_SKILL_SOURCE_DIR_SRC" "$repo_dir/$EARS_REVIEW_SKILL_SOURCE_REL_PATH"
+  cp -R "$CONTRACT_DELTA_SKILL_SOURCE_DIR_SRC" "$repo_dir/$CONTRACT_DELTA_SKILL_SOURCE_REL_PATH"
+  cp -R "$SURFACE_MAP_SKILL_SOURCE_DIR_SRC" "$repo_dir/$SURFACE_MAP_SKILL_SOURCE_REL_PATH"
+  cp -R "$SURFACE_MAP_ENRICH_SKILL_SOURCE_DIR_SRC" "$repo_dir/$SURFACE_MAP_ENRICH_SKILL_SOURCE_REL_PATH"
+  cp -R "$TECHNICAL_REQUIREMENTS_SKILL_SOURCE_DIR_SRC" "$repo_dir/$TECHNICAL_REQUIREMENTS_SKILL_SOURCE_REL_PATH"
+  cp -R "$IMPLEMENTATION_SLICES_SKILL_SOURCE_DIR_SRC" "$repo_dir/$IMPLEMENTATION_SLICES_SKILL_SOURCE_REL_PATH"
+  cp -R "$PREREQUISITE_GAPS_SKILL_SOURCE_DIR_SRC" "$repo_dir/$PREREQUISITE_GAPS_SKILL_SOURCE_REL_PATH"
+  cp -R "$IMPLEMENTATION_PLAN_SKILL_SOURCE_DIR_SRC" "$repo_dir/$IMPLEMENTATION_PLAN_SKILL_SOURCE_REL_PATH"
+  cp -R "$PLAN_SEMANTIC_REVIEW_SKILL_SOURCE_DIR_SRC" "$repo_dir/$PLAN_SEMANTIC_REVIEW_SKILL_SOURCE_REL_PATH"
   chmod +x \
     "$repo_dir/overmind/scripts/project_mgmt/project_setup_first_init_machine.sh" \
     "$repo_dir/overmind/scripts/project_mgmt/project_setup_add_new_project.sh" \
@@ -131,21 +165,8 @@ setup_repo_layout() {
     "$repo_dir/overmind/scripts/project_mgmt/project_add_feature_e2e.sh" \
     "$repo_dir/overmind/scripts/project_mgmt/project_register_worker.sh" \
     "$repo_dir/overmind/scripts/init_common_contract_definition.sh" \
+    "$repo_dir/overmind/scripts/project_mgmt/project_contract_reconciliation.sh" \
     "$repo_dir/overmind/scripts/feature_br_scaffold.sh" \
-    "$repo_dir/overmind/scripts/feature_scan_repo_for_br.sh" \
-    "$repo_dir/overmind/scripts/feature_task_to_br.sh" \
-    "$repo_dir/overmind/scripts/feature_user_br_clarification.sh" \
-    "$repo_dir/overmind/scripts/feature_br_check_ears_readiness.sh" \
-    "$repo_dir/overmind/scripts/feature_br_to_ears.sh" \
-    "$repo_dir/overmind/scripts/feature_requirements_ears_review.sh" \
-    "$repo_dir/overmind/scripts/feature_contract_delta.sh" \
-    "$repo_dir/overmind/scripts/feature_repo_surface_and_exec_context.sh" \
-    "$repo_dir/overmind/scripts/feature_surface_map_mcp_placeholder_enrichment.sh" \
-    "$repo_dir/overmind/scripts/feature_technical_requirements.sh" \
-    "$repo_dir/overmind/scripts/feature_implementation_slices.sh" \
-    "$repo_dir/overmind/scripts/feature_prerequisite_gaps.sh" \
-    "$repo_dir/overmind/scripts/feature_implementation_plan.sh" \
-    "$repo_dir/overmind/scripts/feature_implementation_plan_semantic_review.sh" \
     "$repo_dir/overmind/scripts/feature_assing_workers.sh"
   find "$repo_dir/overmind/scripts/helper" -maxdepth 1 -type f -exec chmod +x {} +
 }

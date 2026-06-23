@@ -33,28 +33,39 @@ The `task-to-br` validator SHALL validate a feature's business-requirements arti
 
 ### Requirement: overmind-task-to-br skill
 
-The repository SHALL provide an `overmind-task-to-br` agent skill at `skills/overmind-task-to-br/` containing `SKILL.md` (with the former task-to-br rule inlined and the orchestrator's former prompt logic) and an `assets/` directory holding the BR-summary template and golden example. The `SKILL.md` SHALL instruct the model to: read the captured task input and required inputs, write/repair `feature_br_summary.md` (and `missing_br_data.md`), then run `overmind-gate task-to-br <feature-path>` and act on its exit code — finish on `0`, repair the artifact per the reported problems and rerun on `1`, and stop and inform the user on `2`. The model SHALL own the repair loop; the skill SHALL NOT auto-run the gate from an orchestrator.
+The repository SHALL provide an `overmind-task-to-br` agent skill sourced at `packages/installer/_data/skills/overmind-task-to-br/` containing `SKILL.md` (with the former task-to-br rule inlined) and an `assets/` directory holding the BR-summary template and golden example. Dynamic capture is provided by `overmind capture task-to-br`, and dynamic context assembly is provided by `overmind context task-to-br`; neither is inlined into `SKILL.md`. The context output SHALL reference skill assets with paths relative to the loaded skill directory, not with a hardcoded agent install path such as `.claude/skills/...`. The `SKILL.md` SHALL instruct the model to: run `overmind capture task-to-br <feature-path>` when `user_br_input.md` is absent, run `overmind context task-to-br <feature-path>` to assemble the inputs, write/repair `feature_br_summary.md` (and `missing_br_data.md`), then run `overmind gate task-to-br <feature-path>` and act on its exit code — finish on `0`, repair the artifact per the reported problems and rerun on `1`, and stop and inform the user on `2`. The model SHALL own the loop; the skill SHALL NOT auto-run the context builder or gate from an orchestrator.
 
-#### Scenario: Skill drives generate-then-validate
+#### Scenario: Capture creates user input from a local story file
 
-- **WHEN** the operator invokes `overmind-task-to-br` for a feature
-- **THEN** the model writes the BR artifacts and runs `overmind-gate task-to-br <feature-path>` before finalizing
+- **WHEN** `overmind capture task-to-br <feature-path> --source-file <path-to-story.md-or.txt>` is run with a source file inside the feature folder
+- **THEN** `<feature-path>/user_br_input.md` is written with capture metadata, feature id/title from `feature_br_summary.md`, the source file reference, and the story text
+
+#### Scenario: Skill drives context-then-generate-then-validate
+
+- **WHEN** the operator invokes `overmind-task-to-br` for a feature without `user_br_input.md`
+- **THEN** the model first captures input via `overmind capture task-to-br <feature-path>` using an explicit local story file or Jira ticket, assembles context via `overmind context task-to-br <feature-path>`, writes the BR artifacts, and runs `overmind gate task-to-br <feature-path>` before finalizing
+
+#### Scenario: Context uses skill-relative asset paths
+
+- **WHEN** `overmind context task-to-br <feature-path>` emits asset references
+- **THEN** those references use `assets/...` paths relative to the loaded `overmind-task-to-br` skill directory
+- **AND** the context output does not hardcode `.claude/skills/...` or any other supported CLI's skill-install directory
 
 #### Scenario: Skill repairs on recoverable failure
 
-- **WHEN** `overmind-gate task-to-br` exits `1`
+- **WHEN** `overmind gate task-to-br` exits `1`
 - **THEN** the model revises the artifact to address each reported problem and reruns the gate until it exits `0` or `2`
 
 #### Scenario: Skill escalates on gate error
 
-- **WHEN** `overmind-gate task-to-br` exits `2`
+- **WHEN** `overmind gate task-to-br` exits `2`
 - **THEN** the model stops, reports that validation cannot complete, and waits for user instructions
 
 ### Requirement: Standalone runnability via golden example
 
-The `overmind-task-to-br` skill SHALL be runnable in isolation without first executing upstream steps, by supplying the reference input `feature_br_summary.md` from the bundled `feature_br_summary_GOLDEN_EXAMPLE.md`.
+The `overmind-task-to-br` skill SHALL be runnable in isolation without first executing upstream steps, by supplying the reference input `feature_br_summary.md` from the bundled `feature_br_summary_GOLDEN_EXAMPLE.md` plus an explicit local story file or Jira ticket for capture. "Without upstream steps" means `user_br_input.md` is not pre-created by another workflow step; the standalone run begins by invoking `overmind capture task-to-br` to create it.
 
 #### Scenario: Pilot runs from a single canned input
 
-- **WHEN** a developer places the golden-example BR summary into a feature folder and invokes the skill
-- **THEN** the full loop (generate/repair → `overmind-gate task-to-br` → exit code) runs without any other upstream artifact being produced first
+- **WHEN** a developer places only the golden-example BR summary and a local story file into a feature folder and invokes the skill
+- **THEN** the full loop (`overmind capture task-to-br` → `overmind context task-to-br` → generate/repair → `overmind gate task-to-br` → exit code) runs without any other upstream artifact being produced first

@@ -10,20 +10,6 @@ PROJECT_CONTRACT_RECONCILIATION_SCRIPT="overmind/scripts/project_mgmt/project_co
 FEATURE_BR_SCAFFOLD_SCRIPT="overmind/scripts/feature_br_scaffold.sh"
 PROJECT_ADD_FEATURE_E2E_SCRIPT="overmind/scripts/project_mgmt/project_add_feature_e2e.sh"
 REGISTER_WORKER_SCRIPT="overmind/scripts/project_mgmt/project_register_worker.sh"
-INIT_SCAN_REPO_FOR_BR_SCRIPT="overmind/scripts/feature_scan_repo_for_br.sh"
-INIT_TASK_TO_BR_SCRIPT="overmind/scripts/feature_task_to_br.sh"
-INIT_USER_BR_CLARIFICATION_SCRIPT="overmind/scripts/feature_user_br_clarification.sh"
-INIT_BR_CHECK_EARS_READINESS_SCRIPT="overmind/scripts/feature_br_check_ears_readiness.sh"
-INIT_BR_TO_EARS_SCRIPT="overmind/scripts/feature_br_to_ears.sh"
-FEATURE_REQUIREMENTS_EARS_REVIEW_SCRIPT="overmind/scripts/feature_requirements_ears_review.sh"
-INIT_FEATURE_CONTRACT_DELTA_SCRIPT="overmind/scripts/feature_contract_delta.sh"
-INIT_REPO_SURFACE_EXECUTION_CONTEXT_SCRIPT="overmind/scripts/feature_repo_surface_and_exec_context.sh"
-FEATURE_SURFACE_MAP_MCP_PLACEHOLDER_ENRICHMENT_SCRIPT="overmind/scripts/feature_surface_map_mcp_placeholder_enrichment.sh"
-FEATURE_TECHNICAL_REQUIREMENTS_SCRIPT="overmind/scripts/feature_technical_requirements.sh"
-FEATURE_IMPLEMENTATION_SLICES_SCRIPT="overmind/scripts/feature_implementation_slices.sh"
-FEATURE_PREREQUISITE_GAPS_SCRIPT="overmind/scripts/feature_prerequisite_gaps.sh"
-FEATURE_IMPLEMENTATION_PLAN_SCRIPT="overmind/scripts/feature_implementation_plan.sh"
-FEATURE_IMPLEMENTATION_PLAN_SEMANTIC_REVIEW_SCRIPT="overmind/scripts/feature_implementation_plan_semantic_review.sh"
 FEATURE_ASSIGN_WORKERS_SCRIPT="overmind/scripts/feature_assing_workers.sh"
 TEMPLATE_SOURCE_FILE="overmind/templates/init_progress_definition_TEMPLATE.yaml"
 RULES_SOURCE_DIR="overmind/rules"
@@ -32,95 +18,75 @@ GOLDEN_EXAMPLES_SOURCE_DIR="overmind/golden_examples"
 HELPER_SCRIPTS_SOURCE_DIR="overmind/scripts/helper"
 SETUP_SOURCE_DIR="overmind/setup"
 COMMON_LIBS_SOURCE_DIR="overmind/scripts/common_libs"
+OVERMIND_CLI_BUNDLE_SOURCE_FILE="packages/asdlc-coordinator/dist/overmind.js"
+SKILL_NAMES=(
+  "overmind-task-to-br"
+  "overmind-repo-br-scan"
+  "overmind-br-clarification"
+  "overmind-requirements-ears"
+  "overmind-ears-review"
+  "overmind-contract-delta"
+  "overmind-surface-map"
+  "overmind-surface-map-enrich"
+  "overmind-technical-requirements"
+  "overmind-implementation-slices"
+  "overmind-prerequisite-gaps"
+  "overmind-implementation-plan"
+  "overmind-plan-semantic-review"
+)
+SKILL_SOURCE_BASE_DIR="packages/installer/_data/skills"
+SKILL_RUNNER_DIRS=(
+  ".codex"
+  ".claude"
+)
+# Skills whose source directory intentionally has no assets/ subdirectory.
+ASSETLESS_SKILL_NAMES=(
+  "overmind-surface-map-enrich"
+)
 LOCAL_TEMPLATE_DIR_NAME=".templates"
 LOCAL_STAGED_RULES_DIR_NAME=".rules"
 LOCAL_STAGED_TEMPLATES_DIR_NAME=".templates"
 LOCAL_STAGED_GOLDEN_EXAMPLES_DIR_NAME=".golden_examples"
 LOCAL_STAGED_HELPER_DIR_NAME=".helper"
 LOCAL_STAGED_SETUP_DIR_NAME=".setup"
+LOCAL_STAGED_OVERMIND_DIR_NAME=".overmind"
+LOCAL_STAGED_OVERMIND_CLI_FILE_NAME="overmind.js"
 LOCAL_STAGED_COMMAND_LIBS_DIR_NAME="common_libs"
 LOCAL_TEMPLATE_FILE_NAME="init_progress_definition_TEMPLATE.yaml"
 METADATA_FILE_NAME="asdlc_metadata.yaml"
 QUICKRUN_FILE_NAME="quickrun.md"
 WORKSPACE_MODE="bootstrap"
-OBSOLETE_STAGED_COMMAND_FILES=(
-  "init_repo_surface_and_execution_context.sh"
-  "init_repo_surface_and_execution_context_be.sh"
-  "init_repo_surface_and_execution_context_fe.sh"
-  "feature_repo_surface_and_exec_context_be.sh"
-  "feature_repo_surface_and_exec_context_fe.sh"
-)
+
 STAGED_RULE_FILES=(
-  "br_to_ears.md"
   "common_contract_definition_rule.md"
-  "feature_contract_delta_rule.md"
-  "implementation_slices_rule.md"
-  "implementation_plan_rule.md"
-  "implementation_plan_semantic_review_rule.md"
   "project_stack_blueprint_rule.md"
-  "requirements_ears_review_rule.md"
-  "repo_br_scan_rule.md"
-  "feature_repo_surface_and_exec_context_rule.md"
-  "feature_surface_map_mcp_placeholder_enrichment_rule.md"
-  "task_to_br_rule.md"
-  "technical_requirements_rule.md"
-  "user_br_clarification_rule.md"
-  "prerequisite_gaps_rule.md"
+"task_to_br_rule.md"
   "project_contract_reconciliation_rule.md"
 )
 STAGED_TEMPLATE_FILES=(
   "common_contract_definition_TEMPLATE.md"
   "feature_br_summary_TEMPLATE.md"
-  "feature_contract_delta_TEMPLATE.md"
-  "implementation_slices_TEMPLATE.md"
-  "implementation_plan_TEMPLATE.md"
-  "implementation_plan_semantic_review_TEMPLATE.md"
   "missing_br_data_TEMPLATE.md"
   "project_stack_blueprint_be_TEMPLATE.md"
   "project_stack_blueprint_fe_TEMPLATE.md"
   "project_stack_blueprint_mobile_TEMPLATE.md"
-  "project_surface_struct_resp_map_be_TEMPLATE.md"
-  "project_surface_struct_resp_map_fe_TEMPLATE.md"
   "requirements_ears_review_TEMPLATE.md"
   "reqirements_ears_TEMPLATE.md"
-  "technical_requirements_TEMPLATE.md"
-  "prerequisite_gaps_TEMPLATE.md"
 )
 STAGED_GOLDEN_EXAMPLE_FILES=(
   "common_contract_definition_GOLDEN_EXAMPLE.md"
   "feature_br_summary_GOLDEN_EXAMPLE.md"
-  "feature_contract_delta_GOLDEN_EXAMPLE.md"
-  "implementation_slices_GOLDEN_EXAMPLE.md"
-  "implementation_plan_GOLDEN_EXAMPLE.md"
-  "implementation_plan_semantic_review_GOLDEN_EXAMPLE.md"
   "missing_br_data_GOLDEN_EXAMPLE.md"
   "project_stack_blueprint_be_GOLDEN_EXAMPLE.md"
   "project_stack_blueprint_fe_GOLDEN_EXAMPLE.md"
   "project_stack_blueprint_mobile_GOLDEN_EXAMPLE.md"
-  "project_surface_struct_resp_map_be_GOLDEN_EXAMPLE.md"
-  "project_surface_struct_resp_map_fe_GOLDEN_EXAMPLE.md"
   "requirements_ears_review_GOLDEN_EXAMPLE.md"
   "reqirements_ears_GOLDEN_EXAMPLE.md"
-  "technical_requirements_GOLDEN_EXAMPLE.md"
-  "prerequisite_gaps_GOLDEN_EXAMPLE.md"
 )
 STAGED_HELPER_FILES=(
-  "check_business_context_filled_from_repo.sh"
   "check_common_contract_definition_quality.sh"
   "check_cross_class_peer_trigger.sh"
-  "check_feature_contract_delta_quality.sh"
-  "check_feature_technical_requirements_quality.sh"
-  "check_implementation_slices_quality.sh"
-  "check_prerequisite_gaps_quality.sh"
-  "check_implementation_plan_quality.sh"
-  "check_implementation_plan_semantic_review_quality.sh"
   "check_project_stack_blueprint_quality.sh"
-  "check_feature_repo_surface_and_exec_context_be_quality.sh"
-  "check_feature_repo_surface_and_exec_context_fe_quality.sh"
-  "check_requirements_ears_review_quality.sh"
-  "check_requirements_ears_quality.sh"
-  "check_task_to_br_quality.sh"
-  "check_user_br_clarification_quality.sh"
 )
 STAGED_SETUP_FILES=(
   "external_sources.yaml"
@@ -137,6 +103,13 @@ STAGED_COMMAND_LIB_FILES=(
   "persist_class_repo_attach.sh"
   "project_setup_common.sh"
   "sync_repo_to_default_branch.sh"
+)
+OBSOLETE_STAGED_COMMAND_FILES=(
+  "feature_technical_requirements.sh"
+  "feature_implementation_slices.sh"
+  "feature_prerequisite_gaps.sh"
+  "feature_implementation_plan.sh"
+  "feature_implementation_plan_semantic_review.sh"
 )
 
 die() {
@@ -286,10 +259,31 @@ ensure_source_directory_exists() {
   [[ -d "$repo_root/$source_rel_dir" ]] || die "Required directory not found: $source_rel_dir"
 }
 
+ensure_skill_source_exists() {
+  local repo_root="$1"
+  local skill_name=""
+  local source_dir=""
+  local assetless=""
+  local is_assetless=""
+
+  for skill_name in "${SKILL_NAMES[@]}"; do
+    source_dir="$repo_root/$SKILL_SOURCE_BASE_DIR/$skill_name"
+    [[ -d "$source_dir" ]] || die "Required packaged skill source not found: $SKILL_SOURCE_BASE_DIR/$skill_name. Run npm install and npm run build from the repository root before ASDLC setup/update."
+    [[ -f "$source_dir/SKILL.md" ]] || die "Required packaged skill file not found: $SKILL_SOURCE_BASE_DIR/$skill_name/SKILL.md"
+    is_assetless="no"
+    for assetless in "${ASSETLESS_SKILL_NAMES[@]}"; do
+      [[ "$skill_name" == "$assetless" ]] && is_assetless="yes" && break
+    done
+    [[ "$is_assetless" == "yes" ]] || [[ -d "$source_dir/assets" ]] || die "Required packaged skill assets not found: $SKILL_SOURCE_BASE_DIR/$skill_name/assets"
+  done
+}
+
 ensure_support_asset_sources_exist() {
   local repo_root="$1"
 
   ensure_template_source_exists "$repo_root"
+  [[ -f "$repo_root/$OVERMIND_CLI_BUNDLE_SOURCE_FILE" ]] || die "Required Overmind CLI bundle not found: $OVERMIND_CLI_BUNDLE_SOURCE_FILE. Run npm install and npm run build from the repository root before ASDLC setup/update."
+  ensure_skill_source_exists "$repo_root"
   ensure_source_directory_exists "$repo_root" "$RULES_SOURCE_DIR"
   ensure_source_directory_exists "$repo_root" "$TEMPLATES_SOURCE_DIR"
   ensure_source_directory_exists "$repo_root" "$GOLDEN_EXAMPLES_SOURCE_DIR"
@@ -452,6 +446,87 @@ stage_support_assets() {
   stage_setup_assets "$repo_root" "$asdlc_root" "$overwrite_existing" "$announce_added"
 }
 
+stage_overmind_cli() {
+  local repo_root="$1"
+  local asdlc_root="$2"
+  local overwrite_existing="$3"
+  local announce_added="$4"
+  local source_path="$repo_root/$OVERMIND_CLI_BUNDLE_SOURCE_FILE"
+  local target_dir="$asdlc_root/$LOCAL_STAGED_OVERMIND_DIR_NAME"
+  local target_path="$target_dir/$LOCAL_STAGED_OVERMIND_CLI_FILE_NAME"
+  local existed_before="no"
+
+  [[ -f "$source_path" ]] || die "Required Overmind CLI bundle not found: $OVERMIND_CLI_BUNDLE_SOURCE_FILE. Run npm install and npm run build from the repository root before ASDLC setup/update."
+
+  if [[ -f "$target_path" ]]; then
+    existed_before="yes"
+  fi
+
+  if [[ "$overwrite_existing" != "yes" && -f "$target_path" ]]; then
+    return 0
+  fi
+
+  if ! mkdir -p "$target_dir"; then
+    die "Failed to create staged Overmind CLI directory: $target_dir"
+  fi
+
+  if ! cp "$source_path" "$target_path"; then
+    die "Failed to stage Overmind CLI bundle to: $target_path"
+  fi
+
+  if ! chmod +x "$target_path"; then
+    die "Failed to set executable permission on staged Overmind CLI bundle: $target_path"
+  fi
+
+  if [[ "$announce_added" == "yes" && "$existed_before" == "no" ]]; then
+    log_update_mode_added_file "$target_path"
+  fi
+}
+
+stage_runner_skills() {
+  local repo_root="$1"
+  local asdlc_root="$2"
+  local announce_added="$3"
+  local skill_name=""
+  local source_dir=""
+  local runner_dir=""
+  local target_parent=""
+  local target_dir=""
+  local existed_before=""
+
+  for skill_name in "${SKILL_NAMES[@]}"; do
+    source_dir="$repo_root/$SKILL_SOURCE_BASE_DIR/$skill_name"
+    [[ -d "$source_dir" ]] || die "Required packaged skill source not found: $SKILL_SOURCE_BASE_DIR/$skill_name. Run npm install and npm run build from the repository root before ASDLC setup/update."
+
+    for runner_dir in "${SKILL_RUNNER_DIRS[@]}"; do
+      target_parent="$asdlc_root/$runner_dir/skills"
+      target_dir="$target_parent/$skill_name"
+      existed_before="no"
+      if [[ -d "$target_dir" ]]; then
+        existed_before="yes"
+      fi
+
+      if ! mkdir -p "$target_parent"; then
+        die "Failed to create runner skills directory: $target_parent"
+      fi
+
+      # Treat the installed skill as package-owned payload: refresh from canonical
+      # source so missing or stale runner skill folders are repaired in update mode.
+      if [[ -e "$target_dir" ]]; then
+        rm -rf "$target_dir" || die "Failed to remove stale staged skill folder: $target_dir"
+      fi
+
+      if ! cp -R "$source_dir" "$target_dir"; then
+        die "Failed to stage runner skill to: $target_dir"
+      fi
+
+      if [[ "$announce_added" == "yes" && "$existed_before" == "no" ]]; then
+        log_update_mode_added_file "$target_dir"
+      fi
+    done
+  done
+}
+
 inject_default_projects_path_config() {
   local script_path="$1"
   local projects_dir="$2"
@@ -590,6 +665,13 @@ stage_commands() {
     die "Failed to create ASDLC commands directory under: $asdlc_root"
   fi
 
+  local obsolete_name=""
+  for obsolete_name in "${OBSOLETE_STAGED_COMMAND_FILES[@]}"; do
+    if [[ -e "$asdlc_root/.commands/$obsolete_name" ]]; then
+      rm -f "$asdlc_root/.commands/$obsolete_name" || die "Failed to remove obsolete staged command: $asdlc_root/.commands/$obsolete_name"
+    fi
+  done
+
   stage_command_libs "$repo_root" "$asdlc_root" "$overwrite_existing" "$announce_added"
   stage_command_script "$repo_root" "$ADD_NEW_PROJECT_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
   stage_command_script "$repo_root" "$UPDATE_PROJECT_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
@@ -600,38 +682,9 @@ stage_commands() {
   stage_command_script "$repo_root" "$REGISTER_WORKER_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
   stage_command_script "$repo_root" "$FEATURE_BR_SCAFFOLD_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
   stage_command_script "$repo_root" "$PROJECT_ADD_FEATURE_E2E_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
-  stage_command_script "$repo_root" "$INIT_SCAN_REPO_FOR_BR_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
-  stage_command_script "$repo_root" "$INIT_TASK_TO_BR_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
-  stage_command_script "$repo_root" "$INIT_USER_BR_CLARIFICATION_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
-  stage_command_script "$repo_root" "$INIT_BR_CHECK_EARS_READINESS_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
-  stage_command_script "$repo_root" "$INIT_BR_TO_EARS_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
-  stage_command_script "$repo_root" "$FEATURE_REQUIREMENTS_EARS_REVIEW_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
-  stage_command_script "$repo_root" "$INIT_FEATURE_CONTRACT_DELTA_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
-  stage_command_script "$repo_root" "$INIT_REPO_SURFACE_EXECUTION_CONTEXT_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
-  stage_command_script "$repo_root" "$FEATURE_SURFACE_MAP_MCP_PLACEHOLDER_ENRICHMENT_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
-  stage_command_script "$repo_root" "$FEATURE_TECHNICAL_REQUIREMENTS_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
-  stage_command_script "$repo_root" "$FEATURE_IMPLEMENTATION_SLICES_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
-  stage_command_script "$repo_root" "$FEATURE_PREREQUISITE_GAPS_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
-  stage_command_script "$repo_root" "$FEATURE_IMPLEMENTATION_PLAN_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
-  stage_command_script "$repo_root" "$FEATURE_IMPLEMENTATION_PLAN_SEMANTIC_REVIEW_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
   stage_command_script "$repo_root" "$FEATURE_ASSIGN_WORKERS_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
 }
 
-remove_obsolete_staged_commands() {
-  local asdlc_root="$1"
-  local obsolete_name=""
-  local obsolete_path=""
-
-  for obsolete_name in "${OBSOLETE_STAGED_COMMAND_FILES[@]}"; do
-    obsolete_path="$asdlc_root/.commands/$obsolete_name"
-    if [[ -e "$obsolete_path" && ! -f "$obsolete_path" ]]; then
-      die "Obsolete staged command path exists and is not a regular file: $obsolete_path"
-    fi
-    if [[ -f "$obsolete_path" ]]; then
-      rm -f "$obsolete_path" || die "Failed to remove obsolete staged command: $obsolete_path"
-    fi
-  done
-}
 
 write_quickrun_guide() {
   local asdlc_root="$1"
@@ -650,6 +703,8 @@ Path conventions:
 - Project path example: \`projects/<project-id>\`
 - Feature path example: \`projects/<project-id>/<feature-folder>\`
 - \`init_progress_scanner.sh\` expects a feature path, not a project path.
+- Task-to-BR gates run through the staged CLI at \`.overmind/overmind.js\`.
+- The \`overmind-task-to-br\`, \`overmind-repo-br-scan\`, \`overmind-br-clarification\`, \`overmind-requirements-ears\`, \`overmind-ears-review\`, \`overmind-contract-delta\`, \`overmind-surface-map\`, \`overmind-surface-map-enrich\`, \`overmind-technical-requirements\`, \`overmind-implementation-slices\`, \`overmind-prerequisite-gaps\`, \`overmind-implementation-plan\`, and \`overmind-plan-semantic-review\` skills are staged for supported runners at \`.codex/skills/\` and \`.claude/skills/\`.
 - Successful scanner runs persist \`projects/<project-id>/step_state_<feature-folder>.md\`; stdout remains the canonical machine-consumable output.
 
 ## 1. Create Or Update Project
@@ -687,6 +742,7 @@ Worker records are stored in:
 \`\`\`
 If \`--path\` is omitted, the script auto-selects the only project under \`projects/\` or prompts you to choose one when multiple projects exist.
 This run discovers unfinished feature folders for the project first and, when any exist, asks whether to start a new feature or continue one of the unfinished features.
+During phase 4.1, the orchestrator starts a Codex repo-br-scan session (when a class repo is ready) followed by a task-to-BR session using the installed skills; when \`user_br_input.md\` is missing, Codex asks for a local story file or Jira ticket. During phase 4.2, the orchestrator starts the BR-clarification skill and then runs the deterministic readiness check. During phase 5, the orchestrator starts the requirements-EARS skill. During optional phase 5.1, the orchestrator starts the EARS-review skill. During phase 6, it syncs ready repositories and starts the contract-delta skill.
 The last selected feature path is cached in:
 \`projects/<project-id>/.project_add_feature_e2e_state.env\`
 as a convenience only; discovery plus scanner status remains the source of truth for project-level feature selection.
@@ -700,62 +756,103 @@ Resume examples:
 \`\`\`bash
 .commands/feature_br_scaffold.sh --path projects/<project-id>
 \`\`\`
-3. If this feature belongs to an existing repository, enrich the BR from repo scan:
+3. During phase 4.1, the orchestrator runs the repo-br-scan skill (when a class repo is ready) to enrich \`## 13. Existing-System Context\`, then runs the task-to-BR skill.
+4. Continue the clarification loop for unresolved BR questions through the installed \`overmind-br-clarification\` skill. The skill uses:
 \`\`\`bash
-.commands/feature_scan_repo_for_br.sh --feature_path projects/<project-id>/<feature-folder>
+node .overmind/overmind.js context br-clarification projects/<project-id>/<feature-folder>
 \`\`\`
-4. Apply task or user input to the feature BR:
+and validates with:
 \`\`\`bash
-.commands/feature_task_to_br.sh --feature_path projects/<project-id>/<feature-folder>
+node .overmind/overmind.js gate br-clarification projects/<project-id>/<feature-folder>
 \`\`\`
-5. Continue the clarification loop for unresolved BR questions:
+5. Check whether the BR is ready for EARS generation:
 \`\`\`bash
-.commands/feature_user_br_clarification.sh --feature_path projects/<project-id>/<feature-folder>
+node .overmind/overmind.js readiness br-clarification projects/<project-id>/<feature-folder>
 \`\`\`
-6. Check whether the BR is ready for EARS generation:
+6. Generate EARS requirements through the installed \`overmind-requirements-ears\` skill. The skill uses:
 \`\`\`bash
-.commands/feature_br_check_ears_readiness.sh --feature_path projects/<project-id>/<feature-folder>
+node .overmind/overmind.js context requirements-ears projects/<project-id>/<feature-folder>
 \`\`\`
-7. Generate EARS requirements:
+and validates with:
 \`\`\`bash
-.commands/feature_br_to_ears.sh --feature_path projects/<project-id>/<feature-folder>
+node .overmind/overmind.js gate requirements-ears projects/<project-id>/<feature-folder>
 \`\`\`
-8. Optionally run extra EARS review against the source feature story:
+7. Optionally run extra EARS review through the installed \`overmind-ears-review\` skill. The skill uses:
 \`\`\`bash
-.commands/feature_requirements_ears_review.sh --feature_path projects/<project-id>/<feature-folder>
+node .overmind/overmind.js context ears-review projects/<project-id>/<feature-folder>
+\`\`\`
+and validates with:
+\`\`\`bash
+node .overmind/overmind.js gate ears-review projects/<project-id>/<feature-folder>
 \`\`\`
 
 ## 3. Continue Toward Implementation
 
-1. Create the feature contract delta:
+1. Create the feature contract delta through the installed \`overmind-contract-delta\` skill. The skill uses:
 \`\`\`bash
-.commands/feature_contract_delta.sh --feature_path projects/<project-id>/<feature-folder>
+node .overmind/overmind.js context contract-delta projects/<project-id>/<feature-folder>
 \`\`\`
-2. Analyze repository surface and execution context:
+and validates with:
 \`\`\`bash
-.commands/feature_repo_surface_and_exec_context.sh --feature_path projects/<project-id>/<feature-folder>
+node .overmind/overmind.js gate contract-delta projects/<project-id>/<feature-folder>
 \`\`\`
-3. Optionally enrich unresolved surface-map placeholders from configured knowledge-base MCP sources (Step 7.1):
+2. Analyze repository surface and execution context per class through the installed \`overmind-surface-map\` skill. The skill assembles context with:
 \`\`\`bash
-.commands/feature_surface_map_mcp_placeholder_enrichment.sh --feature_path projects/<project-id>/<feature-folder>
+node .overmind/overmind.js context surface-map projects/<project-id>/<feature-folder> --class <backend|frontend|mobile>
 \`\`\`
-4. Create feature technical requirements:
+and validates with:
 \`\`\`bash
-.commands/feature_technical_requirements.sh --feature_path projects/<project-id>/<feature-folder>
+node .overmind/overmind.js gate surface-map projects/<project-id>/<feature-folder> --class <backend|frontend|mobile>
 \`\`\`
-5. Create implementation slices (Step 8.1):
+3. Optionally enrich unresolved surface-map placeholders from configured knowledge-base MCP sources (Step 7.1) through the installed \`overmind-surface-map-enrich\` skill. The skill uses:
 \`\`\`bash
-.commands/feature_implementation_slices.sh --feature_path projects/<project-id>/<feature-folder>
+node .overmind/overmind.js context surface-map-enrich projects/<project-id>/<feature-folder>
 \`\`\`
-6. Create the shared implementation plan (Step 8.2):
+and validates with:
 \`\`\`bash
-.commands/feature_implementation_plan.sh --feature_path projects/<project-id>/<feature-folder>
+node .overmind/overmind.js gate surface-map projects/<project-id>/<feature-folder> --class <backend|frontend|mobile>
 \`\`\`
-7. Optionally run implementation-plan semantic review (Step 8.3):
+4. Create feature technical requirements through the installed \`overmind-technical-requirements\` skill. The skill uses:
 \`\`\`bash
-.commands/feature_implementation_plan_semantic_review.sh --feature_path projects/<project-id>/<feature-folder>
+node .overmind/overmind.js context technical-requirements projects/<project-id>/<feature-folder>
 \`\`\`
-8. Assign workers to implementation-plan steps:
+and validates with:
+\`\`\`bash
+node .overmind/overmind.js gate technical-requirements projects/<project-id>/<feature-folder>
+\`\`\`
+5. Create implementation slices through the installed \`overmind-implementation-slices\` skill. The skill uses:
+\`\`\`bash
+node .overmind/overmind.js context implementation-slices projects/<project-id>/<feature-folder>
+\`\`\`
+and validates with:
+\`\`\`bash
+node .overmind/overmind.js gate implementation-slices projects/<project-id>/<feature-folder>
+\`\`\`
+6. Create prerequisite gaps through the installed \`overmind-prerequisite-gaps\` skill. The skill uses:
+\`\`\`bash
+node .overmind/overmind.js context prerequisite-gaps projects/<project-id>/<feature-folder>
+\`\`\`
+and validates with:
+\`\`\`bash
+node .overmind/overmind.js gate prerequisite-gaps projects/<project-id>/<feature-folder>
+\`\`\`
+7. Create the shared implementation plan through the installed \`overmind-implementation-plan\` skill. The skill uses:
+\`\`\`bash
+node .overmind/overmind.js context implementation-plan projects/<project-id>/<feature-folder>
+\`\`\`
+and validates with:
+\`\`\`bash
+node .overmind/overmind.js gate implementation-plan projects/<project-id>/<feature-folder>
+\`\`\`
+8. Optionally run implementation-plan semantic review (Step 8.4) through the installed \`overmind-plan-semantic-review\` skill. The skill uses:
+\`\`\`bash
+node .overmind/overmind.js context plan-semantic-review projects/<project-id>/<feature-folder>
+\`\`\`
+and validates the review ledger with:
+\`\`\`bash
+node .overmind/overmind.js gate plan-semantic-review projects/<project-id>/<feature-folder>
+\`\`\`
+9. Assign workers to implementation-plan steps:
 \`\`\`bash
 .commands/feature_assing_workers.sh --feature_path projects/<project-id>/<feature-folder>
 \`\`\`
@@ -794,7 +891,8 @@ main() {
 
   if [[ "$workspace_mode" == "update" ]]; then
     stage_commands "$repo_root" "$asdlc_root" "no" "yes"
-    remove_obsolete_staged_commands "$asdlc_root"
+    stage_overmind_cli "$repo_root" "$asdlc_root" "yes" "yes"
+    stage_runner_skills "$repo_root" "$asdlc_root" "yes"
     stage_support_assets "$repo_root" "$asdlc_root" "yes" "yes"
     stage_template_file "$repo_root" "$asdlc_root" "yes"
     write_quickrun_guide "$asdlc_root"
@@ -807,7 +905,8 @@ main() {
   stage_support_assets "$repo_root" "$asdlc_root" "yes" "no"
   stage_template_file "$repo_root" "$asdlc_root" "no"
   stage_commands "$repo_root" "$asdlc_root" "yes" "no"
-  remove_obsolete_staged_commands "$asdlc_root"
+  stage_overmind_cli "$repo_root" "$asdlc_root" "yes" "no"
+  stage_runner_skills "$repo_root" "$asdlc_root" "no"
   write_quickrun_guide "$asdlc_root"
   echo "ASDLC workspace bootstrap completed: $asdlc_root"
 }

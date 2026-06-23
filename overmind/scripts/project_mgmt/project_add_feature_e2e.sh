@@ -4,6 +4,34 @@ set -euo pipefail
 SCRIPT_BASENAME="$(basename "${BASH_SOURCE[0]}")"
 STATE_FILE_NAME=".project_add_feature_e2e_state.env"
 FIRST_SUPPORTED_STEP="3"
+MODELS_FILE=".setup/models.md"
+TASK_TO_BR_MODEL_PHASE="task_to_br"
+TASK_TO_BR_SKILL_FILE=".codex/skills/overmind-task-to-br/SKILL.md"
+BR_CLARIFICATION_MODEL_PHASE="user_br_clarification"
+BR_CLARIFICATION_SKILL_FILE=".codex/skills/overmind-br-clarification/SKILL.md"
+REQUIREMENTS_EARS_MODEL_PHASE="br_to_ears"
+REQUIREMENTS_EARS_SKILL_FILE=".codex/skills/overmind-requirements-ears/SKILL.md"
+EARS_REVIEW_MODEL_PHASE="requirements_ears_review"
+EARS_REVIEW_SKILL_FILE=".codex/skills/overmind-ears-review/SKILL.md"
+CONTRACT_DELTA_MODEL_PHASE="feature_contract_delta"
+CONTRACT_DELTA_SKILL_FILE=".codex/skills/overmind-contract-delta/SKILL.md"
+SURFACE_MAP_MODEL_PHASE="feature_repo_surface_and_exec_context"
+SURFACE_MAP_SKILL_FILE=".codex/skills/overmind-surface-map/SKILL.md"
+SURFACE_MAP_ENRICH_MODEL_PHASE="feature_surface_map_mcp_placeholder_enrichment"
+SURFACE_MAP_ENRICH_SKILL_FILE=".codex/skills/overmind-surface-map-enrich/SKILL.md"
+TECHNICAL_REQUIREMENTS_MODEL_PHASE="feature_technical_requirements"
+TECHNICAL_REQUIREMENTS_SKILL_FILE=".codex/skills/overmind-technical-requirements/SKILL.md"
+IMPLEMENTATION_SLICES_MODEL_PHASE="repository_implementation_slices"
+IMPLEMENTATION_SLICES_SKILL_FILE=".codex/skills/overmind-implementation-slices/SKILL.md"
+PREREQUISITE_GAPS_MODEL_PHASE="prerequisite_gap_trace"
+PREREQUISITE_GAPS_SKILL_FILE=".codex/skills/overmind-prerequisite-gaps/SKILL.md"
+IMPLEMENTATION_PLAN_MODEL_PHASE="repository_implementation_plan"
+IMPLEMENTATION_PLAN_SKILL_FILE=".codex/skills/overmind-implementation-plan/SKILL.md"
+PLAN_SEMANTIC_REVIEW_MODEL_PHASE="implementation_plan_semantic_review"
+PLAN_SEMANTIC_REVIEW_SKILL_FILE=".codex/skills/overmind-plan-semantic-review/SKILL.md"
+REPO_BR_SCAN_MODEL_PHASE="repo_analyse"
+REPO_BR_SCAN_SKILL_FILE=".codex/skills/overmind-repo-br-scan/SKILL.md"
+OVERMIND_CLI_FILE=".overmind/overmind.js"
 TARGET_PATH_INPUT=""
 RESUME_STEP_INPUT=""
 RUNTIME_ROOT=""
@@ -27,6 +55,10 @@ DISCOVERED_PROJECT_NAMES=()
 RECONCILIATION_TRANSACTION_STARTED="false"
 RECONCILIATION_RAN="false"
 RECONCILED_CLASSES_THIS_RUN=()
+SCANNER_NEXT_STEP_INFO=""
+MODEL_CMD=""
+MODEL_MODEL=""
+MODEL_ARGS=()
 
 PHASE_IDS=("3" "4.1" "4.2" "5" "5.1" "6" "7" "7.1" "8" "8.1" "8.2" "8.3" "8.4")
 PHASE_OPTIONAL=("false" "false" "false" "false" "true" "false" "false" "true" "false" "false" "false" "false" "true")
@@ -35,6 +67,13 @@ PHASE_OPTIONAL=("false" "false" "false" "false" "true" "false" "false" "true" "f
 die() {
   echo "ERROR: $*" >&2
   exit 1
+}
+
+require_command() {
+  local command_name="$1"
+  if ! command -v "$command_name" >/dev/null 2>&1; then
+    die "Required command not found: $command_name"
+  fi
 }
 
 print_usage() {
@@ -711,6 +750,1266 @@ commit_feature_progress() {
   return 0
 }
 
+load_model_config() {
+  local models_path="$1"
+  local phase="$2"
+  local fields=()
+  local field=""
+
+  if [[ ! -f "$models_path" ]]; then
+    die "Models file not found: $MODELS_FILE"
+  fi
+
+  while IFS= read -r field; do
+    fields+=("$field")
+  done < <(
+    awk -F'|' -v phase="$phase" '
+      function trim(s) { gsub(/^[ \t]+|[ \t]+$/, "", s); return s }
+      /^[[:space:]]*#/ { next }
+      NF < 3 { next }
+      {
+        key = trim($1)
+        cmd = trim($2)
+        model = trim($3)
+        if (tolower(key) == tolower(phase)) {
+          print cmd
+          print model
+          for (i = 4; i <= NF; i++) {
+            arg = trim($i)
+            if (arg != "") { print arg }
+          }
+          exit
+        }
+      }
+    ' "$models_path"
+  )
+
+  if [[ ${#fields[@]} -lt 2 || -z "${fields[0]}" || -z "${fields[1]}" ]]; then
+    die "Invalid or missing '$phase' entry in $MODELS_FILE (expected: $phase | codex | <model> | <args... optional>)"
+  fi
+
+  MODEL_CMD="${fields[0]}"
+  MODEL_MODEL="${fields[1]}"
+  MODEL_ARGS=()
+  if [[ ${#fields[@]} -gt 2 ]]; then
+    MODEL_ARGS=("${fields[@]:2}")
+  fi
+}
+
+build_task_to_br_prompt() {
+  local runtime_root="$1"
+  local feature_br_file="$FEATURE_PATH/feature_br_summary.md"
+  local user_input_file="$FEATURE_PATH/user_br_input.md"
+  local missing_data_file="$FEATURE_PATH/missing_br_data.md"
+
+  cat <<EOF
+Use the overmind-task-to-br skill for this feature.
+
+Runtime bindings:
+- ASDLC workspace root: $runtime_root
+- Current working directory for all commands: $runtime_root
+- Feature path: $FEATURE_PATH
+- Feature BR summary artifact: $feature_br_file
+- Captured user input artifact: $user_input_file
+- Missing-data artifact: $missing_data_file
+- Overmind CLI: $OVERMIND_CLI_FILE
+
+Required flow:
+- Load and follow the overmind-task-to-br skill.
+- If $user_input_file is missing, ask the operator for exactly one source: either a local .txt/.md source file inside the feature folder, or a Jira ticket.
+- If $user_input_file already exists, do not ask for a new source unless the skill requires recovery.
+- Use exactly one capture command only when capture is needed:
+  node $OVERMIND_CLI_FILE capture task-to-br $FEATURE_PATH --source-file <path-to-story.md-or.txt>
+  node $OVERMIND_CLI_FILE capture task-to-br $FEATURE_PATH --jira <ticket>
+- Then assemble deterministic context with:
+  node $OVERMIND_CLI_FILE context task-to-br $FEATURE_PATH
+- Update only the artifacts allowed by the skill.
+- Validate after every write or repair with:
+  node $OVERMIND_CLI_FILE gate task-to-br $FEATURE_PATH
+- Handle gate exit codes exactly as the skill defines.
+EOF
+}
+
+run_task_to_br_skill() {
+  local runtime_root="$1"
+  local models_path="$runtime_root/$MODELS_FILE"
+  local feature_br_file="$runtime_root/$FEATURE_PATH/feature_br_summary.md"
+  local user_input_file="$runtime_root/$FEATURE_PATH/user_br_input.md"
+  local missing_data_file="$runtime_root/$FEATURE_PATH/missing_br_data.md"
+  local prompt_arg=""
+  local model_rc=0
+
+  [[ -f "$feature_br_file" ]] || die "Required file not found: $FEATURE_PATH/feature_br_summary.md"
+  [[ -f "$runtime_root/$TASK_TO_BR_SKILL_FILE" ]] || die "Required skill not found: $TASK_TO_BR_SKILL_FILE"
+  [[ -f "$runtime_root/$OVERMIND_CLI_FILE" ]] || die "Required Overmind CLI not found: $OVERMIND_CLI_FILE"
+
+  load_model_config "$models_path" "$TASK_TO_BR_MODEL_PHASE"
+  if [[ "$MODEL_CMD" != "codex" ]]; then
+    die "Invalid '$TASK_TO_BR_MODEL_PHASE' command in $MODELS_FILE: expected 'codex', got '$MODEL_CMD'."
+  fi
+  require_command "$MODEL_CMD"
+
+  prompt_arg="$(build_task_to_br_prompt "$runtime_root")"
+
+  local cmd=("$MODEL_CMD" -m "$MODEL_MODEL")
+  if [[ ${#MODEL_ARGS[@]} -gt 0 ]]; then
+    cmd+=("${MODEL_ARGS[@]}")
+  fi
+  cmd+=("$prompt_arg")
+
+  set +e
+  (
+    cd "$runtime_root"
+    "${cmd[@]}"
+  )
+  model_rc=$?
+  set -e
+
+  if [[ "$model_rc" -ne 0 ]]; then
+    return "$model_rc"
+  fi
+
+  [[ -f "$user_input_file" ]] || die "Task-to-BR model run did not produce required file: $FEATURE_PATH/user_br_input.md"
+  [[ -f "$missing_data_file" ]] || die "Task-to-BR model run did not produce required file: $FEATURE_PATH/missing_br_data.md"
+
+  echo "Updated $FEATURE_PATH/user_br_input.md"
+  echo "Updated $FEATURE_PATH/missing_br_data.md"
+}
+
+build_repo_br_scan_prompt() {
+  local runtime_root="$1"
+  local feature_br_file="$FEATURE_PATH/feature_br_summary.md"
+
+  cat <<EOF
+Load and follow the overmind-repo-br-scan skill for this feature.
+
+Runtime bindings:
+- ASDLC workspace root: $runtime_root
+- Current working directory for all commands: $runtime_root
+- Feature path: $FEATURE_PATH
+- Feature BR summary artifact: $feature_br_file
+- Overmind CLI: $OVERMIND_CLI_FILE
+
+Required flow:
+- Load and follow the overmind-repo-br-scan skill.
+- Assemble deterministic context with:
+  node $OVERMIND_CLI_FILE context repo-br-scan $FEATURE_PATH
+- Follow the skill's instructions exactly.
+- Validate after every write or repair with:
+  node $OVERMIND_CLI_FILE gate repo-br-scan $FEATURE_PATH
+- Handle gate exit codes as defined in the skill.
+EOF
+}
+
+run_repo_br_scan_skill() {
+  local runtime_root="$1"
+  local models_path="$runtime_root/$MODELS_FILE"
+  local feature_br_file="$runtime_root/$FEATURE_PATH/feature_br_summary.md"
+  local prompt_arg=""
+  local model_rc=0
+  local sync_rc=0
+
+  [[ -f "$feature_br_file" ]] || die "Required file not found: $FEATURE_PATH/feature_br_summary.md"
+  [[ -f "$runtime_root/$REPO_BR_SCAN_SKILL_FILE" ]] || die "Required skill not found: $REPO_BR_SCAN_SKILL_FILE"
+  [[ -f "$runtime_root/$OVERMIND_CLI_FILE" ]] || die "Required Overmind CLI not found: $OVERMIND_CLI_FILE"
+
+  set +e
+  (cd "$runtime_root" && node "$OVERMIND_CLI_FILE" sync repo-br-scan "$FEATURE_PATH")
+  sync_rc=$?
+  set -e
+  if [[ "$sync_rc" -ne 0 ]]; then
+    echo "Execution stopped: phase 4.1 repo sync failed (exit $sync_rc)." >&2
+    echo "Resolve the repository issue shown above, then rerun:" >&2
+    echo "  .commands/$SCRIPT_BASENAME --path $PROJECT_PATH --resume 4.1" >&2
+    return "$PHASE_EXECUTION_FAILED_RC"
+  fi
+
+  load_model_config "$models_path" "$REPO_BR_SCAN_MODEL_PHASE"
+  if [[ "$MODEL_CMD" != "codex" ]]; then
+    die "Invalid '$REPO_BR_SCAN_MODEL_PHASE' command in $MODELS_FILE: expected 'codex', got '$MODEL_CMD'."
+  fi
+  require_command "$MODEL_CMD"
+
+  prompt_arg="$(build_repo_br_scan_prompt "$runtime_root")"
+
+  local cmd=("$MODEL_CMD" -m "$MODEL_MODEL")
+  if [[ ${#MODEL_ARGS[@]} -gt 0 ]]; then
+    cmd+=("${MODEL_ARGS[@]}")
+  fi
+  cmd+=("$prompt_arg")
+
+  set +e
+  (
+    cd "$runtime_root"
+    "${cmd[@]}"
+  )
+  model_rc=$?
+  set -e
+
+  return "$model_rc"
+}
+
+build_br_clarification_prompt() {
+  local runtime_root="$1"
+  local feature_br_file="$FEATURE_PATH/feature_br_summary.md"
+  local missing_data_file="$FEATURE_PATH/missing_br_data.md"
+
+  cat <<EOF
+Load and follow the overmind-br-clarification skill for this feature.
+
+Runtime bindings:
+- ASDLC workspace root: $runtime_root
+- Current working directory for all commands: $runtime_root
+- Feature path: $FEATURE_PATH
+- Feature BR summary artifact: $feature_br_file
+- Missing-data artifact: $missing_data_file
+- Overmind CLI: $OVERMIND_CLI_FILE
+
+Required flow:
+- Load and follow the overmind-br-clarification skill.
+- Assemble deterministic context with:
+  node $OVERMIND_CLI_FILE context br-clarification $FEATURE_PATH
+- Use the exact gate command below when the skill tells you to validate:
+  node $OVERMIND_CLI_FILE gate br-clarification $FEATURE_PATH
+EOF
+}
+
+run_br_clarification_skill() {
+  local runtime_root="$1"
+  local models_path="$runtime_root/$MODELS_FILE"
+  local feature_br_file="$runtime_root/$FEATURE_PATH/feature_br_summary.md"
+  local missing_data_file="$runtime_root/$FEATURE_PATH/missing_br_data.md"
+  local prompt_arg=""
+  local model_rc=0
+
+  [[ -f "$feature_br_file" ]] || die "Required file not found: $FEATURE_PATH/feature_br_summary.md"
+  [[ -f "$missing_data_file" ]] || die "Required file not found: $FEATURE_PATH/missing_br_data.md"
+  [[ -f "$runtime_root/$BR_CLARIFICATION_SKILL_FILE" ]] || die "Required skill not found: $BR_CLARIFICATION_SKILL_FILE"
+  [[ -f "$runtime_root/$OVERMIND_CLI_FILE" ]] || die "Required Overmind CLI not found: $OVERMIND_CLI_FILE"
+
+  load_model_config "$models_path" "$BR_CLARIFICATION_MODEL_PHASE"
+  if [[ "$MODEL_CMD" != "codex" ]]; then
+    die "Invalid '$BR_CLARIFICATION_MODEL_PHASE' command in $MODELS_FILE: expected 'codex', got '$MODEL_CMD'."
+  fi
+  require_command "$MODEL_CMD"
+
+  prompt_arg="$(build_br_clarification_prompt "$runtime_root")"
+
+  local cmd=("$MODEL_CMD" -m "$MODEL_MODEL")
+  if [[ ${#MODEL_ARGS[@]} -gt 0 ]]; then
+    cmd+=("${MODEL_ARGS[@]}")
+  fi
+  cmd+=("$prompt_arg")
+
+  set +e
+  (
+    cd "$runtime_root"
+    "${cmd[@]}"
+  )
+  model_rc=$?
+  set -e
+
+  return "$model_rc"
+}
+
+run_br_clarification_readiness() {
+  local runtime_root="$1"
+  local readiness_rc=0
+
+  [[ -f "$runtime_root/$OVERMIND_CLI_FILE" ]] || die "Required Overmind CLI not found: $OVERMIND_CLI_FILE"
+  require_command node
+
+  set +e
+  (
+    cd "$runtime_root"
+    node "$OVERMIND_CLI_FILE" readiness br-clarification "$FEATURE_PATH"
+  )
+  readiness_rc=$?
+  set -e
+
+  return "$readiness_rc"
+}
+
+build_requirements_ears_prompt() {
+  local runtime_root="$1"
+  local feature_br_file="$FEATURE_PATH/feature_br_summary.md"
+  local requirements_ears_file="$FEATURE_PATH/requirements_ears.md"
+
+  cat <<EOF
+Load and follow the overmind-requirements-ears skill for this feature.
+
+Runtime bindings:
+- ASDLC workspace root: $runtime_root
+- Current working directory for all commands: $runtime_root
+- Feature path: $FEATURE_PATH
+- Read-only BR summary artifact: $feature_br_file
+- Target EARS artifact: $requirements_ears_file
+- Overmind CLI: $OVERMIND_CLI_FILE
+
+Required flow:
+- Load and follow the overmind-requirements-ears skill.
+- Assemble deterministic context with:
+  node $OVERMIND_CLI_FILE context requirements-ears $FEATURE_PATH
+- Use the exact gate command below when the skill tells you to validate:
+  node $OVERMIND_CLI_FILE gate requirements-ears $FEATURE_PATH
+EOF
+}
+
+run_requirements_ears_skill() {
+  local runtime_root="$1"
+  local models_path="$runtime_root/$MODELS_FILE"
+  local feature_br_file="$runtime_root/$FEATURE_PATH/feature_br_summary.md"
+  local prompt_arg=""
+  local model_rc=0
+  local before_snapshot=""
+
+  [[ -f "$feature_br_file" ]] || die "Required file not found: $FEATURE_PATH/feature_br_summary.md"
+  [[ -f "$runtime_root/$REQUIREMENTS_EARS_SKILL_FILE" ]] || die "Required skill not found: $REQUIREMENTS_EARS_SKILL_FILE"
+  [[ -f "$runtime_root/$OVERMIND_CLI_FILE" ]] || die "Required Overmind CLI not found: $OVERMIND_CLI_FILE"
+
+  load_model_config "$models_path" "$REQUIREMENTS_EARS_MODEL_PHASE"
+  if [[ "$MODEL_CMD" != "codex" ]]; then
+    die "Invalid '$REQUIREMENTS_EARS_MODEL_PHASE' command in $MODELS_FILE: expected 'codex', got '$MODEL_CMD'."
+  fi
+  require_command "$MODEL_CMD"
+
+  prompt_arg="$(build_requirements_ears_prompt "$runtime_root")"
+  before_snapshot="$(mktemp)"
+  cp "$feature_br_file" "$before_snapshot"
+
+  local cmd=("$MODEL_CMD" -m "$MODEL_MODEL")
+  if [[ ${#MODEL_ARGS[@]} -gt 0 ]]; then
+    cmd+=("${MODEL_ARGS[@]}")
+  fi
+  cmd+=("$prompt_arg")
+
+  set +e
+  (
+    cd "$runtime_root"
+    "${cmd[@]}"
+  )
+  model_rc=$?
+  set -e
+
+  if [[ "$model_rc" -ne 0 ]]; then
+    rm -f "$before_snapshot"
+    return "$model_rc"
+  fi
+
+  if ! cmp -s "$before_snapshot" "$feature_br_file"; then
+    rm -f "$before_snapshot"
+    die "Requirements-EARS skill must not modify $FEATURE_PATH/feature_br_summary.md; it is read-only input."
+  fi
+  rm -f "$before_snapshot"
+
+  return 0
+}
+
+build_ears_review_prompt() {
+  local runtime_root="$1"
+  local feature_br_file="$FEATURE_PATH/feature_br_summary.md"
+  local requirements_ears_file="$FEATURE_PATH/requirements_ears.md"
+  local review_file="$FEATURE_PATH/requirements_ears_review.md"
+
+  cat <<EOF
+Load and follow the overmind-ears-review skill for this feature.
+
+Runtime bindings:
+- ASDLC workspace root: $runtime_root
+- Current working directory for all commands: $runtime_root
+- Feature path: $FEATURE_PATH
+- Read-only BR summary artifact: $feature_br_file
+- Mutable EARS artifact: $requirements_ears_file
+- Review ledger artifact: $review_file
+- Overmind CLI: $OVERMIND_CLI_FILE
+
+Required flow:
+- Load and follow the overmind-ears-review skill.
+- Assemble deterministic context with:
+  node $OVERMIND_CLI_FILE context ears-review $FEATURE_PATH
+- Use the exact gate command below when the skill tells you to validate:
+  node $OVERMIND_CLI_FILE gate ears-review $FEATURE_PATH
+EOF
+}
+
+run_ears_review_skill() {
+  local runtime_root="$1"
+  local models_path="$runtime_root/$MODELS_FILE"
+  local feature_br_file="$runtime_root/$FEATURE_PATH/feature_br_summary.md"
+  local requirements_ears_file="$runtime_root/$FEATURE_PATH/requirements_ears.md"
+  local review_file="$runtime_root/$FEATURE_PATH/requirements_ears_review.md"
+  local prompt_arg=""
+  local model_rc=0
+  local before_snapshot=""
+
+  [[ -f "$feature_br_file" ]] || die "Required file not found: $FEATURE_PATH/feature_br_summary.md"
+  [[ -f "$requirements_ears_file" ]] || die "Required file not found: $FEATURE_PATH/requirements_ears.md"
+  [[ -f "$runtime_root/$EARS_REVIEW_SKILL_FILE" ]] || die "Required skill not found: $EARS_REVIEW_SKILL_FILE"
+  [[ -f "$runtime_root/$OVERMIND_CLI_FILE" ]] || die "Required Overmind CLI not found: $OVERMIND_CLI_FILE"
+
+  load_model_config "$models_path" "$EARS_REVIEW_MODEL_PHASE"
+  if [[ "$MODEL_CMD" != "codex" ]]; then
+    die "Invalid '$EARS_REVIEW_MODEL_PHASE' command in $MODELS_FILE: expected 'codex', got '$MODEL_CMD'."
+  fi
+  require_command "$MODEL_CMD"
+
+  prompt_arg="$(build_ears_review_prompt "$runtime_root")"
+  before_snapshot="$(mktemp)"
+  cp "$feature_br_file" "$before_snapshot"
+
+  local cmd=("$MODEL_CMD" -m "$MODEL_MODEL")
+  if [[ ${#MODEL_ARGS[@]} -gt 0 ]]; then
+    cmd+=("${MODEL_ARGS[@]}")
+  fi
+  cmd+=("$prompt_arg")
+
+  set +e
+  (
+    cd "$runtime_root"
+    "${cmd[@]}"
+  )
+  model_rc=$?
+  set -e
+
+  if ! cmp -s "$before_snapshot" "$feature_br_file"; then
+    rm -f "$before_snapshot"
+    die "EARS-review skill must not modify $FEATURE_PATH/feature_br_summary.md; it is read-only input."
+  fi
+  rm -f "$before_snapshot"
+
+  if [[ "$model_rc" -ne 0 ]]; then
+    return "$model_rc"
+  fi
+
+  [[ -f "$review_file" ]] || die "EARS-review model run did not produce required file: $FEATURE_PATH/requirements_ears_review.md"
+
+  echo "Updated $FEATURE_PATH/requirements_ears.md"
+  echo "Updated $FEATURE_PATH/requirements_ears_review.md"
+}
+
+build_surface_map_enrich_prompt() {
+  local runtime_root="$1"
+
+  cat <<EOF
+Load and follow the overmind-surface-map-enrich skill for this feature.
+
+Runtime bindings:
+- ASDLC workspace root: $runtime_root
+- Current working directory for all commands: $runtime_root
+- Feature path: $FEATURE_PATH
+- Overmind CLI: $OVERMIND_CLI_FILE
+
+Required flow:
+- Load and follow the overmind-surface-map-enrich skill.
+- Assemble deterministic context with:
+  node $OVERMIND_CLI_FILE context surface-map-enrich $FEATURE_PATH
+- When the skill tells you to validate, use the per-class gate command:
+  node $OVERMIND_CLI_FILE gate surface-map $FEATURE_PATH --class <backend|frontend|mobile>
+- The model owns the gate loop; this orchestrator does not run the gate.
+EOF
+}
+
+run_surface_map_enrich_skill() {
+  local runtime_root="$1"
+  local models_path="$runtime_root/$MODELS_FILE"
+  local sources_path="$runtime_root/.setup/external_sources.yaml"
+  local definition_path="$runtime_root/$PROJECT_PATH/init_progress_definition.yaml"
+  local prompt_arg=""
+  local model_rc=0
+  local before_sources=""
+  local before_definition=""
+  local sources_existed="no"
+  local definition_existed="no"
+
+  [[ -f "$runtime_root/$SURFACE_MAP_ENRICH_SKILL_FILE" ]] || die "Required skill not found: $SURFACE_MAP_ENRICH_SKILL_FILE"
+  [[ -f "$runtime_root/$OVERMIND_CLI_FILE" ]] || die "Required Overmind CLI not found: $OVERMIND_CLI_FILE"
+
+  load_model_config "$models_path" "$SURFACE_MAP_ENRICH_MODEL_PHASE"
+  if [[ "$MODEL_CMD" != "codex" ]]; then
+    die "Invalid '$SURFACE_MAP_ENRICH_MODEL_PHASE' command in $MODELS_FILE: expected 'codex', got '$MODEL_CMD'."
+  fi
+  require_command "$MODEL_CMD"
+
+  before_sources="$(mktemp)"
+  if [[ -f "$sources_path" ]]; then
+    cp "$sources_path" "$before_sources"
+    sources_existed="yes"
+  fi
+  before_definition="$(mktemp)"
+  if [[ -f "$definition_path" ]]; then
+    cp "$definition_path" "$before_definition"
+    definition_existed="yes"
+  fi
+
+  prompt_arg="$(build_surface_map_enrich_prompt "$runtime_root")"
+
+  local cmd=("$MODEL_CMD" -m "$MODEL_MODEL")
+  if [[ ${#MODEL_ARGS[@]} -gt 0 ]]; then
+    cmd+=("${MODEL_ARGS[@]}")
+  fi
+  cmd+=("$prompt_arg")
+
+  set +e
+  (
+    cd "$runtime_root"
+    "${cmd[@]}"
+  )
+  model_rc=$?
+  set -e
+
+  if [[ "$sources_existed" == "yes" ]]; then
+    if ! [[ -f "$sources_path" ]]; then
+      rm -f "$before_sources" "$before_definition"
+      die "Surface-map-enrich skill must not delete or replace .setup/external_sources.yaml; it is read-only input."
+    elif ! cmp -s "$before_sources" "$sources_path"; then
+      rm -f "$before_sources" "$before_definition"
+      die "Surface-map-enrich skill must not modify .setup/external_sources.yaml; it is read-only input."
+    fi
+  elif [[ -e "$sources_path" ]]; then
+    rm -f "$before_sources" "$before_definition"
+    die "Surface-map-enrich skill must not create .setup/external_sources.yaml; it is read-only input."
+  fi
+  rm -f "$before_sources"
+
+  if [[ "$definition_existed" == "yes" ]]; then
+    if ! [[ -f "$definition_path" ]]; then
+      rm -f "$before_definition"
+      die "Surface-map-enrich skill must not delete or replace $PROJECT_PATH/init_progress_definition.yaml; it is read-only input."
+    elif ! cmp -s "$before_definition" "$definition_path"; then
+      rm -f "$before_definition"
+      die "Surface-map-enrich skill must not modify $PROJECT_PATH/init_progress_definition.yaml; it is read-only input."
+    fi
+  elif [[ -e "$definition_path" ]]; then
+    rm -f "$before_definition"
+    die "Surface-map-enrich skill must not create $PROJECT_PATH/init_progress_definition.yaml; it is read-only input."
+  fi
+  rm -f "$before_definition"
+
+  if [[ "$model_rc" -ne 0 ]]; then
+    return "$model_rc"
+  fi
+}
+
+build_contract_delta_prompt() {
+  local runtime_root="$1"
+  local feature_contract_delta_file="$FEATURE_PATH/feature_contract_delta.md"
+
+  cat <<EOF
+Load and follow the overmind-contract-delta skill for this feature.
+
+Runtime bindings:
+- ASDLC workspace root: $runtime_root
+- Current working directory for all commands: $runtime_root
+- Feature path: $FEATURE_PATH
+- Target contract delta artifact: $feature_contract_delta_file
+- Overmind CLI: $OVERMIND_CLI_FILE
+
+Required flow:
+- Load and follow the overmind-contract-delta skill.
+- Assemble deterministic context with:
+  node $OVERMIND_CLI_FILE context contract-delta $FEATURE_PATH
+- Use the exact gate command below when the skill tells you to validate:
+  node $OVERMIND_CLI_FILE gate contract-delta $FEATURE_PATH
+EOF
+}
+
+run_contract_delta_skill() {
+  local runtime_root="$1"
+  local models_path="$runtime_root/$MODELS_FILE"
+  local feature_abs="$runtime_root/$FEATURE_PATH"
+  local output_file="$feature_abs/feature_contract_delta.md"
+  local prompt_arg=""
+  local guard_context=""
+  local context_rc=0
+  local model_rc=0
+  local sync_rc=0
+  local read_only_path=""
+  local resolved_read_only_path=""
+  local pending_file=""
+  local snapshot=""
+  local idx=0
+  local read_only_files=()
+  local snapshots=()
+
+  [[ -f "$runtime_root/$CONTRACT_DELTA_SKILL_FILE" ]] || die "Required skill not found: $CONTRACT_DELTA_SKILL_FILE"
+  [[ -f "$runtime_root/$OVERMIND_CLI_FILE" ]] || die "Required Overmind CLI not found: $OVERMIND_CLI_FILE"
+
+  set +e
+  (cd "$runtime_root" && node "$OVERMIND_CLI_FILE" sync contract-delta "$FEATURE_PATH")
+  sync_rc=$?
+  set -e
+  if [[ "$sync_rc" -ne 0 ]]; then
+    echo "Execution stopped: phase 6 repo sync failed (exit $sync_rc)." >&2
+    echo "Resolve the repository issue shown above, then rerun:" >&2
+    echo "  .commands/$SCRIPT_BASENAME --path $PROJECT_PATH --resume 6" >&2
+    return "$PHASE_EXECUTION_FAILED_RC"
+  fi
+
+  set +e
+  guard_context="$(cd "$runtime_root" && node "$OVERMIND_CLI_FILE" context contract-delta "$FEATURE_PATH")"
+  context_rc=$?
+  set -e
+  if [[ "$context_rc" -ne 0 ]]; then
+    [[ -z "$guard_context" ]] || printf '%s\n' "$guard_context" >&2
+    echo "Execution stopped: phase 6 contract-delta context failed (exit $context_rc)." >&2
+    echo "Resolve the context issue shown above, then rerun:" >&2
+    echo "  .commands/$SCRIPT_BASENAME --path $PROJECT_PATH --resume 6" >&2
+    return "$PHASE_EXECUTION_FAILED_RC"
+  fi
+
+  while IFS= read -r read_only_path; do
+    [[ -n "$read_only_path" ]] || continue
+    if [[ "$read_only_path" == /* ]]; then
+      resolved_read_only_path="$read_only_path"
+    else
+      resolved_read_only_path="$runtime_root/$read_only_path"
+    fi
+    [[ -f "$resolved_read_only_path" ]] || die "Contract-delta context read-only input not found: $read_only_path"
+    read_only_files+=("$resolved_read_only_path")
+  done < <(printf '%s\n' "$guard_context" | sed -n 's/^- read_only_input: //p')
+  [[ ${#read_only_files[@]} -gt 0 ]] || die "Contract-delta context emitted no read-only inputs."
+
+  load_model_config "$models_path" "$CONTRACT_DELTA_MODEL_PHASE"
+  if [[ "$MODEL_CMD" != "codex" ]]; then
+    die "Invalid '$CONTRACT_DELTA_MODEL_PHASE' command in $MODELS_FILE: expected 'codex', got '$MODEL_CMD'."
+  fi
+  require_command "$MODEL_CMD"
+
+  for pending_file in "${read_only_files[@]}"; do
+    snapshot="$(mktemp)"
+    cp "$pending_file" "$snapshot"
+    snapshots+=("$snapshot")
+  done
+
+  prompt_arg="$(build_contract_delta_prompt "$runtime_root")"
+  local cmd=("$MODEL_CMD" -m "$MODEL_MODEL")
+  if [[ ${#MODEL_ARGS[@]} -gt 0 ]]; then
+    cmd+=("${MODEL_ARGS[@]}")
+  fi
+  cmd+=("$prompt_arg")
+
+  set +e
+  (
+    cd "$runtime_root"
+    "${cmd[@]}"
+  )
+  model_rc=$?
+  set -e
+
+  for idx in "${!read_only_files[@]}"; do
+    if ! cmp -s "${snapshots[$idx]}" "${read_only_files[$idx]}"; then
+      for snapshot in "${snapshots[@]}"; do rm -f "$snapshot"; done
+      die "Contract-delta skill must not modify ${read_only_files[$idx]#"$runtime_root/"}; it is read-only input."
+    fi
+  done
+  for snapshot in "${snapshots[@]}"; do rm -f "$snapshot"; done
+
+  if [[ "$model_rc" -ne 0 ]]; then
+    return "$model_rc"
+  fi
+  [[ -f "$output_file" ]] || die "Contract-delta model run did not produce required file: $FEATURE_PATH/feature_contract_delta.md"
+  echo "Updated $FEATURE_PATH/feature_contract_delta.md"
+}
+
+build_surface_map_prompt() {
+  local runtime_root="$1"
+  local target_class="$2"
+  local surface_map_file="$FEATURE_PATH/project_surface_struct_resp_map_${target_class}.md"
+
+  cat <<EOF
+Load and follow the overmind-surface-map skill for this feature and class.
+
+Runtime bindings:
+- ASDLC workspace root: $runtime_root
+- Current working directory for all commands: $runtime_root
+- Feature path: $FEATURE_PATH
+- Target class: $target_class
+- Target surface map artifact: $surface_map_file
+- Overmind CLI: $OVERMIND_CLI_FILE
+
+Required flow:
+- Load and follow the overmind-surface-map skill.
+- Assemble deterministic context with:
+  node $OVERMIND_CLI_FILE context surface-map $FEATURE_PATH --class $target_class
+- Use the exact gate command below when the skill tells you to validate:
+  node $OVERMIND_CLI_FILE gate surface-map $FEATURE_PATH --class $target_class
+EOF
+}
+
+run_surface_map_skill() {
+  local runtime_root="$1"
+  local target_class="$2"
+  local models_path="$runtime_root/$MODELS_FILE"
+  local feature_abs="$runtime_root/$FEATURE_PATH"
+  local output_file="$feature_abs/project_surface_struct_resp_map_${target_class}.md"
+  local prompt_arg=""
+  local guard_context=""
+  local context_rc=0
+  local model_rc=0
+  local sync_rc=0
+  local read_only_path=""
+  local resolved_read_only_path=""
+  local pending_file=""
+  local snapshot=""
+  local idx=0
+  local read_only_files=()
+  local snapshots=()
+
+  [[ -f "$runtime_root/$SURFACE_MAP_SKILL_FILE" ]] || die "Required skill not found: $SURFACE_MAP_SKILL_FILE"
+  [[ -f "$runtime_root/$OVERMIND_CLI_FILE" ]] || die "Required Overmind CLI not found: $OVERMIND_CLI_FILE"
+
+  set +e
+  (cd "$runtime_root" && node "$OVERMIND_CLI_FILE" sync surface-map "$FEATURE_PATH" --class "$target_class")
+  sync_rc=$?
+  set -e
+  if [[ "$sync_rc" -ne 0 ]]; then
+    echo "Execution stopped: phase 7 repo sync failed for class $target_class (exit $sync_rc)." >&2
+    echo "Resolve the repository issue shown above, then rerun:" >&2
+    echo "  .commands/$SCRIPT_BASENAME --path $PROJECT_PATH --resume 7" >&2
+    return "$PHASE_EXECUTION_FAILED_RC"
+  fi
+
+  set +e
+  guard_context="$(cd "$runtime_root" && node "$OVERMIND_CLI_FILE" context surface-map "$FEATURE_PATH" --class "$target_class")"
+  context_rc=$?
+  set -e
+  if [[ "$context_rc" -ne 0 ]]; then
+    [[ -z "$guard_context" ]] || printf '%s\n' "$guard_context" >&2
+    echo "Execution stopped: phase 7 surface-map context failed for class $target_class (exit $context_rc)." >&2
+    echo "Resolve the context issue shown above, then rerun:" >&2
+    echo "  .commands/$SCRIPT_BASENAME --path $PROJECT_PATH --resume 7" >&2
+    return "$PHASE_EXECUTION_FAILED_RC"
+  fi
+
+  while IFS= read -r read_only_path; do
+    [[ -n "$read_only_path" ]] || continue
+    if [[ "$read_only_path" == /* ]]; then
+      resolved_read_only_path="$read_only_path"
+    else
+      resolved_read_only_path="$runtime_root/$read_only_path"
+    fi
+    [[ -f "$resolved_read_only_path" ]] || die "Surface-map context read-only input not found: $read_only_path"
+    read_only_files+=("$resolved_read_only_path")
+  done < <(printf '%s\n' "$guard_context" | sed -n 's/^- read_only_input: //p')
+  [[ ${#read_only_files[@]} -gt 0 ]] || die "Surface-map context emitted no read-only inputs."
+
+  load_model_config "$models_path" "$SURFACE_MAP_MODEL_PHASE"
+  if [[ "$MODEL_CMD" != "codex" ]]; then
+    die "Invalid '$SURFACE_MAP_MODEL_PHASE' command in $MODELS_FILE: expected 'codex', got '$MODEL_CMD'."
+  fi
+  require_command "$MODEL_CMD"
+
+  for pending_file in "${read_only_files[@]}"; do
+    snapshot="$(mktemp)"
+    cp "$pending_file" "$snapshot"
+    snapshots+=("$snapshot")
+  done
+
+  prompt_arg="$(build_surface_map_prompt "$runtime_root" "$target_class")"
+  local cmd=("$MODEL_CMD" -m "$MODEL_MODEL")
+  if [[ ${#MODEL_ARGS[@]} -gt 0 ]]; then
+    cmd+=("${MODEL_ARGS[@]}")
+  fi
+  cmd+=("$prompt_arg")
+
+  set +e
+  (
+    cd "$runtime_root"
+    "${cmd[@]}"
+  )
+  model_rc=$?
+  set -e
+
+  for idx in "${!read_only_files[@]}"; do
+    if ! cmp -s "${snapshots[$idx]}" "${read_only_files[$idx]}"; then
+      for snapshot in "${snapshots[@]}"; do rm -f "$snapshot"; done
+      die "Surface-map skill must not modify ${read_only_files[$idx]#"$runtime_root/"}; it is read-only input."
+    fi
+  done
+  for snapshot in "${snapshots[@]}"; do rm -f "$snapshot"; done
+
+  if [[ "$model_rc" -ne 0 ]]; then
+    return "$model_rc"
+  fi
+  [[ -f "$output_file" ]] || die "Surface-map model run did not produce required file: $FEATURE_PATH/project_surface_struct_resp_map_${target_class}.md"
+  echo "Updated $FEATURE_PATH/project_surface_struct_resp_map_${target_class}.md"
+}
+
+build_technical_requirements_prompt() {
+  local runtime_root="$1"
+
+  cat <<EOF
+Load and follow the overmind-technical-requirements skill for this feature.
+
+Runtime bindings:
+- ASDLC workspace root: $runtime_root
+- Current working directory for all commands: $runtime_root
+- Feature path: $FEATURE_PATH
+- Target artifact: $FEATURE_PATH/technical_requirements.md
+- Overmind CLI: $OVERMIND_CLI_FILE
+
+Required flow:
+- Load and follow the overmind-technical-requirements skill.
+- Assemble deterministic context with:
+  node $OVERMIND_CLI_FILE context technical-requirements $FEATURE_PATH
+- Use the exact gate command below when the skill tells you to validate:
+  node $OVERMIND_CLI_FILE gate technical-requirements $FEATURE_PATH
+- The model owns the gate loop; this orchestrator does not run the gate.
+EOF
+}
+
+run_technical_requirements_skill() {
+  local runtime_root="$1"
+  local models_path="$runtime_root/$MODELS_FILE"
+  local output_file="$runtime_root/$FEATURE_PATH/technical_requirements.md"
+  local guard_context=""
+  local context_rc=0
+  local model_rc=0
+  local read_only_path=""
+  local resolved_read_only_path=""
+  local file=""
+  local snapshot=""
+  local idx=0
+  local prompt_arg=""
+  local read_only_files=()
+  local snapshots=()
+
+  [[ -f "$runtime_root/$TECHNICAL_REQUIREMENTS_SKILL_FILE" ]] || die "Required skill not found: $TECHNICAL_REQUIREMENTS_SKILL_FILE"
+  [[ -f "$runtime_root/$OVERMIND_CLI_FILE" ]] || die "Required Overmind CLI not found: $OVERMIND_CLI_FILE"
+
+  set +e
+  guard_context="$(cd "$runtime_root" && node "$OVERMIND_CLI_FILE" context technical-requirements "$FEATURE_PATH")"
+  context_rc=$?
+  set -e
+  if [[ "$context_rc" -ne 0 ]]; then
+    [[ -z "$guard_context" ]] || printf '%s\n' "$guard_context" >&2
+    return "$context_rc"
+  fi
+
+  while IFS= read -r read_only_path; do
+    [[ -n "$read_only_path" ]] || continue
+    if [[ "$read_only_path" == /* ]]; then
+      resolved_read_only_path="$read_only_path"
+    else
+      resolved_read_only_path="$runtime_root/$read_only_path"
+    fi
+    [[ -f "$resolved_read_only_path" ]] || die "Technical-requirements context read-only input not found: $read_only_path"
+    read_only_files+=("$resolved_read_only_path")
+  done < <(printf '%s\n' "$guard_context" | sed -n 's/^- read_only_input: //p')
+  [[ ${#read_only_files[@]} -gt 0 ]] || die "Technical-requirements context emitted no read-only inputs."
+
+  load_model_config "$models_path" "$TECHNICAL_REQUIREMENTS_MODEL_PHASE"
+  if [[ "$MODEL_CMD" != "codex" ]]; then
+    die "Invalid '$TECHNICAL_REQUIREMENTS_MODEL_PHASE' command in $MODELS_FILE: expected 'codex', got '$MODEL_CMD'."
+  fi
+  require_command "$MODEL_CMD"
+
+  for file in "${read_only_files[@]}"; do
+    snapshot="$(mktemp)"
+    cp "$file" "$snapshot"
+    snapshots+=("$snapshot")
+  done
+
+  prompt_arg="$(build_technical_requirements_prompt "$runtime_root")"
+  local cmd=("$MODEL_CMD" -m "$MODEL_MODEL")
+  if [[ ${#MODEL_ARGS[@]} -gt 0 ]]; then
+    cmd+=("${MODEL_ARGS[@]}")
+  fi
+  cmd+=("$prompt_arg")
+
+  set +e
+  (
+    cd "$runtime_root"
+    "${cmd[@]}"
+  )
+  model_rc=$?
+  set -e
+
+  for idx in "${!read_only_files[@]}"; do
+    if ! cmp -s "${snapshots[$idx]}" "${read_only_files[$idx]}"; then
+      for snapshot in "${snapshots[@]}"; do rm -f "$snapshot"; done
+      die "Technical-requirements skill must not modify ${read_only_files[$idx]#"$runtime_root/"}; it is read-only input."
+    fi
+  done
+  for snapshot in "${snapshots[@]}"; do rm -f "$snapshot"; done
+
+  if [[ "$model_rc" -ne 0 ]]; then
+    return "$model_rc"
+  fi
+  [[ -f "$output_file" ]] || die "Technical-requirements model run did not produce required file: $FEATURE_PATH/technical_requirements.md"
+  echo "Updated $FEATURE_PATH/technical_requirements.md"
+}
+
+build_implementation_slices_prompt() {
+  local runtime_root="$1"
+
+  cat <<EOF
+Load and follow the overmind-implementation-slices skill for this feature.
+
+Runtime bindings:
+- ASDLC workspace root: $runtime_root
+- Current working directory for all commands: $runtime_root
+- Feature path: $FEATURE_PATH
+- Target artifact: $FEATURE_PATH/implementation_slices.md
+- Overmind CLI: $OVERMIND_CLI_FILE
+
+Required flow:
+- Load and follow the overmind-implementation-slices skill.
+- Assemble deterministic context with:
+  node $OVERMIND_CLI_FILE context implementation-slices $FEATURE_PATH
+- Use the exact gate command below when the skill tells you to validate:
+  node $OVERMIND_CLI_FILE gate implementation-slices $FEATURE_PATH
+- The model owns the gate loop; this orchestrator does not run the gate.
+EOF
+}
+
+run_implementation_slices_skill() {
+  local runtime_root="$1"
+  local models_path="$runtime_root/$MODELS_FILE"
+  local output_file="$runtime_root/$FEATURE_PATH/implementation_slices.md"
+  local guard_context=""
+  local context_rc=0
+  local model_rc=0
+  local read_only_path=""
+  local resolved_read_only_path=""
+  local file=""
+  local snapshot=""
+  local idx=0
+  local prompt_arg=""
+  local read_only_files=()
+  local snapshots=()
+
+  [[ -f "$runtime_root/$IMPLEMENTATION_SLICES_SKILL_FILE" ]] || die "Required skill not found: $IMPLEMENTATION_SLICES_SKILL_FILE"
+  [[ -f "$runtime_root/$OVERMIND_CLI_FILE" ]] || die "Required Overmind CLI not found: $OVERMIND_CLI_FILE"
+
+  set +e
+  guard_context="$(cd "$runtime_root" && node "$OVERMIND_CLI_FILE" context implementation-slices "$FEATURE_PATH")"
+  context_rc=$?
+  set -e
+  if [[ "$context_rc" -ne 0 ]]; then
+    [[ -z "$guard_context" ]] || printf '%s\n' "$guard_context" >&2
+    return "$context_rc"
+  fi
+
+  while IFS= read -r read_only_path; do
+    [[ -n "$read_only_path" ]] || continue
+    if [[ "$read_only_path" == /* ]]; then
+      resolved_read_only_path="$read_only_path"
+    else
+      resolved_read_only_path="$runtime_root/$read_only_path"
+    fi
+    [[ -f "$resolved_read_only_path" ]] || die "Implementation-slices context read-only input not found: $read_only_path"
+    read_only_files+=("$resolved_read_only_path")
+  done < <(printf '%s\n' "$guard_context" | sed -n 's/^- read_only_input: //p')
+  [[ ${#read_only_files[@]} -gt 0 ]] || die "Implementation-slices context emitted no read-only inputs."
+
+  load_model_config "$models_path" "$IMPLEMENTATION_SLICES_MODEL_PHASE"
+  if [[ "$MODEL_CMD" != "codex" ]]; then
+    die "Invalid '$IMPLEMENTATION_SLICES_MODEL_PHASE' command in $MODELS_FILE: expected 'codex', got '$MODEL_CMD'."
+  fi
+  require_command "$MODEL_CMD"
+
+  for file in "${read_only_files[@]}"; do
+    snapshot="$(mktemp)"
+    cp "$file" "$snapshot"
+    snapshots+=("$snapshot")
+  done
+
+  prompt_arg="$(build_implementation_slices_prompt "$runtime_root")"
+  local cmd=("$MODEL_CMD" -m "$MODEL_MODEL")
+  if [[ ${#MODEL_ARGS[@]} -gt 0 ]]; then
+    cmd+=("${MODEL_ARGS[@]}")
+  fi
+  cmd+=("$prompt_arg")
+
+  set +e
+  (
+    cd "$runtime_root"
+    "${cmd[@]}"
+  )
+  model_rc=$?
+  set -e
+
+  for idx in "${!read_only_files[@]}"; do
+    if ! cmp -s "${snapshots[$idx]}" "${read_only_files[$idx]}"; then
+      for snapshot in "${snapshots[@]}"; do rm -f "$snapshot"; done
+      die "Implementation-slices skill must not modify ${read_only_files[$idx]#"$runtime_root/"}; it is read-only input."
+    fi
+  done
+  for snapshot in "${snapshots[@]}"; do rm -f "$snapshot"; done
+
+  if [[ "$model_rc" -ne 0 ]]; then
+    return "$model_rc"
+  fi
+  [[ -f "$output_file" ]] || die "Implementation-slices model run did not produce required file: $FEATURE_PATH/implementation_slices.md"
+  echo "Updated $FEATURE_PATH/implementation_slices.md"
+}
+
+build_prerequisite_gaps_prompt() {
+  local runtime_root="$1"
+  cat <<EOF
+Load and follow the overmind-prerequisite-gaps skill for this feature.
+
+Runtime bindings:
+- ASDLC workspace root: $runtime_root
+- Current working directory for all commands: $runtime_root
+- Feature path: $FEATURE_PATH
+- Target artifact: $FEATURE_PATH/prerequisite_gaps.md
+- Overmind CLI: $OVERMIND_CLI_FILE
+
+Required flow:
+- Load and follow the overmind-prerequisite-gaps skill.
+- Assemble deterministic context with:
+  node $OVERMIND_CLI_FILE context prerequisite-gaps $FEATURE_PATH
+- Use the exact gate command below when the skill tells you to validate:
+  node $OVERMIND_CLI_FILE gate prerequisite-gaps $FEATURE_PATH
+- The model owns the gate loop; this orchestrator does not run the gate.
+EOF
+}
+
+run_prerequisite_gaps_skill() {
+  local runtime_root="$1"
+  local models_path="$runtime_root/$MODELS_FILE"
+  local output_file="$runtime_root/$FEATURE_PATH/prerequisite_gaps.md"
+  local guard_context=""
+  local context_rc=0
+  local sync_rc=0
+  local model_rc=0
+  local read_only_path=""
+  local resolved_read_only_path=""
+  local file=""
+  local snapshot=""
+  local idx=0
+  local prompt_arg=""
+  local read_only_files=()
+  local snapshots=()
+
+  [[ -f "$runtime_root/$PREREQUISITE_GAPS_SKILL_FILE" ]] || die "Required skill not found: $PREREQUISITE_GAPS_SKILL_FILE"
+  [[ -f "$runtime_root/$OVERMIND_CLI_FILE" ]] || die "Required Overmind CLI not found: $OVERMIND_CLI_FILE"
+
+  set +e
+  (cd "$runtime_root" && node "$OVERMIND_CLI_FILE" sync prerequisite-gaps "$FEATURE_PATH")
+  sync_rc=$?
+  set -e
+  if [[ "$sync_rc" -ne 0 ]]; then
+    echo "Execution stopped: phase 8.2 repo sync failed (exit $sync_rc)." >&2
+    return "$sync_rc"
+  fi
+
+  set +e
+  guard_context="$(cd "$runtime_root" && node "$OVERMIND_CLI_FILE" context prerequisite-gaps "$FEATURE_PATH")"
+  context_rc=$?
+  set -e
+  if [[ "$context_rc" -ne 0 ]]; then
+    [[ -z "$guard_context" ]] || printf '%s\n' "$guard_context" >&2
+    return "$context_rc"
+  fi
+
+  while IFS= read -r read_only_path; do
+    [[ -n "$read_only_path" ]] || continue
+    if [[ "$read_only_path" == /* ]]; then resolved_read_only_path="$read_only_path"; else resolved_read_only_path="$runtime_root/$read_only_path"; fi
+    [[ -f "$resolved_read_only_path" ]] || die "Prerequisite-gaps context read-only input not found: $read_only_path"
+    read_only_files+=("$resolved_read_only_path")
+  done < <(printf '%s\n' "$guard_context" | sed -n 's/^- read_only_input: //p')
+  [[ ${#read_only_files[@]} -gt 0 ]] || die "Prerequisite-gaps context emitted no read-only inputs."
+
+  load_model_config "$models_path" "$PREREQUISITE_GAPS_MODEL_PHASE"
+  if [[ "$MODEL_CMD" != "codex" ]]; then
+    die "Invalid '$PREREQUISITE_GAPS_MODEL_PHASE' command in $MODELS_FILE: expected 'codex', got '$MODEL_CMD'."
+  fi
+  require_command "$MODEL_CMD"
+
+  for file in "${read_only_files[@]}"; do snapshot="$(mktemp)"; cp "$file" "$snapshot"; snapshots+=("$snapshot"); done
+  prompt_arg="$(build_prerequisite_gaps_prompt "$runtime_root")"
+  local cmd=("$MODEL_CMD" -m "$MODEL_MODEL")
+  if [[ ${#MODEL_ARGS[@]} -gt 0 ]]; then cmd+=("${MODEL_ARGS[@]}"); fi
+  cmd+=("$prompt_arg")
+
+  set +e
+  (cd "$runtime_root" && "${cmd[@]}")
+  model_rc=$?
+  set -e
+
+  for idx in "${!read_only_files[@]}"; do
+    if ! cmp -s "${snapshots[$idx]}" "${read_only_files[$idx]}"; then
+      for snapshot in "${snapshots[@]}"; do rm -f "$snapshot"; done
+      die "Prerequisite-gaps skill must not modify ${read_only_files[$idx]#"$runtime_root/"}; it is read-only input."
+    fi
+  done
+  for snapshot in "${snapshots[@]}"; do rm -f "$snapshot"; done
+
+  if [[ "$model_rc" -ne 0 ]]; then return "$model_rc"; fi
+  [[ -f "$output_file" ]] || die "Prerequisite-gaps model run did not produce required file: $FEATURE_PATH/prerequisite_gaps.md"
+  echo "Updated $FEATURE_PATH/prerequisite_gaps.md"
+}
+
+build_implementation_plan_prompt() {
+  local runtime_root="$1"
+  cat <<EOF
+Load and follow the overmind-implementation-plan skill for this feature.
+
+Runtime bindings:
+- ASDLC workspace root: $runtime_root
+- Current working directory for all commands: $runtime_root
+- Feature path: $FEATURE_PATH
+- Target artifact: $FEATURE_PATH/implementation_plan.md
+- Overmind CLI: $OVERMIND_CLI_FILE
+
+Required flow:
+- Load and follow the overmind-implementation-plan skill.
+- Assemble deterministic context with:
+  node $OVERMIND_CLI_FILE context implementation-plan $FEATURE_PATH
+- Use the exact gate command below when the skill tells you to validate:
+  node $OVERMIND_CLI_FILE gate implementation-plan $FEATURE_PATH
+- The model owns the gate loop; this orchestrator does not run the gate.
+EOF
+}
+
+run_implementation_plan_skill() {
+  local runtime_root="$1"
+  local models_path="$runtime_root/$MODELS_FILE"
+  local output_file="$runtime_root/$FEATURE_PATH/implementation_plan.md"
+  local guard_context=""
+  local context_rc=0
+  local model_rc=0
+  local read_only_path=""
+  local resolved_read_only_path=""
+  local file=""
+  local snapshot=""
+  local idx=0
+  local prompt_arg=""
+  local read_only_files=()
+  local snapshots=()
+
+  [[ -f "$runtime_root/$IMPLEMENTATION_PLAN_SKILL_FILE" ]] || die "Required skill not found: $IMPLEMENTATION_PLAN_SKILL_FILE"
+  [[ -f "$runtime_root/$OVERMIND_CLI_FILE" ]] || die "Required Overmind CLI not found: $OVERMIND_CLI_FILE"
+
+  set +e
+  guard_context="$(cd "$runtime_root" && node "$OVERMIND_CLI_FILE" context implementation-plan "$FEATURE_PATH")"
+  context_rc=$?
+  set -e
+  if [[ "$context_rc" -ne 0 ]]; then
+    [[ -z "$guard_context" ]] || printf '%s\n' "$guard_context" >&2
+    return "$context_rc"
+  fi
+  while IFS= read -r read_only_path; do
+    [[ -n "$read_only_path" ]] || continue
+    if [[ "$read_only_path" == /* ]]; then resolved_read_only_path="$read_only_path"; else resolved_read_only_path="$runtime_root/$read_only_path"; fi
+    [[ -f "$resolved_read_only_path" ]] || die "Implementation-plan context read-only input not found: $read_only_path"
+    read_only_files+=("$resolved_read_only_path")
+  done < <(printf '%s\n' "$guard_context" | sed -n 's/^- read_only_input: //p')
+  [[ ${#read_only_files[@]} -gt 0 ]] || die "Implementation-plan context emitted no read-only inputs."
+
+  load_model_config "$models_path" "$IMPLEMENTATION_PLAN_MODEL_PHASE"
+  [[ "$MODEL_CMD" == "codex" ]] || die "Invalid '$IMPLEMENTATION_PLAN_MODEL_PHASE' command in $MODELS_FILE: expected 'codex', got '$MODEL_CMD'."
+  require_command "$MODEL_CMD"
+  for file in "${read_only_files[@]}"; do snapshot="$(mktemp)"; cp "$file" "$snapshot"; snapshots+=("$snapshot"); done
+  prompt_arg="$(build_implementation_plan_prompt "$runtime_root")"
+  local cmd=("$MODEL_CMD" -m "$MODEL_MODEL")
+  if [[ ${#MODEL_ARGS[@]} -gt 0 ]]; then cmd+=("${MODEL_ARGS[@]}"); fi
+  cmd+=("$prompt_arg")
+  set +e
+  (cd "$runtime_root" && "${cmd[@]}")
+  model_rc=$?
+  set -e
+
+  for idx in "${!read_only_files[@]}"; do
+    if ! cmp -s "${snapshots[$idx]}" "${read_only_files[$idx]}"; then
+      for snapshot in "${snapshots[@]}"; do rm -f "$snapshot"; done
+      die "Implementation-plan skill must not modify ${read_only_files[$idx]#"$runtime_root/"}; it is read-only input."
+    fi
+  done
+  for snapshot in "${snapshots[@]}"; do rm -f "$snapshot"; done
+  if [[ "$model_rc" -ne 0 ]]; then return "$model_rc"; fi
+  [[ -f "$output_file" ]] || die "Implementation-plan model run did not produce required file: $FEATURE_PATH/implementation_plan.md"
+  echo "Updated $FEATURE_PATH/implementation_plan.md"
+}
+
+build_plan_semantic_review_prompt() {
+  local runtime_root="$1"
+  cat <<EOF
+Load and follow the overmind-plan-semantic-review skill for this feature.
+
+Runtime bindings:
+- ASDLC workspace root: $runtime_root
+- Current working directory for all commands: $runtime_root
+- Feature path: $FEATURE_PATH
+- Overmind CLI: $OVERMIND_CLI_FILE
+
+Required flow:
+- Load and follow the overmind-plan-semantic-review skill.
+- Assemble deterministic context with:
+  node $OVERMIND_CLI_FILE context plan-semantic-review $FEATURE_PATH
+- Use the exact review-ledger gate command when the skill tells you to validate the review ledger:
+  node $OVERMIND_CLI_FILE gate plan-semantic-review $FEATURE_PATH
+- Use the exact implementation-plan gate command when the skill tells you to validate the plan:
+  node $OVERMIND_CLI_FILE gate implementation-plan $FEATURE_PATH
+- The model owns both gate loops; this orchestrator does not run either gate.
+EOF
+}
+
+run_plan_semantic_review_skill() {
+  local runtime_root="$1"
+  local models_path="$runtime_root/$MODELS_FILE"
+  local output_file="$runtime_root/$FEATURE_PATH/implementation_plan_semantic_review.md"
+  local guard_context=""
+  local context_rc=0
+  local model_rc=0
+  local read_only_path=""
+  local resolved_read_only_path=""
+  local file=""
+  local snapshot=""
+  local idx=0
+  local prompt_arg=""
+  local read_only_files=()
+  local snapshots=()
+
+  [[ -f "$runtime_root/$PLAN_SEMANTIC_REVIEW_SKILL_FILE" ]] || die "Required skill not found: $PLAN_SEMANTIC_REVIEW_SKILL_FILE"
+  [[ -f "$runtime_root/$OVERMIND_CLI_FILE" ]] || die "Required Overmind CLI not found: $OVERMIND_CLI_FILE"
+
+  set +e
+  guard_context="$(cd "$runtime_root" && node "$OVERMIND_CLI_FILE" context plan-semantic-review "$FEATURE_PATH")"
+  context_rc=$?
+  set -e
+  if [[ "$context_rc" -ne 0 ]]; then
+    [[ -z "$guard_context" ]] || printf '%s\n' "$guard_context" >&2
+    return "$context_rc"
+  fi
+  while IFS= read -r read_only_path; do
+    [[ -n "$read_only_path" ]] || continue
+    if [[ "$read_only_path" == /* ]]; then resolved_read_only_path="$read_only_path"; else resolved_read_only_path="$runtime_root/$read_only_path"; fi
+    [[ -f "$resolved_read_only_path" ]] || die "Plan-semantic-review context read-only input not found: $read_only_path"
+    read_only_files+=("$resolved_read_only_path")
+  done < <(printf '%s\n' "$guard_context" | sed -n 's/^- read_only_input: //p')
+  [[ ${#read_only_files[@]} -gt 0 ]] || die "Plan-semantic-review context emitted no read-only inputs."
+
+  load_model_config "$models_path" "$PLAN_SEMANTIC_REVIEW_MODEL_PHASE"
+  [[ "$MODEL_CMD" == "codex" ]] || die "Invalid '$PLAN_SEMANTIC_REVIEW_MODEL_PHASE' command in $MODELS_FILE: expected 'codex', got '$MODEL_CMD'."
+  require_command "$MODEL_CMD"
+  for file in "${read_only_files[@]}"; do snapshot="$(mktemp)"; cp "$file" "$snapshot"; snapshots+=("$snapshot"); done
+  prompt_arg="$(build_plan_semantic_review_prompt "$runtime_root")"
+  local cmd=("$MODEL_CMD" -m "$MODEL_MODEL")
+  if [[ ${#MODEL_ARGS[@]} -gt 0 ]]; then cmd+=("${MODEL_ARGS[@]}"); fi
+  cmd+=("$prompt_arg")
+
+  set +e
+  (cd "$runtime_root" && "${cmd[@]}")
+  model_rc=$?
+  set -e
+
+  for idx in "${!read_only_files[@]}"; do
+    if ! cmp -s "${snapshots[$idx]}" "${read_only_files[$idx]}"; then
+      for snapshot in "${snapshots[@]}"; do rm -f "$snapshot"; done
+      die "Plan-semantic-review skill must not modify ${read_only_files[$idx]#"$runtime_root/"}; it is read-only input."
+    fi
+  done
+  for snapshot in "${snapshots[@]}"; do rm -f "$snapshot"; done
+
+  if [[ "$model_rc" -ne 0 ]]; then return "$model_rc"; fi
+  [[ -f "$output_file" ]] || die "Plan-semantic-review model run did not produce required file: $FEATURE_PATH/implementation_plan_semantic_review.md"
+  echo "Updated $FEATURE_PATH/implementation_plan_semantic_review.md"
+}
+
 print_restart_guidance() {
   local phase_id="$1"
   local script_name="$2"
@@ -727,44 +2026,29 @@ phase_scripts() {
       printf '%s\n' "feature_br_scaffold.sh"
       ;;
     4.1)
-      if has_ready_class_repo_paths "$RUNTIME_ROOT/$PROJECT_PATH/init_progress_definition.yaml"; then
-        printf '%s\n' "feature_scan_repo_for_br.sh" "feature_task_to_br.sh"
-      else
-        printf '%s\n' "feature_task_to_br.sh"
-      fi
       ;;
+
     4.2)
-      printf '%s\n' "feature_user_br_clarification.sh" "feature_br_check_ears_readiness.sh"
       ;;
     5)
-      printf '%s\n' "feature_br_to_ears.sh"
       ;;
     5.1)
-      printf '%s\n' "feature_requirements_ears_review.sh"
       ;;
     6)
-      printf '%s\n' "feature_contract_delta.sh"
       ;;
     7)
-      printf '%s\n' "feature_repo_surface_and_exec_context.sh"
       ;;
     7.1)
-      printf '%s\n' "feature_surface_map_mcp_placeholder_enrichment.sh"
       ;;
     8)
-      printf '%s\n' "feature_technical_requirements.sh"
       ;;
     8.1)
-      printf '%s\n' "feature_implementation_slices.sh"
       ;;
     8.2)
-      printf '%s\n' "feature_prerequisite_gaps.sh"
       ;;
     8.3)
-      printf '%s\n' "feature_implementation_plan.sh"
       ;;
     8.4)
-      printf '%s\n' "feature_implementation_plan_semantic_review.sh"
       ;;
     *)
       return 1
@@ -918,6 +2202,52 @@ format_class_list() {
   printf '%s' "$output"
 }
 
+select_phase7_pending_class() {
+  local count=${#PHASE7_PENDING_REPO_CLASSES[@]}
+  local class_selection=""
+  local normalized_selection=""
+  local idx=0
+
+  if [[ "$count" -eq 0 ]]; then
+    echo "No pending classes to analyze." >&2
+    return 1
+  fi
+
+  if [[ "$count" -eq 1 ]]; then
+    printf '%s' "${PHASE7_PENDING_REPO_CLASSES[0]}"
+    return 0
+  fi
+
+  echo "Pending classes available to analyze:" >&2
+  for idx in "${!PHASE7_PENDING_REPO_CLASSES[@]}"; do
+    echo "  $((idx + 1)). ${PHASE7_PENDING_REPO_CLASSES[$idx]}" >&2
+  done
+  printf 'Select a class to analyze now (number or class name): ' >&2
+
+  if ! IFS= read -r class_selection; then
+    echo "Execution stopped: user input stream closed during class selection." >&2
+    return 1
+  fi
+  normalized_selection="$(to_lower "$(trim_value "$class_selection")")"
+
+  if [[ "$normalized_selection" =~ ^[0-9]+$ ]]; then
+    idx=$((normalized_selection - 1))
+    if (( idx >= 0 && idx < count )); then
+      printf '%s' "${PHASE7_PENDING_REPO_CLASSES[$idx]}"
+      return 0
+    fi
+  fi
+  for idx in "${!PHASE7_PENDING_REPO_CLASSES[@]}"; do
+    if [[ "${PHASE7_PENDING_REPO_CLASSES[$idx]}" == "$normalized_selection" ]]; then
+      printf '%s' "${PHASE7_PENDING_REPO_CLASSES[$idx]}"
+      return 0
+    fi
+  done
+
+  echo "Invalid class selection: $class_selection" >&2
+  return 1
+}
+
 run_phase7_loop() {
   local runtime_root="$1"
   local selection=""
@@ -933,11 +2263,20 @@ run_phase7_loop() {
     echo "Phase 7 class loop status for feature: $FEATURE_PATH"
     echo "Already picked/completed classes: $completed_list"
     echo "Pending classes: $pending_list"
+    local has_pending=0
+    [[ ${#PHASE7_PENDING_REPO_CLASSES[@]} -gt 0 ]] && has_pending=1
+
     echo "Phase 7 options:"
-    echo "  1) Analyze one class now"
+    if [[ "$has_pending" -eq 1 ]]; then
+      echo "  1) Analyze one class now"
+    fi
     echo "  2) Refresh class status"
     echo "  3) contract delta finished lets move forward"
-    printf 'Choose [1/2/3]: ' >&2
+    if [[ "$has_pending" -eq 1 ]]; then
+      printf 'Choose [1/2/3]: ' >&2
+    else
+      printf 'Choose [2/3]: ' >&2
+    fi
 
     if ! IFS= read -r selection; then
       echo "Execution stopped: user input stream closed during phase 7 loop."
@@ -947,12 +2286,17 @@ run_phase7_loop() {
     normalized="$(to_lower "$(trim_value "$selection")")"
     case "$normalized" in
       1)
+        local selected_class=""
+        if ! selected_class="$(select_phase7_pending_class)"; then
+          continue
+        fi
+        echo "Starting surface-map Codex session for class $selected_class."
         set +e
-        run_feature_script "$runtime_root" "feature_repo_surface_and_exec_context.sh"
+        run_surface_map_skill "$runtime_root" "$selected_class"
         script_rc=$?
         set -e
         if [[ "$script_rc" -ne 0 ]]; then
-          print_restart_guidance "7" "feature_repo_surface_and_exec_context.sh" "$script_rc"
+          print_restart_guidance "7" "overmind-surface-map skill ($selected_class)" "$script_rc"
           return "$PHASE_EXECUTION_FAILED_RC"
         fi
         ;;
@@ -1436,10 +2780,10 @@ run_scanner_and_get_next_step() {
   [[ -x "$scanner_path" ]] || die "Required script not found or not executable: .commands/init_progress_scanner.sh"
 
   scanner_output="$("$scanner_path" --path "$FEATURE_PATH")"
-  printf '%s\n' "$scanner_output" >&2
+  printf '%s\n' "$scanner_output"
 
   parsed_value="$(parse_scanner_next_step_line "$scanner_output")" || die "Unable to parse scanner output: missing canonical 'next step:' line."
-  printf '%s' "$parsed_value"
+  SCANNER_NEXT_STEP_INFO="$parsed_value"
 }
 
 map_scanner_step_to_phase() {
@@ -1528,14 +2872,312 @@ run_phase_by_index() {
     return $?
   fi
 
-  if [[ "$phase_id" == "4.1" ]] && ! has_ready_class_repo_paths "$runtime_root/$PROJECT_PATH/init_progress_definition.yaml"; then
-    echo "Skipping repo scan in phase 4.1: no class_repo_paths entries have state ready."
-  fi
-
   while IFS= read -r script_name; do
     scripts+=("$script_name")
   done < <(phase_scripts "$phase_id")
   total="${#scripts[@]}"
+  if [[ "$phase_id" == "4.1" ]]; then
+    if has_ready_class_repo_paths "$RUNTIME_ROOT/$PROJECT_PATH/init_progress_definition.yaml"; then
+      echo "Starting repo-br-scan Codex session for $FEATURE_PATH."
+      set +e
+      run_repo_br_scan_skill "$runtime_root"
+      script_rc=$?
+      set -e
+      if [[ "$script_rc" -ne 0 ]]; then
+        echo "Execution stopped: phase 4.1 failed while running overmind-repo-br-scan skill (exit $script_rc)." >&2
+        echo "Fix the error above and restart the orchestrator. It will continue from the correct step:" >&2
+        echo "  .commands/$SCRIPT_BASENAME --path $PROJECT_PATH --resume 4.1" >&2
+        return "$PHASE_EXECUTION_FAILED_RC"
+      fi
+    else
+      echo "Skipping repo scan in phase 4.1: no class_repo_paths entries have state ready."
+    fi
+    echo "Starting task-to-BR Codex session for $FEATURE_PATH."
+    set +e
+    run_task_to_br_skill "$runtime_root"
+    script_rc=$?
+    set -e
+    if [[ "$script_rc" -ne 0 ]]; then
+      echo "Execution stopped: phase 4.1 failed while running overmind-task-to-br skill (exit $script_rc)." >&2
+      echo "Fix the error above and restart the orchestrator. It will continue from the correct step:" >&2
+      echo "  .commands/$SCRIPT_BASENAME --path $PROJECT_PATH --resume 4.1" >&2
+      return "$PHASE_EXECUTION_FAILED_RC"
+    fi
+    return 0
+  fi
+  if [[ "$phase_id" == "4.2" ]]; then
+    command_text="overmind-br-clarification skill for $FEATURE_PATH; then node $OVERMIND_CLI_FILE readiness br-clarification $FEATURE_PATH"
+    if ! confirm_start "$phase_id" "1" "1" "$command_text"; then
+      local decision_status=$?
+      if [[ "$decision_status" -eq 2 ]]; then
+        echo "Execution stopped: user input stream closed during confirmation at $phase_id."
+        return 20
+      fi
+      echo "Execution stopped: user denied phase progression at $phase_id."
+      return 20
+    fi
+
+    echo "Starting BR-clarification Codex session for $FEATURE_PATH."
+    set +e
+    run_br_clarification_skill "$runtime_root"
+    script_rc=$?
+    set -e
+    if [[ "$script_rc" -ne 0 ]]; then
+      echo "Execution stopped: phase 4.2 failed while running overmind-br-clarification skill (exit $script_rc)." >&2
+      echo "Fix the error above and restart the orchestrator. It will continue from the correct step:" >&2
+      echo "  .commands/$SCRIPT_BASENAME --path $PROJECT_PATH --resume 4.2" >&2
+      return "$PHASE_EXECUTION_FAILED_RC"
+    fi
+
+    set +e
+    run_br_clarification_readiness "$runtime_root"
+    script_rc=$?
+    set -e
+    if [[ "$script_rc" -ne 0 ]]; then
+      echo "Execution stopped: phase 4.2 failed while running readiness br-clarification (exit $script_rc)." >&2
+      echo "Fix the error above and restart the orchestrator. It will continue from the correct step:" >&2
+      echo "  .commands/$SCRIPT_BASENAME --path $PROJECT_PATH --resume 4.2" >&2
+      return "$PHASE_EXECUTION_FAILED_RC"
+    fi
+    return 0
+  fi
+  if [[ "$phase_id" == "5" ]]; then
+    command_text="overmind-requirements-ears skill for $FEATURE_PATH"
+    if ! confirm_start "$phase_id" "1" "1" "$command_text"; then
+      local decision_status=$?
+      if [[ "$decision_status" -eq 2 ]]; then
+        echo "Execution stopped: user input stream closed during confirmation at $phase_id."
+        return 20
+      fi
+      echo "Execution stopped: user denied phase progression at $phase_id."
+      return 20
+    fi
+
+    echo "Starting requirements-EARS Codex session for $FEATURE_PATH."
+    set +e
+    run_requirements_ears_skill "$runtime_root"
+    script_rc=$?
+    set -e
+    if [[ "$script_rc" -ne 0 ]]; then
+      echo "Execution stopped: phase 5 failed while running overmind-requirements-ears skill (exit $script_rc)." >&2
+      echo "Fix the error above and restart the orchestrator. It will continue from the correct step:" >&2
+      echo "  .commands/$SCRIPT_BASENAME --path $PROJECT_PATH --resume 5" >&2
+      return "$PHASE_EXECUTION_FAILED_RC"
+    fi
+    return 0
+  fi
+  if [[ "$phase_id" == "5.1" ]]; then
+    command_text="overmind-ears-review skill for $FEATURE_PATH"
+    if ! confirm_start "$phase_id" "1" "1" "$command_text"; then
+      local decision_status=$?
+      if [[ "$decision_status" -eq 2 ]]; then
+        echo "Execution stopped: user input stream closed during confirmation at $phase_id."
+        return 20
+      fi
+      echo "Optional phase declined at $phase_id; skipping."
+      if has_later_required_phase "$phase_idx"; then
+        return 10
+      fi
+      echo "Execution finished: no remaining required phases after declined optional phase $phase_id."
+      return 30
+    fi
+
+    echo "Starting EARS-review Codex session for $FEATURE_PATH."
+    set +e
+    run_ears_review_skill "$runtime_root"
+    script_rc=$?
+    set -e
+    if [[ "$script_rc" -ne 0 ]]; then
+      echo "Execution stopped: phase 5.1 failed while running overmind-ears-review skill (exit $script_rc)." >&2
+      echo "Fix the error above and restart the orchestrator. It will continue from the correct step:" >&2
+      echo "  .commands/$SCRIPT_BASENAME --path $PROJECT_PATH --resume 5.1" >&2
+      return "$PHASE_EXECUTION_FAILED_RC"
+    fi
+    return 0
+  fi
+  if [[ "$phase_id" == "6" ]]; then
+    command_text="overmind-contract-delta skill for $FEATURE_PATH"
+    if ! confirm_start "$phase_id" "1" "1" "$command_text"; then
+      local decision_status=$?
+      if [[ "$decision_status" -eq 2 ]]; then
+        echo "Execution stopped: user input stream closed during confirmation at $phase_id."
+        return 20
+      fi
+      echo "Execution stopped: user denied phase progression at $phase_id."
+      return 20
+    fi
+
+    echo "Starting contract-delta Codex session for $FEATURE_PATH."
+    set +e
+    run_contract_delta_skill "$runtime_root"
+    script_rc=$?
+    set -e
+    if [[ "$script_rc" -ne 0 ]]; then
+      echo "Execution stopped: phase 6 failed while running overmind-contract-delta skill (exit $script_rc)." >&2
+      echo "Fix the error above and restart the orchestrator. It will continue from the correct step:" >&2
+      echo "  .commands/$SCRIPT_BASENAME --path $PROJECT_PATH --resume 6" >&2
+      return "$PHASE_EXECUTION_FAILED_RC"
+    fi
+    return 0
+  fi
+  if [[ "$phase_id" == "7.1" ]]; then
+    command_text="overmind-surface-map-enrich skill for $FEATURE_PATH"
+    if ! confirm_start "$phase_id" "1" "1" "$command_text"; then
+      local decision_status=$?
+      if [[ "$decision_status" -eq 2 ]]; then
+        echo "Execution stopped: user input stream closed during confirmation at $phase_id."
+        return 20
+      fi
+      echo "Optional phase declined at $phase_id; skipping."
+      if has_later_required_phase "$phase_idx"; then
+        return 10
+      fi
+      echo "Execution finished: no remaining required phases after declined optional phase $phase_id."
+      return 30
+    fi
+
+    echo "Starting surface-map-enrich Codex session for $FEATURE_PATH."
+    set +e
+    run_surface_map_enrich_skill "$runtime_root"
+    script_rc=$?
+    set -e
+    if [[ "$script_rc" -ne 0 ]]; then
+      echo "Execution stopped: phase 7.1 failed while running overmind-surface-map-enrich skill (exit $script_rc)." >&2
+      echo "Fix the error above and restart the orchestrator. It will continue from the correct step:" >&2
+      echo "  .commands/$SCRIPT_BASENAME --path $PROJECT_PATH --resume 7.1" >&2
+      return "$PHASE_EXECUTION_FAILED_RC"
+    fi
+    return 0
+  fi
+  if [[ "$phase_id" == "8" ]]; then
+    command_text="overmind-technical-requirements skill for $FEATURE_PATH"
+    if ! confirm_start "$phase_id" "1" "1" "$command_text"; then
+      local decision_status=$?
+      if [[ "$decision_status" -eq 2 ]]; then
+        echo "Execution stopped: user input stream closed during confirmation at $phase_id."
+        return 20
+      fi
+      echo "Execution stopped: user denied phase progression at $phase_id."
+      return 20
+    fi
+
+    echo "Starting technical-requirements Codex session for $FEATURE_PATH."
+    set +e
+    run_technical_requirements_skill "$runtime_root"
+    script_rc=$?
+    set -e
+    if [[ "$script_rc" -ne 0 ]]; then
+      echo "Execution stopped: phase 8 failed while running overmind-technical-requirements skill (exit $script_rc)." >&2
+      echo "Fix the error above and restart the orchestrator. It will continue from the correct step:" >&2
+      echo "  .commands/$SCRIPT_BASENAME --path $PROJECT_PATH --resume 8" >&2
+      return "$PHASE_EXECUTION_FAILED_RC"
+    fi
+    return 0
+  fi
+  if [[ "$phase_id" == "8.1" ]]; then
+    command_text="overmind-implementation-slices skill for $FEATURE_PATH"
+    if ! confirm_start "$phase_id" "1" "1" "$command_text"; then
+      local decision_status=$?
+      if [[ "$decision_status" -eq 2 ]]; then
+        echo "Execution stopped: user input stream closed during confirmation at $phase_id."
+        return 20
+      fi
+      echo "Execution stopped: user denied phase progression at $phase_id."
+      return 20
+    fi
+
+    echo "Starting implementation-slices Codex session for $FEATURE_PATH."
+    set +e
+    run_implementation_slices_skill "$runtime_root"
+    script_rc=$?
+    set -e
+    if [[ "$script_rc" -ne 0 ]]; then
+      echo "Execution stopped: phase 8.1 failed while running overmind-implementation-slices skill (exit $script_rc)." >&2
+      echo "Fix the error above and restart the orchestrator. It will continue from the correct step:" >&2
+      echo "  .commands/$SCRIPT_BASENAME --path $PROJECT_PATH --resume 8.1" >&2
+      return "$PHASE_EXECUTION_FAILED_RC"
+    fi
+    return 0
+  fi
+  if [[ "$phase_id" == "8.2" ]]; then
+    command_text="overmind-prerequisite-gaps skill for $FEATURE_PATH"
+    if ! confirm_start "$phase_id" "1" "1" "$command_text"; then
+      local decision_status=$?
+      if [[ "$decision_status" -eq 2 ]]; then
+        echo "Execution stopped: user input stream closed during confirmation at $phase_id."
+        return 20
+      fi
+      echo "Execution stopped: user denied phase progression at $phase_id."
+      return 20
+    fi
+
+    echo "Starting prerequisite-gaps Codex session for $FEATURE_PATH."
+    set +e
+    run_prerequisite_gaps_skill "$runtime_root"
+    script_rc=$?
+    set -e
+    if [[ "$script_rc" -ne 0 ]]; then
+      echo "Execution stopped: phase 8.2 failed while running overmind-prerequisite-gaps skill (exit $script_rc)." >&2
+      echo "Fix the error above and restart the orchestrator. It will continue from the correct step:" >&2
+      echo "  .commands/$SCRIPT_BASENAME --path $PROJECT_PATH --resume 8.2" >&2
+      return "$PHASE_EXECUTION_FAILED_RC"
+    fi
+    return 0
+  fi
+  if [[ "$phase_id" == "8.3" ]]; then
+    command_text="overmind-implementation-plan skill for $FEATURE_PATH"
+    if ! confirm_start "$phase_id" "1" "1" "$command_text"; then
+      local decision_status=$?
+      if [[ "$decision_status" -eq 2 ]]; then
+        echo "Execution stopped: user input stream closed during confirmation at $phase_id."
+        return 20
+      fi
+      echo "Execution stopped: user denied phase progression at $phase_id."
+      return 20
+    fi
+    echo "Starting implementation-plan Codex session for $FEATURE_PATH."
+    set +e
+    run_implementation_plan_skill "$runtime_root"
+    script_rc=$?
+    set -e
+    if [[ "$script_rc" -ne 0 ]]; then
+      echo "Execution stopped: phase 8.3 failed while running overmind-implementation-plan skill (exit $script_rc)." >&2
+      echo "Fix the error above and restart the orchestrator. It will continue from the correct step:" >&2
+      echo "  .commands/$SCRIPT_BASENAME --path $PROJECT_PATH --resume 8.3" >&2
+      return "$PHASE_EXECUTION_FAILED_RC"
+    fi
+    return 0
+  fi
+  if [[ "$phase_id" == "8.4" ]]; then
+    command_text="overmind-plan-semantic-review skill for $FEATURE_PATH"
+    local decision_status=0
+    set +e
+    confirm_start "$phase_id" "1" "1" "$command_text"
+    decision_status=$?
+    set -e
+    if [[ "$decision_status" -ne 0 ]]; then
+      if [[ "$decision_status" -eq 2 ]]; then
+        echo "Execution stopped: user input stream closed during confirmation at $phase_id."
+        return 20
+      fi
+      echo "Optional phase declined at $phase_id; skipping."
+      echo "Execution finished: no remaining required phases after declined optional phase $phase_id."
+      return 30
+    fi
+
+    echo "Starting plan-semantic-review Codex session for $FEATURE_PATH."
+    set +e
+    run_plan_semantic_review_skill "$runtime_root"
+    script_rc=$?
+    set -e
+    if [[ "$script_rc" -ne 0 ]]; then
+      echo "Execution stopped: phase 8.4 failed while running overmind-plan-semantic-review skill (exit $script_rc)." >&2
+      echo "Fix the error above and restart the orchestrator. It will continue from the correct step:" >&2
+      echo "  .commands/$SCRIPT_BASENAME --path $PROJECT_PATH --resume 8.4" >&2
+      return "$PHASE_EXECUTION_FAILED_RC"
+    fi
+    return 0
+  fi
   [[ "$total" -gt 0 ]] || die "No scripts configured for phase $phase_id"
 
   for script_name in "${scripts[@]}"; do
@@ -1694,6 +3336,9 @@ main() {
             ;;
         esac
       done
+    elif [[ "$requested_phase" == "8.4" && "$CACHED_FEATURE_PATH_STATE" == "valid" ]]; then
+      FEATURE_PATH="$CACHED_FEATURE_PATH"
+      echo "Resuming optional phase 8.4 for completed cached feature: $FEATURE_PATH"
     elif [[ -n "$requested_phase" && "$requested_phase" != "3" ]]; then
       die "No unfinished feature context for this project. Run without --resume or use --resume 3 first."
     else
@@ -1705,10 +3350,8 @@ main() {
     local phase3_index=""
     phase3_index="$(phase_index "3")"
 
-    set +e
-    run_phase_by_index "$RUNTIME_ROOT" "$phase3_index"
-    local phase3_rc=$?
-    set -e
+    local phase3_rc=0
+    run_phase_by_index "$RUNTIME_ROOT" "$phase3_index" || phase3_rc=$?
 
     case "$phase3_rc" in
       0)
@@ -1736,7 +3379,8 @@ main() {
   local scanner_number=""
   local scanner_name=""
 
-  scanner_step_info="$(run_scanner_and_get_next_step "$RUNTIME_ROOT")"
+  run_scanner_and_get_next_step "$RUNTIME_ROOT"
+  scanner_step_info="$SCANNER_NEXT_STEP_INFO"
   if [[ "$scanner_step_info" != "none" ]]; then
     scanner_number="${scanner_step_info%%|*}"
     scanner_name="${scanner_step_info#*|}"
@@ -1777,10 +3421,8 @@ main() {
         ;;
     esac
 
-    set +e
-    run_phase_by_index "$RUNTIME_ROOT" "$idx"
-    local phase_rc=$?
-    set -e
+    local phase_rc=0
+    run_phase_by_index "$RUNTIME_ROOT" "$idx" || phase_rc=$?
 
     if [[ "${PHASE_IDS[$idx]}" == "8.4" && ( "$phase_rc" -eq 0 || "$phase_rc" -eq 30 ) ]]; then
       commit_feature_progress "after step 8.4 (semantic review)"

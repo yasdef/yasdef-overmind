@@ -1,5 +1,7 @@
 # Requirements (EARS) - Overmind VS Code Extension
 
+> **Partially superseded (2026-07-03).** This document predates the e2e orchestrator migration: every `.commands/*.sh` launching surface it requires (notably Requirement 7 and Requirement 9 verification) is replaced by `overmind` CLI verbs / in-process coordinator core. Before implementing, consult the mapping in `design_docs/e2e_orchestrator_migration/03_target_architecture.md ### Supersession of the extension design docs`. Full revision of this document is scheduled in `design_docs/e2e_orchestrator_migration/04_migration_plan.md ## Slice 5 — Cleanup + extension enablement`.
+
 System name: Overmind VS Code Extension
 Scope: Local VS Code extension that provides BA/PO operators with a dashboard and guided controls for an ASDLC workspace. The ASDLC filesystem remains the source of truth.
 
@@ -26,8 +28,9 @@ Scope: Local VS Code extension that provides BA/PO operators with a dashboard an
 ## Assumptions
 - Operators have VS Code installed or can install it.
 - The ASDLC workspace is available on the local filesystem or through VS Code Remote WSL.
-- Existing Overmind scripts remain the authoritative implementation of workflow actions.
+- Existing Overmind scripts and shared core primitives remain the authoritative implementation of workflow actions.
 - Version 1 is read-only and must not mutate ASDLC files.
+- Future guided task-to-BR capture forms will call the shared Overmind core capture primitive instead of duplicating `user_br_input.md` file-writing rules in the Webview. Jira capture records a ticket marker; the task skill/context step remains responsible for MCP fetch and persistence of fetched story text.
 
 ---
 
@@ -135,11 +138,25 @@ Scope: Local VS Code extension that provides BA/PO operators with a dashboard an
 **User Story:** As a maintainer, I want the extension to avoid duplicating Overmind workflow rules, so that behavior stays consistent with the ASDLC scripts.
 
 **Acceptance Criteria (EARS):**
-- THE Overmind VS Code Extension SHALL treat ASDLC files and Overmind scripts as the source of truth.
+- THE Overmind VS Code Extension SHALL treat ASDLC files, Overmind scripts, and shared core primitives as the source of truth.
 - THE Overmind VS Code Extension SHALL NOT persist authoritative project, feature, or readiness state outside the ASDLC workspace.
 - WHEN the extension needs durable configuration, THE Overmind VS Code Extension SHALL store only extension preferences, not workflow state.
 
 **Verification:** Code review confirms workflow mutation paths call ASDLC scripts or documented ASDLC file contracts.
+
+---
+
+### Requirement 10 - Task-To-BR Input Capture Form
+**User Story:** As a BA/PO operator, I want to capture story input for task-to-BR through a guided UI, so that I do not need to manually create `user_br_input.md`.
+
+**Acceptance Criteria (EARS):**
+- WHEN the operator starts task-to-BR capture for a feature, THE Overmind VS Code Extension SHALL let the operator choose exactly one source: a local `.txt`/`.md` story file inside the feature folder or a Jira ticket identifier.
+- WHEN the operator submits a local story file or Jira ticket, THE Overmind VS Code Extension SHALL call the shared Overmind core capture primitive for `task-to-br` and SHALL NOT duplicate `user_br_input.md` rendering logic in Webview code.
+- WHEN the operator submits a Jira ticket, THE Overmind VS Code Extension SHALL treat capture as ticket-marker persistence and SHALL leave Jira story fetch/persistence to the shared task-to-BR skill/context flow.
+- WHEN capture succeeds, THE Overmind VS Code Extension SHALL refresh the feature dashboard and show `user_br_input.md` as present.
+- IF capture fails validation, THEN THE Overmind VS Code Extension SHALL show the core error without mutating unrelated artifacts.
+
+**Verification:** Extension action tests verify form validation and mocked calls into the shared core capture API for local-file and Jira capture.
 
 ---
 

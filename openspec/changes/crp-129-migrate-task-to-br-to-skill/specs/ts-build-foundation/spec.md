@@ -2,7 +2,7 @@
 
 ### Requirement: TypeScript npm-workspaces monorepo
 
-The repository SHALL provide a single npm-workspaces monorepo whose root `package.json` declares workspaces for `packages/asdlc-coordinator`, `packages/installer`, and `packages/vscode-extension`, plus a top-level `skills/` directory holding canonical skill sources. TypeScript SHALL be the implementation language; no new `.sh` files SHALL be introduced.
+The repository SHALL provide a single npm-workspaces monorepo whose root `package.json` declares workspaces for `packages/asdlc-coordinator`, `packages/installer`, and `packages/vscode-extension`. Canonical skill sources SHALL live under `packages/installer/_data/skills/` as installer package data (matching the yasdef worker's `_data/skills/`). TypeScript SHALL be the implementation language; no new `.sh` files SHALL be introduced.
 
 #### Scenario: Install resolves the workspace graph
 
@@ -12,16 +12,16 @@ The repository SHALL provide a single npm-workspaces monorepo whose root `packag
 #### Scenario: No bash is added by the foundation
 
 - **WHEN** the foundation is created
-- **THEN** every new source file is `.ts` or `.md` (with `.yaml`/`.json` permitted for data/config) and no new `.sh` file exists under `packages/` or `skills/`
+- **THEN** every new source file is `.ts` or `.md` (with `.yaml`/`.json` permitted for data/config) and no new `.sh` file exists under `packages/` (which includes the skill sources at `packages/installer/_data/skills/`)
 
 ### Requirement: asdlc-coordinator package layout
 
-The `asdlc-coordinator` package SHALL expose `parse/`, `validate/`, `readiness/`, and `types/` modules and a `bin/overmind-gate` executable entrypoint.
+The `asdlc-coordinator` package SHALL expose `parse/`, `validate/`, `context/`, `readiness/`, and `types/` modules and a single `bin/overmind` executable entrypoint with `gate` and `context` subcommands.
 
 #### Scenario: Package surface is present
 
 - **WHEN** the `asdlc-coordinator` package is built
-- **THEN** the `parse/`, `validate/`, `readiness/`, and `types/` modules resolve and the `overmind-gate` binary is runnable
+- **THEN** the `parse/`, `validate/`, `context/`, `readiness/`, and `types/` modules resolve and the `overmind` binary (`gate` and `context` subcommands) is runnable
 
 ### Requirement: TypeScript test runner
 
@@ -36,16 +36,16 @@ The monorepo SHALL provide a single test command at the repository root that exe
 
 Shipped artifacts SHALL bundle `asdlc-coordinator` so they run without relying on a workspace symlink or `node_modules` resolution at runtime.
 
-#### Scenario: Gate CLI bundle is standalone
+#### Scenario: CLI bundle is standalone
 
-- **WHEN** the build produces the installable `overmind-gate.js`
+- **WHEN** the build produces the installable `overmind.js`
 - **THEN** `asdlc-coordinator` code is bundled into that single file and it executes on plain Node without a separate dependency install
 
 ### Requirement: Minimal project install (`overmind init`)
 
-The `installer` package SHALL provide a minimal `overmind init` that installs the bundled gate to `<project>/.overmind/overmind-gate.js` and installs a skill into `<project>/.claude/skills/<skill>/`. This is the mechanism by which skills and the gate reach a runtime project. Broader fan-out to `.codex/.github/.agents` and update/version handling are out of scope for this change.
+The `installer` package SHALL provide a minimal `overmind init` that installs the bundled `overmind` CLI to `<project>/.overmind/overmind.js` and installs a skill into `<project>/.claude/skills/<skill>/`. This is the mechanism by which skills and the CLI reach a runtime project. Broader fan-out to `.codex/.github/.agents` and update/version handling are out of scope for this change.
 
-#### Scenario: init provisions the gate and the skill
+#### Scenario: init provisions the CLI and the skill
 
 - **WHEN** `overmind init` runs in a project
-- **THEN** `<project>/.overmind/overmind-gate.js` exists, `<project>/.claude/skills/overmind-task-to-br/SKILL.md` exists, and the skill can invoke the gate at `.overmind/overmind-gate.js`
+- **THEN** `<project>/.overmind/overmind.js` exists, `<project>/.claude/skills/overmind-task-to-br/SKILL.md` exists, and the skill can invoke the CLI at `.overmind/overmind.js`
