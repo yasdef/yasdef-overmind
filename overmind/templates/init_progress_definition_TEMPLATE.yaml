@@ -80,6 +80,7 @@ steps:
       - condition: "For project type A, when at least one in-project cross-class peer exists for the backend (another active backend, an active frontend, or an active mobile class), common_contract_definition.md reflects each active backend blueprint's Cross-Class Transport/Contract Approach verbatim; concrete values mirror as concrete values, the literal placeholder mirrors as the placeholder, and per-backend ownership is recorded by service_name or repo_name when more than one active backend exists."
       - condition: "For project type A, placeholder carry-through in Cross-Class Transport/Contract Approach does not block Create Cross-Repository Contract Definition For This Project."
       - condition: "For project type A with no in-project cross-class peer (lone backend or no active backend) and for project types B and C, common_contract_definition.md writes no Cross-Class Transport/Contract Approach mirror entries."
+      - condition: "On successful completion, the project git repository has a clean committed initialization baseline containing init_progress_definition.yaml, common_contract_definition.md, and every applicable project_stack_blueprint_<class>.md."
 
   - step_number: 3
     phase_name: "feature"

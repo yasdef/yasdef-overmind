@@ -4,16 +4,20 @@ set -euo pipefail
 
 SCRIPT_BASENAME="$(basename "${BASH_SOURCE[0]}")"
 PROJECT_PATH_INPUT=""
+TARGET_CLASSES=()
 PROJECT_ROOT=""
 PROJECT_DEFINITION_FILE="init_progress_definition.yaml"
 PROJECT_OUTPUT_FILE="common_contract_definition.md"
 MODELS_FILE=".setup/models.md"
+RULE_FILE=".rules/project_contract_reconciliation_rule.md"
+QUALITY_GATE_HELPER=".helper/check_common_contract_definition_quality.sh"
 MODEL_PHASE="project_contract_reconciliation"
 MODEL_CMD=""
 MODEL_MODEL=""
 MODEL_ARGS=()
 READY_REPO_PATHS=()
 READY_REPO_CONTEXT_LINES=()
+OUT_OF_SCOPE_CLASS_CONTEXT_LINES=()
 
 die() {
   echo "ERROR: $*" >&2
@@ -92,6 +96,11 @@ parse_args() {
       [[ $# -gt 0 ]] || die "Missing value for --path."
       PROJECT_PATH_INPUT="$(normalize_project_path "$1")"
       ;;
+    --class)
+      shift
+      [[ $# -gt 0 ]] || die "Missing value for --class."
+      TARGET_CLASSES+=("$(printf '%s' "$(trim_value "$1")" | tr '[:upper:]' '[:lower:]')")
+      ;;
     *)
       die "Unknown argument: $1"
       ;;
@@ -100,6 +109,7 @@ parse_args() {
   done
 
   [[ -n "$PROJECT_PATH_INPUT" ]] || die "Missing required argument: --path <asdlc/projects/<project-id>>."
+  [[ "${#TARGET_CLASSES[@]}" -gt 0 ]] || die "Missing required argument: --class <class> (repeatable)."
 }
 
 source_class_repo_paths_lib() {
@@ -153,6 +163,8 @@ ensure_required_files() {
     "$PROJECT_ROOT/$PROJECT_DEFINITION_FILE"
     "$PROJECT_ROOT/$PROJECT_OUTPUT_FILE"
     "$MODELS_FILE"
+    "$RULE_FILE"
+    "$QUALITY_GATE_HELPER"
   )
   local relative_path=""
 
@@ -163,11 +175,10 @@ ensure_required_files() {
   done
 }
 
-collect_ready_repo_paths() {
+collect_target_repo_paths() {
   local definition_path="$1"
-  local parsed_entries=""
-  local entry=""
   local class_name=""
+  local entry=""
   local class_state=""
   local class_path=""
   local normalized_state=""
@@ -177,18 +188,17 @@ collect_ready_repo_paths() {
   READY_REPO_PATHS=()
   READY_REPO_CONTEXT_LINES=()
 
-  if ! parsed_entries="$(class_repo_paths_extract_entries "$definition_path" 2>/dev/null)"; then
-    die "Failed to read meta_info.class_repo_paths from $definition_path."
-  fi
-
-  while IFS= read -r entry; do
-    [[ -n "$entry" ]] || continue
-    IFS='|' read -r class_name class_state class_path <<<"$entry"
-    class_name="$(trim_value "$class_name")"
+  for class_name in "${TARGET_CLASSES[@]}"; do
+    if ! entry="$(class_repo_paths_find_entry "$definition_path" "$class_name" 2>/dev/null)"; then
+      die "Target class '$class_name' not found in meta_info.class_repo_paths: $definition_path"
+    fi
+    IFS='|' read -r class_state class_path <<<"$entry"
     normalized_state="$(printf '%s' "$(trim_value "$class_state")" | tr '[:upper:]' '[:lower:]')"
     normalized_path="$(strip_quotes "$class_path")"
-    [[ -n "$class_name" && "$normalized_state" == "ready" ]] || continue
 
+    if [[ "$normalized_state" != "ready" ]]; then
+      die "Target class '$class_name' is not ready (state: '$normalized_state'); cannot reconcile."
+    fi
     if [[ -z "$normalized_path" ]]; then
       die "Repo path for class '$class_name' is marked ready but path is empty in $definition_path."
     fi
@@ -201,15 +211,40 @@ collect_ready_repo_paths() {
     if ! resolved_path="$(cd "$normalized_path" && pwd -P)"; then
       die "Failed to resolve repo path for class '$class_name': $normalized_path"
     fi
+    READY_REPO_CONTEXT_LINES+=("- $class_name: $resolved_path")
     if ! array_contains "$resolved_path" "${READY_REPO_PATHS[@]-}"; then
       READY_REPO_PATHS+=("$resolved_path")
-      READY_REPO_CONTEXT_LINES+=("- $class_name: $resolved_path")
     fi
-  done <<<"$parsed_entries"
+  done
 
   if [[ ${#READY_REPO_PATHS[@]} -eq 0 ]]; then
-    die "No ready repository paths found in meta_info.class_repo_paths."
+    die "No target repository paths resolved from meta_info.class_repo_paths."
   fi
+}
+
+collect_out_of_scope_classes() {
+  local definition_path="$1"
+  local parsed_entries=""
+  local entry=""
+  local class_name=""
+  local class_state=""
+  local normalized_state=""
+
+  OUT_OF_SCOPE_CLASS_CONTEXT_LINES=()
+
+  if ! parsed_entries="$(class_repo_paths_extract_entries "$definition_path" 2>/dev/null)"; then
+    die "Failed to read meta_info.class_repo_paths from $definition_path."
+  fi
+
+  while IFS= read -r entry; do
+    [[ -n "$entry" ]] || continue
+    IFS='|' read -r class_name class_state _ <<<"$entry"
+    class_name="$(printf '%s' "$(trim_value "$class_name")" | tr '[:upper:]' '[:lower:]')"
+    normalized_state="$(printf '%s' "$(trim_value "$class_state")" | tr '[:upper:]' '[:lower:]')"
+    [[ -n "$class_name" ]] || continue
+    array_contains "$class_name" "${TARGET_CLASSES[@]-}" && continue
+    OUT_OF_SCOPE_CLASS_CONTEXT_LINES+=("- $class_name ($normalized_state)")
+  done <<<"$parsed_entries"
 }
 
 load_model_config() {
@@ -265,24 +300,40 @@ render_ready_repo_context_lines() {
   done
 }
 
+render_unique_repo_paths() {
+  local repo_path=""
+  for repo_path in "${READY_REPO_PATHS[@]}"; do
+    printf '%s\n' "- $repo_path"
+  done
+}
+
+render_out_of_scope_class_lines() {
+  if [[ ${#OUT_OF_SCOPE_CLASS_CONTEXT_LINES[@]} -eq 0 ]]; then
+    printf '%s\n' "- none"
+    return 0
+  fi
+  local line=""
+  for line in "${OUT_OF_SCOPE_CLASS_CONTEXT_LINES[@]}"; do
+    printf '%s\n' "$line"
+  done
+}
+
 build_prompt() {
   local runtime_root="$1"
   local project_definition_path="$2"
   local target_artifact_path="$3"
+  local quality_command=""
+  printf -v quality_command "%q %q" "$QUALITY_GATE_HELPER" "$target_artifact_path"
 
   cat <<EOF_PROMPT
 Reconcile the project common contract definition against the as-built API for a first attached class.
 
 Hard constraints:
-- This is a one-time stopgap for first-attach contract drift only.
-- Read the current documented contract from $target_artifact_path.
-- Inspect only the ready repository paths listed below as as-built API evidence.
-- List mismatches between the documented contract and the as-built API for operator review.
-- Ask the operator to approve, reject, or revise each proposed correction before editing.
-- Write back only operator-approved corrections to $target_artifact_path.
-- If the operator approves no corrections, leave $target_artifact_path unchanged.
-- Do not modify $project_definition_path.
-- Do not modify any attached repository source files.
+- Read and follow $RULE_FILE fully before editing.
+- Treat $RULE_FILE as authoritative for all reconciliation behavior: scope, read-only inputs, the write-back rule, and the quality-gate repair loop.
+- If you change the contract, run the quality gate command and make it pass before finishing: $quality_command
+- If the gate cannot pass with the available evidence, stop and end with this exact line:
+  "contract reconciliation gate cannot pass with current repository evidence. Please provide instructions what to do, or adjust inputs and rerun this phase"
 - When contract reconciliation is fully complete, end your final response with this exact last line: "Contract reconciliation phase is finished. Nothing else to do now; press Ctrl-C so orchestrator can start the next phase"
 
 Context:
@@ -290,8 +341,15 @@ Context:
 - ASDLC project root: $PROJECT_ROOT
 - Project definition file: $project_definition_path
 - Current common contract definition: $target_artifact_path
-- Ready repository paths:
+- Rule file: $RULE_FILE
+- Quality gate helper: $QUALITY_GATE_HELPER
+- Quality gate command: $quality_command
+- Unique repositories to inspect (scan each path once):
+$(render_unique_repo_paths)
+- In-scope class-to-repository mappings:
 $(render_ready_repo_context_lines)
+- Out-of-scope classes (do not challenge their contract surface):
+$(render_out_of_scope_class_lines)
 EOF_PROMPT
 }
 
@@ -305,35 +363,10 @@ ensure_file_unchanged() {
   fi
 }
 
-commit_contract_if_changed() {
-  local project_abs_path="$1"
-  local contract_relative_path="$2"
-  local target_status=""
-
-  if ! git -C "$project_abs_path" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    die "Project path must be a git repository to commit contract reconciliation: $project_abs_path"
-  fi
-
-  target_status="$(git -C "$project_abs_path" status --porcelain -- "$contract_relative_path")"
-  if [[ -n "$target_status" ]]; then
-    git -C "$project_abs_path" add -- "$contract_relative_path"
-    if git -C "$project_abs_path" diff --cached --quiet -- "$contract_relative_path"; then
-      echo "No approved contract reconciliation corrections to commit."
-      return 0
-    fi
-    git -C "$project_abs_path" commit -m "Reconcile common contract with attached repo API" >/dev/null
-    echo "Committed $PROJECT_ROOT/$contract_relative_path"
-    return 0
-  fi
-
-  echo "No approved contract reconciliation corrections to commit."
-}
-
 main() {
   require_command awk
   require_command cmp
   require_command cp
-  require_command git
   require_command mktemp
   parse_args "$@"
 
@@ -353,7 +386,8 @@ main() {
   target_artifact_path="$runtime_root/$PROJECT_ROOT/$PROJECT_OUTPUT_FILE"
   models_path="$runtime_root/$MODELS_FILE"
 
-  collect_ready_repo_paths "$project_definition_path"
+  collect_target_repo_paths "$project_definition_path"
+  collect_out_of_scope_classes "$project_definition_path"
   load_model_config "$models_path" "$MODEL_PHASE"
   if [[ "$MODEL_CMD" != "codex" ]]; then
     die "Invalid '$MODEL_PHASE' command in $MODELS_FILE: expected 'codex', got '$MODEL_CMD'."
@@ -382,7 +416,9 @@ main() {
   fi
 
   ensure_file_unchanged "$before_project_definition" "$project_definition_path" "$PROJECT_ROOT/$PROJECT_DEFINITION_FILE"
-  commit_contract_if_changed "$runtime_root/$PROJECT_ROOT" "$PROJECT_OUTPUT_FILE"
+  # The reconciled contract is left in the working tree; the orchestrator commits
+  # the whole reconciliation/attach unit (definition + contract + markers) after
+  # the operator confirms (project_add_feature_e2e.sh: commit_reconciliation_unit).
   echo "Updated $PROJECT_ROOT/$PROJECT_OUTPUT_FILE"
 }
 

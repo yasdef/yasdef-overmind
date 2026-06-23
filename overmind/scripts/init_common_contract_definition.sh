@@ -436,6 +436,55 @@ cleanup_stack_blueprint_snapshots() {
   done
 }
 
+commit_initialization_baseline() {
+  local project_type_code="$1"
+  local blueprint_path=""
+  local remaining_changes=""
+  local unexpected_changes=""
+  local -a baseline_paths=(
+    "$PROJECT_DEFINITION_FILE"
+    "$PROJECT_OUTPUT_FILE"
+  )
+  local -a status_pathspecs=(".")
+
+  if [[ "$project_type_code" == "A" ]]; then
+    for blueprint_path in "${STACK_BLUEPRINT_PATHS[@]}"; do
+      baseline_paths+=("${blueprint_path#"$PROJECT_ROOT/"}")
+    done
+  fi
+  for blueprint_path in "${baseline_paths[@]}"; do
+    status_pathspecs+=(":(exclude)$blueprint_path")
+  done
+
+  if ! git -C "$PROJECT_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    die "Project path must be a git repository to finalize initialization baseline: $PROJECT_ROOT"
+  fi
+  if ! unexpected_changes="$(git -C "$PROJECT_ROOT" status --porcelain -- "${status_pathspecs[@]}")"; then
+    die "Failed to validate project initialization baseline paths."
+  fi
+  if [[ -n "$unexpected_changes" ]]; then
+    echo "ERROR: Project initialization created unexpected changes; baseline was not committed:" >&2
+    printf '%s\n' "$unexpected_changes" >&2
+    exit 1
+  fi
+
+  git -C "$PROJECT_ROOT" add -- "${baseline_paths[@]}" || die "Failed to stage project initialization baseline."
+  if ! git -C "$PROJECT_ROOT" diff --cached --quiet -- "${baseline_paths[@]}"; then
+    git -C "$PROJECT_ROOT" commit -m "Finalize project initialization baseline" -- "${baseline_paths[@]}" >/dev/null \
+      || die "Failed to commit project initialization baseline."
+    echo "Committed project initialization baseline."
+  fi
+
+  if ! remaining_changes="$(git -C "$PROJECT_ROOT" status --porcelain)"; then
+    die "Failed to verify project initialization baseline."
+  fi
+  if [[ -n "$remaining_changes" ]]; then
+    echo "ERROR: Project initialization baseline left unexpected uncommitted changes:" >&2
+    printf '%s\n' "$remaining_changes" >&2
+    exit 1
+  fi
+}
+
 load_model_config() {
   local models_path="$1"
   local phase="$2"
@@ -565,6 +614,7 @@ main() {
   require_command awk
   require_command cmp
   require_command cp
+  require_command git
   require_command mktemp
   parse_args "$@"
 
@@ -628,6 +678,7 @@ main() {
     trap - EXIT
   fi
 
+  commit_initialization_baseline "$project_type_code"
   echo "Updated $target_artifact_path"
 }
 

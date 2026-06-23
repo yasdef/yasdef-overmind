@@ -41,6 +41,7 @@ sequenceDiagram
     end
 
     PO->>PO: 2.3 Common Contracts Definition → common_contract_definition.md
+    Note over PO: Commit the project initialization baseline: init definition + applicable stack blueprints + common contract.
   end
 
   rect rgb(247, 248, 240)

@@ -24,6 +24,9 @@ PHASE7_PENDING_REPO_CLASSES=()
 PHASE_EXECUTION_FAILED_RC=40
 DISCOVERED_PROJECT_PATHS=()
 DISCOVERED_PROJECT_NAMES=()
+RECONCILIATION_TRANSACTION_STARTED="false"
+RECONCILIATION_RAN="false"
+RECONCILED_CLASSES_THIS_RUN=()
 
 PHASE_IDS=("3" "4.1" "4.2" "5" "5.1" "6" "7" "7.1" "8" "8.1" "8.2" "8.3" "8.4")
 PHASE_OPTIONAL=("false" "false" "false" "false" "true" "false" "false" "true" "false" "false" "false" "false" "true")
@@ -1198,23 +1201,60 @@ has_ready_class_repo_paths() {
   return 1
 }
 
-run_contract_reconciliation_once() {
+run_contract_reconciliation_for_classes() {
   local runtime_root="$1"
-  local class_name="$2"
-  local input_fd="${3:-}"
+  local input_fd="$2"
+  shift 2
   local project_abs_path="$runtime_root/$PROJECT_PATH"
-  local marker_path="$project_abs_path/.contract_reconciled_$class_name"
   local command_path="$runtime_root/.commands/project_contract_reconciliation.sh"
+  local class_name=""
+  local -a cmd_args=()
 
-  [[ -f "$marker_path" ]] && return 0
+  [[ "$#" -gt 0 ]] || return 0
   [[ -x "$command_path" ]] || die "Required script not found or not executable: .commands/project_contract_reconciliation.sh"
 
+  cmd_args=(--path "$project_abs_path")
+  for class_name in "$@"; do
+    cmd_args+=(--class "$class_name")
+  done
+
+  # One session reconciles every newly-attached (markerless) class at once.
   if [[ -n "$input_fd" ]]; then
-    "$command_path" --path "$project_abs_path" <&"$input_fd"
+    "$command_path" "${cmd_args[@]}" <&"$input_fd"
   else
-    "$command_path" --path "$project_abs_path"
+    "$command_path" "${cmd_args[@]}"
   fi
-  : >"$marker_path"
+
+  # Mark each covered class only after the single session succeeds; a failed run
+  # leaves every marker unwritten so the next feature-start retries the full set.
+  for class_name in "$@"; do
+    : >"$project_abs_path/.contract_reconciled_$class_name"
+  done
+}
+
+begin_reconciliation_transaction() {
+  local runtime_root="$1"
+  local project_abs_path="$runtime_root/$PROJECT_PATH"
+
+  [[ "$RECONCILIATION_TRANSACTION_STARTED" == "false" ]] || return 0
+
+  command -v git >/dev/null 2>&1 || {
+    RECONCILIATION_TRANSACTION_STARTED="true"
+    return 0
+  }
+  [[ -e "$project_abs_path/.git" ]] || {
+    RECONCILIATION_TRANSACTION_STARTED="true"
+    return 0
+  }
+  git -C "$project_abs_path" rev-parse --is-inside-work-tree >/dev/null 2>&1 || {
+    RECONCILIATION_TRANSACTION_STARTED="true"
+    return 0
+  }
+  [[ -z "$(git -C "$project_abs_path" status --porcelain)" ]] || {
+    die "Project worktree must be clean before repo attachment and contract reconciliation: $PROJECT_PATH"
+  }
+
+  RECONCILIATION_TRANSACTION_STARTED="true"
 }
 
 attempt_class_repo_attach() {
@@ -1226,6 +1266,7 @@ attempt_class_repo_attach() {
   local helper_rc=0
 
   [[ -x "$helper_path" ]] || die "Required command lib not found or not executable: common_libs/persist_class_repo_attach.sh"
+  begin_reconciliation_transaction "$runtime_root"
 
   set +e
   helper_output="$("$helper_path" "$runtime_root/$PROJECT_PATH" "$class_name" "$repo_path" 2>&1)"
@@ -1255,8 +1296,10 @@ prompt_attach_deferred_class_repo() {
   answer="$(trim_value "$answer")"
   [[ -n "$answer" ]] || return 0
 
+  # Reconciliation is intentionally not run here. It runs once after the whole
+  # attach loop (reconcile_ready_classes_missing_markers), so the operator can
+  # attach every repo they intend to before any reconciliation starts (D10).
   if attempt_class_repo_attach "$runtime_root" "$class_name" "$answer"; then
-    run_contract_reconciliation_once "$runtime_root" "$class_name" "$input_fd"
     return 0
   fi
 
@@ -1268,7 +1311,7 @@ prompt_attach_deferred_class_repo() {
   retry_answer="$(trim_value "$retry_answer")"
   [[ -n "$retry_answer" ]] || return 0
   if attempt_class_repo_attach "$runtime_root" "$class_name" "$retry_answer"; then
-    run_contract_reconciliation_once "$runtime_root" "$class_name" "$input_fd"
+    return 0
   fi
 }
 
@@ -1293,13 +1336,95 @@ reconcile_ready_classes_missing_markers() {
   local project_abs_path="$runtime_root/$PROJECT_PATH"
   local definition_path="$project_abs_path/init_progress_definition.yaml"
   local class_name=""
+  local -a pending_classes=()
 
   [[ -f "$definition_path" ]] || return 0
 
+  # Reconcile only ready classes that have not been reconciled yet; an existing
+  # marker means a previous session already covered that class, so it stays out.
   while IFS= read -r class_name; do
     [[ -n "$class_name" ]] || continue
-    run_contract_reconciliation_once "$runtime_root" "$class_name"
+    [[ -f "$project_abs_path/.contract_reconciled_$class_name" ]] && continue
+    pending_classes+=("$class_name")
   done < <(read_ready_reconciliation_candidate_classes "$definition_path")
+
+  [[ "${#pending_classes[@]}" -gt 0 ]] || return 0
+  begin_reconciliation_transaction "$runtime_root"
+
+  # Reconciliation is an interactive model session, so it must read the operator's
+  # stdin (fd 9 dup), not any process substitution redirected over fd 0.
+  exec 9<&0
+  run_contract_reconciliation_for_classes "$runtime_root" 9 "${pending_classes[@]}"
+  exec 9<&-
+  RECONCILIATION_RAN="true"
+  RECONCILED_CLASSES_THIS_RUN=("${pending_classes[@]}")
+}
+
+commit_reconciliation_unit() {
+  local runtime_root="$1"
+  local project_abs_path="$runtime_root/$PROJECT_PATH"
+  local answer=""
+  local class_name=""
+  local remaining_changes=""
+  local unexpected_changes=""
+  local -a commit_paths=(
+    "init_progress_definition.yaml"
+    "common_contract_definition.md"
+  )
+  local -a status_pathspecs=(".")
+
+  [[ "$RECONCILIATION_RAN" == "true" ]] || return 0
+  [[ "${#RECONCILED_CLASSES_THIS_RUN[@]}" -gt 0 ]] || return 0
+
+  for class_name in "${RECONCILED_CLASSES_THIS_RUN[@]}"; do
+    commit_paths+=(".contract_reconciled_$class_name")
+  done
+  for class_name in "${commit_paths[@]}"; do
+    status_pathspecs+=(":(exclude)$class_name")
+  done
+
+  command -v git >/dev/null 2>&1 || return 0
+  [[ -e "$project_abs_path/.git" ]] || return 0
+  git -C "$project_abs_path" rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
+  if ! unexpected_changes="$(git -C "$project_abs_path" status --porcelain -- "${status_pathspecs[@]}")"; then
+    die "Failed to validate reconciliation-owned paths."
+  fi
+  if [[ -n "$unexpected_changes" ]]; then
+    for class_name in "${RECONCILED_CLASSES_THIS_RUN[@]}"; do
+      rm -f "$project_abs_path/.contract_reconciled_$class_name"
+    done
+    echo "ERROR: Reconciliation created unexpected changes; completion markers were removed:" >&2
+    printf '%s\n' "$unexpected_changes" >&2
+    exit 1
+  fi
+  [[ -n "$(git -C "$project_abs_path" status --porcelain -- "${commit_paths[@]}")" ]] || return 0
+
+  printf "Commit reconciliation results? [y/N] " >&2
+  IFS= read -r answer || answer=""
+  case "$answer" in
+  y | Y | yes | YES)
+    git -C "$project_abs_path" add -- "${commit_paths[@]}" || die "Failed to stage reconciliation results."
+    if git -C "$project_abs_path" diff --cached --quiet -- "${commit_paths[@]}"; then
+      echo "No reconciliation results to commit."
+      return 0
+    fi
+    git -C "$project_abs_path" commit -m "Reconcile contract and attach repos" -- "${commit_paths[@]}" >/dev/null \
+      || die "Failed to commit reconciliation results."
+    if ! remaining_changes="$(git -C "$project_abs_path" status --porcelain)"; then
+      die "Failed to verify project worktree after committing reconciliation results."
+    fi
+    if [[ -n "$remaining_changes" ]]; then
+      echo "ERROR: Reconciliation left unexpected uncommitted changes:" >&2
+      printf '%s\n' "$remaining_changes" >&2
+      exit 1
+    fi
+    echo "Committed reconciliation results for $PROJECT_PATH"
+    ;;
+  *)
+    echo "Leaving reconciliation results uncommitted at operator request."
+    return 20
+    ;;
+  esac
 }
 
 run_scanner_and_get_next_step() {
@@ -1486,6 +1611,16 @@ main() {
   PROJECT_TYPE_CODE="$(extract_project_type_code_from_definition "$RUNTIME_ROOT/$PROJECT_PATH/init_progress_definition.yaml")"
   maybe_prompt_for_deferred_class_repo_attaches "$RUNTIME_ROOT"
   reconcile_ready_classes_missing_markers "$RUNTIME_ROOT"
+  local reconciliation_commit_rc=0
+  set +e
+  commit_reconciliation_unit "$RUNTIME_ROOT"
+  reconciliation_commit_rc=$?
+  set -e
+  if [[ "$reconciliation_commit_rc" -eq 20 ]]; then
+    echo "Execution stopped: reconciliation results were not committed."
+    exit 0
+  fi
+  [[ "$reconciliation_commit_rc" -eq 0 ]] || die "Unexpected reconciliation commit status: $reconciliation_commit_rc"
 
   local requested_phase=""
   if [[ -n "$RESUME_STEP_INPUT" ]]; then
