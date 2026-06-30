@@ -1,0 +1,11 @@
+projects:
+  - id: complete-project
+    name: Complete Project
+  - id: partial-project
+    name: Partial Project
+  - id: blocked-project
+    name: Blocked Project
+  - id: invalid-project
+    name: Invalid Project
+  - id: unknown-project
+    name: Unknown Project

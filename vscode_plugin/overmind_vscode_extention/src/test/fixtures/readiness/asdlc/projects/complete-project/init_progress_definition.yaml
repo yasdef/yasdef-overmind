@@ -1,0 +1,8 @@
+project_type_code: product
+meta_info:
+  project_classes:
+    - frontend
+    - backend
+  class_repo_paths:
+    frontend: D:/repo/frontend
+    backend: deferred

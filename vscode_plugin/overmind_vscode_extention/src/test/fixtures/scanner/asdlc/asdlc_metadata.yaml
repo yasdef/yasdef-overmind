@@ -1,0 +1,8 @@
+projects:
+  - id: alpha
+    name: Alpha Project
+    created_at: 2026-06-01
+  - id: beta
+    name: Beta Project
+  - id: missing-project
+    name: Missing Project

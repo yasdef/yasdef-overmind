@@ -1,0 +1,46 @@
+{
+  "name": "overmind-vscode-extension",
+  "displayName": "Overmind",
+  "description": "Local operator dashboard for ASDLC workspaces.",
+  "version": "0.0.1",
+  "publisher": "specific-group",
+  "license": "UNLICENSED",
+  "private": true,
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onCommand:overmind.openDashboard"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "overmind.openDashboard",
+        "title": "Open Dashboard",
+        "category": "Overmind"
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile",
+    "test": "node ./out/test/runTest.js",
+    "vscode:prepublish": "npm run compile",
+    "prepackage": "node -e \"require('fs').mkdirSync('dist', { recursive: true })\"",
+    "package": "vsce package --no-dependencies --allow-missing-repository --out dist/overmind-vscode-extension.vsix"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^20.14.11",
+    "@types/vscode": "^1.90.0",
+    "@vscode/test-electron": "^2.4.1",
+    "@vscode/vsce": "^2.15.0",
+    "mocha": "^10.7.3",
+    "typescript": "^5.5.4"
+  }
+}

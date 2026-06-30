@@ -1,0 +1,6 @@
+project_type_code: product
+meta_info:
+  project_classes:
+    - service
+  class_repo_paths:
+    service: D:/repo/service

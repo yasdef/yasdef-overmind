@@ -1,0 +1,4 @@
+UNLICENSED INTERNAL SOFTWARE
+
+This package is for internal Specific-Group evaluation and distribution only.
+No public license is granted.

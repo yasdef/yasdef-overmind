@@ -1,0 +1,5 @@
+project_type_code: product
+meta_info:
+  project_classes:
+    - docs
+  class_repo_paths: {}
