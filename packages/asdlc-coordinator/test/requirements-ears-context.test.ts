@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -25,7 +25,10 @@ function withWorkspace(fn: (root: string) => void): void {
 }
 
 function readySummary(): string {
-  return completeSummary().replace("- last_updated: 2026-03-20", "- last_updated: 2026-03-20\n- ready_to_ears: true");
+  return completeSummary().replace(
+    "- last_updated: 2026-03-20",
+    "- last_updated: 2026-03-20\n- ready_to_ears: true"
+  );
 }
 
 test("requirements-ears context assembles runtime paths, allowed write, gate command, and skill assets", () => {
@@ -37,13 +40,32 @@ test("requirements-ears context assembles runtime paths, allowed write, gate com
     assert.match(result.text ?? "", /# requirements-ears context/);
     assert.match(result.text ?? "", new RegExp(`feature_path: ${escapeRegExp(featureDir)}`));
     assert.match(result.text ?? "", /feature_path_for_command: projects\/project-a\/feature-alpha/);
-    assert.match(result.text ?? "", new RegExp(`target_ears_artifact: ${escapeRegExp(path.join(featureDir, "requirements_ears.md"))}`));
-    assert.match(result.text ?? "", new RegExp(`read_only_br_source: ${escapeRegExp(path.join(featureDir, "feature_br_summary.md"))}`));
-    assert.match(result.text ?? "", /gate_command: node \.overmind\/overmind\.js gate requirements-ears projects\/project-a\/feature-alpha/);
+    assert.match(
+      result.text ?? "",
+      new RegExp(
+        `target_ears_artifact: ${escapeRegExp(path.join(featureDir, "requirements_ears.md"))}`
+      )
+    );
+    assert.match(
+      result.text ?? "",
+      new RegExp(
+        `read_only_br_source: ${escapeRegExp(path.join(featureDir, "feature_br_summary.md"))}`
+      )
+    );
+    assert.match(
+      result.text ?? "",
+      /gate_command: node \.overmind\/overmind\.js gate requirements-ears projects\/project-a\/feature-alpha/
+    );
     assert.match(result.text ?? "", /ears_template_asset: assets\/reqirements_ears_TEMPLATE\.md/);
-    assert.match(result.text ?? "", /ears_golden_example_asset: assets\/reqirements_ears_GOLDEN_EXAMPLE\.md/);
+    assert.match(
+      result.text ?? "",
+      /ears_golden_example_asset: assets\/reqirements_ears_GOLDEN_EXAMPLE\.md/
+    );
     assert.match(result.text ?? "", /## Allowed Write Surface\n- requirements_ears\.md/);
-    assert.doesNotMatch(result.text ?? "", /\.codex\/skills|\.claude\/skills|overmind\/templates|\.rules\/br_to_ears/);
+    assert.doesNotMatch(
+      result.text ?? "",
+      /\.codex\/skills|\.claude\/skills|overmind\/templates|\.rules\/br_to_ears/
+    );
   });
 });
 
@@ -90,10 +112,14 @@ test("overmind context requirements-ears uses common usage and unknown-step erro
     assert.equal(missingArg.status, 2);
     assert.match(missingArg.stderr, /ERROR: Usage: overmind context <step> <feature_path>/);
 
-    const unknown = spawnSync(process.execPath, [bundlePath, "context", "unknown-requirements-ears", "."], {
-      cwd: root,
-      encoding: "utf8"
-    });
+    const unknown = spawnSync(
+      process.execPath,
+      [bundlePath, "context", "unknown-requirements-ears", "."],
+      {
+        cwd: root,
+        encoding: "utf8"
+      }
+    );
     assert.equal(unknown.status, 2);
     assert.match(unknown.stderr, /ERROR: Unknown context step: unknown-requirements-ears/);
   });

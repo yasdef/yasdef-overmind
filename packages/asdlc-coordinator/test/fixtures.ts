@@ -1,15 +1,24 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
-export function createFeatureFixture(root: string, overrides: Partial<FeatureFixture> = {}): string {
+export function createFeatureFixture(
+  root: string,
+  overrides: Partial<FeatureFixture> = {}
+): string {
   const featureDir = path.join(root, "projects", "project-a", "feature-alpha");
   mkdirSync(featureDir, { recursive: true });
-  writeFileSync(path.join(featureDir, "feature_br_summary.md"), overrides.summary ?? completeSummary());
+  writeFileSync(
+    path.join(featureDir, "feature_br_summary.md"),
+    overrides.summary ?? completeSummary()
+  );
   if (overrides.userInput !== null) {
     writeFileSync(path.join(featureDir, "user_br_input.md"), overrides.userInput ?? userInput());
   }
   if (overrides.missingData !== null) {
-    writeFileSync(path.join(featureDir, "missing_br_data.md"), overrides.missingData ?? emptyMissingData());
+    writeFileSync(
+      path.join(featureDir, "missing_br_data.md"),
+      overrides.missingData ?? emptyMissingData()
+    );
   }
   return featureDir;
 }

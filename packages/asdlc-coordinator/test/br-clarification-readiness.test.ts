@@ -8,10 +8,7 @@ import assert from "node:assert/strict";
 
 import { runBrClarificationReadiness } from "../src/readiness/br-clarification.js";
 
-import {
-  completeSummary,
-  createFeatureFixture
-} from "./fixtures.js";
+import { completeSummary, createFeatureFixture } from "./fixtures.js";
 
 const bundlePath = fileURLToPath(new URL("../overmind.js", import.meta.url));
 
@@ -25,10 +22,12 @@ function withWorkspace(fn: (root: string) => void): void {
 }
 
 function summaryWithReady(value = "false", repoContext = ""): string {
-  return completeSummary().replace(
-    "- last_updated: 2026-03-20",
-    `- last_updated: 2026-03-20\n- ready_to_ears: ${value}`
-  ) + repoContext;
+  return (
+    completeSummary().replace(
+      "- last_updated: 2026-03-20",
+      `- last_updated: 2026-03-20\n- ready_to_ears: ${value}`
+    ) + repoContext
+  );
 }
 
 function missingData(entry: string): string {
@@ -45,7 +44,10 @@ ${entry}
 `;
 }
 
-function writeDefinition(featureDir: string, entries: Array<{ name: string; state: string; repoPath: string }>): void {
+function writeDefinition(
+  featureDir: string,
+  entries: Array<{ name: string; state: string; repoPath: string }>
+): void {
   const projectDir = path.dirname(featureDir);
   const lines = ["meta_info:", "  class_repo_paths:"];
   for (const entry of entries) {
@@ -81,7 +83,10 @@ test("readiness passes with no ready class, prints skip notice, and flips ready_
     assert.equal(result.exitCode, 0);
     assert.match(result.message ?? "", /Skipping repository business-context readiness gate/);
     assert.match(result.message ?? "", /EARS readiness check passed/);
-    assert.match(readFileSync(path.join(featureDir, "feature_br_summary.md"), "utf8"), /- ready_to_ears: true/);
+    assert.match(
+      readFileSync(path.join(featureDir, "feature_br_summary.md"), "utf8"),
+      /- ready_to_ears: true/
+    );
   });
 });
 
@@ -99,7 +104,10 @@ test("readiness evaluates repo validator when a class is ready", () => {
 
     const result = runBrClarificationReadiness(path.relative(root, featureDir), root);
     assert.equal(result.exitCode, 0, result.errorMessage);
-    assert.match(readFileSync(path.join(featureDir, "feature_br_summary.md"), "utf8"), /- ready_to_ears: true/);
+    assert.match(
+      readFileSync(path.join(featureDir, "feature_br_summary.md"), "utf8"),
+      /- ready_to_ears: true/
+    );
   });
 });
 
@@ -115,8 +123,14 @@ test("readiness blocks unresolved or skipped clarification item and does not fli
 
     const result = runBrClarificationReadiness(path.relative(root, featureDir), root);
     assert.equal(result.exitCode, 1);
-    assert.match((result.problems ?? []).join("\n"), /unresolved user BR clarification items remain/);
-    assert.match(readFileSync(path.join(featureDir, "feature_br_summary.md"), "utf8"), /- ready_to_ears: false/);
+    assert.match(
+      (result.problems ?? []).join("\n"),
+      /unresolved user BR clarification items remain/
+    );
+    assert.match(
+      readFileSync(path.join(featureDir, "feature_br_summary.md"), "utf8"),
+      /- ready_to_ears: false/
+    );
   });
 });
 
@@ -131,7 +145,10 @@ test("readiness requires init_progress_definition before business gates", () => 
 
     const result = runBrClarificationReadiness(path.relative(root, featureDir), root);
     assert.equal(result.exitCode, 2);
-    assert.match(result.errorMessage ?? "", /Required file not found: .*init_progress_definition\.yaml/);
+    assert.match(
+      result.errorMessage ?? "",
+      /Required file not found: .*init_progress_definition\.yaml/
+    );
   });
 });
 
@@ -170,8 +187,14 @@ test("readiness blocks repo-br-scan validator failure and does not flip", () => 
 
     const result = runBrClarificationReadiness(path.relative(root, featureDir), root);
     assert.equal(result.exitCode, 1);
-    assert.match((result.problems ?? []).join("\n"), /section ## 13\. Existing-System Context is missing/);
-    assert.match(readFileSync(path.join(featureDir, "feature_br_summary.md"), "utf8"), /- ready_to_ears: false/);
+    assert.match(
+      (result.problems ?? []).join("\n"),
+      /section ## 13\. Existing-System Context is missing/
+    );
+    assert.match(
+      readFileSync(path.join(featureDir, "feature_br_summary.md"), "utf8"),
+      /- ready_to_ears: false/
+    );
   });
 });
 
@@ -217,10 +240,14 @@ test("overmind readiness br-clarification exposes CLI success, usage, and unknow
     writeDefinition(featureDir, [{ name: "backend", state: "deferred", repoPath: "" }]);
     const featurePath = path.relative(root, featureDir);
 
-    const success = spawnSync(process.execPath, [bundlePath, "readiness", "br-clarification", featurePath], {
-      cwd: root,
-      encoding: "utf8"
-    });
+    const success = spawnSync(
+      process.execPath,
+      [bundlePath, "readiness", "br-clarification", featurePath],
+      {
+        cwd: root,
+        encoding: "utf8"
+      }
+    );
     assert.equal(success.status, 0);
     assert.match(success.stdout, /EARS readiness check passed/);
 

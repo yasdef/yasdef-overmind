@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -8,11 +8,7 @@ import assert from "node:assert/strict";
 
 import { validateBrClarification } from "../src/validate/br-clarification.js";
 
-import {
-  completeSummary,
-  createFeatureFixture,
-  emptyMissingData
-} from "./fixtures.js";
+import { completeSummary, createFeatureFixture, emptyMissingData } from "./fixtures.js";
 
 const bundlePath = fileURLToPath(new URL("../overmind.js", import.meta.url));
 
@@ -94,7 +90,9 @@ test("br-clarification validator surfaces base task-to-br failure verbatim", () 
     });
     const result = validateBrClarification(featureDir, root);
     assert.equal(result.exitCode, 1);
-    assert.deepEqual(result.problems, ["## 1. Document Meta -> source_type must include User input"]);
+    assert.deepEqual(result.problems, [
+      "## 1. Document Meta -> source_type must include User input"
+    ]);
   });
 });
 
@@ -103,13 +101,23 @@ test("overmind gate br-clarification prints progress for base task-to-br failure
     const featureDir = createFeatureFixture(root, {
       summary: completeSummary().replace("- source_type: User input", "- source_type: Story")
     });
-    const result = spawnSync(process.execPath, [bundlePath, "gate", "br-clarification", featureDir], {
-      cwd: root,
-      encoding: "utf8"
-    });
+    const result = spawnSync(
+      process.execPath,
+      [bundlePath, "gate", "br-clarification", featureDir],
+      {
+        cwd: root,
+        encoding: "utf8"
+      }
+    );
     assert.equal(result.status, 1);
-    assert.match(result.stdout, /^rule 1: task-to-br base business-context validation \.\.\. FAIL/m);
-    assert.match(result.stdout, /^missing: ## 1\. Document Meta -> source_type must include User input/m);
+    assert.match(
+      result.stdout,
+      /^rule 1: task-to-br base business-context validation \.\.\. FAIL/m
+    );
+    assert.match(
+      result.stdout,
+      /^missing: ## 1\. Document Meta -> source_type must include User input/m
+    );
   });
 });
 
@@ -128,15 +136,28 @@ test("overmind gate br-clarification exits 1 with missing line for unresolved le
         "- rised_item_1: source=## 15. Open Questions -> critical_questions; rised=false; unresolved_item=A?"
       )
     });
-    const result = spawnSync(process.execPath, [bundlePath, "gate", "br-clarification", featureDir], {
-      cwd: root,
-      encoding: "utf8"
-    });
+    const result = spawnSync(
+      process.execPath,
+      [bundlePath, "gate", "br-clarification", featureDir],
+      {
+        cwd: root,
+        encoding: "utf8"
+      }
+    );
     assert.equal(result.status, 1);
-    assert.match(result.stdout, /^rule 1: task-to-br base business-context validation \.\.\. PASS/m);
-    assert.match(result.stdout, /^rule 2: missing_br_data unresolved BR clarification ledger \.\.\. FAIL/m);
+    assert.match(
+      result.stdout,
+      /^rule 1: task-to-br base business-context validation \.\.\. PASS/m
+    );
+    assert.match(
+      result.stdout,
+      /^rule 2: missing_br_data unresolved BR clarification ledger \.\.\. FAIL/m
+    );
     assert.match(result.stdout, /^business-context gate failed/m);
-    assert.match(result.stdout, /^missing: missing_br_data\.md -> unresolved user BR clarification items remain/m);
+    assert.match(
+      result.stdout,
+      /^missing: missing_br_data\.md -> unresolved user BR clarification items remain/m
+    );
   });
 });
 
@@ -147,14 +168,27 @@ test("overmind gate br-clarification exits 0 for all-rised ledger", () => {
         "- rised_item_1: source=## 15. Open Questions -> critical_questions; rised=true; unresolved_item=A?"
       )
     });
-    const result = spawnSync(process.execPath, [bundlePath, "gate", "br-clarification", featureDir], {
-      cwd: root,
-      encoding: "utf8"
-    });
+    const result = spawnSync(
+      process.execPath,
+      [bundlePath, "gate", "br-clarification", featureDir],
+      {
+        cwd: root,
+        encoding: "utf8"
+      }
+    );
     assert.equal(result.status, 0);
-    assert.match(result.stdout, /^rule 1: task-to-br base business-context validation \.\.\. PASS/m);
-    assert.match(result.stdout, /^rule 2: missing_br_data unresolved BR clarification ledger \.\.\. PASS/m);
-    assert.match(result.stdout, /^rule 3: BR clarification is complete for EARS readiness \.\.\. PASS/m);
+    assert.match(
+      result.stdout,
+      /^rule 1: task-to-br base business-context validation \.\.\. PASS/m
+    );
+    assert.match(
+      result.stdout,
+      /^rule 2: missing_br_data unresolved BR clarification ledger \.\.\. PASS/m
+    );
+    assert.match(
+      result.stdout,
+      /^rule 3: BR clarification is complete for EARS readiness \.\.\. PASS/m
+    );
     assert.match(result.stdout, /^business-context gate passed/m);
   });
 });

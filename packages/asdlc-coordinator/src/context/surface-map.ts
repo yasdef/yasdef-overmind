@@ -1,7 +1,11 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 
-import { checkRepoBranchState, collectReadyRepoPaths, listCommittedSiblingFeatures } from "../repo/index.js";
+import {
+  checkRepoBranchState,
+  collectReadyRepoPaths,
+  listCommittedSiblingFeatures
+} from "../repo/index.js";
 import { displayPath, resolveFeatureWithinWorkspace, stripQuotes } from "../parse/index.js";
 import type { ContextResult } from "../types/index.js";
 import type { SurfaceMapClass } from "../validate/surface-map.js";
@@ -50,7 +54,7 @@ function parseProjectClasses(definitionPath: string): string[] {
     }
     const inline = rawLine.match(/^\s{2}project_classes:\s*\[([^\]]*)\]\s*$/);
     if (inline) {
-      for (const value of inline[1].split(",")) {
+      for (const value of inline[1]!.split(",")) {
         record(value);
       }
       inClasses = false;
@@ -63,7 +67,7 @@ function parseProjectClasses(definitionPath: string): string[] {
     if (inClasses) {
       const item = rawLine.match(/^\s{4}-\s*(.*)$/);
       if (item) {
-        record(item[1]);
+        record(item[1]!);
         continue;
       }
       inClasses = false;
@@ -84,10 +88,12 @@ export function buildSurfaceMapContext(
   const { workspaceRoot, featureDir, relativeFeature } = resolved.value;
   const parts = relativeFeature.split(path.sep);
   if (parts.length !== 3 || parts[0] !== "projects" || parts[1] === "" || parts[2] === "") {
-    return contextError(`Feature path must resolve under projects/<project-id>/<feature-folder>: ${relativeFeature}`);
+    return contextError(
+      `Feature path must resolve under projects/<project-id>/<feature-folder>: ${relativeFeature}`
+    );
   }
 
-  const projectDir = path.join(workspaceRoot, "projects", parts[1]);
+  const projectDir = path.join(workspaceRoot, "projects", parts[1]!);
   const definitionPath = path.join(projectDir, "init_progress_definition.yaml");
   const earsPath = path.join(featureDir, "requirements_ears.md");
   const contractDeltaPath = path.join(featureDir, "feature_contract_delta.md");
@@ -101,7 +107,9 @@ export function buildSurfaceMapContext(
   try {
     const projectClasses = parseProjectClasses(definitionPath);
     if (!projectClasses.includes(klass)) {
-      return contextError(`Class '${klass}' is not an active meta_info.project_classes member in ${displayPath(definitionPath, workspaceRoot)}`);
+      return contextError(
+        `Class '${klass}' is not an active meta_info.project_classes member in ${displayPath(definitionPath, workspaceRoot)}`
+      );
     }
 
     const readyRepo = collectReadyRepoPaths(definitionPath).find((repo) => repo.class === klass);
@@ -136,11 +144,14 @@ export function buildSurfaceMapContext(
       readOnlyPaths.push(blueprintPath);
     }
     readOnlyPaths.push(...inFlightPlanPaths);
-    const readOnlyLines = readOnlyPaths.map((p) => `- read_only_input: ${displayPath(p, workspaceRoot)}`);
+    const readOnlyLines = readOnlyPaths.map(
+      (p) => `- read_only_input: ${displayPath(p, workspaceRoot)}`
+    );
 
-    const inFlightLines = inFlightPlanPaths.length > 0
-      ? inFlightPlanPaths.map((p) => `- In-flight plan source: ${displayPath(p, projectDir)}`)
-      : ["- none"];
+    const inFlightLines =
+      inFlightPlanPaths.length > 0
+        ? inFlightPlanPaths.map((p) => `- In-flight plan source: ${displayPath(p, projectDir)}`)
+        : ["- none"];
 
     const scanScopeLine = scanScopePath
       ? `- ${klass}: ${scanScopePath}`
@@ -174,7 +185,9 @@ export function buildSurfaceMapContext(
       "",
       "## Scan Scope",
       scanScopeLine,
-      ...(blueprintExists ? [`- Stack blueprint source: ${displayPath(blueprintPath, workspaceRoot)}`] : []),
+      ...(blueprintExists
+        ? [`- Stack blueprint source: ${displayPath(blueprintPath, workspaceRoot)}`]
+        : []),
       "",
       "## In-Flight Promise Evidence",
       ...inFlightLines

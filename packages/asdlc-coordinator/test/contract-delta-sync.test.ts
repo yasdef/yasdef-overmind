@@ -30,7 +30,10 @@ function fixture(root: string, ready: boolean): { feature: string; repo: string;
   const project = path.join(root, "projects", "p1");
   const feature = path.join(project, "feature-a");
   mkdirSync(feature, { recursive: true });
-  writeFileSync(path.join(project, "init_progress_definition.yaml"), `meta_info:\n  class_repo_paths:\n    backend:\n      state: ${ready ? "ready" : "deferred"}\n      path: "${ready ? repo : ""}"\nsteps: []\n`);
+  writeFileSync(
+    path.join(project, "init_progress_definition.yaml"),
+    `meta_info:\n  class_repo_paths:\n    backend:\n      state: ${ready ? "ready" : "deferred"}\n      path: "${ready ? repo : ""}"\nsteps: []\n`
+  );
   return { feature, repo, remote };
 }
 

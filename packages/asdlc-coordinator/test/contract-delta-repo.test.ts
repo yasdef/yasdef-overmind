@@ -16,7 +16,10 @@ test("committed sibling lister returns sorted planned siblings and excludes curr
     writeFileSync(path.join(project, "current", "implementation_plan.md"), "current");
     writeFileSync(path.join(project, "planned-a", "implementation_plan.md"), "plan");
     writeFileSync(path.join(project, "planned-b", "implementation_plan.md"), "plan");
-    assert.deepEqual(listCommittedSiblingFeatures(path.join(project, "current")), ["planned-a", "planned-b"]);
+    assert.deepEqual(listCommittedSiblingFeatures(path.join(project, "current")), [
+      "planned-a",
+      "planned-b"
+    ]);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -38,7 +41,10 @@ test("cross-class trigger matches block and inline shell-helper cases", () => {
       const classLines = inline
         ? `  project_classes: [${classes.join(", ")}]`
         : `  project_classes:\n${classes.map((value) => `    - ${value}`).join("\n")}`;
-      writeFileSync(definition, `meta_info:\n${classLines}\n  project_type_code: "${type}"\n  class_repo_paths: {}\nsteps: []\n`);
+      writeFileSync(
+        definition,
+        `meta_info:\n${classLines}\n  project_type_code: "${type}"\n  class_repo_paths: {}\nsteps: []\n`
+      );
       assert.equal(computeCrossClassPeerTrigger(definition), expected);
     }
   } finally {

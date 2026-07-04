@@ -6,12 +6,22 @@ import assert from "node:assert/strict";
 
 import { buildImplementationSlicesContext } from "../src/context/implementation-slices.js";
 
-function fixture(root: string, classes = "[backend, frontend]"): { project: string; feature: string } {
+function fixture(
+  root: string,
+  classes = "[backend, frontend]"
+): { project: string; feature: string } {
   const project = path.join(root, "projects", "p1");
   const feature = path.join(project, "feature-a");
   mkdirSync(feature, { recursive: true });
-  writeFileSync(path.join(project, "init_progress_definition.yaml"), `meta_info:\n  project_classes: ${classes}\nsteps: []\n`);
-  for (const file of ["requirements_ears.md", "technical_requirements.md", "feature_contract_delta.md"]) {
+  writeFileSync(
+    path.join(project, "init_progress_definition.yaml"),
+    `meta_info:\n  project_classes: ${classes}\nsteps: []\n`
+  );
+  for (const file of [
+    "requirements_ears.md",
+    "technical_requirements.md",
+    "feature_contract_delta.md"
+  ]) {
     writeFileSync(path.join(feature, file), `${file}\n`);
   }
   for (const klass of ["backend", "frontend"]) {
@@ -37,9 +47,12 @@ test("implementation-slices context: emits full two-class context and read-only 
       "assets/implementation_slices_GOLDEN_EXAMPLE.md",
       "- backend: projects/p1/feature-a/project_surface_struct_resp_map_backend.md",
       "- frontend: projects/p1/feature-a/project_surface_struct_resp_map_frontend.md"
-    ]) assert.ok(text.includes(expected), expected);
+    ])
+      assert.ok(text.includes(expected), expected);
     assert.equal((text.match(/^- read_only_input:/gm) ?? []).length, 6);
-  } finally { rmSync(root, { recursive: true, force: true }); }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("implementation-slices context: prerequisite gaps is conditional read-only input", () => {
@@ -52,8 +65,13 @@ test("implementation-slices context: prerequisite gaps is conditional read-only 
     writeFileSync(path.join(feature, "prerequisite_gaps.md"), "gaps\n");
     result = buildImplementationSlicesContext("projects/p1/feature-a", root);
     assert.equal(result.exitCode, 0);
-    assert.match(result.text ?? "", /read_only_input: projects\/p1\/feature-a\/prerequisite_gaps\.md/);
-  } finally { rmSync(root, { recursive: true, force: true }); }
+    assert.match(
+      result.text ?? "",
+      /read_only_input: projects\/p1\/feature-a\/prerequisite_gaps\.md/
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("implementation-slices context: infrastructure is skipped and unsupported classes fail", () => {
@@ -68,12 +86,19 @@ test("implementation-slices context: infrastructure is skipped and unsupported c
       assert.equal(result.exitCode, exitCode);
       if (exitCode === 0) assert.doesNotMatch(result.text ?? "", pattern);
       else assert.match(result.errorMessage ?? "", pattern);
-    } finally { rmSync(root, { recursive: true, force: true }); }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   }
 });
 
 test("implementation-slices context: missing required inputs exit 2", () => {
-  for (const missing of ["requirements_ears.md", "technical_requirements.md", "feature_contract_delta.md", "project_surface_struct_resp_map_frontend.md"]) {
+  for (const missing of [
+    "requirements_ears.md",
+    "technical_requirements.md",
+    "feature_contract_delta.md",
+    "project_surface_struct_resp_map_frontend.md"
+  ]) {
     const root = mkdtempSync(path.join(tmpdir(), "slices-context-missing-"));
     try {
       const { feature } = fixture(root);
@@ -81,7 +106,9 @@ test("implementation-slices context: missing required inputs exit 2", () => {
       const result = buildImplementationSlicesContext("projects/p1/feature-a", root);
       assert.equal(result.exitCode, 2, missing);
       assert.ok((result.errorMessage ?? "").includes(missing));
-    } finally { rmSync(root, { recursive: true, force: true }); }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   }
 });
 
@@ -92,5 +119,7 @@ test("implementation-slices context: feature path must be nested under projects"
     const result = buildImplementationSlicesContext("feature-a", root);
     assert.equal(result.exitCode, 2);
     assert.match(result.errorMessage ?? "", /projects\/<project-id>\/<feature-folder>/);
-  } finally { rmSync(root, { recursive: true, force: true }); }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });

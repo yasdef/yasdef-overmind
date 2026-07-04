@@ -6,11 +6,7 @@ import { spawnSync } from "node:child_process";
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import {
-  createFeatureFixture,
-  goldenBasedValidSummary,
-  jiraUserInput
-} from "./fixtures.js";
+import { createFeatureFixture, goldenBasedValidSummary, jiraUserInput } from "./fixtures.js";
 
 const bundlePath = fileURLToPath(new URL("../overmind.js", import.meta.url));
 
@@ -51,7 +47,10 @@ test("overmind gate task-to-br exits 1 with one missing line per problem", () =>
     });
     assert.equal(result.status, 1);
     assert.match(result.stdout, /^business-context gate failed/m);
-    assert.match(result.stdout, /^missing: ## 1\. Document Meta -> source_type must include User input/m);
+    assert.match(
+      result.stdout,
+      /^missing: ## 1\. Document Meta -> source_type must include User input/m
+    );
     assert.match(result.stdout, /^missing: ## 1\. Document Meta -> last_updated is unfilled/m);
   });
 });
@@ -95,12 +94,15 @@ test("overmind context task-to-br emits assembled context and Jira branch", () =
     const featureDir = createFeatureFixture(root, { userInput: jiraUserInput() });
     const setupDir = path.join(root, ".setup");
     mkdirSync(setupDir, { recursive: true });
-    writeFileSync(path.join(setupDir, "external_sources.yaml"), `sources:
+    writeFileSync(
+      path.join(setupDir, "external_sources.yaml"),
+      `sources:
   - name: jira-main
     type: jira
   - name: knowledge-base
     type: stack_knowledge_base
-`);
+`
+    );
 
     const featurePath = path.relative(root, featureDir);
     const result = spawnSync(process.execPath, [bundlePath, "context", "task-to-br", featurePath], {
@@ -109,11 +111,20 @@ test("overmind context task-to-br emits assembled context and Jira branch", () =
     });
     assert.equal(result.status, 0);
     assert.match(result.stdout, /# task-to-br context/);
-    assert.match(result.stdout, /target_br_artifact: projects\/project-a\/feature-alpha\/feature_br_summary\.md/);
+    assert.match(
+      result.stdout,
+      /target_br_artifact: projects\/project-a\/feature-alpha\/feature_br_summary\.md/
+    );
     assert.match(result.stdout, /## Skill Assets/);
-    assert.match(result.stdout, /feature_br_template_asset: assets\/feature_br_summary_TEMPLATE\.md/);
+    assert.match(
+      result.stdout,
+      /feature_br_template_asset: assets\/feature_br_summary_TEMPLATE\.md/
+    );
     assert.doesNotMatch(result.stdout, /\.claude\/skills/);
-    assert.match(result.stdout, /gate_command: node \.overmind\/overmind\.js gate task-to-br projects\/project-a\/feature-alpha/);
+    assert.match(
+      result.stdout,
+      /gate_command: node \.overmind\/overmind\.js gate task-to-br projects\/project-a\/feature-alpha/
+    );
     assert.match(result.stdout, /epic_story_source_file: jira:AUTH-241/);
     assert.match(result.stdout, /eligible_jira_mcp_source_names:/);
     assert.match(result.stdout, /  - jira-main/);
@@ -138,21 +149,31 @@ test("overmind capture task-to-br writes user_br_input.md from a local story fil
     );
 
     assert.equal(capture.status, 0);
-    assert.match(capture.stdout, /captured task-to-BR input: projects\/project-a\/feature-alpha\/user_br_input\.md/);
+    assert.match(
+      capture.stdout,
+      /captured task-to-BR input: projects\/project-a\/feature-alpha\/user_br_input\.md/
+    );
 
     const userInputPath = path.join(featureDir, "user_br_input.md");
     assert.equal(existsSync(userInputPath), true);
     const userInput = readFileSync(userInputPath, "utf8");
     assert.match(userInput, /feature_id: FEAT-RESET-001/);
     assert.match(userInput, /feature_title: Self-service password reset/);
-    assert.match(userInput, /epic_story_source_file: projects\/project-a\/feature-alpha\/story\.md/);
+    assert.match(
+      userInput,
+      /epic_story_source_file: projects\/project-a\/feature-alpha\/story\.md/
+    );
     assert.match(userInput, /As a user I need captured input\./);
     assert.doesNotMatch(userInput, /Wrong workspace-root story/);
 
-    const context = spawnSync(process.execPath, [bundlePath, "context", "task-to-br", featurePath], {
-      cwd: root,
-      encoding: "utf8"
-    });
+    const context = spawnSync(
+      process.execPath,
+      [bundlePath, "context", "task-to-br", featurePath],
+      {
+        cwd: root,
+        encoding: "utf8"
+      }
+    );
     assert.equal(context.status, 0);
     assert.match(context.stdout, /As a user I need captured input\./);
   });
@@ -181,10 +202,14 @@ test("overmind capture task-to-br writes Jira capture metadata", () => {
     assert.match(userInput, /epic_story_source_file: jira:AUTH-241/);
     assert.match(userInput, /epic_or_story: \|/);
 
-    const context = spawnSync(process.execPath, [bundlePath, "context", "task-to-br", featurePath], {
-      cwd: root,
-      encoding: "utf8"
-    });
+    const context = spawnSync(
+      process.execPath,
+      [bundlePath, "context", "task-to-br", featurePath],
+      {
+        cwd: root,
+        encoding: "utf8"
+      }
+    );
     assert.equal(context.status, 0);
     assert.match(context.stdout, /epic_story_source_file: jira:AUTH-241/);
     assert.match(context.stdout, /eligible_jira_mcp_source_names:/);
@@ -220,7 +245,15 @@ test("overmind capture task-to-br does not overwrite existing capture unless req
 
     const overwrite = spawnSync(
       process.execPath,
-      [bundlePath, "capture", "task-to-br", featurePath, "--source-file", "story-b.md", "--overwrite"],
+      [
+        bundlePath,
+        "capture",
+        "task-to-br",
+        featurePath,
+        "--source-file",
+        "story-b.md",
+        "--overwrite"
+      ],
       { cwd: root, encoding: "utf8" }
     );
     assert.equal(overwrite.status, 0);

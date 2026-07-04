@@ -13,8 +13,7 @@ export interface WorkspaceFeature {
 }
 
 export type ResolveFeatureResult =
-  | { ok: true; value: WorkspaceFeature }
-  | { ok: false; message: string };
+  { ok: true; value: WorkspaceFeature } | { ok: false; message: string };
 
 /**
  * Resolve a feature path to its canonical location and enforce that it stays
@@ -24,7 +23,10 @@ export type ResolveFeatureResult =
  * passes a purely lexical `projects/<id>/<feature>` check while reads/writes
  * follow the link to another feature or outside the workspace.
  */
-export function resolveFeatureWithinWorkspace(inputPath: string, cwd: string): ResolveFeatureResult {
+export function resolveFeatureWithinWorkspace(
+  inputPath: string,
+  cwd: string
+): ResolveFeatureResult {
   if (!inputPath || inputPath.trim() === "") {
     return { ok: false, message: "Missing feature path." };
   }
@@ -47,7 +49,10 @@ export function resolveFeatureWithinWorkspace(inputPath: string, cwd: string): R
   }
 
   if (featureDir !== workspaceRoot && !featureDir.startsWith(workspaceRoot + path.sep)) {
-    return { ok: false, message: `Feature path must resolve inside ASDLC workspace: ${featureDir}` };
+    return {
+      ok: false,
+      message: `Feature path must resolve inside ASDLC workspace: ${featureDir}`
+    };
   }
 
   return {

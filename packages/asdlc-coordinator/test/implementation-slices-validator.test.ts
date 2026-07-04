@@ -5,8 +5,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  canonicalSurface, extractRequiredMissingSurfaces, surfaceMatches,
-  validateImplementationSlices, validateImplementationSlicesContent
+  canonicalSurface,
+  extractRequiredMissingSurfaces,
+  surfaceMatches,
+  validateImplementationSlices,
+  validateImplementationSlicesContent
 } from "../src/validate/implementation-slices.js";
 
 const ACTIVE = new Set(["backend", "frontend"]);
@@ -73,51 +76,141 @@ test("implementation-slices gate: valid artifact and semantic surface helpers pa
   assert.deepEqual(problems(validArtifact()), []);
   assert.equal(canonicalSurface("Admin sign-in screen"), "admin login page");
   assert.equal(surfaceMatches("Operator login page", "Admin sign-in screen"), true);
-  assert.equal(surfaceMatches("Protected operator workspace shell", "Admin workspace container"), true);
-  assert.equal(surfaceMatches("Operator account lookup page", "Operator account search screen"), true);
+  assert.equal(
+    surfaceMatches("Protected operator workspace shell", "Admin workspace container"),
+    true
+  );
+  assert.equal(
+    surfaceMatches("Operator account lookup page", "Operator account search screen"),
+    true
+  );
   assert.equal(surfaceMatches("Admin refunds page", "Admin orders page"), false);
 });
 
 test("implementation-slices gate: all sections and meta keys are required", () => {
-  for (const heading of ["## 1. Document Meta", "## 2. Slice Planning Guardrails", "## 3. Slice Candidates", "## 4. Handoff To Ordered Plan"]) {
-    assert.ok(problems(validArtifact().replace(heading, `${heading} renamed`)).some((p) => p.includes("missing section")), heading);
+  for (const heading of [
+    "## 1. Document Meta",
+    "## 2. Slice Planning Guardrails",
+    "## 3. Slice Candidates",
+    "## 4. Handoff To Ordered Plan"
+  ]) {
+    assert.ok(
+      problems(validArtifact().replace(heading, `${heading} renamed`)).some((p) =>
+        p.includes("missing section")
+      ),
+      heading
+    );
   }
   for (const key of [
-    "feature_id", "feature_title", "project_type_code", "source_requirements_ears", "source_technical_requirements",
-    "source_feature_contract_delta", "source_surface_map_artifacts", "analyzed_repo_classes", "ordering_scope",
-    "traceability_scope", "last_updated", "confidence_level"
-  ]) assert.ok(problems(removeLine(validArtifact(), key)).some((p) => p.includes(key)), key);
-  assert.ok(problems(validArtifact().replace("ordering_scope: local_prerequisites_only", "ordering_scope: global")).some((p) => p.includes("ordering_scope")));
-  assert.ok(problems(validArtifact().replace("traceability_scope: slice_level_only", "traceability_scope: full")).some((p) => p.includes("traceability_scope")));
+    "feature_id",
+    "feature_title",
+    "project_type_code",
+    "source_requirements_ears",
+    "source_technical_requirements",
+    "source_feature_contract_delta",
+    "source_surface_map_artifacts",
+    "analyzed_repo_classes",
+    "ordering_scope",
+    "traceability_scope",
+    "last_updated",
+    "confidence_level"
+  ])
+    assert.ok(
+      problems(removeLine(validArtifact(), key)).some((p) => p.includes(key)),
+      key
+    );
+  assert.ok(
+    problems(
+      validArtifact().replace("ordering_scope: local_prerequisites_only", "ordering_scope: global")
+    ).some((p) => p.includes("ordering_scope"))
+  );
+  assert.ok(
+    problems(
+      validArtifact().replace("traceability_scope: slice_level_only", "traceability_scope: full")
+    ).some((p) => p.includes("traceability_scope"))
+  );
 });
 
 test("implementation-slices gate: slice existence, planned status, and fields are enforced", () => {
   const noSlices = validArtifact().replace(/### Slice 1:[\s\S]*?(?=\n## 4\.)/, "");
   assert.ok(problems(noSlices).some((p) => p.includes("at least one Slice block")));
-  assert.ok(problems(validArtifact().replace(/status: planned/g, "status: existing")).some((p) => p.includes("at least one planned slice")));
-  for (const key of ["repo", "status", "objective", "first_increment", "prerequisites", "preserved_operator_surface", "evidence"]) {
-    const broken = validArtifact().replace(new RegExp(`(### Slice 1:[\\s\\S]*?)- ${key}:.*\\n`), "$1");
-    assert.ok(problems(broken).some((p) => p.includes(`slice 1 missing or unfilled key: ${key}`)), key);
+  assert.ok(
+    problems(validArtifact().replace(/status: planned/g, "status: existing")).some((p) =>
+      p.includes("at least one planned slice")
+    )
+  );
+  for (const key of [
+    "repo",
+    "status",
+    "objective",
+    "first_increment",
+    "prerequisites",
+    "preserved_operator_surface",
+    "evidence"
+  ]) {
+    const broken = validArtifact().replace(
+      new RegExp(`(### Slice 1:[\\s\\S]*?)- ${key}:.*\\n`),
+      "$1"
+    );
+    assert.ok(
+      problems(broken).some((p) => p.includes(`slice 1 missing or unfilled key: ${key}`)),
+      key
+    );
   }
-  assert.ok(problems(validArtifact().replace("repo: backend", "repo: mobile")).some((p) => p.includes("outside active project classes")));
-  assert.ok(problems(validArtifact().replace("status: planned", "status: pending")).some((p) => p.includes("invalid status")));
+  assert.ok(
+    problems(validArtifact().replace("repo: backend", "repo: mobile")).some((p) =>
+      p.includes("outside active project classes")
+    )
+  );
+  assert.ok(
+    problems(validArtifact().replace("status: planned", "status: pending")).some((p) =>
+      p.includes("invalid status")
+    )
+  );
 });
 
 test("implementation-slices gate: evidence, checklist, boilerplate, and coordination rules are enforced", () => {
-  assert.ok(problems(validArtifact().replace("gap/TECH_REQ-6, comp/backend-order-service", "TECH_REQ-6")).some((p) => p.includes("invalid evidence token")));
-  assert.ok(problems(validArtifact().replace("gap/TECH_REQ-6, comp/backend-order-service", "gap/TECH_REQ-6,")).some((p) => p.includes("empty evidence token")));
-  assert.ok(problems(validArtifact().replace("- [ ] Add endpoint tests\n", "")).some((p) => p.includes("at least 2")));
+  assert.ok(
+    problems(
+      validArtifact().replace("gap/TECH_REQ-6, comp/backend-order-service", "TECH_REQ-6")
+    ).some((p) => p.includes("invalid evidence token"))
+  );
+  assert.ok(
+    problems(
+      validArtifact().replace("gap/TECH_REQ-6, comp/backend-order-service", "gap/TECH_REQ-6,")
+    ).some((p) => p.includes("empty evidence token"))
+  );
+  assert.ok(
+    problems(validArtifact().replace("- [ ] Add endpoint tests\n", "")).some((p) =>
+      p.includes("at least 2")
+    )
+  );
   for (const literal of ["Plan and discuss the slice", "Review slice readiness"]) {
-    assert.ok(problems(validArtifact().replace("Implement the endpoint", literal)).some((p) => p.includes(literal)));
+    assert.ok(
+      problems(validArtifact().replace("Implement the endpoint", literal)).some((p) =>
+        p.includes(literal)
+      )
+    );
   }
-  const coordination = validArtifact().replace("- objective: Deliver the order query endpoint.", "- kind: coordination\n- signal_ref: signal-1\n- objective: Deliver the order query endpoint.");
+  const coordination = validArtifact().replace(
+    "- objective: Deliver the order query endpoint.",
+    "- kind: coordination\n- signal_ref: signal-1\n- objective: Deliver the order query endpoint."
+  );
   assert.deepEqual(problems(coordination), []);
-  assert.ok(problems(coordination.replace("- signal_ref: signal-1\n", "")).some((p) => p.includes("signal_ref")));
+  assert.ok(
+    problems(coordination.replace("- signal_ref: signal-1\n", "")).some((p) =>
+      p.includes("signal_ref")
+    )
+  );
   assert.deepEqual(problems(validArtifact()), []);
 });
 
 test("implementation-slices gate: operator surface and prerequisite coverage are enforced", () => {
-  assert.ok(problems(validArtifact().replace("Order query endpoint", "token refresh middleware")).some((p) => p.includes("not operator-facing")));
+  assert.ok(
+    problems(validArtifact().replace("Order query endpoint", "token refresh middleware")).some(
+      (p) => p.includes("not operator-facing")
+    )
+  );
   const supporting = validArtifact()
     .replace("### Slice 1: Backend query endpoint", "### Slice 1: Auth middleware")
     .replace("Deliver the order query endpoint.", "Add auth token middleware.")
@@ -126,16 +219,40 @@ test("implementation-slices gate: operator surface and prerequisite coverage are
     .replace("Add endpoint tests", "Add token adapter tests");
   assert.ok(problems(supporting).some((p) => p.includes("supporting-only")));
   assert.deepEqual(problems(validArtifact(), ["Order query endpoint"]), []);
-  assert.ok(problems(validArtifact(), ["Admin refunds page"]).some((p) => p.includes("Admin refunds page")));
+  assert.ok(
+    problems(validArtifact(), ["Admin refunds page"]).some((p) => p.includes("Admin refunds page"))
+  );
 });
 
 test("implementation-slices gate: handoff keys and structured UNFILLED placeholders are rejected", () => {
-  for (const key of ["ordering_intent", "unresolved_ordering_questions", "unresolved_traceability_questions"]) {
-    assert.ok(problems(removeLine(validArtifact(), key)).some((p) => p.includes(key)), key);
+  for (const key of [
+    "ordering_intent",
+    "unresolved_ordering_questions",
+    "unresolved_traceability_questions"
+  ]) {
+    assert.ok(
+      problems(removeLine(validArtifact(), key)).some((p) => p.includes(key)),
+      key
+    );
   }
-  assert.ok(problems(validArtifact().replace("feature_id: ORD-42", "feature_id: [UNFILLED]")).some((p) => p.includes("[UNFILLED]")));
-  assert.ok(problems(validArtifact().replace("### Slice 1: Backend query endpoint", "### Slice 1: [UNFILLED title]")).some((p) => p.includes("[UNFILLED]")));
-  assert.ok(problems(validArtifact().replace("Implement the endpoint", "[UNFILLED concrete implementation slice]")).some((p) => p.includes("[UNFILLED]")));
+  assert.ok(
+    problems(validArtifact().replace("feature_id: ORD-42", "feature_id: [UNFILLED]")).some((p) =>
+      p.includes("[UNFILLED]")
+    )
+  );
+  assert.ok(
+    problems(
+      validArtifact().replace(
+        "### Slice 1: Backend query endpoint",
+        "### Slice 1: [UNFILLED title]"
+      )
+    ).some((p) => p.includes("[UNFILLED]"))
+  );
+  assert.ok(
+    problems(
+      validArtifact().replace("Implement the endpoint", "[UNFILLED concrete implementation slice]")
+    ).some((p) => p.includes("[UNFILLED]"))
+  );
 });
 
 test("implementation-slices gate: UNFILLED marker references in prose are allowed", () => {
@@ -167,15 +284,26 @@ test("implementation-slices gate: prerequisite parser selects required missing s
 - requirement_summary: Shares the refunds surface.
 - prerequisites: Refunds surface
 `;
-  assert.deepEqual(extractRequiredMissingSurfaces(input), ["Admin refunds page", "Operator command"]);
+  assert.deepEqual(extractRequiredMissingSurfaces(input), [
+    "Admin refunds page",
+    "Operator command"
+  ]);
 });
 
 function fixture(root: string): { project: string; feature: string } {
   const project = path.join(root, "projects", "p1");
   const feature = path.join(project, "feature-a");
   mkdirSync(feature, { recursive: true });
-  writeFileSync(path.join(project, "init_progress_definition.yaml"), "meta_info:\n  project_classes: [backend, frontend, infrastructure]\nsteps: []\n");
-  for (const file of ["requirements_ears.md", "technical_requirements.md", "feature_contract_delta.md"]) writeFileSync(path.join(feature, file), `${file}\n`);
+  writeFileSync(
+    path.join(project, "init_progress_definition.yaml"),
+    "meta_info:\n  project_classes: [backend, frontend, infrastructure]\nsteps: []\n"
+  );
+  for (const file of [
+    "requirements_ears.md",
+    "technical_requirements.md",
+    "feature_contract_delta.md"
+  ])
+    writeFileSync(path.join(feature, file), `${file}\n`);
   writeFileSync(path.join(feature, "implementation_slices.md"), validArtifact());
   return { project, feature };
 }
@@ -190,19 +318,37 @@ test("implementation-slices gate: runtime exit codes preserve helper parity", ()
     unlinkSync(path.join(feature, "implementation_slices.md"));
     assert.equal(validateImplementationSlices("projects/p1/feature-a", root).exitCode, 2);
     assert.equal(validateImplementationSlices("", root).exitCode, 2);
-  } finally { rmSync(root, { recursive: true, force: true }); }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("implementation-slices gate: missing siblings, definition, and supported classes exit 2", () => {
-  for (const missing of ["requirements_ears.md", "technical_requirements.md", "feature_contract_delta.md", "definition", "classes"]) {
+  for (const missing of [
+    "requirements_ears.md",
+    "technical_requirements.md",
+    "feature_contract_delta.md",
+    "definition",
+    "classes"
+  ]) {
     const root = mkdtempSync(path.join(tmpdir(), "slices-gate-missing-"));
     try {
       const { project, feature } = fixture(root);
       if (missing === "definition") unlinkSync(path.join(project, "init_progress_definition.yaml"));
-      else if (missing === "classes") writeFileSync(path.join(project, "init_progress_definition.yaml"), "meta_info:\n  project_classes: [infrastructure]\nsteps: []\n");
+      else if (missing === "classes")
+        writeFileSync(
+          path.join(project, "init_progress_definition.yaml"),
+          "meta_info:\n  project_classes: [infrastructure]\nsteps: []\n"
+        );
       else unlinkSync(path.join(feature, missing));
-      assert.equal(validateImplementationSlices("projects/p1/feature-a", root).exitCode, 2, missing);
-    } finally { rmSync(root, { recursive: true, force: true }); }
+      assert.equal(
+        validateImplementationSlices("projects/p1/feature-a", root).exitCode,
+        2,
+        missing
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   }
 });
 
@@ -211,9 +357,17 @@ test("implementation-slices gate: optional prerequisite gaps activates cross-che
   try {
     const { feature } = fixture(root);
     assert.equal(validateImplementationSlices("projects/p1/feature-a", root).exitCode, 0);
-    writeFileSync(path.join(feature, "prerequisite_gaps.md"), `#### Prerequisite: Required\n- status: unmet\n- surface_kind: required_missing_user_reachable_surface\n- surface_identity: Admin refunds page\n`);
+    writeFileSync(
+      path.join(feature, "prerequisite_gaps.md"),
+      `#### Prerequisite: Required\n- status: unmet\n- surface_kind: required_missing_user_reachable_surface\n- surface_identity: Admin refunds page\n`
+    );
     assert.equal(validateImplementationSlices("projects/p1/feature-a", root).exitCode, 1);
-    writeFileSync(path.join(feature, "prerequisite_gaps.md"), `#### Prerequisite: Required\n- status: unmet\n- surface_kind: required_missing_user_reachable_surface\n- surface_identity: Order query endpoint\n`);
+    writeFileSync(
+      path.join(feature, "prerequisite_gaps.md"),
+      `#### Prerequisite: Required\n- status: unmet\n- surface_kind: required_missing_user_reachable_surface\n- surface_identity: Order query endpoint\n`
+    );
     assert.equal(validateImplementationSlices("projects/p1/feature-a", root).exitCode, 0);
-  } finally { rmSync(root, { recursive: true, force: true }); }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });

@@ -94,7 +94,8 @@ function assertNoRebaseState(repoPath: string): void {
     gitDir = path.join(repoPath, gitDir);
   }
   assert.ok(
-    !existsSync(path.join(gitDir, "rebase-merge")) && !existsSync(path.join(gitDir, "rebase-apply")),
+    !existsSync(path.join(gitDir, "rebase-merge")) &&
+      !existsSync(path.join(gitDir, "rebase-apply")),
     "Expected no rebase state after abort"
   );
 }
@@ -135,7 +136,7 @@ test("repo-br-scan sync blocks and aborts rebase on pull --rebase failure (D7)",
     const result = syncRepoBrScanStep(path.relative(root, featureDir), root);
     assert.equal(result.exitCode, 2);
     assert.ok(result.blockedMessages && result.blockedMessages.length > 0);
-    assert.match(result.blockedMessages![0], /BLOCKED:.*could not sync.*D7/);
+    assert.match(result.blockedMessages[0]!, /BLOCKED:.*could not sync.*D7/);
     assertNoRebaseState(localPath);
   });
 });
@@ -158,7 +159,7 @@ test("repo-br-scan sync blocks and aborts rebase for linked worktree (D7)", () =
     const result = syncRepoBrScanStep(path.relative(root, featureDir), root);
     assert.equal(result.exitCode, 2);
     assert.ok(result.blockedMessages && result.blockedMessages.length > 0);
-    assert.match(result.blockedMessages![0], /BLOCKED:.*could not sync.*D7/);
+    assert.match(result.blockedMessages[0]!, /BLOCKED:.*could not sync.*D7/);
     assertNoRebaseState(linkedPath);
   });
 });

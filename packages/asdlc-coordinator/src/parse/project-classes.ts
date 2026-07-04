@@ -20,7 +20,7 @@ export function parseImplementationSlicesProjectClasses(definitionPath: string):
     if (!inMeta) continue;
     const inline = rawLine.match(/^\s{2}project_classes:\s*\[([^\]]*)\]\s*$/);
     if (inline) {
-      for (const item of inline[1].split(",")) record(item);
+      for (const item of inline[1]!.split(",")) record(item);
       inClasses = false;
       continue;
     }
@@ -31,7 +31,7 @@ export function parseImplementationSlicesProjectClasses(definitionPath: string):
     if (inClasses) {
       const item = rawLine.match(/^\s{4}-\s*(.*)$/);
       if (item) {
-        record(item[1]);
+        record(item[1]!);
         continue;
       }
       inClasses = false;

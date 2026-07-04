@@ -30,23 +30,10 @@ const REQUIRED_META_KEYS = [
   "source_inputs_used",
   "last_updated"
 ] as const;
-const REQUIRED_SCOPE_KEYS = ["feature_summary", "in_scope_feature_delta", "out_of_scope_notes"] as const;
-const REQUIRED_LAYER_FIELDS = [
-  "responsibility_summary",
-  "main_repo_paths",
-  "key_components",
-  "transport_layer",
-  "user_reachable_surface"
-] as const;
-const REQUIRED_SURFACE_FIELDS = [
-  "surface_summary",
-  "applicability",
-  "repo_paths",
-  "why_feature_touches_it",
-  "expected_changes",
-  "evidence",
-  "transport_layer",
-  "user_reachable_surface"
+const REQUIRED_SCOPE_KEYS = [
+  "feature_summary",
+  "in_scope_feature_delta",
+  "out_of_scope_notes"
 ] as const;
 const LAYER_3_8 = "3.8 Another Layer(s)";
 
@@ -104,7 +91,8 @@ const FRONTEND_CONFIG: ClassConfig = {
     "4.7 Test Surface",
     "4.8 Unexpected Frontend / Mobile Surface"
   ],
-  projectClassesOk: (value) => /frontend/.test(value.toLowerCase()) || /mobile/.test(value.toLowerCase()),
+  projectClassesOk: (value) =>
+    /frontend/.test(value.toLowerCase()) || /mobile/.test(value.toLowerCase()),
   projectClassesFailure: "project_classes must include frontend or mobile",
   noApplicableSurfaceFailure: "at least one frontend/mobile surface should be marked applicable",
   passMessage: "quality gate passed: frontend/mobile repo surface map is complete enough"
@@ -128,7 +116,7 @@ function parseSurfaceBullet(line: string): { key: string; value: string } | unde
   if (!match) {
     return undefined;
   }
-  const content = match[1];
+  const content = match[1]!;
   const colonIndex = content.indexOf(":");
   if (colonIndex < 0) {
     return undefined;
@@ -157,10 +145,14 @@ export function validateSurfaceMap(
     }
     const content = readRequiredTextFile(targetPath);
     if (!/[^ \t\r\n]/.test(content)) {
-      return gateRecoverable([`quality gate failed: target surface map artifact is empty: ${targetPath}`]);
+      return gateRecoverable([
+        `quality gate failed: target surface map artifact is empty: ${targetPath}`
+      ]);
     }
     const problems = validateSurfaceMapContent(content, klass);
-    return problems.length > 0 ? gateRecoverable(problems) : gatePassed(configForClass(klass).passMessage);
+    return problems.length > 0
+      ? gateRecoverable(problems)
+      : gatePassed(configForClass(klass).passMessage);
   } catch (err) {
     return gateError(err instanceof Error ? err.message : String(err));
   }
@@ -232,7 +224,7 @@ export function validateSurfaceMapContent(content: string, klass: SurfaceMapClas
 
     const layerHeading = line.match(/^### (3\.[0-9]+ .*)$/);
     if (layerHeading) {
-      currentLayer = layerHeading[1];
+      currentLayer = layerHeading[1]!;
       currentSurface = "";
       if (currentLayer === LAYER_3_8) {
         saw38 = true;
@@ -243,7 +235,7 @@ export function validateSurfaceMapContent(content: string, klass: SurfaceMapClas
     }
     const surfaceHeading = line.match(/^### (4\.[0-9]+ .*)$/);
     if (surfaceHeading) {
-      currentSurface = surfaceHeading[1];
+      currentSurface = surfaceHeading[1]!;
       currentLayer = "";
       seenSurfaces.add(currentSurface);
       continue;

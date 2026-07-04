@@ -5,7 +5,9 @@ import { isUnfilled, parseBulletField } from "../parse/index.js";
 import type { GateResult } from "../types/index.js";
 
 function resolveTargetPath(inputPath: string, cwd: string): string {
-  const resolved = path.isAbsolute(inputPath) ? path.normalize(inputPath) : path.resolve(cwd, inputPath);
+  const resolved = path.isAbsolute(inputPath)
+    ? path.normalize(inputPath)
+    : path.resolve(cwd, inputPath);
   if (existsSync(resolved) && statSync(resolved).isDirectory()) {
     return path.join(resolved, "feature_br_summary.md");
   }

@@ -9,7 +9,9 @@ if (command !== "init" || extra !== undefined) {
 } else {
   try {
     const result = installProject(process.cwd());
-    process.stdout.write(`Installed overmind CLI to ${relative(result.projectRoot, result.cliPath)}\n`);
+    process.stdout.write(
+      `Installed overmind CLI to ${relative(result.projectRoot, result.cliPath)}\n`
+    );
     process.stdout.write(`Installed skill to ${relative(result.projectRoot, result.skillPath)}\n`);
     process.exitCode = 0;
   } catch (error) {

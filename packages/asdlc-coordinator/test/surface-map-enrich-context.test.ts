@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -32,9 +32,7 @@ function writeFrontendMap(feature: string, withPlaceholder = true): void {
 
 function writeExternalSources(root: string, names: string[]): void {
   const items = names.map((n) => `  - name: ${n}`).join("\n");
-  const content = names.length === 0
-    ? "sources: []\n"
-    : `sources:\n${items}\n`;
+  const content = names.length === 0 ? "sources: []\n" : `sources:\n${items}\n`;
   writeFileSync(path.join(root, ".setup", "external_sources.yaml"), content);
 }
 
@@ -80,7 +78,10 @@ test("surface-map-enrich context: full context emitted with backend map path, ga
     const result = buildSurfaceMapEnrichContext("projects/p1/feature-a", root);
     assert.equal(result.exitCode, 0, result.errorMessage);
     const text = result.text ?? "";
-    assert.ok(text.includes("projects/p1/feature-a/project_surface_struct_resp_map_backend.md"), text);
+    assert.ok(
+      text.includes("projects/p1/feature-a/project_surface_struct_resp_map_backend.md"),
+      text
+    );
     assert.ok(text.includes("class: backend"), text);
     assert.ok(text.includes("gate surface-map projects/p1/feature-a --class backend"), text);
     assert.ok(text.includes("- project-kb"), text);
@@ -132,7 +133,10 @@ test("surface-map-enrich context: exit 2 when feature path does not resolve unde
     mkdirSync(path.join(root, "not-projects", "feature-a"), { recursive: true });
 
     // Path resolves outside workspace root — fails at workspace resolution
-    const outsideResult = buildSurfaceMapEnrichContext(path.join(root, "not-projects", "feature-a"), root);
+    const outsideResult = buildSurfaceMapEnrichContext(
+      path.join(root, "not-projects", "feature-a"),
+      root
+    );
     assert.equal(outsideResult.exitCode, 2, outsideResult.errorMessage);
 
     // Path does not have projects/<id>/<feature> shape — fails at path structure check
@@ -148,7 +152,10 @@ test("surface-map-enrich context: exit 2 for feature path symlinked outside work
   const root = mkdtempSync(path.join(tmpdir(), "overmind-sme-symlink-"));
   const outside = mkdtempSync(path.join(tmpdir(), "overmind-sme-outside-"));
   try {
-    writeFileSync(path.join(outside, "project_surface_struct_resp_map_backend.md"), `field: ${PLACEHOLDER}\n`);
+    writeFileSync(
+      path.join(outside, "project_surface_struct_resp_map_backend.md"),
+      `field: ${PLACEHOLDER}\n`
+    );
     mkdirSync(path.join(root, "projects", "p1"), { recursive: true });
     symlinkSync(outside, path.join(root, "projects", "p1", "feature-a"));
 

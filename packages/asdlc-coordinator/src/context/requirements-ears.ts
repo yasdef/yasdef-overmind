@@ -10,7 +10,10 @@ import {
 
 import type { ContextResult } from "../types/index.js";
 
-export function buildRequirementsEarsContext(inputPath: string, cwd = process.cwd()): ContextResult {
+export function buildRequirementsEarsContext(
+  inputPath: string,
+  cwd = process.cwd()
+): ContextResult {
   if (!inputPath || inputPath.trim() === "") {
     return contextError("Missing feature path.");
   }
@@ -23,7 +26,9 @@ export function buildRequirementsEarsContext(inputPath: string, cwd = process.cw
   const brSummaryPath = path.join(featureDir, "feature_br_summary.md");
   const targetEarsPath = path.join(featureDir, "requirements_ears.md");
   if (!existsSync(brSummaryPath)) {
-    return contextError(`Upstream BR summary is required before BR-to-EARS conversion: ${displayPath(brSummaryPath, cwd)}`);
+    return contextError(
+      `Upstream BR summary is required before BR-to-EARS conversion: ${displayPath(brSummaryPath, cwd)}`
+    );
   }
 
   const featurePathForCommand = displayPath(featureDir, cwd);

@@ -23,11 +23,26 @@ test("br-clarification context assembles runtime paths, allowed writes, gate com
     const result = buildBrClarificationContext(featurePath, root);
     assert.equal(result.exitCode, 0);
     assert.match(result.text ?? "", /# br-clarification context/);
-    assert.match(result.text ?? "", /target_br_artifact: projects\/project-a\/feature-alpha\/feature_br_summary\.md/);
-    assert.match(result.text ?? "", /missing_data_artifact: projects\/project-a\/feature-alpha\/missing_br_data\.md/);
-    assert.match(result.text ?? "", /gate_command: node \.overmind\/overmind\.js gate br-clarification projects\/project-a\/feature-alpha/);
-    assert.match(result.text ?? "", /feature_br_template_asset: assets\/feature_br_summary_TEMPLATE\.md/);
-    assert.match(result.text ?? "", /feature_br_golden_example_asset: assets\/feature_br_summary_GOLDEN_EXAMPLE\.md/);
+    assert.match(
+      result.text ?? "",
+      /target_br_artifact: projects\/project-a\/feature-alpha\/feature_br_summary\.md/
+    );
+    assert.match(
+      result.text ?? "",
+      /missing_data_artifact: projects\/project-a\/feature-alpha\/missing_br_data\.md/
+    );
+    assert.match(
+      result.text ?? "",
+      /gate_command: node \.overmind\/overmind\.js gate br-clarification projects\/project-a\/feature-alpha/
+    );
+    assert.match(
+      result.text ?? "",
+      /feature_br_template_asset: assets\/feature_br_summary_TEMPLATE\.md/
+    );
+    assert.match(
+      result.text ?? "",
+      /feature_br_golden_example_asset: assets\/feature_br_summary_GOLDEN_EXAMPLE\.md/
+    );
     assert.match(result.text ?? "", /## Allowed Write Surface/);
     assert.doesNotMatch(result.text ?? "", /\.codex\/skills|\.claude\/skills|overmind\/templates/);
   });

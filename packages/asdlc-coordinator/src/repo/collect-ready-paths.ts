@@ -1,5 +1,4 @@
-import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
-import path from "node:path";
+import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 
 export interface ClassRepoEntry {
   class: string;
@@ -75,7 +74,7 @@ function parseClassRepoPaths(definitionPath: string): ParsedEntry[] {
       flushEntry();
       const match = rawLine.match(/^\s{4}([A-Za-z0-9_.-]+):\s*$/);
       if (match) {
-        currentClass = match[1].trim();
+        currentClass = match[1]!.trim();
       }
       continue;
     }
@@ -94,7 +93,10 @@ function parseClassRepoPaths(definitionPath: string): ParsedEntry[] {
   return entries;
 }
 
-export function collectReadyRepoPaths(definitionPath: string, supportedClasses?: string[]): ClassRepoEntry[] {
+export function collectReadyRepoPaths(
+  definitionPath: string,
+  supportedClasses?: string[]
+): ClassRepoEntry[] {
   if (!definitionPath || definitionPath.trim() === "") {
     throw new Error("class_repo_paths ready path resolution failed: definition path is required");
   }
@@ -115,9 +117,10 @@ export function collectReadyRepoPaths(definitionPath: string, supportedClasses?:
 
   const seenPaths = new Set<string>();
   const result: ClassRepoEntry[] = [];
-  const supported = supportedClasses === undefined
-    ? undefined
-    : new Set(supportedClasses.map((value) => value.toLowerCase()));
+  const supported =
+    supportedClasses === undefined
+      ? undefined
+      : new Set(supportedClasses.map((value) => value.toLowerCase()));
 
   for (const entry of entries) {
     if (supported && !supported.has(entry.class.toLowerCase())) {

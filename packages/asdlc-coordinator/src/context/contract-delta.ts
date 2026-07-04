@@ -18,10 +18,12 @@ export function buildContractDeltaContext(inputPath: string, cwd = process.cwd()
   const { workspaceRoot, featureDir, relativeFeature } = resolved.value;
   const parts = relativeFeature.split(path.sep);
   if (parts.length !== 3 || parts[0] !== "projects" || parts[1] === "" || parts[2] === "") {
-    return contextError(`Feature path must resolve under projects/<project-id>/<feature-folder>: ${relativeFeature}`);
+    return contextError(
+      `Feature path must resolve under projects/<project-id>/<feature-folder>: ${relativeFeature}`
+    );
   }
 
-  const projectDir = path.join(workspaceRoot, "projects", parts[1]);
+  const projectDir = path.join(workspaceRoot, "projects", parts[1]!);
   const definitionPath = path.join(projectDir, "init_progress_definition.yaml");
   const featureBrPath = path.join(featureDir, "feature_br_summary.md");
   const earsPath = path.join(featureDir, "requirements_ears.md");
@@ -48,14 +50,20 @@ export function buildContractDeltaContext(inputPath: string, cwd = process.cwd()
     const trigger = computeCrossClassPeerTrigger(definitionPath);
     const featurePath = displayPath(featureDir, workspaceRoot);
 
-    const readyRepoLines = readyRepos.length > 0
-      ? readyRepos.map((repo) => `- ${repo.class}: ${repo.path}`)
-      : ["- none"];
-    const pendingLines = pendingDeltaPaths.length > 0
-      ? pendingDeltaPaths.map((pendingPath) => `- Pending contract delta source: ${displayPath(pendingPath, projectDir)}`)
-      : ["- none"];
-    const readOnlyLines = [featureBrPath, earsPath, commonContractPath, ...pendingDeltaPaths]
-      .map((readOnlyPath) => `- read_only_input: ${displayPath(readOnlyPath, workspaceRoot)}`);
+    const readyRepoLines =
+      readyRepos.length > 0
+        ? readyRepos.map((repo) => `- ${repo.class}: ${repo.path}`)
+        : ["- none"];
+    const pendingLines =
+      pendingDeltaPaths.length > 0
+        ? pendingDeltaPaths.map(
+            (pendingPath) =>
+              `- Pending contract delta source: ${displayPath(pendingPath, projectDir)}`
+          )
+        : ["- none"];
+    const readOnlyLines = [featureBrPath, earsPath, commonContractPath, ...pendingDeltaPaths].map(
+      (readOnlyPath) => `- read_only_input: ${displayPath(readOnlyPath, workspaceRoot)}`
+    );
 
     const lines = [
       "# contract-delta context",

@@ -208,7 +208,11 @@ for (const config of VALIDATION_CONFIGS) {
   test(`${config.klass}: every required title, section, meta, and scope value is enforced`, () => {
     const base = buildSurfaceMap(config.klass);
     const missingTitle = base.replace(config.title, "# Wrong title");
-    assert.ok(validateSurfaceMapContent(missingTitle, config.klass).some((problem) => problem.includes("unexpected title")));
+    assert.ok(
+      validateSurfaceMapContent(missingTitle, config.klass).some((problem) =>
+        problem.includes("unexpected title")
+      )
+    );
 
     for (const heading of [
       "## 1. Document Meta",
@@ -218,7 +222,9 @@ for (const config of VALIDATION_CONFIGS) {
     ]) {
       const broken = base.replace(heading, `${heading} RENAMED`);
       assert.ok(
-        validateSurfaceMapContent(broken, config.klass).some((problem) => problem.includes("missing section")),
+        validateSurfaceMapContent(broken, config.klass).some((problem) =>
+          problem.includes("missing section")
+        ),
         `${config.klass} should reject missing section: ${heading}`
       );
     }
@@ -226,25 +232,33 @@ for (const config of VALIDATION_CONFIGS) {
     for (const key of META_KEYS) {
       const broken = blankField(base, key);
       assert.ok(
-        validateSurfaceMapContent(broken, config.klass).some((problem) => problem.includes(`missing or empty meta field: ${key}`)),
+        validateSurfaceMapContent(broken, config.klass).some((problem) =>
+          problem.includes(`missing or empty meta field: ${key}`)
+        ),
         `${config.klass} should reject missing meta key: ${key}`
       );
     }
     for (const key of SCOPE_KEYS) {
       const broken = blankField(base, key);
       assert.ok(
-        validateSurfaceMapContent(broken, config.klass).some((problem) => problem.includes(`missing or empty feature scope field: ${key}`)),
+        validateSurfaceMapContent(broken, config.klass).some((problem) =>
+          problem.includes(`missing or empty feature scope field: ${key}`)
+        ),
         `${config.klass} should reject missing scope key: ${key}`
       );
     }
 
     assert.ok(
-      validateSurfaceMapContent(base.replace("- project_type_code: B", "- project_type_code: Z"), config.klass)
-        .some((problem) => problem.includes("project_type_code must be A, B, or C"))
+      validateSurfaceMapContent(
+        base.replace("- project_type_code: B", "- project_type_code: Z"),
+        config.klass
+      ).some((problem) => problem.includes("project_type_code must be A, B, or C"))
     );
     assert.ok(
-      validateSurfaceMapContent(base.replace("- last_updated: 2026-06-15", "- last_updated: invalid"), config.klass)
-        .some((problem) => problem.includes("last_updated must be YYYY-MM-DD"))
+      validateSurfaceMapContent(
+        base.replace("- last_updated: 2026-06-15", "- last_updated: invalid"),
+        config.klass
+      ).some((problem) => problem.includes("last_updated must be YYYY-MM-DD"))
     );
   });
 
@@ -253,19 +267,30 @@ for (const config of VALIDATION_CONFIGS) {
     for (const layer of config.layers) {
       const missingLayer = base.replace(`### ${layer}`, `### ${layer} RENAMED`);
       assert.ok(
-        validateSurfaceMapContent(missingLayer, config.klass).some((problem) => problem.includes(`missing layer subsection: ${layer}`)),
+        validateSurfaceMapContent(missingLayer, config.klass).some((problem) =>
+          problem.includes(`missing layer subsection: ${layer}`)
+        ),
         `${config.klass} should reject missing layer: ${layer}`
       );
       for (const field of LAYER_FIELDS) {
         const missingField = dropFieldFromBlock(base, layer, field);
         assert.ok(
-          validateSurfaceMapContent(missingField, config.klass).some((problem) => problem.includes(field) && problem.includes(layer)),
+          validateSurfaceMapContent(missingField, config.klass).some(
+            (problem) => problem.includes(field) && problem.includes(layer)
+          ),
           `${config.klass} should reject ${layer} without ${field}`
         );
       }
     }
-    const missingAnotherLayer = base.replace("### 3.8 Another Layer(s)", "### 3.8 Another Layer(s) RENAMED");
-    assert.ok(validateSurfaceMapContent(missingAnotherLayer, config.klass).some((problem) => problem.includes("3.8 Another Layer(s)")));
+    const missingAnotherLayer = base.replace(
+      "### 3.8 Another Layer(s)",
+      "### 3.8 Another Layer(s) RENAMED"
+    );
+    assert.ok(
+      validateSurfaceMapContent(missingAnotherLayer, config.klass).some((problem) =>
+        problem.includes("3.8 Another Layer(s)")
+      )
+    );
   });
 
   test(`${config.klass}: every required surface subsection and field is enforced`, () => {
@@ -273,13 +298,17 @@ for (const config of VALIDATION_CONFIGS) {
     for (const surface of config.surfaces) {
       const missingSurface = base.replace(`### ${surface}`, `### ${surface} RENAMED`);
       assert.ok(
-        validateSurfaceMapContent(missingSurface, config.klass).some((problem) => problem.includes(`missing surface subsection: ${surface}`)),
+        validateSurfaceMapContent(missingSurface, config.klass).some((problem) =>
+          problem.includes(`missing surface subsection: ${surface}`)
+        ),
         `${config.klass} should reject missing surface: ${surface}`
       );
       for (const field of SURFACE_FIELDS) {
         const missingField = dropFieldFromBlock(base, surface, field);
         assert.ok(
-          validateSurfaceMapContent(missingField, config.klass).some((problem) => problem.includes(field) && problem.includes(surface)),
+          validateSurfaceMapContent(missingField, config.klass).some(
+            (problem) => problem.includes(field) && problem.includes(surface)
+          ),
           `${config.klass} should reject ${surface} without ${field}`
         );
       }
@@ -290,10 +319,21 @@ for (const config of VALIDATION_CONFIGS) {
     const base = buildSurfaceMap(config.klass);
     for (const placeholder of ["[UNFILLED]", "[OPTIONAL value]"]) {
       const broken = base.replace("demo-repo", placeholder);
-      assert.ok(validateSurfaceMapContent(broken, config.klass).some((problem) => problem.includes("template placeholders")));
+      assert.ok(
+        validateSurfaceMapContent(broken, config.klass).some((problem) =>
+          problem.includes("template placeholders")
+        )
+      );
     }
-    const noneApplicable = base.replace("- applicability: applicable", "- applicability: not_applicable");
-    assert.ok(validateSurfaceMapContent(noneApplicable, config.klass).some((problem) => problem.includes("at least one")));
+    const noneApplicable = base.replace(
+      "- applicability: applicable",
+      "- applicability: not_applicable"
+    );
+    assert.ok(
+      validateSurfaceMapContent(noneApplicable, config.klass).some((problem) =>
+        problem.includes("at least one")
+      )
+    );
 
     const dir = mkdtempSync(path.join(tmpdir(), `overmind-surface-${config.klass}-`));
     try {
@@ -310,10 +350,22 @@ for (const config of VALIDATION_CONFIGS) {
 }
 
 test("wrong project_classes for the class fails", () => {
-  const wrong = buildSurfaceMap("backend").replace("- project_classes: backend", "- project_classes: frontend");
-  assert.ok(validateSurfaceMapContent(wrong, "backend").some((p) => p.includes("project_classes must include backend")));
-  const wrongFe = buildSurfaceMap("frontend").replace("- project_classes: frontend", "- project_classes: backend");
+  const wrong = buildSurfaceMap("backend").replace(
+    "- project_classes: backend",
+    "- project_classes: frontend"
+  );
   assert.ok(
-    validateSurfaceMapContent(wrongFe, "frontend").some((p) => p.includes("project_classes must include frontend or mobile"))
+    validateSurfaceMapContent(wrong, "backend").some((p) =>
+      p.includes("project_classes must include backend")
+    )
+  );
+  const wrongFe = buildSurfaceMap("frontend").replace(
+    "- project_classes: frontend",
+    "- project_classes: backend"
+  );
+  assert.ok(
+    validateSurfaceMapContent(wrongFe, "frontend").some((p) =>
+      p.includes("project_classes must include frontend or mobile")
+    )
   );
 });

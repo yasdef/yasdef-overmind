@@ -25,7 +25,7 @@ export function parseTechnicalRequirementsProjectClasses(definitionPath: string)
     if (!inMeta) continue;
     const inline = rawLine.match(/^\s{2}project_classes:\s*\[([^\]]*)\]\s*$/);
     if (inline) {
-      for (const item of inline[1].split(",")) record(item);
+      for (const item of inline[1]!.split(",")) record(item);
       inClasses = false;
       continue;
     }
@@ -36,7 +36,7 @@ export function parseTechnicalRequirementsProjectClasses(definitionPath: string)
     if (inClasses) {
       const item = rawLine.match(/^\s{4}-\s*(.*)$/);
       if (item) {
-        record(item[1]);
+        record(item[1]!);
         continue;
       }
       inClasses = false;
@@ -45,23 +45,29 @@ export function parseTechnicalRequirementsProjectClasses(definitionPath: string)
   return classes;
 }
 
-export function buildTechnicalRequirementsContext(inputPath: string, cwd = process.cwd()): ContextResult {
+export function buildTechnicalRequirementsContext(
+  inputPath: string,
+  cwd = process.cwd()
+): ContextResult {
   const resolved = resolveFeatureWithinWorkspace(inputPath, cwd);
   if (!resolved.ok) return contextError(resolved.message);
 
   const { workspaceRoot, featureDir, relativeFeature } = resolved.value;
   const parts = relativeFeature.split(path.sep);
   if (parts.length !== 3 || parts[0] !== "projects" || parts[1] === "" || parts[2] === "") {
-    return contextError(`Feature path must resolve under projects/<project-id>/<feature-folder>: ${relativeFeature}`);
+    return contextError(
+      `Feature path must resolve under projects/<project-id>/<feature-folder>: ${relativeFeature}`
+    );
   }
 
-  const projectDir = path.join(workspaceRoot, "projects", parts[1]);
+  const projectDir = path.join(workspaceRoot, "projects", parts[1]!);
   const definitionPath = path.join(projectDir, "init_progress_definition.yaml");
   const requirementsPath = path.join(featureDir, "requirements_ears.md");
   const contractPath = path.join(projectDir, "common_contract_definition.md");
 
   for (const requiredPath of [definitionPath, requirementsPath, contractPath]) {
-    if (!isFile(requiredPath)) return contextError(`Required file not found: ${displayPath(requiredPath, workspaceRoot)}`);
+    if (!isFile(requiredPath))
+      return contextError(`Required file not found: ${displayPath(requiredPath, workspaceRoot)}`);
   }
 
   try {
@@ -74,7 +80,9 @@ export function buildTechnicalRequirementsContext(inputPath: string, cwd = proce
     }
     const classes = projectClasses.filter((item) => SURFACE_CLASSES.has(item));
     if (classes.length === 0) {
-      return contextError(`No supported repo classes found in ${displayPath(definitionPath, workspaceRoot)}`);
+      return contextError(
+        `No supported repo classes found in ${displayPath(definitionPath, workspaceRoot)}`
+      );
     }
     const surfaceMaps = classes.map((klass) => ({
       klass,
@@ -87,7 +95,12 @@ export function buildTechnicalRequirementsContext(inputPath: string, cwd = proce
     }
 
     const featurePath = displayPath(featureDir, workspaceRoot);
-    const readOnly = [definitionPath, requirementsPath, contractPath, ...surfaceMaps.map((surface) => surface.file)];
+    const readOnly = [
+      definitionPath,
+      requirementsPath,
+      contractPath,
+      ...surfaceMaps.map((surface) => surface.file)
+    ];
     const lines = [
       "# technical-requirements context",
       "",
@@ -109,7 +122,9 @@ export function buildTechnicalRequirementsContext(inputPath: string, cwd = proce
       ...readOnly.map((file) => `- read_only_input: ${displayPath(file, workspaceRoot)}`),
       "",
       "## Active Surface-Map Classes",
-      ...surfaceMaps.map((surface) => `- ${surface.klass}: ${displayPath(surface.file, workspaceRoot)}`),
+      ...surfaceMaps.map(
+        (surface) => `- ${surface.klass}: ${displayPath(surface.file, workspaceRoot)}`
+      ),
       "",
       "## Allowed Write Surface",
       `- ${featurePath}/technical_requirements.md`

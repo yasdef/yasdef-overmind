@@ -101,12 +101,18 @@ test("ears-review validator exits 2 when target argument or artifact is missing"
   withWorkspace((root) => {
     const missingArg = validateEarsReview("", root);
     assert.equal(missingArg.exitCode, 2);
-    assert.match(missingArg.errorMessage ?? "", /Missing target requirements ears review path argument/);
+    assert.match(
+      missingArg.errorMessage ?? "",
+      /Missing target requirements ears review path argument/
+    );
 
     const featureDir = createFeatureFixture(root);
     const missingTarget = validateEarsReview(featureDir, root);
     assert.equal(missingTarget.exitCode, 2);
-    assert.match(missingTarget.errorMessage ?? "", /Target requirements ears review artifact not found:/);
+    assert.match(
+      missingTarget.errorMessage ?? "",
+      /Target requirements ears review artifact not found:/
+    );
   });
 });
 
@@ -145,7 +151,10 @@ test("ears-review validator exits 1 for empty and unfilled target", () => {
     assert.equal(empty.exitCode, 1);
     assert.match(empty.problems.join("\n"), /target requirements ears review artifact is empty/);
 
-    writeReview(featureDir, validReview().replace("- user_response: yes", "- user_response: [UNFILLED]"));
+    writeReview(
+      featureDir,
+      validReview().replace("- user_response: yes", "- user_response: [UNFILLED]")
+    );
     const unfilled = validateEarsReview(featureDir, root);
     assert.equal(unfilled.exitCode, 1);
     assert.match(unfilled.problems.join("\n"), /artifact still contains \[UNFILLED\] placeholders/);
@@ -155,9 +164,12 @@ test("ears-review validator exits 1 for empty and unfilled target", () => {
 test("ears-review validator reports missing sections and meta keys", () => {
   withWorkspace((root) => {
     const featureDir = createFeatureFixture(root);
-    writeReview(featureDir, validReview()
-      .replace("## 2. Review Guidance", "## 2. Missing")
-      .replace("- feature_title: Payments access review\n", ""));
+    writeReview(
+      featureDir,
+      validReview()
+        .replace("## 2. Review Guidance", "## 2. Missing")
+        .replace("- feature_title: Payments access review\n", "")
+    );
 
     const result = validateEarsReview(featureDir, root);
     assert.equal(result.exitCode, 1);
@@ -169,14 +181,20 @@ test("ears-review validator reports missing sections and meta keys", () => {
 test("ears-review validator reports missing finding field and invalid severity or state", () => {
   withWorkspace((root) => {
     const featureDir = createFeatureFixture(root);
-    writeReview(featureDir, validReview()
-      .replace("- source_br_summary_reference: feature_br_summary.md -> access guard notes\n", "")
-      .replace("- severity: Medium", "- severity: Critical")
-      .replace("- state: added to ears", "- state: pending"));
+    writeReview(
+      featureDir,
+      validReview()
+        .replace("- source_br_summary_reference: feature_br_summary.md -> access guard notes\n", "")
+        .replace("- severity: Medium", "- severity: Critical")
+        .replace("- state: added to ears", "- state: pending")
+    );
 
     const result = validateEarsReview(featureDir, root);
     assert.equal(result.exitCode, 1);
-    assert.match(result.problems.join("\n"), /finding block 1 missing or unfilled key: source_br_summary_reference/);
+    assert.match(
+      result.problems.join("\n"),
+      /finding block 1 missing or unfilled key: source_br_summary_reference/
+    );
     assert.match(result.problems.join("\n"), /finding block 1 has invalid severity: Critical/);
     assert.match(result.problems.join("\n"), /finding block 1 has invalid state: pending/);
   });
@@ -185,7 +203,10 @@ test("ears-review validator reports missing finding field and invalid severity o
 test("ears-review validator normalizes quoted and spaced finding state", () => {
   withWorkspace((root) => {
     const featureDir = createFeatureFixture(root);
-    writeReview(featureDir, validReview().replace("- state: added to ears", "- state: \"added   to   ears\""));
+    writeReview(
+      featureDir,
+      validReview().replace("- state: added to ears", '- state: "added   to   ears"')
+    );
 
     const result = validateEarsReview(featureDir, root);
     assert.equal(result.exitCode, 0);
@@ -196,20 +217,35 @@ test("ears-review validator enforces no_findings and review_status consistency",
   withWorkspace((root) => {
     const featureDir = createFeatureFixture(root);
 
-    writeReview(featureDir, noFindingsReview().replace("- no_findings: true", "- no_findings: false"));
+    writeReview(
+      featureDir,
+      noFindingsReview().replace("- no_findings: true", "- no_findings: false")
+    );
     const missingNoFindings = validateEarsReview(featureDir, root);
     assert.equal(missingNoFindings.exitCode, 1);
     assert.match(missingNoFindings.problems.join("\n"), /must declare - no_findings: true/);
 
-    writeReview(featureDir, noFindingsReview().replace("- review_status: complete", "- review_status: in_progress"));
+    writeReview(
+      featureDir,
+      noFindingsReview().replace("- review_status: complete", "- review_status: in_progress")
+    );
     const incompleteNoFindings = validateEarsReview(featureDir, root);
     assert.equal(incompleteNoFindings.exitCode, 1);
-    assert.match(incompleteNoFindings.problems.join("\n"), /review_status must be complete when no_findings is true/);
+    assert.match(
+      incompleteNoFindings.problems.join("\n"),
+      /review_status must be complete when no_findings is true/
+    );
 
-    writeReview(featureDir, validReview().replace("## 3. Findings Ledger", "## 3. Findings Ledger\n- no_findings: true"));
+    writeReview(
+      featureDir,
+      validReview().replace("## 3. Findings Ledger", "## 3. Findings Ledger\n- no_findings: true")
+    );
     const findingsWithNoFindings = validateEarsReview(featureDir, root);
     assert.equal(findingsWithNoFindings.exitCode, 1);
-    assert.match(findingsWithNoFindings.problems.join("\n"), /no_findings must not be true when Finding blocks are present/);
+    assert.match(
+      findingsWithNoFindings.problems.join("\n"),
+      /no_findings must not be true when Finding blocks are present/
+    );
   });
 });
 
@@ -220,12 +256,21 @@ test("ears-review validator enforces review_status versus escalated findings", (
     writeReview(featureDir, validReview().replace("- state: added to ears", "- state: escalated"));
     const completeWithEscalated = validateEarsReview(featureDir, root);
     assert.equal(completeWithEscalated.exitCode, 1);
-    assert.match(completeWithEscalated.problems.join("\n"), /review_status is complete but escalated findings remain/);
+    assert.match(
+      completeWithEscalated.problems.join("\n"),
+      /review_status is complete but escalated findings remain/
+    );
 
-    writeReview(featureDir, validReview().replace("- review_status: complete", "- review_status: in_progress"));
+    writeReview(
+      featureDir,
+      validReview().replace("- review_status: complete", "- review_status: in_progress")
+    );
     const inProgressWithoutEscalated = validateEarsReview(featureDir, root);
     assert.equal(inProgressWithoutEscalated.exitCode, 1);
-    assert.match(inProgressWithoutEscalated.problems.join("\n"), /review_status is in_progress but no escalated findings remain/);
+    assert.match(
+      inProgressWithoutEscalated.problems.join("\n"),
+      /review_status is in_progress but no escalated findings remain/
+    );
   });
 });
 
@@ -247,12 +292,19 @@ test("overmind gate ears-review uses common usage, unknown-step, and recoverable
 
     const featureDir = createFeatureFixture(root);
     writeReview(featureDir, "");
-    const recoverable = spawnSync(process.execPath, [bundlePath, "gate", "ears-review", path.relative(root, featureDir)], {
-      cwd: root,
-      encoding: "utf8"
-    });
+    const recoverable = spawnSync(
+      process.execPath,
+      [bundlePath, "gate", "ears-review", path.relative(root, featureDir)],
+      {
+        cwd: root,
+        encoding: "utf8"
+      }
+    );
     assert.equal(recoverable.status, 1);
     assert.match(recoverable.stdout, /business-context gate failed/);
-    assert.match(recoverable.stdout, /missing: quality gate failed: target requirements ears review artifact is empty:/);
+    assert.match(
+      recoverable.stdout,
+      /missing: quality gate failed: target requirements ears review artifact is empty:/
+    );
   });
 });

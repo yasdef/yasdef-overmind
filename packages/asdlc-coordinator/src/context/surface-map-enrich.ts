@@ -26,7 +26,7 @@ function parseExternalSourceNames(content: string): string[] {
     if (!inSources) continue;
     const match = line.match(/^\s*-\s+name:\s*(.*)$/);
     if (match) {
-      const name = stripQuotes(match[1].trim());
+      const name = stripQuotes(match[1]!.trim());
       if (name) names.push(name);
     }
   }
@@ -49,7 +49,9 @@ export function buildSurfaceMapEnrichContext(
   const { workspaceRoot, featureDir, relativeFeature } = resolved.value;
   const parts = relativeFeature.split(path.sep);
   if (parts.length !== 3 || parts[0] !== "projects" || parts[1] === "" || parts[2] === "") {
-    return contextError(`Feature path must resolve under projects/<project-id>/<feature-folder>: ${relativeFeature}`);
+    return contextError(
+      `Feature path must resolve under projects/<project-id>/<feature-folder>: ${relativeFeature}`
+    );
   }
 
   const mapsWithPlaceholders: Array<{ relPath: string; klass: string }> = [];
@@ -70,11 +72,14 @@ export function buildSurfaceMapEnrichContext(
     return contextError(`Required file not found: ${EXTERNAL_SOURCES_FILE}`);
   }
 
-  const eligibleNames = parseExternalSourceNames(readFileSync(sourcesPath, "utf8"))
-    .filter(isKnowledgeBaseName);
+  const eligibleNames = parseExternalSourceNames(readFileSync(sourcesPath, "utf8")).filter(
+    isKnowledgeBaseName
+  );
 
   if (eligibleNames.length === 0) {
-    return noOpContext("No eligible knowledge-base MCP sources configured in .setup/external_sources.yaml.");
+    return noOpContext(
+      "No eligible knowledge-base MCP sources configured in .setup/external_sources.yaml."
+    );
   }
 
   const featurePath = displayPath(featureDir, workspaceRoot);
@@ -84,7 +89,9 @@ export function buildSurfaceMapEnrichContext(
 
   for (const { relPath, klass } of mapsWithPlaceholders) {
     mapEntries.push(`  - file: ${relPath}`, `    class: ${klass}`);
-    gateEntries.push(`  - node .overmind/overmind.js gate surface-map ${featurePath} --class ${klass}`);
+    gateEntries.push(
+      `  - node .overmind/overmind.js gate surface-map ${featurePath} --class ${klass}`
+    );
     writeEntries.push(`- ${relPath}`);
   }
 
@@ -118,12 +125,7 @@ export function buildSurfaceMapEnrichContext(
 }
 
 function noOpContext(reason: string): ContextResult {
-  const lines = [
-    "# surface-map-enrich context",
-    "",
-    "no_op: true",
-    `reason: ${reason}`
-  ];
+  const lines = ["# surface-map-enrich context", "", "no_op: true", `reason: ${reason}`];
   return { exitCode: 0, text: `${lines.join("\n")}\n` };
 }
 

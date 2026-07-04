@@ -7,7 +7,10 @@ import { validateBrClarification, validateRepoBrScan } from "../validate/index.j
 
 import type { GateResult, ReadinessResult } from "../types/index.js";
 
-export function runBrClarificationReadiness(inputPath: string, cwd = process.cwd()): ReadinessResult {
+export function runBrClarificationReadiness(
+  inputPath: string,
+  cwd = process.cwd()
+): ReadinessResult {
   if (!inputPath || inputPath.trim() === "") {
     return readinessError("Missing feature path.");
   }
@@ -46,7 +49,9 @@ export function runBrClarificationReadiness(inputPath: string, cwd = process.cwd
 
   const messages: string[] = [];
   if (readyRepos.length === 0) {
-    messages.push("Skipping repository business-context readiness gate: no class_repo_paths entries have state ready.");
+    messages.push(
+      "Skipping repository business-context readiness gate: no class_repo_paths entries have state ready."
+    );
   } else {
     const repoResult = validateRepoBrScan(featureDir, cwd);
     if (repoResult.exitCode !== 0) {

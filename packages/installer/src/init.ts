@@ -58,9 +58,7 @@ export function installProject(projectRoot = process.cwd()): InstallResult {
     if (!existsSync(skillSourcePath)) {
       throw new Error(`Skill source not found: ${skillSourcePath}`);
     }
-    const requiredPayload = ASSETLESS_SKILLS.has(skillName)
-      ? ["SKILL.md"]
-      : ["SKILL.md", "assets"];
+    const requiredPayload = ASSETLESS_SKILLS.has(skillName) ? ["SKILL.md"] : ["SKILL.md", "assets"];
     for (const payloadEntry of requiredPayload) {
       const payloadPath = path.join(skillSourcePath, payloadEntry);
       if (!existsSync(payloadPath)) {

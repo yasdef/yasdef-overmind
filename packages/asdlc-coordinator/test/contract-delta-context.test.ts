@@ -30,7 +30,10 @@ function createRepo(root: string): string {
   return repo;
 }
 
-function fixture(root: string, withRepo = false): { project: string; feature: string; repo?: string } {
+function fixture(
+  root: string,
+  withRepo = false
+): { project: string; feature: string; repo?: string } {
   const project = path.join(root, "projects", "p1");
   const feature = path.join(project, "feature-a");
   mkdirSync(feature, { recursive: true });
@@ -38,14 +41,17 @@ function fixture(root: string, withRepo = false): { project: string; feature: st
   writeFileSync(path.join(feature, "requirements_ears.md"), "EARS\n");
   writeFileSync(path.join(project, "common_contract_definition.md"), "baseline\n");
   const repo = withRepo ? createRepo(root) : undefined;
-  writeFileSync(path.join(project, "init_progress_definition.yaml"), `meta_info:\n  project_classes: [backend, frontend]\n  project_type_code: A\n  class_repo_paths:${repo ? `\n    backend:\n      state: ready\n      path: "${repo}"` : " {}"}\nsteps: []\n`);
+  writeFileSync(
+    path.join(project, "init_progress_definition.yaml"),
+    `meta_info:\n  project_classes: [backend, frontend]\n  project_type_code: A\n  class_repo_paths:${repo ? `\n    backend:\n      state: ready\n      path: "${repo}"` : " {}"}\nsteps: []\n`
+  );
   return { project, feature, repo };
 }
 
 test("contract-delta context includes sources, repos, siblings, trigger, assets, and one write", () => {
   const root = mkdtempSync(path.join(tmpdir(), "overmind-contract-context-"));
   try {
-    const { project, feature, repo } = fixture(root, true);
+    const { project, feature } = fixture(root, true);
     const sibling = path.join(project, "feature-b");
     mkdirSync(sibling);
     writeFileSync(path.join(sibling, "implementation_plan.md"), "plan\n");
@@ -64,7 +70,8 @@ test("contract-delta context includes sources, repos, siblings, trigger, assets,
       "gate contract-delta projects/p1/feature-a",
       "assets/feature_contract_delta_TEMPLATE.md",
       "assets/feature_contract_delta_GOLDEN_EXAMPLE.md"
-    ]) assert.ok(text.includes(expected), expected);
+    ])
+      assert.ok(text.includes(expected), expected);
     assert.doesNotMatch(text, /\.codex\/skills|\.claude\/skills/);
     assert.equal((text.match(/^- read_only_input: /gm) ?? []).length, 4);
     assert.equal((text.match(/## Allowed Write Surface/g) ?? []).length, 1);
@@ -120,7 +127,7 @@ test("contract-delta context returns repo block message verbatim", () => {
   try {
     const { feature, repo } = fixture(root, true);
     assert.ok(repo && existsSync(repo));
-    writeFileSync(path.join(repo!, "dirty.txt"), "dirty\n");
+    writeFileSync(path.join(repo, "dirty.txt"), "dirty\n");
     const result = buildContractDeltaContext(path.relative(root, feature), root);
     assert.equal(result.exitCode, 2);
     assert.equal(result.verbatim, true);

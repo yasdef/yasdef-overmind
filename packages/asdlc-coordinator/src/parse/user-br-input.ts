@@ -19,5 +19,7 @@ export function readUserBrInput(filePath: string): UserBrInput {
 }
 
 export function capturedUserInputHasStoryContent(content: string): boolean {
-  return getBlockField(content, "epic_or_story").split(/\r?\n/).some((line) => line.trim() !== "");
+  return getBlockField(content, "epic_or_story")
+    .split(/\r?\n/)
+    .some((line) => line.trim() !== "");
 }

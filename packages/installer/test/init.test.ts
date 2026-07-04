@@ -1,4 +1,12 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -92,9 +100,10 @@ for (const missing of ["SKILL.md", "assets"] as const) {
     try {
       withProject((root) => {
         assert.throws(() => installProject(root), /Skill payload missing/);
-        for (const skillName of ALL_SKILLS) for (const runnerDir of RUNNER_DIRS) {
-          assert.equal(existsSync(path.join(root, runnerDir, "skills", skillName)), false);
-        }
+        for (const skillName of ALL_SKILLS)
+          for (const runnerDir of RUNNER_DIRS) {
+            assert.equal(existsSync(path.join(root, runnerDir, "skills", skillName)), false);
+          }
       });
     } finally {
       renameSync(backup, payload);
@@ -112,9 +121,17 @@ test("overmind init installs the bundled CLI and both skills into Codex and Clau
     for (const skillName of ALL_SKILLS) {
       for (const runnerDir of RUNNER_DIRS) {
         const skillDir = path.join(root, runnerDir, "skills", skillName);
-        assert.equal(existsSync(path.join(skillDir, "SKILL.md")), true, `SKILL.md missing for ${skillName}/${runnerDir}`);
+        assert.equal(
+          existsSync(path.join(skillDir, "SKILL.md")),
+          true,
+          `SKILL.md missing for ${skillName}/${runnerDir}`
+        );
         if (SKILL_ASSET_CHECKS[skillName].length > 0) {
-          assert.equal(existsSync(path.join(skillDir, "assets")), true, `assets/ missing for ${skillName}/${runnerDir}`);
+          assert.equal(
+            existsSync(path.join(skillDir, "assets")),
+            true,
+            `assets/ missing for ${skillName}/${runnerDir}`
+          );
         }
         for (const assetName of SKILL_ASSET_CHECKS[skillName]) {
           assert.equal(
@@ -137,9 +154,13 @@ test("overmind init installs the bundled CLI and both skills into Codex and Clau
 test("plan-semantic-review skill asks once per ledger decision round", () => {
   withProject((root) => {
     installProject(root);
-    const question = "Which finding numbers should I apply to implementation_plan.md? (examples: 1,3 | all | none | postpone 2 | reject 4)";
+    const question =
+      "Which finding numbers should I apply to implementation_plan.md? (examples: 1,3 | all | none | postpone 2 | reject 4)";
     for (const runnerDir of RUNNER_DIRS) {
-      const skillText = readFileSync(path.join(root, runnerDir, "skills", "overmind-plan-semantic-review", "SKILL.md"), "utf8");
+      const skillText = readFileSync(
+        path.join(root, runnerDir, "skills", "overmind-plan-semantic-review", "SKILL.md"),
+        "utf8"
+      );
       assert.equal(skillText.split(question).length - 1, 1);
       assert.match(skillText, /ask exactly once for this decision round/);
       assert.match(skillText, /this section does not trigger a second ask action/);
@@ -158,7 +179,11 @@ test("overmind init keeps overmind.js as the only CLI; runner skill folders cont
       for (const skillName of ALL_SKILLS) {
         const skillDir = path.join(root, runnerDir, "skills", skillName);
         assert.equal(existsSync(skillDir), true);
-        assert.equal(existsSync(path.join(skillDir, "overmind.js")), false, `overmind.js should not be in skill dir ${skillName}/${runnerDir}`);
+        assert.equal(
+          existsSync(path.join(skillDir, "overmind.js")),
+          false,
+          `overmind.js should not be in skill dir ${skillName}/${runnerDir}`
+        );
       }
       assert.equal(existsSync(path.join(root, runnerDir, "overmind.js")), false);
     }
@@ -314,14 +339,22 @@ for (const payloadEntry of ["SKILL.md", "assets"] as const) {
 test("fresh install exposes surface-map skill, per-class assets, class commands, and track final lines only in SKILL.md", () => {
   withProject((root) => {
     installProject(root);
-    const successLine = "Repo surface and execution context <track> phase is finished. Nothing else to do now; press Ctrl-C so orchestrator can start the next phase";
-    const infeasibleLine = "repo surface and execution context <track> gate cannot pass with current repository evidence. Please provide instructions what to do, or adjust requirements and rerun this phase";
+    const successLine =
+      "Repo surface and execution context <track> phase is finished. Nothing else to do now; press Ctrl-C so orchestrator can start the next phase";
+    const infeasibleLine =
+      "repo surface and execution context <track> gate cannot pass with current repository evidence. Please provide instructions what to do, or adjust requirements and rerun this phase";
 
     for (const runnerDir of RUNNER_DIRS) {
       const skillDir = path.join(root, runnerDir, "skills", "overmind-surface-map");
       const skillText = readFileSync(path.join(skillDir, "SKILL.md"), "utf8");
-      assert.match(skillText, /node \.overmind\/overmind\.js context surface-map <feature-path> --class <class>/);
-      assert.match(skillText, /node \.overmind\/overmind\.js gate surface-map <feature-path> --class <class>/);
+      assert.match(
+        skillText,
+        /node \.overmind\/overmind\.js context surface-map <feature-path> --class <class>/
+      );
+      assert.match(
+        skillText,
+        /node \.overmind\/overmind\.js gate surface-map <feature-path> --class <class>/
+      );
       assert.equal(skillText.includes(successLine), true);
       assert.equal(skillText.includes(infeasibleLine), true);
       for (const asset of [
@@ -339,18 +372,29 @@ test("fresh install exposes surface-map skill, per-class assets, class commands,
 test("fresh install exposes contract-delta skill, assets, commands, and final lines only in SKILL.md", () => {
   withProject((root) => {
     installProject(root);
-    const successLine = "Feature contract delta phase is finished. Nothing else to do now; press Ctrl-C so orchestrator can start the next phase";
-    const infeasibleLine = "feature contract delta gate cannot pass with current EARS/common-contract inputs. Please provide instructions what to do, or adjust requirements and rerun this phase";
+    const successLine =
+      "Feature contract delta phase is finished. Nothing else to do now; press Ctrl-C so orchestrator can start the next phase";
+    const infeasibleLine =
+      "feature contract delta gate cannot pass with current EARS/common-contract inputs. Please provide instructions what to do, or adjust requirements and rerun this phase";
 
     for (const runnerDir of RUNNER_DIRS) {
       const skillDir = path.join(root, runnerDir, "skills", "overmind-contract-delta");
       const skillText = readFileSync(path.join(skillDir, "SKILL.md"), "utf8");
-      assert.match(skillText, /node \.overmind\/overmind\.js context contract-delta <feature-path>/);
+      assert.match(
+        skillText,
+        /node \.overmind\/overmind\.js context contract-delta <feature-path>/
+      );
       assert.match(skillText, /node \.overmind\/overmind\.js gate contract-delta <feature-path>/);
       assert.equal(skillText.includes(successLine), true);
       assert.equal(skillText.includes(infeasibleLine), true);
-      assert.equal(existsSync(path.join(skillDir, "assets", "feature_contract_delta_TEMPLATE.md")), true);
-      assert.equal(existsSync(path.join(skillDir, "assets", "feature_contract_delta_GOLDEN_EXAMPLE.md")), true);
+      assert.equal(
+        existsSync(path.join(skillDir, "assets", "feature_contract_delta_TEMPLATE.md")),
+        true
+      );
+      assert.equal(
+        existsSync(path.join(skillDir, "assets", "feature_contract_delta_GOLDEN_EXAMPLE.md")),
+        true
+      );
     }
   });
 });
@@ -361,11 +405,21 @@ test("fresh install runs task-to-br capture and context from golden summary plus
     const featureDir = path.join(root, "projects", "project-a", "feature-alpha");
     mkdirSync(featureDir, { recursive: true });
     const goldenSummary = readFileSync(
-      path.join(root, ".claude", "skills", "overmind-task-to-br", "assets", "feature_br_summary_GOLDEN_EXAMPLE.md"),
+      path.join(
+        root,
+        ".claude",
+        "skills",
+        "overmind-task-to-br",
+        "assets",
+        "feature_br_summary_GOLDEN_EXAMPLE.md"
+      ),
       "utf8"
     );
     writeFileSync(path.join(featureDir, "feature_br_summary.md"), goldenSummary);
-    writeFileSync(path.join(featureDir, "story.md"), "As an operator I need standalone task-to-BR capture.\n");
+    writeFileSync(
+      path.join(featureDir, "story.md"),
+      "As an operator I need standalone task-to-BR capture.\n"
+    );
     assert.equal(existsSync(path.join(featureDir, "user_br_input.md")), false);
 
     const capture = spawnSync(
@@ -387,7 +441,12 @@ test("fresh install runs task-to-br capture and context from golden summary plus
 
     const run = spawnSync(
       process.execPath,
-      [path.join(root, ".overmind", "overmind.js"), "context", "task-to-br", "projects/project-a/feature-alpha"],
+      [
+        path.join(root, ".overmind", "overmind.js"),
+        "context",
+        "task-to-br",
+        "projects/project-a/feature-alpha"
+      ],
       { cwd: root, encoding: "utf8" }
     );
 
@@ -396,15 +455,24 @@ test("fresh install runs task-to-br capture and context from golden summary plus
     assert.match(run.stdout, /As an operator I need standalone task-to-BR capture\./);
     assert.match(run.stdout, /feature_br_template_asset: assets\/feature_br_summary_TEMPLATE\.md/);
     assert.doesNotMatch(run.stdout, /\.claude\/skills/);
-    assert.match(run.stdout, /gate_command: node \.overmind\/overmind\.js gate task-to-br projects\/project-a\/feature-alpha/);
+    assert.match(
+      run.stdout,
+      /gate_command: node \.overmind\/overmind\.js gate task-to-br projects\/project-a\/feature-alpha/
+    );
   });
 });
 
 test("fresh install exposes repo-br-scan context command after install", () => {
   withProject((root) => {
     installProject(root);
-    assert.equal(existsSync(path.join(root, ".claude", "skills", "overmind-repo-br-scan", "SKILL.md")), true);
-    assert.equal(existsSync(path.join(root, ".codex", "skills", "overmind-repo-br-scan", "SKILL.md")), true);
+    assert.equal(
+      existsSync(path.join(root, ".claude", "skills", "overmind-repo-br-scan", "SKILL.md")),
+      true
+    );
+    assert.equal(
+      existsSync(path.join(root, ".codex", "skills", "overmind-repo-br-scan", "SKILL.md")),
+      true
+    );
   });
 });
 
@@ -414,13 +482,22 @@ test("fresh install exposes br-clarification skill and shared readiness CLI", ()
     for (const runnerDir of RUNNER_DIRS) {
       const skillDir = path.join(root, runnerDir, "skills", "overmind-br-clarification");
       assert.equal(existsSync(path.join(skillDir, "SKILL.md")), true);
-      assert.equal(existsSync(path.join(skillDir, "assets", "feature_br_summary_TEMPLATE.md")), true);
+      assert.equal(
+        existsSync(path.join(skillDir, "assets", "feature_br_summary_TEMPLATE.md")),
+        true
+      );
       const skillText = readFileSync(path.join(skillDir, "SKILL.md"), "utf8");
       assert.match(skillText, /If no unresolved questions exist, ask no questions\./);
-      assert.match(skillText, /Run `node \.overmind\/overmind\.js gate br-clarification <feature-path>`/);
+      assert.match(
+        skillText,
+        /Run `node \.overmind\/overmind\.js gate br-clarification <feature-path>`/
+      );
       assert.match(skillText, /add `rised=false` to the affected `rised_item_N` entry/);
       assert.match(skillText, /After every gate run, show the gate command output to the operator/);
-      assert.match(skillText, /rule 3: BR clarification is complete for EARS readiness \.\.\. PASS/);
+      assert.match(
+        skillText,
+        /rule 3: BR clarification is complete for EARS readiness \.\.\. PASS/
+      );
     }
 
     const result = spawnSync(
@@ -436,17 +513,28 @@ test("fresh install exposes br-clarification skill and shared readiness CLI", ()
 test("fresh install exposes requirements-ears skill, assets, and final lines only in SKILL.md", () => {
   withProject((root) => {
     installProject(root);
-    const successLine = "BR->requirement-EARS phase is finished. Nothing else to do now; press Ctrl-C so orchestrator can start the next phase";
-    const infeasibleLine = "based on provided reasons, EARS gate cannot pass with current BR input. Please provide instructions what to do, or adjust requirements and rerun this phase";
+    const successLine =
+      "BR->requirement-EARS phase is finished. Nothing else to do now; press Ctrl-C so orchestrator can start the next phase";
+    const infeasibleLine =
+      "based on provided reasons, EARS gate cannot pass with current BR input. Please provide instructions what to do, or adjust requirements and rerun this phase";
 
     for (const runnerDir of RUNNER_DIRS) {
       const skillDir = path.join(root, runnerDir, "skills", "overmind-requirements-ears");
       assert.equal(existsSync(path.join(skillDir, "SKILL.md")), true);
       assert.equal(existsSync(path.join(skillDir, "assets", "reqirements_ears_TEMPLATE.md")), true);
-      assert.equal(existsSync(path.join(skillDir, "assets", "reqirements_ears_GOLDEN_EXAMPLE.md")), true);
+      assert.equal(
+        existsSync(path.join(skillDir, "assets", "reqirements_ears_GOLDEN_EXAMPLE.md")),
+        true
+      );
       const skillText = readFileSync(path.join(skillDir, "SKILL.md"), "utf8");
-      assert.match(skillText, /node \.overmind\/overmind\.js context requirements-ears <feature-path>/);
-      assert.match(skillText, /node \.overmind\/overmind\.js gate requirements-ears <feature-path>/);
+      assert.match(
+        skillText,
+        /node \.overmind\/overmind\.js context requirements-ears <feature-path>/
+      );
+      assert.match(
+        skillText,
+        /node \.overmind\/overmind\.js gate requirements-ears <feature-path>/
+      );
       assert.match(skillText, /requirements_ears\.md/);
       assert.match(skillText, /feature_br_summary\.md/);
       assert.equal(skillText.includes(successLine), true);
@@ -458,14 +546,22 @@ test("fresh install exposes requirements-ears skill, assets, and final lines onl
 test("fresh install exposes ears-review skill, assets, commands, and final lines only in SKILL.md", () => {
   withProject((root) => {
     installProject(root);
-    const successLine = "requirements_ears extra review phase is finished. Nothing else to do now; press Ctrl-C so orchestrator can start the next phase";
-    const infeasibleLine = "based on provided reasons, requirements_ears extra review cannot be completed with current BR/EARS input. Please provide instructions what to do, or adjust artifacts and rerun this phase";
+    const successLine =
+      "requirements_ears extra review phase is finished. Nothing else to do now; press Ctrl-C so orchestrator can start the next phase";
+    const infeasibleLine =
+      "based on provided reasons, requirements_ears extra review cannot be completed with current BR/EARS input. Please provide instructions what to do, or adjust artifacts and rerun this phase";
 
     for (const runnerDir of RUNNER_DIRS) {
       const skillDir = path.join(root, runnerDir, "skills", "overmind-ears-review");
       assert.equal(existsSync(path.join(skillDir, "SKILL.md")), true);
-      assert.equal(existsSync(path.join(skillDir, "assets", "requirements_ears_review_TEMPLATE.md")), true);
-      assert.equal(existsSync(path.join(skillDir, "assets", "requirements_ears_review_GOLDEN_EXAMPLE.md")), true);
+      assert.equal(
+        existsSync(path.join(skillDir, "assets", "requirements_ears_review_TEMPLATE.md")),
+        true
+      );
+      assert.equal(
+        existsSync(path.join(skillDir, "assets", "requirements_ears_review_GOLDEN_EXAMPLE.md")),
+        true
+      );
       const skillText = readFileSync(path.join(skillDir, "SKILL.md"), "utf8");
       assert.match(skillText, /node \.overmind\/overmind\.js context ears-review <feature-path>/);
       assert.match(skillText, /node \.overmind\/overmind\.js gate ears-review <feature-path>/);
@@ -485,7 +581,11 @@ test("fresh install copies overmind-surface-map-enrich to .codex/skills/ and .cl
 
     for (const runnerDir of RUNNER_DIRS) {
       const skillDir = path.join(root, runnerDir, "skills", "overmind-surface-map-enrich");
-      assert.equal(existsSync(path.join(skillDir, "SKILL.md")), true, `SKILL.md missing for overmind-surface-map-enrich/${runnerDir}`);
+      assert.equal(
+        existsSync(path.join(skillDir, "SKILL.md")),
+        true,
+        `SKILL.md missing for overmind-surface-map-enrich/${runnerDir}`
+      );
     }
   });
 });
@@ -516,8 +616,14 @@ test("fresh install copies overmind-technical-requirements with assets to suppor
     for (const runnerDir of RUNNER_DIRS) {
       const skillDir = path.join(root, runnerDir, "skills", "overmind-technical-requirements");
       assert.equal(existsSync(path.join(skillDir, "SKILL.md")), true);
-      assert.equal(existsSync(path.join(skillDir, "assets", "technical_requirements_TEMPLATE.md")), true);
-      assert.equal(existsSync(path.join(skillDir, "assets", "technical_requirements_GOLDEN_EXAMPLE.md")), true);
+      assert.equal(
+        existsSync(path.join(skillDir, "assets", "technical_requirements_TEMPLATE.md")),
+        true
+      );
+      assert.equal(
+        existsSync(path.join(skillDir, "assets", "technical_requirements_GOLDEN_EXAMPLE.md")),
+        true
+      );
     }
   });
 });
@@ -546,8 +652,14 @@ test("fresh install copies overmind-implementation-slices with assets to support
     for (const runnerDir of RUNNER_DIRS) {
       const skillDir = path.join(root, runnerDir, "skills", "overmind-implementation-slices");
       assert.equal(existsSync(path.join(skillDir, "SKILL.md")), true);
-      assert.equal(existsSync(path.join(skillDir, "assets", "implementation_slices_TEMPLATE.md")), true);
-      assert.equal(existsSync(path.join(skillDir, "assets", "implementation_slices_GOLDEN_EXAMPLE.md")), true);
+      assert.equal(
+        existsSync(path.join(skillDir, "assets", "implementation_slices_TEMPLATE.md")),
+        true
+      );
+      assert.equal(
+        existsSync(path.join(skillDir, "assets", "implementation_slices_GOLDEN_EXAMPLE.md")),
+        true
+      );
       assert.equal(existsSync(path.join(skillDir, "overmind.js")), false);
     }
   });
@@ -577,8 +689,14 @@ test("fresh install copies overmind-prerequisite-gaps with assets to supported r
     for (const runnerDir of RUNNER_DIRS) {
       const skillDir = path.join(root, runnerDir, "skills", "overmind-prerequisite-gaps");
       assert.equal(existsSync(path.join(skillDir, "SKILL.md")), true);
-      assert.equal(existsSync(path.join(skillDir, "assets", "prerequisite_gaps_TEMPLATE.md")), true);
-      assert.equal(existsSync(path.join(skillDir, "assets", "prerequisite_gaps_GOLDEN_EXAMPLE.md")), true);
+      assert.equal(
+        existsSync(path.join(skillDir, "assets", "prerequisite_gaps_TEMPLATE.md")),
+        true
+      );
+      assert.equal(
+        existsSync(path.join(skillDir, "assets", "prerequisite_gaps_GOLDEN_EXAMPLE.md")),
+        true
+      );
       assert.equal(existsSync(path.join(skillDir, "overmind.js")), false);
     }
   });
@@ -592,11 +710,14 @@ for (const missing of ["SKILL.md", "assets"] as const) {
     try {
       withProject((root) => {
         assert.throws(() => installProject(root), /Skill payload missing/);
-        for (const skillName of ALL_SKILLS) for (const runnerDir of RUNNER_DIRS) {
-          assert.equal(existsSync(path.join(root, runnerDir, "skills", skillName)), false);
-        }
+        for (const skillName of ALL_SKILLS)
+          for (const runnerDir of RUNNER_DIRS) {
+            assert.equal(existsSync(path.join(root, runnerDir, "skills", skillName)), false);
+          }
       });
-    } finally { renameSync(backup, payload); }
+    } finally {
+      renameSync(backup, payload);
+    }
   });
 }
 
@@ -606,8 +727,14 @@ test("fresh install copies overmind-implementation-plan with assets to supported
     for (const runnerDir of RUNNER_DIRS) {
       const skillDir = path.join(root, runnerDir, "skills", "overmind-implementation-plan");
       assert.equal(existsSync(path.join(skillDir, "SKILL.md")), true);
-      assert.equal(existsSync(path.join(skillDir, "assets", "implementation_plan_TEMPLATE.md")), true);
-      assert.equal(existsSync(path.join(skillDir, "assets", "implementation_plan_GOLDEN_EXAMPLE.md")), true);
+      assert.equal(
+        existsSync(path.join(skillDir, "assets", "implementation_plan_TEMPLATE.md")),
+        true
+      );
+      assert.equal(
+        existsSync(path.join(skillDir, "assets", "implementation_plan_GOLDEN_EXAMPLE.md")),
+        true
+      );
       assert.equal(existsSync(path.join(skillDir, "overmind.js")), false);
     }
   });
@@ -621,10 +748,13 @@ for (const missing of ["SKILL.md", "assets"] as const) {
     try {
       withProject((root) => {
         assert.throws(() => installProject(root), /Skill payload missing/);
-        for (const skillName of ALL_SKILLS) for (const runnerDir of RUNNER_DIRS) {
-          assert.equal(existsSync(path.join(root, runnerDir, "skills", skillName)), false);
-        }
+        for (const skillName of ALL_SKILLS)
+          for (const runnerDir of RUNNER_DIRS) {
+            assert.equal(existsSync(path.join(root, runnerDir, "skills", skillName)), false);
+          }
       });
-    } finally { renameSync(backup, payload); }
+    } finally {
+      renameSync(backup, payload);
+    }
   });
 }

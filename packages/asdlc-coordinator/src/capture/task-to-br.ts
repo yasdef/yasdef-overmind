@@ -1,4 +1,11 @@
-import { existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  statSync,
+  writeFileSync
+} from "node:fs";
 import path from "node:path";
 
 import {
@@ -33,7 +40,9 @@ export function captureTaskToBrInput(
   const sourceFile = options.sourceFile?.trim();
   const jira = options.jira?.trim();
   if ((sourceFile && jira) || (!sourceFile && !jira)) {
-    return captureError("Provide exactly one input source: --source-file <path> or --jira <ticket>.");
+    return captureError(
+      "Provide exactly one input source: --source-file <path> or --jira <ticket>."
+    );
   }
 
   const targetBrPath = path.join(featureDir, "feature_br_summary.md");
@@ -67,7 +76,9 @@ export function captureTaskToBrInput(
     epicStorySourceFile = displayPath(sourceResolution.path, cwd);
     epicStory = readFileSync(sourceResolution.path, "utf8");
     if (epicStory.trim() === "") {
-      return captureError(`Epic/Story source file exists but it is empty: ${displayPath(sourceResolution.path, cwd)}`);
+      return captureError(
+        `Epic/Story source file exists but it is empty: ${displayPath(sourceResolution.path, cwd)}`
+      );
     }
   } else if (jira) {
     jiraTicket = jira;
@@ -95,11 +106,13 @@ export function captureTaskToBrInput(
   };
 }
 
-type SourceResolution =
-  | { ok: true; path: string }
-  | { ok: false; error: string };
+type SourceResolution = { ok: true; path: string } | { ok: false; error: string };
 
-function resolveStorySourceFile(sourceInput: string, featureDir: string, cwd: string): SourceResolution {
+function resolveStorySourceFile(
+  sourceInput: string,
+  featureDir: string,
+  cwd: string
+): SourceResolution {
   if (!/\.(txt|md)$/i.test(sourceInput)) {
     return { ok: false, error: "Epic/Story source file must use .txt or .md extension." };
   }
@@ -109,13 +122,20 @@ function resolveStorySourceFile(sourceInput: string, featureDir: string, cwd: st
     return { ok: false, error: `Epic/Story source file not found: ${sourceInput}` };
   }
   if (!statSync(sourcePath).isFile()) {
-    return { ok: false, error: `Epic/Story source path is not a file: ${displayPath(sourcePath, cwd)}` };
+    return {
+      ok: false,
+      error: `Epic/Story source path is not a file: ${displayPath(sourcePath, cwd)}`
+    };
   }
 
   const featureRoot = realpathSync(featureDir);
   const resolvedSourcePath = realpathSync(sourcePath);
   const relativeToFeature = path.relative(featureRoot, resolvedSourcePath);
-  if (relativeToFeature === "" || relativeToFeature.startsWith("..") || path.isAbsolute(relativeToFeature)) {
+  if (
+    relativeToFeature === "" ||
+    relativeToFeature.startsWith("..") ||
+    path.isAbsolute(relativeToFeature)
+  ) {
     return {
       ok: false,
       error: `Epic/Story source file must be inside feature path root: ${displayPath(featureDir, cwd)}`
@@ -125,7 +145,11 @@ function resolveStorySourceFile(sourceInput: string, featureDir: string, cwd: st
   return { ok: true, path: resolvedSourcePath };
 }
 
-function resolveStorySourceCandidate(sourceInput: string, featureDir: string, cwd: string): string | undefined {
+function resolveStorySourceCandidate(
+  sourceInput: string,
+  featureDir: string,
+  cwd: string
+): string | undefined {
   if (path.isAbsolute(sourceInput)) {
     const candidate = path.normalize(sourceInput);
     return existsSync(candidate) ? candidate : undefined;
@@ -133,9 +157,11 @@ function resolveStorySourceCandidate(sourceInput: string, featureDir: string, cw
 
   const normalizedInput = path.normalize(sourceInput.replace(/^\.\//, ""));
   const featureRelativePath = path.relative(cwd, featureDir);
-  const candidate = normalizedInput === featureRelativePath || normalizedInput.startsWith(`${featureRelativePath}${path.sep}`)
-    ? path.resolve(cwd, normalizedInput)
-    : path.resolve(featureDir, normalizedInput);
+  const candidate =
+    normalizedInput === featureRelativePath ||
+    normalizedInput.startsWith(`${featureRelativePath}${path.sep}`)
+      ? path.resolve(cwd, normalizedInput)
+      : path.resolve(featureDir, normalizedInput);
 
   return existsSync(candidate) ? candidate : undefined;
 }

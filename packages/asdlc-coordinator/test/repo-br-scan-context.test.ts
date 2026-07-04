@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -87,20 +87,6 @@ function makeFeatureDir(root: string): string {
   return dir;
 }
 
-function assertNoRebaseState(repoPath: string): void {
-  const r = spawnSync("git", ["rev-parse", "--git-dir"], { cwd: repoPath, encoding: "utf8" });
-  if ((r.status ?? 1) !== 0) {
-    return;
-  }
-  let gitDir = r.stdout.trim();
-  if (!path.isAbsolute(gitDir)) {
-    gitDir = path.join(repoPath, gitDir);
-  }
-  const hasRebaseMerge = existsSync(path.join(gitDir, "rebase-merge"));
-  const hasRebaseApply = existsSync(path.join(gitDir, "rebase-apply"));
-  assert.equal(hasRebaseMerge || hasRebaseApply, false, "Expected rebase state to be aborted");
-}
-
 // ── Non-git basic tests ─────────────────────────────────────────────────────
 
 test("repo-br-scan context exits 2 when feature path is not a directory", () => {
@@ -172,7 +158,10 @@ test("repo-br-scan context assembles block with ready repos when repos are on de
     assert.match(result.text ?? "", /- backend:/);
     assert.match(result.text ?? "", /gate_command: node .overmind\/overmind.js gate repo-br-scan/);
     assert.doesNotMatch(result.text ?? "", /\.claude\/skills/);
-    assert.match(result.text ?? "", /feature_br_template_asset: assets\/feature_br_summary_TEMPLATE\.md/);
+    assert.match(
+      result.text ?? "",
+      /feature_br_template_asset: assets\/feature_br_summary_TEMPLATE\.md/
+    );
   });
 });
 
@@ -226,10 +215,7 @@ test("repo-br-scan context blocks when ready repo is on non-default branch (D7)"
     writeDefinition(root, featureDir, [{ name: "backend", state: "ready", path: localPath }]);
     const result = buildRepoBrScanContext(path.relative(root, featureDir), root);
     assert.equal(result.exitCode, 2);
-    assert.match(
-      result.errorMessage ?? "",
-      /BLOCKED:.*is not on its default branch.*D7/
-    );
+    assert.match(result.errorMessage ?? "", /BLOCKED:.*is not on its default branch.*D7/);
   });
 });
 
@@ -251,11 +237,10 @@ test("repo-br-scan context blocks when both main and master exist with no remote
     const { localPath } = createSyncedGitRepo(root, "backend");
     git(["checkout", "-q", "-b", "master"], localPath);
     git(["checkout", "-q", "main"], localPath);
-    const headRefResult = spawnSync(
-      "git",
-      ["symbolic-ref", "-q", "refs/remotes/origin/HEAD"],
-      { cwd: localPath, encoding: "utf8" }
-    );
+    const headRefResult = spawnSync("git", ["symbolic-ref", "-q", "refs/remotes/origin/HEAD"], {
+      cwd: localPath,
+      encoding: "utf8"
+    });
     if ((headRefResult.status ?? 1) === 0) {
       spawnSync("git", ["symbolic-ref", "-d", "refs/remotes/origin/HEAD"], {
         cwd: localPath,

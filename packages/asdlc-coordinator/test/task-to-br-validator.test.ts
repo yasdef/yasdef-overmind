@@ -9,7 +9,6 @@ import { validateTaskToBr } from "../src/validate/task-to-br.js";
 import {
   completeSummary,
   createFeatureFixture,
-  emptyMissingData,
   goldenBasedValidSummary,
   userInputWithoutStoryContent
 } from "./fixtures.js";
@@ -90,10 +89,22 @@ test("validator reports required BR summary field failures distinctly", () => {
       summary: completeSummary()
         .replace("- source_type: User input", "- source_type: Story")
         .replace("- last_updated: 2026-03-20", "- last_updated: 03/20/2026")
-        .replace("- short summary: Product owners need invoice approval turnaround visibility.", "- short summary: [UNFILLED]")
-        .replace("- primary_business_goal: Reduce billing approval cycle time.", "- primary_business_goal: [UNFILLED]")
-        .replace("- FR-1: System captures required invoice approval fields from product owner.", "- FR-1: [UNFILLED]")
-        .replace("- BR-1: Approval requests above threshold require compliance review before release.", "- BR-1: [UNFILLED]")
+        .replace(
+          "- short summary: Product owners need invoice approval turnaround visibility.",
+          "- short summary: [UNFILLED]"
+        )
+        .replace(
+          "- primary_business_goal: Reduce billing approval cycle time.",
+          "- primary_business_goal: [UNFILLED]"
+        )
+        .replace(
+          "- FR-1: System captures required invoice approval fields from product owner.",
+          "- FR-1: [UNFILLED]"
+        )
+        .replace(
+          "- BR-1: Approval requests above threshold require compliance review before release.",
+          "- BR-1: [UNFILLED]"
+        )
     });
     const result = validateTaskToBr(featureDir, root);
     assert.equal(result.exitCode, 1);
@@ -118,9 +129,7 @@ test("validator reports a missing Document Meta section", () => {
     });
     const result = validateTaskToBr(featureDir, root);
     assert.equal(result.exitCode, 1);
-    assert.deepEqual(result.problems, [
-      "section ## 1. Document Meta is missing"
-    ]);
+    assert.deepEqual(result.problems, ["section ## 1. Document Meta is missing"]);
   });
 });
 

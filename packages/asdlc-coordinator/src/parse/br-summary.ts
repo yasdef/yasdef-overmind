@@ -69,7 +69,9 @@ export function flipReadyToEarsFalseToTrue(filePath: string): void {
     throw new Error("Missing key ready_to_ears in ## 1. Document Meta");
   }
   if (currentValue !== "false") {
-    throw new Error(`Expected ready_to_ears to be false before readiness check; found '${currentValue}'.`);
+    throw new Error(
+      `Expected ready_to_ears to be false before readiness check; found '${currentValue}'.`
+    );
   }
 
   let inMeta = false;

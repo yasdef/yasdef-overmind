@@ -30,7 +30,10 @@ function createRepo(root: string): string {
   return repo;
 }
 
-function fixture(root: string, opts: { repo?: boolean; blueprint?: boolean; classes?: string } = {}): {
+function fixture(
+  root: string,
+  opts: { repo?: boolean; blueprint?: boolean; classes?: string } = {}
+): {
   project: string;
   feature: string;
 } {
@@ -73,7 +76,8 @@ test("surface-map context: backend with ready repo emits binding, scan scope, ma
       "- read_only_input: projects/p1/init_progress_definition.yaml",
       "- read_only_input: projects/p1/feature-b/implementation_plan.md",
       "- In-flight plan source: feature-b/implementation_plan.md"
-    ]) assert.ok(text.includes(expected), expected);
+    ])
+      assert.ok(text.includes(expected), expected);
     assert.doesNotMatch(text, /\.codex\/skills|\.claude\/skills/);
     assert.equal((text.match(/^- read_only_input: /gm) ?? []).length, 4);
   } finally {
@@ -88,7 +92,9 @@ test("surface-map context: frontend uses fe assets", () => {
     writeFileSync(path.join(project, "project_stack_blueprint_frontend.md"), "# fe blueprint\n");
     const result = buildSurfaceMapContext("projects/p1/feature-a", "frontend", root);
     assert.equal(result.exitCode, 0, result.errorMessage);
-    assert.ok((result.text ?? "").includes("assets/project_surface_struct_resp_map_fe_TEMPLATE.md"));
+    assert.ok(
+      (result.text ?? "").includes("assets/project_surface_struct_resp_map_fe_TEMPLATE.md")
+    );
     assert.ok((result.text ?? "").includes("--class frontend"));
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -121,7 +127,9 @@ test("surface-map context: ready repo AND blueprint expose both evidence sources
     // Ready repo is the scan scope...
     assert.match(text, /## Scan Scope\n- backend: \//);
     // ...and the blueprint is still surfaced AND read-only-protected (in the manifest).
-    assert.ok(text.includes("- Stack blueprint source: projects/p1/project_stack_blueprint_backend.md"));
+    assert.ok(
+      text.includes("- Stack blueprint source: projects/p1/project_stack_blueprint_backend.md")
+    );
     assert.ok(text.includes("- read_only_input: projects/p1/project_stack_blueprint_backend.md"));
     // three always-on inputs + the blueprint = 4 read-only inputs
     assert.equal((text.match(/^- read_only_input: /gm) ?? []).length, 4);
@@ -133,13 +141,19 @@ test("surface-map context: ready repo AND blueprint expose both evidence sources
 test("surface-map context: blueprint fallback when no ready repo", () => {
   const root = mkdtempSync(path.join(tmpdir(), "overmind-surface-context-bp-"));
   try {
-    const { project } = fixture(root, { blueprint: true });
+    fixture(root, { blueprint: true });
     const result = buildSurfaceMapContext("projects/p1/feature-a", "backend", root);
     assert.equal(result.exitCode, 0, result.errorMessage);
     const text = result.text ?? "";
-    assert.ok(text.includes("no ready repository; blueprint evidence is primary planned structural evidence"));
+    assert.ok(
+      text.includes(
+        "no ready repository; blueprint evidence is primary planned structural evidence"
+      )
+    );
     assert.ok(text.includes("- read_only_input: projects/p1/project_stack_blueprint_backend.md"));
-    assert.ok(text.includes("Stack blueprint source: projects/p1/project_stack_blueprint_backend.md"));
+    assert.ok(
+      text.includes("Stack blueprint source: projects/p1/project_stack_blueprint_backend.md")
+    );
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

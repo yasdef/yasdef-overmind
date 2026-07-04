@@ -18,11 +18,22 @@ export function syncSurfaceMapStep(
   const { workspaceRoot, relativeFeature } = resolved.value;
   const parts = relativeFeature.split(path.sep);
   if (parts.length !== 3 || parts[0] !== "projects") {
-    return { exitCode: 2, errorMessage: `Feature path must resolve under projects/<project-id>/<feature-folder>: ${relativeFeature}` };
+    return {
+      exitCode: 2,
+      errorMessage: `Feature path must resolve under projects/<project-id>/<feature-folder>: ${relativeFeature}`
+    };
   }
-  const definitionPath = path.join(workspaceRoot, "projects", parts[1], "init_progress_definition.yaml");
+  const definitionPath = path.join(
+    workspaceRoot,
+    "projects",
+    parts[1]!,
+    "init_progress_definition.yaml"
+  );
   if (!existsSync(definitionPath)) {
-    return { exitCode: 2, errorMessage: `Required file not found: ${path.relative(workspaceRoot, definitionPath)}` };
+    return {
+      exitCode: 2,
+      errorMessage: `Required file not found: ${path.relative(workspaceRoot, definitionPath)}`
+    };
   }
 
   try {

@@ -1,10 +1,48 @@
 import { captureTaskToBrInput } from "../capture/index.js";
-import { buildTaskToBrContext, buildRepoBrScanContext, buildBrClarificationContext, buildRequirementsEarsContext, buildEarsReviewContext, buildContractDeltaContext, buildSurfaceMapContext, buildSurfaceMapEnrichContext, buildTechnicalRequirementsContext, buildImplementationSlicesContext, buildPrerequisiteGapsContext, buildImplementationPlanContext, buildPlanSemanticReviewContext } from "../context/index.js";
+import {
+  buildTaskToBrContext,
+  buildRepoBrScanContext,
+  buildBrClarificationContext,
+  buildRequirementsEarsContext,
+  buildEarsReviewContext,
+  buildContractDeltaContext,
+  buildSurfaceMapContext,
+  buildSurfaceMapEnrichContext,
+  buildTechnicalRequirementsContext,
+  buildImplementationSlicesContext,
+  buildPrerequisiteGapsContext,
+  buildImplementationPlanContext,
+  buildPlanSemanticReviewContext
+} from "../context/index.js";
 import { runBrClarificationReadiness } from "../readiness/index.js";
-import { syncContractDeltaStep, syncRepoBrScanStep, syncSurfaceMapStep, syncPrerequisiteGapsStep } from "../sync/index.js";
-import { validateTaskToBr, validateRepoBrScan, validateBrClarification, validateRequirementsEars, validateEarsReview, validateContractDelta, validateSurfaceMap, validateTechnicalRequirements, validateImplementationSlices, validatePrerequisiteGaps, validateImplementationPlan, validatePlanSemanticReview } from "../validate/index.js";
+import {
+  syncContractDeltaStep,
+  syncRepoBrScanStep,
+  syncSurfaceMapStep,
+  syncPrerequisiteGapsStep
+} from "../sync/index.js";
+import {
+  validateTaskToBr,
+  validateRepoBrScan,
+  validateBrClarification,
+  validateRequirementsEars,
+  validateEarsReview,
+  validateContractDelta,
+  validateSurfaceMap,
+  validateTechnicalRequirements,
+  validateImplementationSlices,
+  validatePrerequisiteGaps,
+  validateImplementationPlan,
+  validatePlanSemanticReview
+} from "../validate/index.js";
 
-import type { CaptureResult, ContextResult, GateResult, ReadinessResult, SyncStepResult } from "../types/index.js";
+import type {
+  CaptureResult,
+  ContextResult,
+  GateResult,
+  ReadinessResult,
+  SyncStepResult
+} from "../types/index.js";
 import type { SurfaceMapClass } from "../validate/surface-map.js";
 
 const SURFACE_CLASSES = ["backend", "frontend", "mobile"] as const;
@@ -43,7 +81,10 @@ const contextRegistry: Record<string, (featurePath: string) => ContextResult> = 
   "prerequisite-gaps": buildPrerequisiteGapsContext
 };
 
-const captureRegistry: Record<string, (featurePath: string, options: CaptureOptions) => CaptureResult> = {
+const captureRegistry: Record<
+  string,
+  (featurePath: string, options: CaptureOptions) => CaptureResult
+> = {
   "task-to-br": captureTaskToBrInput
 };
 
@@ -57,19 +98,31 @@ const readinessRegistry: Record<string, (featurePath: string) => ReadinessResult
   "br-clarification": runBrClarificationReadiness
 };
 
-const classGateRegistry: Record<string, (targetPath: string, klass: SurfaceMapClass) => GateResult> = {
+const classGateRegistry: Record<
+  string,
+  (targetPath: string, klass: SurfaceMapClass) => GateResult
+> = {
   "surface-map": validateSurfaceMap
 };
 
-const classContextRegistry: Record<string, (featurePath: string, klass: SurfaceMapClass) => ContextResult> = {
+const classContextRegistry: Record<
+  string,
+  (featurePath: string, klass: SurfaceMapClass) => ContextResult
+> = {
   "surface-map": buildSurfaceMapContext
 };
 
-const classSyncRegistry: Record<string, (featurePath: string, klass: SurfaceMapClass) => SyncStepResult> = {
+const classSyncRegistry: Record<
+  string,
+  (featurePath: string, klass: SurfaceMapClass) => SyncStepResult
+> = {
   "surface-map": syncSurfaceMapStep
 };
 
-function parseClassOption(args: string[], verb: string): { klass?: SurfaceMapClass; error?: string } {
+function parseClassOption(
+  args: string[],
+  verb: string
+): { klass?: SurfaceMapClass; error?: string } {
   let klass: string | undefined;
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
@@ -121,7 +174,9 @@ export async function runCli(
     return runReadiness(step, targetPath, streams);
   }
 
-  streams.stderr.write("ERROR: Usage: overmind <capture|context|gate|sync|readiness> <step> <path>\n");
+  streams.stderr.write(
+    "ERROR: Usage: overmind <capture|context|gate|sync|readiness> <step> <path>\n"
+  );
   return 2;
 }
 
@@ -151,11 +206,12 @@ function runGate(
       streams.stderr.write(`ERROR: Unknown gate step: ${step}\n`);
       return 2;
     }
-    result = step === "br-clarification"
-      ? validateBrClarification(targetPath, process.cwd(), {
-        onProgress: (line) => streams.stdout.write(`${line}\n`)
-      })
-      : validator(targetPath);
+    result =
+      step === "br-clarification"
+        ? validateBrClarification(targetPath, process.cwd(), {
+            onProgress: (line) => streams.stdout.write(`${line}\n`)
+          })
+        : validator(targetPath);
   }
   if (result.exitCode === 0) {
     streams.stdout.write(`${result.passMessage}\n`);
@@ -218,7 +274,9 @@ function runCapture(
   streams: OutputStreams
 ): number {
   if (!step || !featurePath) {
-    streams.stderr.write("ERROR: Usage: overmind capture <step> <feature_path> (--source-file <path> | --jira <ticket>) [--overwrite]\n");
+    streams.stderr.write(
+      "ERROR: Usage: overmind capture <step> <feature_path> (--source-file <path> | --jira <ticket>) [--overwrite]\n"
+    );
     return 2;
   }
 
@@ -274,7 +332,9 @@ function runSync(
   }
   if (result.exitCode === 0) {
     const count = result.syncedCount ?? 0;
-    streams.stdout.write(count === 0 ? "No ready repos to sync.\n" : `Synced ${count} repo(s) to default branch.\n`);
+    streams.stdout.write(
+      count === 0 ? "No ready repos to sync.\n" : `Synced ${count} repo(s) to default branch.\n`
+    );
     return 0;
   }
 
@@ -296,7 +356,9 @@ function runReadiness(
 ): number {
   if (!step || !featurePath) {
     streams.stderr.write("ERROR: Usage: overmind readiness <step> <feature_path>\n");
-    streams.stderr.write("ERROR: Usage: overmind <capture|context|gate|sync|readiness> <step> <path>\n");
+    streams.stderr.write(
+      "ERROR: Usage: overmind <capture|context|gate|sync|readiness> <step> <path>\n"
+    );
     return 2;
   }
 

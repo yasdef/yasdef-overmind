@@ -1,11 +1,7 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 
-import {
-  displayPath,
-  readUserBrInput,
-  resolveInputPath
-} from "../parse/index.js";
+import { displayPath, readUserBrInput, resolveInputPath } from "../parse/index.js";
 
 import type { ContextResult } from "../types/index.js";
 
@@ -156,7 +152,7 @@ function readFileSyncUtf8(filePath: string): string {
 function stripYamlScalar(value: string): string {
   const trimmed = value.trim();
   if (
-    (trimmed.startsWith("\"") && trimmed.endsWith("\"")) ||
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
     (trimmed.startsWith("'") && trimmed.endsWith("'"))
   ) {
     return trimmed.slice(1, -1).trim();

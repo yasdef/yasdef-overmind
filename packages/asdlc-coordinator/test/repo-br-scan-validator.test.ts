@@ -172,7 +172,9 @@ test("repo-br-scan validator fails when ## 13. Existing-System Context is missin
     );
     const result = validateRepoBrScan(featureDir, root);
     assert.equal(result.exitCode, 1);
-    assert.ok(result.problems.some((p) => p.includes("section ## 13. Existing-System Context is missing")));
+    assert.ok(
+      result.problems.some((p) => p.includes("section ## 13. Existing-System Context is missing"))
+    );
   });
 });
 
@@ -184,7 +186,9 @@ test("repo-br-scan validator fails when ## 13 has no fields", () => {
     );
     const result = validateRepoBrScan(featureDir, root);
     assert.equal(result.exitCode, 1);
-    assert.ok(result.problems.some((p) => p.includes("## 13. Existing-System Context has no fields")));
+    assert.ok(
+      result.problems.some((p) => p.includes("## 13. Existing-System Context has no fields"))
+    );
   });
 });
 
@@ -237,7 +241,10 @@ test("overmind gate repo-br-scan exits 1 with missing lines for invalid content"
     assert.equal(result.status, 1);
     assert.match(result.stdout, /^business-context gate failed/m);
     assert.match(result.stdout, /^missing: ## 1\. Document Meta -> source_type is unfilled/m);
-    assert.match(result.stdout, /^missing: ## 1\. Document Meta -> last_updated must be YYYY-MM-DD/m);
+    assert.match(
+      result.stdout,
+      /^missing: ## 1\. Document Meta -> last_updated must be YYYY-MM-DD/m
+    );
   });
 });
 

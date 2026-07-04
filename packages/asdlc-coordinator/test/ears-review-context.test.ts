@@ -38,14 +38,44 @@ test("ears-review context assembles runtime paths, allowed writes, gate command,
     assert.match(result.text ?? "", /# ears-review context/);
     assert.match(result.text ?? "", new RegExp(`feature_path: ${escapeRegExp(featureDir)}`));
     assert.match(result.text ?? "", /feature_path_for_command: projects\/project-a\/feature-alpha/);
-    assert.match(result.text ?? "", new RegExp(`read_only_br_source: ${escapeRegExp(path.join(featureDir, "feature_br_summary.md"))}`));
-    assert.match(result.text ?? "", new RegExp(`requirements_ears_artifact: ${escapeRegExp(path.join(featureDir, "requirements_ears.md"))}`));
-    assert.match(result.text ?? "", new RegExp(`review_ledger_artifact: ${escapeRegExp(path.join(featureDir, "requirements_ears_review.md"))}`));
-    assert.match(result.text ?? "", /gate_command: node \.overmind\/overmind\.js gate ears-review projects\/project-a\/feature-alpha/);
-    assert.match(result.text ?? "", /review_template_asset: assets\/requirements_ears_review_TEMPLATE\.md/);
-    assert.match(result.text ?? "", /review_golden_example_asset: assets\/requirements_ears_review_GOLDEN_EXAMPLE\.md/);
-    assert.match(result.text ?? "", /## Allowed Write Surface\n- requirements_ears\.md\n- requirements_ears_review\.md/);
-    assert.doesNotMatch(result.text ?? "", /\.codex\/skills|\.claude\/skills|overmind\/templates|\.rules\/requirements_ears_review/);
+    assert.match(
+      result.text ?? "",
+      new RegExp(
+        `read_only_br_source: ${escapeRegExp(path.join(featureDir, "feature_br_summary.md"))}`
+      )
+    );
+    assert.match(
+      result.text ?? "",
+      new RegExp(
+        `requirements_ears_artifact: ${escapeRegExp(path.join(featureDir, "requirements_ears.md"))}`
+      )
+    );
+    assert.match(
+      result.text ?? "",
+      new RegExp(
+        `review_ledger_artifact: ${escapeRegExp(path.join(featureDir, "requirements_ears_review.md"))}`
+      )
+    );
+    assert.match(
+      result.text ?? "",
+      /gate_command: node \.overmind\/overmind\.js gate ears-review projects\/project-a\/feature-alpha/
+    );
+    assert.match(
+      result.text ?? "",
+      /review_template_asset: assets\/requirements_ears_review_TEMPLATE\.md/
+    );
+    assert.match(
+      result.text ?? "",
+      /review_golden_example_asset: assets\/requirements_ears_review_GOLDEN_EXAMPLE\.md/
+    );
+    assert.match(
+      result.text ?? "",
+      /## Allowed Write Surface\n- requirements_ears\.md\n- requirements_ears_review\.md/
+    );
+    assert.doesNotMatch(
+      result.text ?? "",
+      /\.codex\/skills|\.claude\/skills|overmind\/templates|\.rules\/requirements_ears_review/
+    );
   });
 });
 
@@ -88,10 +118,14 @@ test("overmind context ears-review uses common usage and unknown-step errors", (
     assert.equal(missingArg.status, 2);
     assert.match(missingArg.stderr, /ERROR: Usage: overmind context <step> <feature_path>/);
 
-    const unknown = spawnSync(process.execPath, [bundlePath, "context", "unknown-ears-review", "."], {
-      cwd: root,
-      encoding: "utf8"
-    });
+    const unknown = spawnSync(
+      process.execPath,
+      [bundlePath, "context", "unknown-ears-review", "."],
+      {
+        cwd: root,
+        encoding: "utf8"
+      }
+    );
     assert.equal(unknown.status, 2);
     assert.match(unknown.stderr, /ERROR: Unknown context step: unknown-ears-review/);
   });

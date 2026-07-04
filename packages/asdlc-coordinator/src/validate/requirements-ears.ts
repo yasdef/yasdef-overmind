@@ -30,7 +30,9 @@ export function validateRequirementsEars(inputPath: string, cwd = process.cwd())
 
     const content = readRequiredTextFile(targetPath);
     if (!/[^ \t\r\n]/.test(content)) {
-      return gateRecoverable([`quality gate failed: target EARS requirements is empty: ${targetPath}`]);
+      return gateRecoverable([
+        `quality gate failed: target EARS requirements is empty: ${targetPath}`
+      ]);
     }
 
     const problems = validateRequirementsEarsContent(content);
@@ -98,7 +100,9 @@ export function validateRequirementsEarsContent(content: string): string[] {
           failQuality(`Requirement numbering must start at 1; found ${headingNumber}`);
         }
         if (lastRequirementNumber > 0 && headingNumber !== lastRequirementNumber + 1) {
-          failQuality(`Requirement numbering must be sequential; expected ${lastRequirementNumber + 1}, found ${headingNumber}`);
+          failQuality(
+            `Requirement numbering must be sequential; expected ${lastRequirementNumber + 1}, found ${headingNumber}`
+          );
         }
         lastRequirementNumber = headingNumber;
       } else {
@@ -110,7 +114,9 @@ export function validateRequirementsEarsContent(content: string): string[] {
           failQuality(`NFR numbering must start at 1; found ${headingNumber}`);
         }
         if (lastNfrNumber > 0 && headingNumber !== lastNfrNumber + 1) {
-          failQuality(`NFR numbering must be sequential; expected ${lastNfrNumber + 1}, found ${headingNumber}`);
+          failQuality(
+            `NFR numbering must be sequential; expected ${lastNfrNumber + 1}, found ${headingNumber}`
+          );
         }
         lastNfrNumber = headingNumber;
       }

@@ -44,14 +44,14 @@ export function computeCrossClassPeerTrigger(definitionPath: string): CrossClass
 
     const projectTypeMatch = rawLine.match(/^\s{2}project_type_code:\s*(.*)$/);
     if (projectTypeMatch) {
-      projectTypeCode = stripQuotes(projectTypeMatch[1]);
+      projectTypeCode = stripQuotes(projectTypeMatch[1]!);
       inClasses = false;
       continue;
     }
 
     const inlineClassesMatch = rawLine.match(/^\s{2}project_classes:\s*\[([^\]]*)\]\s*$/);
     if (inlineClassesMatch) {
-      for (const value of inlineClassesMatch[1].split(",")) {
+      for (const value of inlineClassesMatch[1]!.split(",")) {
         recordClass(value);
       }
       inClasses = false;
@@ -66,7 +66,7 @@ export function computeCrossClassPeerTrigger(definitionPath: string): CrossClass
     if (inClasses) {
       const itemMatch = rawLine.match(/^\s{4}-\s*(.*)$/);
       if (itemMatch) {
-        recordClass(itemMatch[1]);
+        recordClass(itemMatch[1]!);
         continue;
       }
       inClasses = false;

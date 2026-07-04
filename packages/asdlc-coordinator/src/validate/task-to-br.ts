@@ -143,7 +143,11 @@ function validateSummaryContent(
     if (inBusinessRules && /^BR-[0-9]+$/.test(field.key) && !isUnfilled(field.value)) {
       completeBrCount += 1;
     }
-    if (inOpenQuestions && !isUnfilled(field.value) && !field.value.toLowerCase().includes("rised")) {
+    if (
+      inOpenQuestions &&
+      !isUnfilled(field.value) &&
+      !field.value.toLowerCase().includes("rised")
+    ) {
       nonRisedOpenQuestionsFound = true;
     }
     if (
@@ -182,33 +186,49 @@ function validateSummaryContent(
     problems.push("### 3.1 Business goal -> primary_business_goal is unfilled");
   }
   if (completeFrCount < 1) {
-    problems.push("## 6. Functional Requirements -> at least one meaningful one-line FR item (`- FR-N: ...`) is required");
+    problems.push(
+      "## 6. Functional Requirements -> at least one meaningful one-line FR item (`- FR-N: ...`) is required"
+    );
   }
   if (completeBrCount < 1) {
-    problems.push("## 7. Business Rules and Decision Logic -> at least one meaningful one-line BR item (`- BR-N: ...`) is required");
+    problems.push(
+      "## 7. Business Rules and Decision Logic -> at least one meaningful one-line BR item (`- BR-N: ...`) is required"
+    );
   }
   if (nonRisedOpenQuestionsFound) {
-    problems.push("## 15. Open Questions -> unresolved items must be moved to missing_br_data.md as rised_item_N with rised=false");
+    problems.push(
+      "## 15. Open Questions -> unresolved items must be moved to missing_br_data.md as rised_item_N with rised=false"
+    );
   }
   if (nonRisedAssumptionsNeedingValidationFound) {
-    problems.push("### Needs validation -> unresolved assumptions_needing_validation must be moved to missing_br_data.md as rised_item_N with rised=false");
+    problems.push(
+      "### Needs validation -> unresolved assumptions_needing_validation must be moved to missing_br_data.md as rised_item_N with rised=false"
+    );
   }
   if (nonRisedScopePointsFound) {
-    problems.push("### 5.3 Open scope boundaries -> unresolved unclear_scope_points must be moved to missing_br_data.md as rised_item_N with rised=false");
+    problems.push(
+      "### 5.3 Open scope boundaries -> unresolved unclear_scope_points must be moved to missing_br_data.md as rised_item_N with rised=false"
+    );
   }
 
   if (missingData.risedItems.length > 0) {
     if (missingData.risedItems.some((item) => item.risedState === "missing")) {
-      problems.push("missing_br_data.md -> every unresolved ledger item must include rised=false or rised=true");
+      problems.push(
+        "missing_br_data.md -> every unresolved ledger item must include rised=false or rised=true"
+      );
     }
     if (
       missingData.risedItems.some((item) => item.risedState === "true") &&
       !missingData.hasFilledAnswer
     ) {
-      problems.push("missing_br_data.md -> unresolved rised items exist but ## 6. Latest User Answers -> answers is [UNFILLED]");
+      problems.push(
+        "missing_br_data.md -> unresolved rised items exist but ## 6. Latest User Answers -> answers is [UNFILLED]"
+      );
     }
     if (!missingData.hasFilledUnresolvedAfterStop) {
-      problems.push("missing_br_data.md -> unresolved rised items exist but ## 7. Loop Decision -> unresolved_after_stop is [UNFILLED]");
+      problems.push(
+        "missing_br_data.md -> unresolved rised items exist but ## 7. Loop Decision -> unresolved_after_stop is [UNFILLED]"
+      );
     }
   }
 

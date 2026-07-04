@@ -19,10 +19,14 @@ export function buildEarsReviewContext(inputPath: string, cwd = process.cwd()): 
   const requirementsEarsPath = path.join(featureDir, "requirements_ears.md");
   const reviewLedgerPath = path.join(featureDir, "requirements_ears_review.md");
   if (!existsSync(brSummaryPath)) {
-    return contextError(`Upstream BR summary is required before EARS review: ${displayPath(brSummaryPath, cwd)}`);
+    return contextError(
+      `Upstream BR summary is required before EARS review: ${displayPath(brSummaryPath, cwd)}`
+    );
   }
   if (!existsSync(requirementsEarsPath)) {
-    return contextError(`Upstream EARS requirements are required before EARS review: ${displayPath(requirementsEarsPath, cwd)}`);
+    return contextError(
+      `Upstream EARS requirements are required before EARS review: ${displayPath(requirementsEarsPath, cwd)}`
+    );
   }
 
   const featurePathForCommand = displayPath(featureDir, cwd);

@@ -30,12 +30,10 @@ test("findUnresolvedRisedItems detects false, non-rised, not-rised, and missing 
 - rised_item_5: source=## 15. Open Questions -> critical_questions; rised=true; unresolved_item=E?
 `;
 
-  assert.deepEqual(findUnresolvedRisedItems(content).map((item) => item.id), [
-    "rised_item_1",
-    "rised_item_2",
-    "rised_item_3",
-    "rised_item_4"
-  ]);
+  assert.deepEqual(
+    findUnresolvedRisedItems(content).map((item) => item.id),
+    ["rised_item_1", "rised_item_2", "rised_item_3", "rised_item_4"]
+  );
 });
 
 test("findUnresolvedRisedItems ignores quoted examples and non-ledger lines", () => {
@@ -79,7 +77,10 @@ test("document meta reader strips quotes and readiness flip enforces false preco
 test("readiness flip fails when ready_to_ears is absent", () => {
   withWorkspace((root) => {
     const filePath = path.join(root, "feature_br_summary.md");
-    writeFileSync(filePath, "# Feature Business Requirements Summary\n\n## 1. Document Meta\n- source_type: User input\n");
+    writeFileSync(
+      filePath,
+      "# Feature Business Requirements Summary\n\n## 1. Document Meta\n- source_type: User input\n"
+    );
     assert.throws(() => flipReadyToEarsFalseToTrue(filePath), /Missing key ready_to_ears/);
   });
 });

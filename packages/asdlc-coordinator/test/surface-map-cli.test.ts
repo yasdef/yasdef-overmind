@@ -6,13 +6,27 @@ import assert from "node:assert/strict";
 
 import { runCli } from "../src/cli/run.js";
 
-function capture(): { streams: { stdout: { write: (s: string) => boolean }; stderr: { write: (s: string) => boolean } }; out: () => string; err: () => string } {
+function capture(): {
+  streams: { stdout: { write: (s: string) => boolean }; stderr: { write: (s: string) => boolean } };
+  out: () => string;
+  err: () => string;
+} {
   let out = "";
   let err = "";
   return {
     streams: {
-      stdout: { write: (s: string) => { out += s; return true; } },
-      stderr: { write: (s: string) => { err += s; return true; } }
+      stdout: {
+        write: (s: string) => {
+          out += s;
+          return true;
+        }
+      },
+      stderr: {
+        write: (s: string) => {
+          err += s;
+          return true;
+        }
+      }
     },
     out: () => out,
     err: () => err
@@ -21,7 +35,7 @@ function capture(): { streams: { stdout: { write: (s: string) => boolean }; stde
 
 async function run(args: string[]): Promise<{ code: number; out: string; err: string }> {
   const cap = capture();
-  const code = await runCli(["node", "overmind", ...args], cap.streams as never);
+  const code = await runCli(["node", "overmind", ...args], cap.streams);
   return { code, out: cap.out(), err: cap.err() };
 }
 
@@ -33,7 +47,13 @@ for (const verb of ["gate", "context", "sync"]) {
   });
 
   test(`${verb} surface-map with an unknown --class is a usage error`, async () => {
-    const { code, err } = await run([verb, "surface-map", "projects/p1/feature-a", "--class", "infra"]);
+    const { code, err } = await run([
+      verb,
+      "surface-map",
+      "projects/p1/feature-a",
+      "--class",
+      "infra"
+    ]);
     assert.equal(code, 2);
     assert.match(err, /Invalid class 'infra'/);
   });
@@ -69,9 +89,15 @@ const dispatchExpectation: Record<string, RegExp> = {
 for (const verb of ["gate", "context", "sync"]) {
   for (const klass of ["backend", "frontend", "mobile"]) {
     test(`${verb} surface-map --class ${klass} dispatches to its handler`, async () => {
-      const { code, err } = await run([verb, "surface-map", "does-not-exist/feature", "--class", klass]);
+      const { code, err } = await run([
+        verb,
+        "surface-map",
+        "does-not-exist/feature",
+        "--class",
+        klass
+      ]);
       assert.equal(code, 2);
-      assert.match(err, dispatchExpectation[verb]);
+      assert.match(err, dispatchExpectation[verb]!);
       assert.doesNotMatch(err, /Invalid class|Missing (value for|required option:) --class/);
     });
   }

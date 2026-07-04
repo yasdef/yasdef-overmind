@@ -61,7 +61,9 @@ export function validateEarsReview(inputPath: string, cwd = process.cwd()): Gate
 
     const content = readRequiredTextFile(targetPath);
     if (!/[^ \t\r\n]/.test(content)) {
-      return gateRecoverable([`quality gate failed: target requirements ears review artifact is empty: ${targetPath}`]);
+      return gateRecoverable([
+        `quality gate failed: target requirements ears review artifact is empty: ${targetPath}`
+      ]);
     }
 
     const problems = validateEarsReviewContent(content);
@@ -182,7 +184,12 @@ export function validateEarsReviewContent(content: string): string[] {
 
     const rawState = finding.fields.get("state") ?? "";
     const state = normalizeState(rawState);
-    if (state !== "escalated" && state !== "added to ears" && state !== "rejected" && state !== "postponed") {
+    if (
+      state !== "escalated" &&
+      state !== "added to ears" &&
+      state !== "rejected" &&
+      state !== "postponed"
+    ) {
       failQuality(`finding block ${findingNumber} has invalid state: ${rawState}`);
     }
     if (state === "escalated") {

@@ -125,26 +125,37 @@ test("requirements-ears validator exits 1 when target is empty", () => {
 test("requirements-ears validator reports missing required block fields", () => {
   withWorkspace((root) => {
     const featureDir = createFeatureFixture(root);
-    writeRequirements(featureDir, `# Requirements (EARS)
+    writeRequirements(
+      featureDir,
+      `# Requirements (EARS)
 
 ## Requirements
 
 ### Requirement 1 - Missing fields
 **Acceptance Criteria (EARS):**
 - WHEN a request is submitted, THE System SHALL process it.
-`);
+`
+    );
 
     const result = validateRequirementsEars(featureDir, root);
     assert.equal(result.exitCode, 1);
-    assert.match(result.problems.join("\n"), /missing User Story in block: ### Requirement 1 - Missing fields/);
-    assert.match(result.problems.join("\n"), /missing Verification in block: ### Requirement 1 - Missing fields/);
+    assert.match(
+      result.problems.join("\n"),
+      /missing User Story in block: ### Requirement 1 - Missing fields/
+    );
+    assert.match(
+      result.problems.join("\n"),
+      /missing Verification in block: ### Requirement 1 - Missing fields/
+    );
   });
 });
 
 test("requirements-ears validator reports invalid and absent EARS patterns", () => {
   withWorkspace((root) => {
     const featureDir = createFeatureFixture(root);
-    writeRequirements(featureDir, `# Requirements (EARS)
+    writeRequirements(
+      featureDir,
+      `# Requirements (EARS)
 
 ## Requirements
 
@@ -162,20 +173,32 @@ test("requirements-ears validator reports invalid and absent EARS patterns", () 
 **Acceptance Criteria (EARS):**
 
 **Verification:** Unit test.
-`);
+`
+    );
 
     const result = validateRequirementsEars(featureDir, root);
     assert.equal(result.exitCode, 1);
-    assert.match(result.problems.join("\n"), /invalid EARS bullet pattern in block ### Requirement 1 - Invalid pattern/);
-    assert.match(result.problems.join("\n"), /no valid EARS-pattern bullets in block: ### Requirement 1 - Invalid pattern/);
-    assert.match(result.problems.join("\n"), /no acceptance-criteria bullets in block: ### Requirement 2 - No bullets/);
+    assert.match(
+      result.problems.join("\n"),
+      /invalid EARS bullet pattern in block ### Requirement 1 - Invalid pattern/
+    );
+    assert.match(
+      result.problems.join("\n"),
+      /no valid EARS-pattern bullets in block: ### Requirement 1 - Invalid pattern/
+    );
+    assert.match(
+      result.problems.join("\n"),
+      /no acceptance-criteria bullets in block: ### Requirement 2 - No bullets/
+    );
   });
 });
 
 test("requirements-ears validator accepts all allowed EARS patterns case-insensitively", () => {
   withWorkspace((root) => {
     const featureDir = createFeatureFixture(root);
-    writeRequirements(featureDir, `# Requirements (EARS)
+    writeRequirements(
+      featureDir,
+      `# Requirements (EARS)
 
 ## Requirements
 
@@ -188,7 +211,8 @@ test("requirements-ears validator accepts all allowed EARS patterns case-insensi
 - WHILE a session is active, THE System SHALL keep the session available.
 
 **Verification:** Unit test.
-`);
+`
+    );
 
     const result = validateRequirementsEars(featureDir, root);
     assert.equal(result.exitCode, 0);
@@ -198,14 +222,23 @@ test("requirements-ears validator accepts all allowed EARS patterns case-insensi
 test("requirements-ears validator reports Requirement and NFR numbering violations", () => {
   withWorkspace((root) => {
     const featureDir = createFeatureFixture(root);
-    writeRequirements(featureDir, validRequirements()
-      .replace("### Requirement 2 - Reject invalid create request", "### Requirement 1 - Duplicate create request")
-      .replace("### NFR 1 - Query latency", "### NFR 2 - Query latency"));
+    writeRequirements(
+      featureDir,
+      validRequirements()
+        .replace(
+          "### Requirement 2 - Reject invalid create request",
+          "### Requirement 1 - Duplicate create request"
+        )
+        .replace("### NFR 1 - Query latency", "### NFR 2 - Query latency")
+    );
 
     const result = validateRequirementsEars(featureDir, root);
     assert.equal(result.exitCode, 1);
     assert.match(result.problems.join("\n"), /duplicate Requirement numbering: 1/);
-    assert.match(result.problems.join("\n"), /Requirement numbering must be sequential; expected 2, found 1/);
+    assert.match(
+      result.problems.join("\n"),
+      /Requirement numbering must be sequential; expected 2, found 1/
+    );
     assert.match(result.problems.join("\n"), /NFR numbering must start at 1; found 2/);
   });
 });
@@ -230,10 +263,14 @@ test("overmind gate requirements-ears uses common usage and unknown-step errors"
     assert.equal(missingArg.status, 2);
     assert.match(missingArg.stderr, /ERROR: Usage: overmind gate <step> <path>/);
 
-    const unknown = spawnSync(process.execPath, [bundlePath, "gate", "unknown-requirements-ears", "."], {
-      cwd: root,
-      encoding: "utf8"
-    });
+    const unknown = spawnSync(
+      process.execPath,
+      [bundlePath, "gate", "unknown-requirements-ears", "."],
+      {
+        cwd: root,
+        encoding: "utf8"
+      }
+    );
     assert.equal(unknown.status, 2);
     assert.match(unknown.stderr, /ERROR: Unknown gate step: unknown-requirements-ears/);
   });
@@ -243,10 +280,14 @@ test("overmind gate requirements-ears prints recoverable failures as missing lin
   withWorkspace((root) => {
     const featureDir = createFeatureFixture(root);
     writeRequirements(featureDir, "");
-    const result = spawnSync(process.execPath, [bundlePath, "gate", "requirements-ears", path.relative(root, featureDir)], {
-      cwd: root,
-      encoding: "utf8"
-    });
+    const result = spawnSync(
+      process.execPath,
+      [bundlePath, "gate", "requirements-ears", path.relative(root, featureDir)],
+      {
+        cwd: root,
+        encoding: "utf8"
+      }
+    );
     assert.equal(result.status, 1);
     assert.match(result.stdout, /business-context gate failed/);
     assert.match(result.stdout, /missing: quality gate failed: target EARS requirements is empty:/);

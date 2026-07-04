@@ -10,7 +10,7 @@ export function trimValue(value: string): string {
 export function stripQuotes(value: string): string {
   const trimmed = trimValue(value);
   if (
-    (trimmed.startsWith("\"") && trimmed.endsWith("\"")) ||
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
     (trimmed.startsWith("'") && trimmed.endsWith("'"))
   ) {
     return trimmed.slice(1, -1);
@@ -83,14 +83,14 @@ export function displayPath(filePath: string, cwd = process.cwd()): string {
 export function getBlockField(content: string, fieldName: string): string {
   const lines = content.split(/\r?\n/);
   for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index];
+    const line = lines[index]!;
     if (!new RegExp(`^-\\s+${escapeRegExp(fieldName)}:\\s*\\|\\s*$`).test(line)) {
       continue;
     }
 
     const blockLines: string[] = [];
     for (let cursor = index + 1; cursor < lines.length; cursor += 1) {
-      const candidate = lines[cursor];
+      const candidate = lines[cursor]!;
       if (/^-\s+[A-Za-z0-9_-]+:\s*/.test(candidate) || /^##\s+/.test(candidate)) {
         break;
       }

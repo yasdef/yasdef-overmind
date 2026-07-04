@@ -51,7 +51,9 @@ export function validateContractDelta(inputPath: string, cwd = process.cwd()): G
 
     const content = readRequiredTextFile(targetPath);
     if (!/[^ \t\r\n]/.test(content)) {
-      return gateRecoverable([`quality gate failed: target feature contract delta artifact is empty: ${targetPath}`]);
+      return gateRecoverable([
+        `quality gate failed: target feature contract delta artifact is empty: ${targetPath}`
+      ]);
     }
 
     const problems = validateContractDeltaContent(content);
@@ -158,7 +160,9 @@ export function validateContractDeltaContent(content: string): string[] {
   }
   if (deltaNeeded === "false") {
     if (noContractDeltaRequired !== "true") {
-      failQuality("delta_needed is false but section 3 does not declare - no_contract_delta_required: true");
+      failQuality(
+        "delta_needed is false but section 3 does not declare - no_contract_delta_required: true"
+      );
     }
     if (deltas.length > 0) {
       failQuality("delta_needed is false but Delta blocks are still present");
@@ -182,7 +186,11 @@ function resolveContractDeltaPath(inputPath: string, cwd: string): string {
 }
 
 function gatePassed(): GateResult {
-  return { exitCode: 0, passMessage: "quality gate passed: feature contract delta structure is complete", problems: [] };
+  return {
+    exitCode: 0,
+    passMessage: "quality gate passed: feature contract delta structure is complete",
+    problems: []
+  };
 }
 
 function gateRecoverable(problems: string[]): GateResult {

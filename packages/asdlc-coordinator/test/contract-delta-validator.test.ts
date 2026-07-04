@@ -40,12 +40,16 @@ function validDelta(deltaNeeded = true): string {
 - no_delta_reason: ${deltaNeeded ? "none" : "baseline covers it"}
 
 ## 3. Contract Delta Items
-${deltaNeeded ? `### Delta 1: add-field
+${
+  deltaNeeded
+    ? `### Delta 1: add-field
 - delta_kind: add
 - related_baseline_contract: contract-a
 - change_scope: add a field
 - compatibility_impact: additive
-- verification_expectation: contract test` : "- no_contract_delta_required: true"}
+- verification_expectation: contract test`
+    : "- no_contract_delta_required: true"
+}
 
 ## 4. Track Handoff Signals
 - backend_handoff: implement the delta
@@ -59,7 +63,11 @@ function writeDelta(featureDir: string, content: string): void {
 
 test("contract-delta validator accepts true and false branches and ignores section 5", () => {
   withWorkspace((root, featureDir) => {
-    for (const content of [validDelta(true), validDelta(false), `${validDelta(true)}\n## 5. Cross-Class Transport/Contract Approach Mirror\nmalformed but exempt\n`]) {
+    for (const content of [
+      validDelta(true),
+      validDelta(false),
+      `${validDelta(true)}\n## 5. Cross-Class Transport/Contract Approach Mirror\nmalformed but exempt\n`
+    ]) {
       writeDelta(featureDir, content);
       const result = validateContractDelta(featureDir, root);
       assert.equal(result.exitCode, 0, result.problems.join("\n"));
@@ -69,14 +77,33 @@ test("contract-delta validator accepts true and false branches and ignores secti
 
 test("contract-delta validator reports every required section and meta key", () => {
   withWorkspace((root, featureDir) => {
-    const sections = ["## 1. Document Meta", "## 2. Delta Summary", "## 3. Contract Delta Items", "## 4. Track Handoff Signals"];
+    const sections = [
+      "## 1. Document Meta",
+      "## 2. Delta Summary",
+      "## 3. Contract Delta Items",
+      "## 4. Track Handoff Signals"
+    ];
     for (const section of sections) {
       writeDelta(featureDir, validDelta().replace(section, `## missing ${section}`));
-      assert.match(validateContractDelta(featureDir, root).problems.join("\n"), new RegExp(`missing section: ${section.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
+      assert.match(
+        validateContractDelta(featureDir, root).problems.join("\n"),
+        new RegExp(`missing section: ${section.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`)
+      );
     }
-    for (const key of ["feature_id", "feature_title", "project_type_code", "source_requirements_ears", "source_common_contract_definition", "delta_needed", "last_updated"]) {
+    for (const key of [
+      "feature_id",
+      "feature_title",
+      "project_type_code",
+      "source_requirements_ears",
+      "source_common_contract_definition",
+      "delta_needed",
+      "last_updated"
+    ]) {
       writeDelta(featureDir, validDelta().replace(new RegExp(`^- ${key}:.*$`, "m"), ""));
-      assert.match(validateContractDelta(featureDir, root).problems.join("\n"), new RegExp(`missing or unfilled meta key: ${key}`));
+      assert.match(
+        validateContractDelta(featureDir, root).problems.join("\n"),
+        new RegExp(`missing or unfilled meta key: ${key}`)
+      );
     }
   });
 });
@@ -85,12 +112,27 @@ test("contract-delta validator enforces delta branches, fields, handoffs, and pl
   withWorkspace((root, featureDir) => {
     const cases: Array<[string, string]> = [
       [validDelta().replace(/### Delta 1:[\s\S]*?(?=\n## 4)/, ""), "no Delta blocks"],
-      [validDelta().replace("## 4. Track", "- no_contract_delta_required: true\n\n## 4. Track"), "must not be true"],
+      [
+        validDelta().replace("## 4. Track", "- no_contract_delta_required: true\n\n## 4. Track"),
+        "must not be true"
+      ],
       [validDelta(false).replace("- no_contract_delta_required: true", ""), "does not declare"],
-      [validDelta(false).replace("- no_contract_delta_required: true", "### Delta 1: stale"), "Delta blocks are still present"],
+      [
+        validDelta(false).replace("- no_contract_delta_required: true", "### Delta 1: stale"),
+        "Delta blocks are still present"
+      ],
       [validDelta().replace("- backend_handoff: implement the delta", ""), "backend_handoff"],
-      [validDelta().replace("- frontend_mobile_handoff: consume the delta", ""), "frontend_mobile_handoff"],
-      [validDelta().replace("- verification_expectation: contract test", "- verification_expectation: [UNFILLED]"), "still contains [UNFILLED]"]
+      [
+        validDelta().replace("- frontend_mobile_handoff: consume the delta", ""),
+        "frontend_mobile_handoff"
+      ],
+      [
+        validDelta().replace(
+          "- verification_expectation: contract test",
+          "- verification_expectation: [UNFILLED]"
+        ),
+        "still contains [UNFILLED]"
+      ]
     ];
     for (const [content, expected] of cases) {
       writeDelta(featureDir, content);
@@ -98,9 +140,18 @@ test("contract-delta validator enforces delta branches, fields, handoffs, and pl
       assert.equal(result.exitCode, 1);
       assert.ok(result.problems.join("\n").includes(expected), result.problems.join("\n"));
     }
-    for (const key of ["delta_kind", "related_baseline_contract", "change_scope", "compatibility_impact", "verification_expectation"]) {
+    for (const key of [
+      "delta_kind",
+      "related_baseline_contract",
+      "change_scope",
+      "compatibility_impact",
+      "verification_expectation"
+    ]) {
       writeDelta(featureDir, validDelta().replace(new RegExp(`^- ${key}:.*$`, "m"), ""));
-      assert.match(validateContractDelta(featureDir, root).problems.join("\n"), new RegExp(`delta block 1 missing or unfilled key: ${key}`));
+      assert.match(
+        validateContractDelta(featureDir, root).problems.join("\n"),
+        new RegExp(`delta block 1 missing or unfilled key: ${key}`)
+      );
     }
   });
 });
@@ -126,10 +177,14 @@ test("contract-delta validator distinguishes recoverable empty content from runt
 });
 
 test("contract-delta CLI preserves common usage and unknown-step errors", () => {
-  const missing = spawnSync(process.execPath, [bundlePath, "gate", "contract-delta"], { encoding: "utf8" });
+  const missing = spawnSync(process.execPath, [bundlePath, "gate", "contract-delta"], {
+    encoding: "utf8"
+  });
   assert.equal(missing.status, 2);
   assert.match(missing.stderr, /Usage: overmind gate/);
-  const unknown = spawnSync(process.execPath, [bundlePath, "gate", "unknown-contract", "."], { encoding: "utf8" });
+  const unknown = spawnSync(process.execPath, [bundlePath, "gate", "unknown-contract", "."], {
+    encoding: "utf8"
+  });
   assert.equal(unknown.status, 2);
   assert.match(unknown.stderr, /Unknown gate step/);
 });

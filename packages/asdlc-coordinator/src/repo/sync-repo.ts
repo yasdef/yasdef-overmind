@@ -23,7 +23,10 @@ function abortRebaseIfNeeded(repoPath: string): void {
   if (!path.isAbsolute(gitDir)) {
     gitDir = path.join(repoPath, gitDir);
   }
-  if (existsSync(path.join(gitDir, "rebase-merge")) || existsSync(path.join(gitDir, "rebase-apply"))) {
+  if (
+    existsSync(path.join(gitDir, "rebase-merge")) ||
+    existsSync(path.join(gitDir, "rebase-apply"))
+  ) {
     spawnSync("git", ["rebase", "--abort"], { cwd: repoPath, encoding: "utf8" });
   }
 }
@@ -37,7 +40,10 @@ function resolveRemoteDefaultBranch(repoPath: string, currentBranch: string): st
     if (upstreamResult.status === 0) {
       const remoteName = upstreamResult.stdout.split("/")[0];
       if (remoteName) {
-        const headRef = git(["symbolic-ref", "--quiet", `refs/remotes/${remoteName}/HEAD`], repoPath);
+        const headRef = git(
+          ["symbolic-ref", "--quiet", `refs/remotes/${remoteName}/HEAD`],
+          repoPath
+        );
         if (headRef.status === 0) {
           const candidate = headRef.stdout.split("/").pop() ?? "";
           if (candidate === "main" || candidate === "master") {
@@ -79,8 +85,10 @@ export function checkRepoBranchState(repoPath: string): RepoStateResult {
   const branchResult = git(["rev-parse", "--abbrev-ref", "HEAD"], repoPath);
   const currentBranch = branchResult.status === 0 ? branchResult.stdout : "";
 
-  const hasMain = git(["rev-parse", "--verify", "--quiet", "refs/heads/main"], repoPath).status === 0;
-  const hasMaster = git(["rev-parse", "--verify", "--quiet", "refs/heads/master"], repoPath).status === 0;
+  const hasMain =
+    git(["rev-parse", "--verify", "--quiet", "refs/heads/main"], repoPath).status === 0;
+  const hasMaster =
+    git(["rev-parse", "--verify", "--quiet", "refs/heads/master"], repoPath).status === 0;
 
   let defaultBranch: string | undefined = resolveRemoteDefaultBranch(repoPath, currentBranch);
 
@@ -138,7 +146,11 @@ export function syncRepoToDefaultBranch(repoPath: string): SyncResult {
     GIT_EDITOR: "true",
     GIT_SEQUENCE_EDITOR: "true"
   };
-  const pullResult = spawnSync("git", ["pull", "--rebase"], { cwd: repoPath, encoding: "utf8", env: pullEnv });
+  const pullResult = spawnSync("git", ["pull", "--rebase"], {
+    cwd: repoPath,
+    encoding: "utf8",
+    env: pullEnv
+  });
   if ((pullResult.status ?? 1) !== 0) {
     abortRebaseIfNeeded(repoPath);
     const detail = pullResult.stderr?.trim() ? `; git said: ${pullResult.stderr.trim()}` : "";
