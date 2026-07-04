@@ -10,10 +10,10 @@ Per-slice discipline (inherited from `design_docs/to_skills_migration/step_by_st
 
 **Goal:** prod-level TS infrastructure in place before orchestrator code lands, applied to the already-migrated packages too (the 13-step coordinator/installer code is currently unlinted and only typechecked via build). Contract in `03_target_architecture.md ## Engineering baseline`.
 
-- ESLint flat config (typescript-eslint type-checked presets) + Prettier + `.editorconfig` at the repo root, wired into every workspace.
+- ESLint flat config (typescript-eslint type-checked presets) + Prettier + `.editorconfig` at the repo root, wired into every workspace; Prettier coverage is scoped to TypeScript and toolchain configuration files.
 - `tsconfig.base.json` strictness additions (`noUncheckedIndexedAccess`, `noImplicitOverride`, `noFallthroughCasesInSwitch`, `verbatimModuleSyntax`); all existing-code fallout fixed in the same change.
 - Scripts per workspace + root aggregate: `typecheck` (`tsc --noEmit`, tests included), `lint`, `format:check`.
-- Single root `npm run verify` command: typecheck → lint → format-check → build → test (TS workspaces + the surviving `tests/ai_scripts/*.sh` suites); mandated in both `AGENTS.md` (Codex) and `CLAUDE.md` (Claude) as the local gate agents run and confirm green before completing a change from this slice on. `engines` pins the Node floor. Coverage report-only. No remote CI, no git hooks.
+- Single root `npm run verify` command: typecheck → lint → format-check → build → test (TS workspaces + the surviving `tests/ai_scripts/*.sh` suites); a green local run is the completion criterion for this and every later slice. `AGENTS.md` and `CLAUDE.md` remain gitignored local configuration. `engines` pins the Node floor. Coverage report-only. No remote CI, no git hooks.
 - No behavior changes — pure infrastructure plus mechanical fixes; no new runtime dependencies (the coordinator's `dependencies` stays empty, per the zero-runtime-dependency rule).
 
 ## Slice 1 — Workspace + sequencing core (`overmind status`)
@@ -64,10 +64,10 @@ Per-slice discipline (inherited from `design_docs/to_skills_migration/step_by_st
 
 **Goal:** end-state hygiene and the first extension consumption proof.
 
-- Remove now-orphaned `common_libs` helpers and staging entries; sweep docs (`overmind/README.md`, `CLAUDE.md` test list, `QUICKRUN.md`) for dead references.
+- Remove now-orphaned `common_libs` helpers and staging entries; sweep versioned docs (`overmind/README.md`, `QUICKRUN.md`) for dead references.
 - `packages/vscode-extension`: minimal read-only dashboard wired to `workspace/` + `sequencing/` (proves the reuse claim).
 - **Revise the extension design docs** (`design_docs/overmind_vscode_extention/requirements_ears.md`, `technical_requirements.md`, `implementation_plan.md`): replace every `.commands/*.sh` launching surface (Requirement 7 clauses, Requirement 9 verification, Run Scanner / Create Feature / Continue E2E actions, script allow-list) with the shipped `overmind` verbs and in-process core, per the mapping in `03_target_architecture.md ### Supersession of the extension design docs`; remove the supersession banners. Extension implementation must not restart from the old plan before this revision lands.
-- Audit against `02_responsibility_translation_map.md ## Full parity gate`: every row resolved.
+- Audit against `02_responsibility_translation_map.md ## Full parity gate`: every row resolved. The behavior-level sweep is already **complete** and the gate closed at that level in `05_parity_reconciliation.md ## Sweep result` (Slice 3 executed it before deleting the shell suites); Slice 5 only folds that result into the formal `02` write-up and revises the extension docs.
 
 ---
 
@@ -86,5 +86,5 @@ Per-slice discipline (inherited from `design_docs/to_skills_migration/step_by_st
 4. `overmind status` step reporting matches `init_progress_definition.yaml` exactly — every declared step, no joining, no omissions.
 5. The extension imports `workspace/` + `sequencing/` with zero orchestrator-CLI coupling.
 6. Core data problems (parse failures, missing artifacts, inconsistent definitions) surface as `Diagnostic` values in typed results — no throws for data errors; the CLI and the extension render the same values.
-7. `npm run verify` (typecheck, type-checked lint, format check, build, all tests) is green for every slice — run locally by the agents (`AGENTS.md`/`CLAUDE.md`), no remote CI; `asdlc-coordinator`'s runtime `dependencies` list is still empty.
+7. `npm run verify` (typecheck, type-checked lint, format check, build, all tests) is green locally for every slice; no remote CI; `asdlc-coordinator`'s runtime `dependencies` list is still empty.
 8. Every row in `02_responsibility_translation_map.md` is marked owned-or-retired; every decision in `03_target_architecture.md ## Decisions` is confirmed or explicitly revised.

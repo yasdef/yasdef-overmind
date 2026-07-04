@@ -3,13 +3,26 @@ set -euo pipefail
 
 ASDLC_PROJECTS_DIR_NAME="projects"
 PROJECT_DEFINITION_FILE_NAME="init_progress_definition.yaml"
-PERSIST_CLASS_REPO_ATTACH_SCRIPT="$(dirname "$0")/../common_libs/persist_class_repo_attach.sh"
 
 source "$(dirname "$0")/../common_libs/project_setup_common.sh"
 
 die() {
   echo "ERROR: $*" >&2
   exit 1
+}
+
+# Classic y/N confirmation; default No on empty, non-yes, or closed input (EOF).
+prompt_yes_no() {
+  local prompt_message="$1"
+  local answer=""
+  printf '%s ' "$prompt_message" >&2
+  if ! read -r answer; then
+    return 1
+  fi
+  case "$answer" in
+  y | Y | yes | YES) return 0 ;;
+  *) return 1 ;;
+  esac
 }
 
 require_command() {
@@ -132,260 +145,10 @@ prompt_project_selection() {
   done
 }
 
-read_deferred_classes() {
-  local definition_path="$1"
-  awk '
-    BEGIN { in_block = 0; current_class = "" }
-    /^  class_repo_paths:[[:space:]]*$/ { in_block = 1; next }
-    in_block && /^[^ ]/ { in_block = 0; current_class = "" }
-    in_block && /^    [a-z][a-zA-Z_]*:[[:space:]]*$/ {
-      line = $0
-      sub(/^    /, "", line)
-      sub(/:[[:space:]]*$/, "", line)
-      current_class = line
-    }
-    in_block && /^      state: "deferred"/ {
-      if (current_class != "") print current_class
-    }
-  ' "$definition_path"
-}
-
-_SELECTED_CLASS=""
-
-prompt_class_selection() {
-  local deferred_classes="$1"
-  local classes=()
-  local class_name=""
-  local selection=""
-
-  while IFS= read -r class_name; do
-    [[ -z "$class_name" ]] && continue
-    classes+=("$class_name")
-  done <<<"$deferred_classes"
-
-  if [[ "${#classes[@]}" -eq 0 ]]; then
-    echo "No deferred classes found. Nothing to add." >&2
-    exit 0
-  fi
-
-  while true; do
-    echo "Select class to add repo for:" >&2
-    local i=1
-    for class_name in "${classes[@]}"; do
-      echo "$i. $class_name" >&2
-      ((i++)) || true
-    done
-    echo "q. Quit" >&2
-
-    if ! read -r selection; then
-      die "Failed to read class selection."
-    fi
-
-    case "$selection" in
-    q|Q)
-      exit 0
-      ;;
-    *)
-      if [[ "$selection" =~ ^[0-9]+$ ]] && \
-         [[ "$selection" -ge 1 ]] && \
-         [[ "$selection" -le "${#classes[@]}" ]]; then
-        _SELECTED_CLASS="${classes[$((selection - 1))]}"
-        return 0
-      fi
-      echo "Invalid selection. Enter a number between 1 and ${#classes[@]}, or q to quit." >&2
-      ;;
-    esac
-  done
-}
-
-_RESOLVED_REPO_PATH=""
-
-prompt_repo_path_with_quit() {
-  local class_name="$1"
-  local repo_path=""
-  local resolved_repo_path=""
-
-  while true; do
-    echo "Enter repo path for $class_name (or q to quit):" >&2
-    if ! read -r repo_path; then
-      die "Failed to read repo path for $class_name."
-    fi
-
-    case "$repo_path" in
-    q|Q)
-      exit 0
-      ;;
-    esac
-
-    if ! validate_repo_path "$repo_path"; then
-      continue
-    fi
-
-    if [[ ! -e "$repo_path/.git" ]]; then
-      echo "Repo path must contain .git: $repo_path" >&2
-      continue
-    fi
-
-    if ! resolved_repo_path="$(resolve_repo_path "$repo_path")"; then
-      echo "Failed to resolve repo path: $repo_path" >&2
-      continue
-    fi
-
-    _RESOLVED_REPO_PATH="$resolved_repo_path"
-    return 0
-  done
-}
-
-assert_class_entry_is_deferred() {
-  local definition_path="$1"
-  local class_name="$2"
-
-  local check_result=""
-  check_result="$(awk -v target="$class_name" '
-    BEGIN { in_block = 0; in_target = 0; found_class = 0; found_deferred = 0 }
-    /^  class_repo_paths:[[:space:]]*$/ { in_block = 1; next }
-    in_block && /^[^ ]/ { in_block = 0; in_target = 0 }
-    in_block && /^    [a-z][a-zA-Z_]*:[[:space:]]*$/ {
-      line = $0
-      sub(/^    /, "", line)
-      sub(/:[[:space:]]*$/, "", line)
-      in_target = (line == target) ? 1 : 0
-      if (in_target) found_class = 1
-    }
-    in_target && /^      state: "deferred"/ { found_deferred = 1 }
-    END {
-      if (found_class && found_deferred) print "ok"
-      else if (!found_class) print "not_found"
-      else print "not_deferred"
-    }
-  ' "$definition_path")"
-
-  case "$check_result" in
-  "ok")
-    return 0
-    ;;
-  "not_found")
-    die "Class '$class_name' not found in class_repo_paths: $definition_path"
-    ;;
-  "not_deferred")
-    die "Class '$class_name' does not have state 'deferred' — shape mismatch: $definition_path"
-    ;;
-  *)
-    die "Unexpected assertion result for class '$class_name': $check_result"
-    ;;
-  esac
-}
-
-is_all_classes_ready() {
-  local definition_path="$1"
-  local deferred_count=""
-
-  deferred_count="$(awk '
-    BEGIN { in_block = 0; count = 0 }
-    /^  class_repo_paths:[[:space:]]*$/ { in_block = 1; next }
-    in_block && /^[^ ]/ { in_block = 0 }
-    in_block && /^      state: "deferred"/ { count++ }
-    END { print count }
-  ' "$definition_path")"
-
-  [[ "$deferred_count" -eq 0 ]]
-}
-
-read_project_type_code() {
-  local definition_path="$1"
-  awk '
-    /^  project_type_code:/ {
-      line = $0
-      sub(/^[[:space:]]*project_type_code:[[:space:]]*"/, "", line)
-      sub(/"[[:space:]]*$/, "", line)
-      print line; exit
-    }
-  ' "$definition_path"
-}
-
-_RECLASSIFICATION_CODE=""
-
-prompt_reclassification() {
-  local current_type="$1"
-  local current_label=""
-  local selection=""
-
-  if ! current_label="$(project_type_label_for_code "$current_type")"; then
-    current_label="$current_type"
-  fi
-
-  echo "All class repos are now ready. Project type is currently $current_type ($current_label)." >&2
-
-  while true; do
-    echo "Reclassify?" >&2
-    echo "1. B - Existing project with partial context" >&2
-    echo "2. C - Existing project with code-first context" >&2
-    echo "3. Keep type $current_type and finish" >&2
-
-    if ! read -r selection; then
-      die "Failed to read reclassification selection."
-    fi
-
-    case "$selection" in
-    1)
-      _RECLASSIFICATION_CODE="B"
-      return 0
-      ;;
-    2)
-      _RECLASSIFICATION_CODE="C"
-      return 0
-      ;;
-    3|q|Q|"")
-      _RECLASSIFICATION_CODE="$current_type"
-      return 0
-      ;;
-    *)
-      echo "Invalid selection. Enter 1, 2, 3, or q to keep type $current_type." >&2
-      ;;
-    esac
-  done
-}
-
-update_project_type_code_and_label() {
-  local definition_path="$1"
-  local new_type_code="$2"
-  local new_type_label="$3"
-  local escaped_type_code=""
-  local escaped_type_label=""
-  local tmp_file=""
-
-  escaped_type_code="$(escape_yaml_double_quoted_value "$new_type_code")"
-  escaped_type_label="$(escape_yaml_double_quoted_value "$new_type_label")"
-
-  if ! tmp_file="$(mktemp)"; then
-    die "Failed to create temporary file for type update."
-  fi
-
-  if ! awk -v new_code="$escaped_type_code" -v new_label="$escaped_type_label" '
-    /^  project_type_code: / {
-      print "  project_type_code: \"" new_code "\""
-      next
-    }
-    /^  project_type_label: / {
-      print "  project_type_label: \"" new_label "\""
-      next
-    }
-    { print }
-  ' "$definition_path" >"$tmp_file"; then
-    rm -f "$tmp_file"
-    die "Failed to process type code update: $definition_path"
-  fi
-
-  if ! mv "$tmp_file" "$definition_path"; then
-    rm -f "$tmp_file"
-    die "Failed to write updated type code: $definition_path"
-  fi
-}
-
 main() {
   require_command awk
-  require_command mktemp
   require_command find
+  require_command node
 
   local script_dir=""
   local asdlc_root=""
@@ -393,9 +156,8 @@ main() {
   local projects_list=""
   local project_id=""
   local definition_path=""
-  local deferred_classes=""
-  local type_code=""
-  local new_type_label=""
+  local project_dir=""
+  local overmind_cli=""
 
   script_dir="$(resolve_script_dir)"
   asdlc_root="$(resolve_asdlc_root_from_staged_path "$script_dir")"
@@ -403,40 +165,33 @@ main() {
 
   [[ -d "$projects_root" ]] || die "Required directory not found: $projects_root"
 
+  overmind_cli="$asdlc_root/.overmind/overmind.js"
+  [[ -f "$overmind_cli" ]] || die "Bundled overmind CLI not found: $overmind_cli"
+
   projects_list="$(discover_projects "$projects_root")"
 
   prompt_project_selection "$projects_list"
   project_id="$_SELECTED_PROJECT_ID"
   definition_path="$_SELECTED_DEFINITION_PATH"
+  project_dir="$(dirname "$definition_path")"
 
-  deferred_classes="$(read_deferred_classes "$definition_path")"
-
-  prompt_class_selection "$deferred_classes"
-  local chosen_class="$_SELECTED_CLASS"
-
-  prompt_repo_path_with_quit "$chosen_class"
-  local resolved_repo_path="$_RESOLVED_REPO_PATH"
-
-  assert_class_entry_is_deferred "$definition_path" "$chosen_class"
-  [[ -x "$PERSIST_CLASS_REPO_ATTACH_SCRIPT" ]] || die "Required command lib not found or not executable: $PERSIST_CLASS_REPO_ATTACH_SCRIPT"
-  "$PERSIST_CLASS_REPO_ATTACH_SCRIPT" "$(dirname "$definition_path")" "$chosen_class" "$resolved_repo_path" >/dev/null
-
-  echo "Repo path for class '$chosen_class' in project '$project_id' updated to: $resolved_repo_path" >&2
-
-  type_code="$(read_project_type_code "$definition_path")"
-
-  if [[ "$type_code" == "A" ]] && is_all_classes_ready "$definition_path"; then
-    prompt_reclassification "$type_code"
-    local new_type_code="$_RECLASSIFICATION_CODE"
-    if [[ "$new_type_code" != "$type_code" ]]; then
-      if ! new_type_label="$(project_type_label_for_code "$new_type_code")"; then
-        die "Unsupported project type code: $new_type_code"
-      fi
-      update_project_type_code_and_label "$definition_path" "$new_type_code" "$new_type_label"
-      echo "Project reclassified to type $new_type_code ($new_type_label)." >&2
-      echo "Note: existing type-A artifacts (stack blueprints, contract documents, surface maps) under the project tree are not removed by this script and may need to be regenerated." >&2
-    fi
+  # Deferred-class attachment now runs through the TypeScript `overmind project
+  # reconcile` flow, which also performs a one-time contract reconciliation — this
+  # is not just a repo attach. Make that explicit and confirm before delegating.
+  echo "Updating class repositories runs the full project reconciliation flow, not just a repo attach." >&2
+  echo "'overmind project reconcile' will:" >&2
+  echo "  - prompt for each deferred class repository to attach," >&2
+  echo "  - run a one-time contract reconciliation session over newly ready classes, and" >&2
+  echo "  - offer to commit the reconciliation results." >&2
+  if ! prompt_yes_no "Proceed with attach + full reconciliation for project '$project_id'? [y/N]"; then
+    echo "Aborted: no changes made to project '$project_id'." >&2
+    exit 0
   fi
+
+  # The wrapper's sole responsibility is to hand off to the TypeScript flow. Project-level
+  # type (project_type_code) is legacy and is intentionally not manipulated here, so the
+  # reconcile flow's clean-worktree/commit unit is not violated by a later definition edit.
+  node "$overmind_cli" project reconcile --path "$project_dir"
 }
 
 main "$@"

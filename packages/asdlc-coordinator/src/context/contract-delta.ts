@@ -9,6 +9,7 @@ import {
 } from "../repo/index.js";
 import { displayPath, resolveFeatureWithinWorkspace } from "../parse/index.js";
 import type { ContextResult } from "../types/index.js";
+import { buildReadOnlyInputManifest } from "./read-only-inputs.js";
 
 export function buildContractDeltaContext(inputPath: string, cwd = process.cwd()): ContextResult {
   const resolved = resolveFeatureWithinWorkspace(inputPath, cwd);
@@ -61,8 +62,9 @@ export function buildContractDeltaContext(inputPath: string, cwd = process.cwd()
               `- Pending contract delta source: ${displayPath(pendingPath, projectDir)}`
           )
         : ["- none"];
-    const readOnlyLines = [featureBrPath, earsPath, commonContractPath, ...pendingDeltaPaths].map(
-      (readOnlyPath) => `- read_only_input: ${displayPath(readOnlyPath, workspaceRoot)}`
+    const readOnlyInputs = buildReadOnlyInputManifest(
+      [featureBrPath, earsPath, commonContractPath, ...pendingDeltaPaths],
+      workspaceRoot
     );
 
     const lines = [
@@ -84,7 +86,7 @@ export function buildContractDeltaContext(inputPath: string, cwd = process.cwd()
       "- feature_contract_delta_golden_example_asset: assets/feature_contract_delta_GOLDEN_EXAMPLE.md",
       "",
       "## Read-Only Inputs",
-      ...readOnlyLines,
+      ...readOnlyInputs.lines,
       "",
       "## Allowed Write Surface",
       `- ${featurePath}/feature_contract_delta.md`,
@@ -99,7 +101,7 @@ export function buildContractDeltaContext(inputPath: string, cwd = process.cwd()
       `- cross_class_peer_trigger: ${trigger}`
     ];
 
-    return { exitCode: 0, text: `${lines.join("\n")}\n` };
+    return { exitCode: 0, text: `${lines.join("\n")}\n`, readOnlyInputs: readOnlyInputs.paths };
   } catch (err) {
     return contextError(err instanceof Error ? err.message : String(err));
   }

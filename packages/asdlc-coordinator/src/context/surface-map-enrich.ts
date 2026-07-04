@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { displayPath, resolveFeatureWithinWorkspace, stripQuotes } from "../parse/index.js";
 import type { ContextResult } from "../types/index.js";
+import { buildReadOnlyInputManifest } from "./read-only-inputs.js";
 
 const PLACEHOLDER_LITERAL = "<to be defined during implementation>";
 const EXTERNAL_SOURCES_FILE = ".setup/external_sources.yaml";
@@ -96,6 +97,7 @@ export function buildSurfaceMapEnrichContext(
   }
 
   const sourceEntries = eligibleNames.map((n) => `  - ${n}`);
+  const readOnlyInputs = buildReadOnlyInputManifest([sourcesPath], workspaceRoot);
 
   const lines = [
     "# surface-map-enrich context",
@@ -115,13 +117,13 @@ export function buildSurfaceMapEnrichContext(
     ...sourceEntries,
     "",
     "## Read-Only Inputs",
-    `- read_only_input: ${EXTERNAL_SOURCES_FILE}`,
+    ...readOnlyInputs.lines,
     "",
     "## Allowed Write Surface",
     ...writeEntries
   ];
 
-  return { exitCode: 0, text: `${lines.join("\n")}\n` };
+  return { exitCode: 0, text: `${lines.join("\n")}\n`, readOnlyInputs: readOnlyInputs.paths };
 }
 
 function noOpContext(reason: string): ContextResult {

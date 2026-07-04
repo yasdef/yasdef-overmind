@@ -9,6 +9,7 @@ import {
 import { displayPath, resolveFeatureWithinWorkspace, stripQuotes } from "../parse/index.js";
 import type { ContextResult } from "../types/index.js";
 import type { SurfaceMapClass } from "../validate/surface-map.js";
+import { buildReadOnlyInputManifest } from "./read-only-inputs.js";
 
 interface ClassBinding {
   templateAsset: string;
@@ -144,9 +145,7 @@ export function buildSurfaceMapContext(
       readOnlyPaths.push(blueprintPath);
     }
     readOnlyPaths.push(...inFlightPlanPaths);
-    const readOnlyLines = readOnlyPaths.map(
-      (p) => `- read_only_input: ${displayPath(p, workspaceRoot)}`
-    );
+    const readOnlyInputs = buildReadOnlyInputManifest(readOnlyPaths, workspaceRoot);
 
     const inFlightLines =
       inFlightPlanPaths.length > 0
@@ -178,7 +177,7 @@ export function buildSurfaceMapContext(
       `- surface_map_golden_example_asset: ${binding.goldenAsset}`,
       "",
       "## Read-Only Inputs",
-      ...readOnlyLines,
+      ...readOnlyInputs.lines,
       "",
       "## Allowed Write Surface",
       `- ${targetArtifact}`,
@@ -193,7 +192,7 @@ export function buildSurfaceMapContext(
       ...inFlightLines
     ];
 
-    return { exitCode: 0, text: `${lines.join("\n")}\n` };
+    return { exitCode: 0, text: `${lines.join("\n")}\n`, readOnlyInputs: readOnlyInputs.paths };
   } catch (err) {
     return contextError(err instanceof Error ? err.message : String(err));
   }

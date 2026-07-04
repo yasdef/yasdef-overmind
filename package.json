@@ -2,16 +2,30 @@
   "name": "yasdef-overmind",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0"
+  },
   "workspaces": [
     "packages/*"
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present"
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "format:check": "npm run format:check --workspaces --if-present && prettier --check package.json tsconfig.base.json eslint.config.js .prettierrc.json",
+    "test": "npm run test:ts && npm run test:shell",
+    "test:ts": "npm run test --workspaces --if-present",
+    "test:shell": "bash -c 'for suite in tests/ai_scripts/*.sh; do bash \"$suite\" || exit 1; done'",
+    "verify": "npm run typecheck && npm run lint && npm run format:check && npm run build && npm test"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
     "esbuild": "^0.25.0",
-    "typescript": "^5.8.0"
+    "eslint": "^9.39.4",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.9.4",
+    "typescript": "^5.8.0",
+    "typescript-eslint": "^8.62.1"
   }
 }

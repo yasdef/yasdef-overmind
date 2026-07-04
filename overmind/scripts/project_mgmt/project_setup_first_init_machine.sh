@@ -3,12 +3,8 @@ set -euo pipefail
 
 ADD_NEW_PROJECT_SCRIPT="overmind/scripts/project_mgmt/project_setup_add_new_project.sh"
 UPDATE_PROJECT_SCRIPT="overmind/scripts/project_mgmt/project_setup_update_project.sh"
-INIT_PROGRESS_SCANNER_SCRIPT="overmind/scripts/project_mgmt/init_progress_scanner.sh"
 INIT_PROJECT_STACK_BLUEPRINTS_SCRIPT="overmind/scripts/init_project_stack_blueprints.sh"
 INIT_COMMON_CONTRACT_DEFINITION_SCRIPT="overmind/scripts/init_common_contract_definition.sh"
-PROJECT_CONTRACT_RECONCILIATION_SCRIPT="overmind/scripts/project_mgmt/project_contract_reconciliation.sh"
-FEATURE_BR_SCAFFOLD_SCRIPT="overmind/scripts/feature_br_scaffold.sh"
-PROJECT_ADD_FEATURE_E2E_SCRIPT="overmind/scripts/project_mgmt/project_add_feature_e2e.sh"
 REGISTER_WORKER_SCRIPT="overmind/scripts/project_mgmt/project_register_worker.sh"
 FEATURE_ASSIGN_WORKERS_SCRIPT="overmind/scripts/feature_assing_workers.sh"
 TEMPLATE_SOURCE_FILE="overmind/templates/init_progress_definition_TEMPLATE.yaml"
@@ -33,6 +29,7 @@ SKILL_NAMES=(
   "overmind-prerequisite-gaps"
   "overmind-implementation-plan"
   "overmind-plan-semantic-review"
+  "overmind-contract-reconciliation"
 )
 SKILL_SOURCE_BASE_DIR="packages/installer/_data/skills"
 SKILL_RUNNER_DIRS=(
@@ -61,7 +58,6 @@ STAGED_RULE_FILES=(
   "common_contract_definition_rule.md"
   "project_stack_blueprint_rule.md"
 "task_to_br_rule.md"
-  "project_contract_reconciliation_rule.md"
 )
 STAGED_TEMPLATE_FILES=(
   "common_contract_definition_TEMPLATE.md"
@@ -99,17 +95,22 @@ STAGED_SETUP_FILES_PRESERVE_IF_EXISTS=(
 STAGED_COMMAND_LIB_FILES=(
   "class_repo_paths.sh"
   "check_implementation_plan_readiness.sh"
-  "list_committed_sibling_features.sh"
-  "persist_class_repo_attach.sh"
   "project_setup_common.sh"
+)
+OBSOLETE_STAGED_COMMAND_LIB_FILES=(
+  "list_committed_sibling_features.sh"
   "sync_repo_to_default_branch.sh"
 )
 OBSOLETE_STAGED_COMMAND_FILES=(
+  "init_progress_scanner.sh"
   "feature_technical_requirements.sh"
   "feature_implementation_slices.sh"
   "feature_prerequisite_gaps.sh"
   "feature_implementation_plan.sh"
   "feature_implementation_plan_semantic_review.sh"
+  "project_add_feature_e2e.sh"
+  "feature_br_scaffold.sh"
+  "project_contract_reconciliation.sh"
 )
 
 die() {
@@ -625,6 +626,13 @@ stage_command_libs() {
     die "Failed to create command libs directory: $target_dir"
   fi
 
+  local obsolete_name=""
+  for obsolete_name in "${OBSOLETE_STAGED_COMMAND_LIB_FILES[@]}"; do
+    if [[ -e "$target_dir/$obsolete_name" ]]; then
+      rm -f "$target_dir/$obsolete_name" || die "Failed to remove obsolete staged command lib: $target_dir/$obsolete_name"
+    fi
+  done
+
   for source_file_name in "${STAGED_COMMAND_LIB_FILES[@]}"; do
     source_path="$source_dir/$source_file_name"
     target_path="$target_dir/$source_file_name"
@@ -675,13 +683,9 @@ stage_commands() {
   stage_command_libs "$repo_root" "$asdlc_root" "$overwrite_existing" "$announce_added"
   stage_command_script "$repo_root" "$ADD_NEW_PROJECT_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
   stage_command_script "$repo_root" "$UPDATE_PROJECT_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
-  stage_command_script "$repo_root" "$INIT_PROGRESS_SCANNER_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
   stage_command_script "$repo_root" "$INIT_PROJECT_STACK_BLUEPRINTS_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
   stage_command_script "$repo_root" "$INIT_COMMON_CONTRACT_DEFINITION_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
-  stage_command_script "$repo_root" "$PROJECT_CONTRACT_RECONCILIATION_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
   stage_command_script "$repo_root" "$REGISTER_WORKER_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
-  stage_command_script "$repo_root" "$FEATURE_BR_SCAFFOLD_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
-  stage_command_script "$repo_root" "$PROJECT_ADD_FEATURE_E2E_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
   stage_command_script "$repo_root" "$FEATURE_ASSIGN_WORKERS_SCRIPT" "$asdlc_root" "$projects_dir" "$overwrite_existing" "$announce_added"
 }
 
@@ -702,10 +706,10 @@ Run all commands from:
 Path conventions:
 - Project path example: \`projects/<project-id>\`
 - Feature path example: \`projects/<project-id>/<feature-folder>\`
-- \`init_progress_scanner.sh\` expects a feature path, not a project path.
+- \`node .overmind/overmind.js status <path>\` accepts a project or feature path.
 - Task-to-BR gates run through the staged CLI at \`.overmind/overmind.js\`.
-- The \`overmind-task-to-br\`, \`overmind-repo-br-scan\`, \`overmind-br-clarification\`, \`overmind-requirements-ears\`, \`overmind-ears-review\`, \`overmind-contract-delta\`, \`overmind-surface-map\`, \`overmind-surface-map-enrich\`, \`overmind-technical-requirements\`, \`overmind-implementation-slices\`, \`overmind-prerequisite-gaps\`, \`overmind-implementation-plan\`, and \`overmind-plan-semantic-review\` skills are staged for supported runners at \`.codex/skills/\` and \`.claude/skills/\`.
-- Successful scanner runs persist \`projects/<project-id>/step_state_<feature-folder>.md\`; stdout remains the canonical machine-consumable output.
+- The \`overmind-task-to-br\`, \`overmind-repo-br-scan\`, \`overmind-br-clarification\`, \`overmind-requirements-ears\`, \`overmind-ears-review\`, \`overmind-contract-delta\`, \`overmind-surface-map\`, \`overmind-surface-map-enrich\`, \`overmind-technical-requirements\`, \`overmind-implementation-slices\`, \`overmind-prerequisite-gaps\`, \`overmind-implementation-plan\`, \`overmind-plan-semantic-review\`, and \`overmind-contract-reconciliation\` skills are staged for supported runners at \`.codex/skills/\` and \`.claude/skills/\`.
+- Status is read-only; stdout is the canonical machine-consumable output.
 
 ## 1. Create Or Update Project
 
@@ -733,28 +737,28 @@ Worker records are stored in:
 
 ## 2. Create EARS Requirements
 
-1. Preferred: run feature steps 3..8.3 with the lightweight orchestrator:
+1. Preferred: run feature steps 3..8.4 with the orchestrator:
 \`\`\`bash
-.commands/project_add_feature_e2e.sh
+node .overmind/overmind.js run
 \`\`\`
 \`\`\`bash
-.commands/project_add_feature_e2e.sh --path projects/<project-id>
+node .overmind/overmind.js run --path projects/<project-id>
 \`\`\`
-If \`--path\` is omitted, the script auto-selects the only project under \`projects/\` or prompts you to choose one when multiple projects exist.
-This run discovers unfinished feature folders for the project first and, when any exist, asks whether to start a new feature or continue one of the unfinished features.
-During phase 4.1, the orchestrator starts a Codex repo-br-scan session (when a class repo is ready) followed by a task-to-BR session using the installed skills; when \`user_br_input.md\` is missing, Codex asks for a local story file or Jira ticket. During phase 4.2, the orchestrator starts the BR-clarification skill and then runs the deterministic readiness check. During phase 5, the orchestrator starts the requirements-EARS skill. During optional phase 5.1, the orchestrator starts the EARS-review skill. During phase 6, it syncs ready repositories and starts the contract-delta skill.
+If \`--path\` is omitted, the command auto-selects the only project under \`projects/\` or prompts you to choose one when multiple projects exist.
+This run first refuses when project-level work is pending (incomplete initialization, a deferred class repo, or a ready-but-unreconciled class) and names the command that resolves it. Project-level repo attach and contract reconciliation run through \`node .overmind/overmind.js project reconcile --path projects/<project-id>\`, which attaches deferred class repositories and reconciles the common contract in one flow. Otherwise it discovers unfinished feature folders for the project and, when any exist, asks whether to start a new feature or continue one of the unfinished features.
+During phase 4.1, the orchestrator starts a Codex repo-br-scan session (when a class repo is ready) followed by a task-to-BR session using the installed skills. During phase 4.2, it starts the BR-clarification skill and then runs the deterministic readiness check. During phase 5, it starts the requirements-EARS skill. During optional phase 5.1, it starts the EARS-review skill. During phase 6, it syncs ready repositories and starts the contract-delta skill.
 The last selected feature path is cached in:
-\`projects/<project-id>/.project_add_feature_e2e_state.env\`
-as a convenience only; discovery plus scanner status remains the source of truth for project-level feature selection.
+\`projects/<project-id>/.overmind_feature_state.json\`
+as a convenience only; discovery plus Overmind status remains the source of truth for project-level feature selection.
 Resume examples:
 \`\`\`bash
-.commands/project_add_feature_e2e.sh --resume 4.2
-.commands/project_add_feature_e2e.sh --path projects/<project-id>
-.commands/project_add_feature_e2e.sh --path projects/<project-id> --resume 8.2
+node .overmind/overmind.js run --resume 4.2
+node .overmind/overmind.js run --path projects/<project-id>
+node .overmind/overmind.js run --path projects/<project-id> --resume 8.2
 \`\`\`
 2. Manual fallback - create feature BR scaffold:
 \`\`\`bash
-.commands/feature_br_scaffold.sh --path projects/<project-id>
+node .overmind/overmind.js scaffold feature --path projects/<project-id>
 \`\`\`
 3. During phase 4.1, the orchestrator runs the repo-br-scan skill (when a class repo is ready) to enrich \`## 13. Existing-System Context\`, then runs the task-to-BR skill.
 4. Continue the clarification loop for unresolved BR questions through the installed \`overmind-br-clarification\` skill. The skill uses:
@@ -860,13 +864,10 @@ This command writes \`#### Assigned:\` for every plan step with a class-matched 
 
 ## 4. Check Current Feature Progress
 
-1. Scan current feature progress:
+1. Show current project or feature progress:
 \`\`\`bash
-.commands/init_progress_scanner.sh --path projects/<project-id>/<feature-folder>
+node .overmind/overmind.js status projects/<project-id>/<feature-folder>
 \`\`\`
-Careful: provide a feature path here, not a project path.
-The persisted checklist file is written to:
-\`projects/<project-id>/step_state_<feature-folder>.md\`
 EOF
 }
 

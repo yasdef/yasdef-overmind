@@ -7,6 +7,7 @@ import {
   resolveFeatureWithinWorkspace
 } from "../parse/index.js";
 import type { ContextResult } from "../types/index.js";
+import { buildReadOnlyInputManifest } from "./read-only-inputs.js";
 
 const SUPPORTED_CLASSES = new Set(["backend", "frontend", "mobile"]);
 const VALID_CLASSES = new Set([...SUPPORTED_CLASSES, "infrastructure"]);
@@ -48,6 +49,7 @@ export function buildImplementationPlanContext(
         `No supported repo classes found in ${displayPath(definitionPath, workspaceRoot)}`
       );
     const featurePath = displayPath(featureDir, workspaceRoot);
+    const readOnlyInputs = buildReadOnlyInputManifest([definitionPath, ...files], workspaceRoot);
     const lines = [
       "# implementation-plan context",
       "",
@@ -69,9 +71,7 @@ export function buildImplementationPlanContext(
       "- implementation_plan_golden_example_asset: assets/implementation_plan_GOLDEN_EXAMPLE.md",
       "",
       "## Read-Only Inputs",
-      ...[definitionPath, ...files].map(
-        (file) => `- read_only_input: ${displayPath(file, workspaceRoot)}`
-      ),
+      ...readOnlyInputs.lines,
       "",
       "## Active Repo Classes",
       ...activeClasses.map((item) => `- ${item}`),
@@ -79,7 +79,7 @@ export function buildImplementationPlanContext(
       "## Allowed Write Surface",
       `- ${featurePath}/implementation_plan.md`
     ];
-    return { exitCode: 0, text: `${lines.join("\n")}\n` };
+    return { exitCode: 0, text: `${lines.join("\n")}\n`, readOnlyInputs: readOnlyInputs.paths };
   } catch (err) {
     return contextError(err instanceof Error ? err.message : String(err));
   }

@@ -6,13 +6,9 @@ OPTION_1_HELPER_SRC="$SOURCE_ROOT/overmind/scripts/project_mgmt/project_setup_fi
 OPTION_2_HELPER_SRC="$SOURCE_ROOT/overmind/scripts/project_mgmt/project_setup_add_new_project.sh"
 OPTION_3_HELPER_SRC="$SOURCE_ROOT/overmind/scripts/project_mgmt/project_setup_update_project.sh"
 COMMON_LIBS_SRC="$SOURCE_ROOT/overmind/scripts/common_libs"
-OPTION_4_HELPER_SRC="$SOURCE_ROOT/overmind/scripts/project_mgmt/init_progress_scanner.sh"
 INIT_PROJECT_STACK_BLUEPRINTS_SRC="$SOURCE_ROOT/overmind/scripts/init_project_stack_blueprints.sh"
 OPTION_5_HELPER_SRC="$SOURCE_ROOT/overmind/scripts/init_common_contract_definition.sh"
-PROJECT_CONTRACT_RECONCILIATION_SRC="$SOURCE_ROOT/overmind/scripts/project_mgmt/project_contract_reconciliation.sh"
 REGISTER_WORKER_SRC="$SOURCE_ROOT/overmind/scripts/project_mgmt/project_register_worker.sh"
-OPTION_6_HELPER_SRC="$SOURCE_ROOT/overmind/scripts/feature_br_scaffold.sh"
-PROJECT_ADD_FEATURE_E2E_SRC="$SOURCE_ROOT/overmind/scripts/project_mgmt/project_add_feature_e2e.sh"
 OPTION_18_HELPER_SRC="$SOURCE_ROOT/overmind/scripts/feature_assing_workers.sh"
 TEMPLATE_SRC="$SOURCE_ROOT/overmind/templates/init_progress_definition_TEMPLATE.yaml"
 RULES_DIR_SRC="$SOURCE_ROOT/overmind/rules"
@@ -47,6 +43,8 @@ IMPLEMENTATION_PLAN_SKILL_SOURCE_REL_PATH="packages/installer/_data/skills/overm
 IMPLEMENTATION_PLAN_SKILL_SOURCE_DIR_SRC="$SOURCE_ROOT/$IMPLEMENTATION_PLAN_SKILL_SOURCE_REL_PATH"
 PLAN_SEMANTIC_REVIEW_SKILL_SOURCE_REL_PATH="packages/installer/_data/skills/overmind-plan-semantic-review"
 PLAN_SEMANTIC_REVIEW_SKILL_SOURCE_DIR_SRC="$SOURCE_ROOT/$PLAN_SEMANTIC_REVIEW_SKILL_SOURCE_REL_PATH"
+CONTRACT_RECONCILIATION_SKILL_SOURCE_REL_PATH="packages/installer/_data/skills/overmind-contract-reconciliation"
+CONTRACT_RECONCILIATION_SKILL_SOURCE_DIR_SRC="$SOURCE_ROOT/$CONTRACT_RECONCILIATION_SKILL_SOURCE_REL_PATH"
 SKILL_RUNNER_DIRS=(
   ".codex"
   ".claude"
@@ -55,7 +53,6 @@ STAGED_RULE_FILES=(
   "common_contract_definition_rule.md"
   "project_stack_blueprint_rule.md"
   "task_to_br_rule.md"
-  "project_contract_reconciliation_rule.md"
 )
 STAGED_TEMPLATE_FILES=(
   "common_contract_definition_TEMPLATE.md"
@@ -460,6 +457,15 @@ assert_runner_skills_installed() {
     assert_file_exists "$skill_dir/assets/implementation_plan_semantic_review_TEMPLATE.md"
     assert_file_exists "$skill_dir/assets/implementation_plan_semantic_review_GOLDEN_EXAMPLE.md"
     assert_file_not_exists "$skill_dir/overmind.js"
+
+    skill_dir="$asdlc_root/$runner_dir/skills/overmind-contract-reconciliation"
+    assert_dir_exists "$skill_dir"
+    assert_dir_exists "$skill_dir/assets"
+    assert_file_exists "$skill_dir/SKILL.md"
+    assert_file_content_equal "$repo_dir/$CONTRACT_RECONCILIATION_SKILL_SOURCE_REL_PATH/SKILL.md" "$skill_dir/SKILL.md"
+    assert_file_exists "$skill_dir/assets/common_contract_definition_TEMPLATE.md"
+    assert_file_exists "$skill_dir/assets/common_contract_definition_GOLDEN_EXAMPLE.md"
+    assert_file_not_exists "$skill_dir/overmind.js"
   done
 
   assert_file_not_exists "$asdlc_root/.templates/feature_contract_delta_TEMPLATE.md"
@@ -492,7 +498,7 @@ assert_runner_skills_installed() {
   assert_file_not_exists "$asdlc_root/.templates/implementation_plan_TEMPLATE.md"
   assert_file_not_exists "$asdlc_root/.golden_examples/implementation_plan_GOLDEN_EXAMPLE.md"
   assert_file_not_exists "$asdlc_root/.helper/check_implementation_plan_quality.sh"
-  assert_file_exists "$asdlc_root/common_libs/list_committed_sibling_features.sh"
+  assert_file_not_exists "$asdlc_root/common_libs/list_committed_sibling_features.sh"
   assert_file_exists "$asdlc_root/.helper/check_cross_class_peer_trigger.sh"
 }
 
@@ -598,16 +604,9 @@ setup_repo_layout() {
   cp "$COMMON_LIBS_SRC/project_setup_common.sh" "$repo_dir/overmind/scripts/common_libs/project_setup_common.sh"
   cp "$COMMON_LIBS_SRC/class_repo_paths.sh" "$repo_dir/overmind/scripts/common_libs/class_repo_paths.sh"
   cp "$COMMON_LIBS_SRC/check_implementation_plan_readiness.sh" "$repo_dir/overmind/scripts/common_libs/check_implementation_plan_readiness.sh"
-  cp "$COMMON_LIBS_SRC/list_committed_sibling_features.sh" "$repo_dir/overmind/scripts/common_libs/list_committed_sibling_features.sh"
-  cp "$COMMON_LIBS_SRC/persist_class_repo_attach.sh" "$repo_dir/overmind/scripts/common_libs/persist_class_repo_attach.sh"
-  cp "$COMMON_LIBS_SRC/sync_repo_to_default_branch.sh" "$repo_dir/overmind/scripts/common_libs/sync_repo_to_default_branch.sh"
-  cp "$OPTION_4_HELPER_SRC" "$repo_dir/overmind/scripts/project_mgmt/init_progress_scanner.sh"
   cp "$INIT_PROJECT_STACK_BLUEPRINTS_SRC" "$repo_dir/overmind/scripts/init_project_stack_blueprints.sh"
-  cp "$PROJECT_ADD_FEATURE_E2E_SRC" "$repo_dir/overmind/scripts/project_mgmt/project_add_feature_e2e.sh"
   cp "$REGISTER_WORKER_SRC" "$repo_dir/overmind/scripts/project_mgmt/project_register_worker.sh"
   cp "$OPTION_5_HELPER_SRC" "$repo_dir/overmind/scripts/init_common_contract_definition.sh"
-  cp "$PROJECT_CONTRACT_RECONCILIATION_SRC" "$repo_dir/overmind/scripts/project_mgmt/project_contract_reconciliation.sh"
-  cp "$OPTION_6_HELPER_SRC" "$repo_dir/overmind/scripts/feature_br_scaffold.sh"
   cp "$OPTION_18_HELPER_SRC" "$repo_dir/overmind/scripts/feature_assing_workers.sh"
   cp -R "$RULES_DIR_SRC" "$repo_dir/overmind/rules"
   cp -R "$TEMPLATES_DIR_SRC" "$repo_dir/overmind/templates"
@@ -634,16 +633,13 @@ OUT
   cp -R "$PREREQUISITE_GAPS_SKILL_SOURCE_DIR_SRC" "$repo_dir/$PREREQUISITE_GAPS_SKILL_SOURCE_REL_PATH"
   cp -R "$IMPLEMENTATION_PLAN_SKILL_SOURCE_DIR_SRC" "$repo_dir/$IMPLEMENTATION_PLAN_SKILL_SOURCE_REL_PATH"
   cp -R "$PLAN_SEMANTIC_REVIEW_SKILL_SOURCE_DIR_SRC" "$repo_dir/$PLAN_SEMANTIC_REVIEW_SKILL_SOURCE_REL_PATH"
+  cp -R "$CONTRACT_RECONCILIATION_SKILL_SOURCE_DIR_SRC" "$repo_dir/$CONTRACT_RECONCILIATION_SKILL_SOURCE_REL_PATH"
   chmod +x "$repo_dir/overmind/scripts/project_mgmt/project_setup_first_init_machine.sh"
   chmod +x "$repo_dir/overmind/scripts/project_mgmt/project_setup_add_new_project.sh"
   chmod +x "$repo_dir/overmind/scripts/project_mgmt/project_setup_update_project.sh"
-  chmod +x "$repo_dir/overmind/scripts/project_mgmt/init_progress_scanner.sh"
   chmod +x "$repo_dir/overmind/scripts/init_project_stack_blueprints.sh"
-  chmod +x "$repo_dir/overmind/scripts/project_mgmt/project_add_feature_e2e.sh"
   chmod +x "$repo_dir/overmind/scripts/project_mgmt/project_register_worker.sh"
   chmod +x "$repo_dir/overmind/scripts/init_common_contract_definition.sh"
-  chmod +x "$repo_dir/overmind/scripts/project_mgmt/project_contract_reconciliation.sh"
-  chmod +x "$repo_dir/overmind/scripts/feature_br_scaffold.sh"
   chmod +x "$repo_dir/overmind/scripts/feature_assing_workers.sh"
   find "$repo_dir/overmind/scripts/helper" -maxdepth 1 -type f -exec chmod +x {} +
 }
@@ -702,26 +698,23 @@ test_first_init_machine_bootstraps_asdlc_workspace_with_local_template() {
   assert_file_exists "$asdlc_root/common_libs/project_setup_common.sh"
   assert_file_exists "$asdlc_root/common_libs/class_repo_paths.sh"
   assert_file_exists "$asdlc_root/common_libs/check_implementation_plan_readiness.sh"
-  assert_file_exists "$asdlc_root/common_libs/list_committed_sibling_features.sh"
-  assert_file_exists "$asdlc_root/common_libs/persist_class_repo_attach.sh"
-  assert_file_exists "$asdlc_root/common_libs/sync_repo_to_default_branch.sh"
+  assert_file_not_exists "$asdlc_root/common_libs/list_committed_sibling_features.sh"
+  assert_file_not_exists "$asdlc_root/common_libs/persist_class_repo_attach.sh"
+  assert_file_not_exists "$asdlc_root/common_libs/sync_repo_to_default_branch.sh"
   assert_file_executable "$asdlc_root/common_libs/class_repo_paths.sh"
   assert_file_executable "$asdlc_root/common_libs/check_implementation_plan_readiness.sh"
-  assert_file_executable "$asdlc_root/common_libs/list_committed_sibling_features.sh"
-  assert_file_executable "$asdlc_root/common_libs/persist_class_repo_attach.sh"
-  assert_file_executable "$asdlc_root/common_libs/sync_repo_to_default_branch.sh"
   assert_file_exists "$asdlc_root/asdlc_metadata.yaml"
   assert_file_exists "$asdlc_root/quickrun.md"
   assert_file_exists "$asdlc_root/.templates/init_progress_definition_TEMPLATE.yaml"
   assert_file_exists "$asdlc_root/.commands/project_setup_add_new_project.sh"
   assert_file_exists "$asdlc_root/.commands/project_setup_update_project.sh"
-  assert_file_exists "$asdlc_root/.commands/init_progress_scanner.sh"
+  assert_file_not_exists "$asdlc_root/.commands/init_progress_scanner.sh"
   assert_file_exists "$asdlc_root/.commands/init_project_stack_blueprints.sh"
   assert_file_exists "$asdlc_root/.commands/init_common_contract_definition.sh"
-  assert_file_exists "$asdlc_root/.commands/project_contract_reconciliation.sh"
+  assert_file_not_exists "$asdlc_root/.commands/project_contract_reconciliation.sh"
   assert_file_exists "$asdlc_root/.commands/project_register_worker.sh"
-  assert_file_exists "$asdlc_root/.commands/feature_br_scaffold.sh"
-  assert_file_exists "$asdlc_root/.commands/project_add_feature_e2e.sh"
+  assert_file_not_exists "$asdlc_root/.commands/feature_br_scaffold.sh"
+  assert_file_not_exists "$asdlc_root/.commands/project_add_feature_e2e.sh"
   assert_file_not_exists "$asdlc_root/.commands/feature_user_br_clarification.sh"
   assert_file_not_exists "$asdlc_root/.commands/feature_br_check_ears_readiness.sh"
   assert_file_not_exists "$asdlc_root/.commands/feature_br_to_ears.sh"
@@ -735,48 +728,42 @@ test_first_init_machine_bootstraps_asdlc_workspace_with_local_template() {
   assert_file_exists "$asdlc_root/.commands/feature_assing_workers.sh"
   assert_file_executable "$asdlc_root/.commands/project_setup_add_new_project.sh"
   assert_file_executable "$asdlc_root/.commands/project_setup_update_project.sh"
-  assert_file_executable "$asdlc_root/.commands/init_progress_scanner.sh"
   assert_file_executable "$asdlc_root/.commands/init_project_stack_blueprints.sh"
   assert_file_executable "$asdlc_root/.commands/init_common_contract_definition.sh"
-  assert_file_executable "$asdlc_root/.commands/project_contract_reconciliation.sh"
   assert_file_executable "$asdlc_root/.commands/project_register_worker.sh"
-  assert_file_executable "$asdlc_root/.commands/feature_br_scaffold.sh"
-  assert_file_executable "$asdlc_root/.commands/project_add_feature_e2e.sh"
   assert_file_executable "$asdlc_root/.commands/feature_assing_workers.sh"
   assert_file_content_equal \
     "$repo_dir/overmind/templates/init_progress_definition_TEMPLATE.yaml" \
     "$asdlc_root/.templates/init_progress_definition_TEMPLATE.yaml"
 
   local add_cmd=""
-  local scanner_cmd=""
   local quickrun=""
   local metadata=""
   add_cmd="$(cat "$asdlc_root/.commands/project_setup_add_new_project.sh")"
-  scanner_cmd="$(cat "$asdlc_root/.commands/init_progress_scanner.sh")"
   quickrun="$(cat "$asdlc_root/quickrun.md")"
   metadata="$(cat "$asdlc_root/asdlc_metadata.yaml")"
   assert_contains "$add_cmd" "ASDLC_PROJECTS_DIR_DEFAULT=\"$asdlc_root/projects\""
-  assert_contains "$scanner_cmd" "ASDLC_PROJECTS_DIR_DEFAULT=\"$asdlc_root/projects\""
   assert_contains "$quickrun" "## 2. Create EARS Requirements"
   assert_contains "$quickrun" 'Project path example: `projects/<project-id>`'
   assert_contains "$quickrun" 'Feature path example: `projects/<project-id>/<feature-folder>`'
   assert_contains "$quickrun" 'Task-to-BR gates run through the staged CLI at `.overmind/overmind.js`.'
-  assert_contains "$quickrun" '`overmind-plan-semantic-review` skills are staged for supported runners'
-  assert_contains "$quickrun" 'Successful scanner runs persist `projects/<project-id>/step_state_<feature-folder>.md`; stdout remains the canonical machine-consumable output.'
-  assert_contains "$quickrun" ".commands/project_add_feature_e2e.sh"
-  assert_contains "$quickrun" ".commands/project_add_feature_e2e.sh --path projects/<project-id>"
-  assert_contains "$quickrun" 'During phase 4.1, the orchestrator starts a Codex repo-br-scan session (when a class repo is ready) followed by a task-to-BR session using the installed skills; when `user_br_input.md` is missing, Codex asks for a local story file or Jira ticket. During phase 4.2, the orchestrator starts the BR-clarification skill and then runs the deterministic readiness check. During phase 5, the orchestrator starts the requirements-EARS skill. During optional phase 5.1, the orchestrator starts the EARS-review skill. During phase 6, it syncs ready repositories and starts the contract-delta skill.'
-  assert_contains "$quickrun" '.commands/project_add_feature_e2e.sh --resume 4.2'
-  assert_contains "$quickrun" ".commands/project_add_feature_e2e.sh --path projects/<project-id> --resume 8.2"
-  assert_contains "$quickrun" '.project_add_feature_e2e_state.env'
-  assert_contains "$quickrun" 'If `--path` is omitted, the script auto-selects the only project under `projects/`'
-  assert_contains "$quickrun" "discovers unfinished feature folders for the project first"
+  assert_contains "$quickrun" '`overmind-contract-reconciliation` skills are staged for supported runners'
+  assert_contains "$quickrun" 'Status is read-only; stdout is the canonical machine-consumable output.'
+  assert_contains "$quickrun" "node .overmind/overmind.js run"
+  assert_contains "$quickrun" "node .overmind/overmind.js run --path projects/<project-id>"
+  assert_contains "$quickrun" 'During phase 4.1, the orchestrator starts a Codex repo-br-scan session (when a class repo is ready) followed by a task-to-BR session using the installed skills. During phase 4.2, it starts the BR-clarification skill and then runs the deterministic readiness check. During phase 5, it starts the requirements-EARS skill. During optional phase 5.1, it starts the EARS-review skill. During phase 6, it syncs ready repositories and starts the contract-delta skill.'
+  assert_contains "$quickrun" 'node .overmind/overmind.js run --resume 4.2'
+  assert_contains "$quickrun" "node .overmind/overmind.js run --path projects/<project-id> --resume 8.2"
+  assert_contains "$quickrun" '.overmind_feature_state.json'
+  assert_contains "$quickrun" 'run through `node .overmind/overmind.js project reconcile --path projects/<project-id>`'
+  assert_contains "$quickrun" 'If `--path` is omitted, the command auto-selects the only project under `projects/`'
+  assert_contains "$quickrun" "discovers unfinished feature folders for the project"
   assert_contains "$quickrun" "asks whether to start a new feature or continue one of the unfinished features"
-  assert_contains "$quickrun" "as a convenience only; discovery plus scanner status remains the source of truth"
+  assert_contains "$quickrun" "as a convenience only; discovery plus Overmind status remains the source of truth"
   assert_contains "$quickrun" ".commands/project_register_worker.sh --path projects/<project-id>"
   assert_contains "$quickrun" ".commands/init_project_stack_blueprints.sh --path projects/<project-id>"
   assert_contains "$quickrun" "projects/<project-id>/workers.yaml"
-  assert_contains "$quickrun" ".commands/feature_br_scaffold.sh --path projects/<project-id>"
+  assert_contains "$quickrun" "node .overmind/overmind.js scaffold feature --path projects/<project-id>"
   assert_contains "$quickrun" "node .overmind/overmind.js context br-clarification projects/<project-id>/<feature-folder>"
   assert_contains "$quickrun" "node .overmind/overmind.js gate br-clarification projects/<project-id>/<feature-folder>"
   assert_contains "$quickrun" "node .overmind/overmind.js readiness br-clarification projects/<project-id>/<feature-folder>"
@@ -807,12 +794,9 @@ test_first_init_machine_bootstraps_asdlc_workspace_with_local_template() {
   assert_file_not_exists "$asdlc_root/.helper/check_implementation_plan_semantic_review_quality.sh"
   assert_contains "$quickrun" ".commands/feature_assing_workers.sh --feature_path projects/<project-id>/<feature-folder>"
   assert_contains "$quickrun" 'This command writes `#### Assigned:` for every plan step with a class-matched worker UUID or `ERROR: no active worker available for class <class>`.'
-  assert_contains "$quickrun" ".commands/init_progress_scanner.sh --path projects/<project-id>/<feature-folder>"
-  assert_contains "$quickrun" "Careful: provide a feature path here, not a project path."
-  assert_contains "$quickrun" 'projects/<project-id>/step_state_<feature-folder>.md'
+  assert_contains "$quickrun" "node .overmind/overmind.js status projects/<project-id>/<feature-folder>"
   assert_contains "$metadata" "meta:"
   assert_contains "$metadata" "projects:"
-  assert_contains "$(cat "$asdlc_root/.commands/feature_br_scaffold.sh")" 'TEMPLATE_FILE=".templates/feature_br_summary_TEMPLATE.md"'
   assert_file_not_exists "$asdlc_root/.rules/user_br_clarification_rule.md"
   assert_file_not_exists "$asdlc_root/.rules/br_to_ears.md"
   assert_file_not_exists "$asdlc_root/.rules/requirements_ears_review_rule.md"
@@ -926,9 +910,10 @@ test_first_init_machine_update_mode_repairs_missing_commands_without_overwriting
   local common_lib_path="$asdlc_root/common_libs/project_setup_common.sh"
   local class_repo_paths_lib_path="$asdlc_root/common_libs/class_repo_paths.sh"
   local readiness_lib_path="$asdlc_root/common_libs/check_implementation_plan_readiness.sh"
-  local sibling_lister_lib_path="$asdlc_root/common_libs/list_committed_sibling_features.sh"
+  local obsolete_sibling_lister_lib_path="$asdlc_root/common_libs/list_committed_sibling_features.sh"
   local attach_lib_path="$asdlc_root/common_libs/persist_class_repo_attach.sh"
-  local sync_repo_lib_path="$asdlc_root/common_libs/sync_repo_to_default_branch.sh"
+  local obsolete_sync_repo_lib_path="$asdlc_root/common_libs/sync_repo_to_default_branch.sh"
+  local operator_lib_path="$asdlc_root/common_libs/operator_custom.sh"
   local stale_rule_path="$asdlc_root/.rules/repo_br_scan_rule.md"
   local stale_br_to_ears_rule_path="$asdlc_root/.rules/br_to_ears.md"
   local stale_requirements_ears_helper_path="$asdlc_root/.helper/check_requirements_ears_quality.sh"
@@ -985,6 +970,9 @@ test_first_init_machine_update_mode_repairs_missing_commands_without_overwriting
   echo "stale helper" >"$stale_helper_path"
   chmod -x "$stale_helper_path"
   echo "stale setup" >"$stale_setup_models_path"
+  echo "stale command lib" >"$obsolete_sibling_lister_lib_path"
+  echo "stale command lib" >"$obsolete_sync_repo_lib_path"
+  echo "operator managed content" >"$operator_lib_path"
 
   local metadata_before=""
   local add_cmd_before=""
@@ -995,16 +983,16 @@ test_first_init_machine_update_mode_repairs_missing_commands_without_overwriting
 
   rm -f "$common_lib_path"
   rm -f "$overmind_cli_path"
+  printf 'obsolete scanner\n' >"$scanner_cmd_path"
+  printf 'obsolete e2e\n' >"$feature_orchestrator_cmd_path"
+  printf 'obsolete scaffold\n' >"$feature_br_cmd_path"
+  printf 'obsolete reconciliation\n' >"$contract_reconciliation_cmd_path"
 
   rm -f \
     "$update_cmd_path" \
-    "$scanner_cmd_path" \
     "$stack_blueprints_cmd_path" \
-    "$feature_orchestrator_cmd_path" \
     "$common_contract_cmd_path" \
-    "$contract_reconciliation_cmd_path" \
     "$register_worker_cmd_path" \
-    "$feature_br_cmd_path" \
     "$assign_workers_cmd_path"
 
   local out=""
@@ -1016,13 +1004,9 @@ test_first_init_machine_update_mode_repairs_missing_commands_without_overwriting
   assert_contains "$out" "asdlc folder already exists, switch to update mode"
   assert_contains "$out" "Update mode added file: $common_lib_path"
   assert_contains "$out" "Update mode added file: $update_cmd_path"
-  assert_contains "$out" "Update mode added file: $scanner_cmd_path"
   assert_contains "$out" "Update mode added file: $stack_blueprints_cmd_path"
-  assert_contains "$out" "Update mode added file: $feature_orchestrator_cmd_path"
   assert_contains "$out" "Update mode added file: $common_contract_cmd_path"
-  assert_contains "$out" "Update mode added file: $contract_reconciliation_cmd_path"
   assert_contains "$out" "Update mode added file: $register_worker_cmd_path"
-  assert_contains "$out" "Update mode added file: $feature_br_cmd_path"
   assert_contains "$out" "Update mode added file: $assign_workers_cmd_path"
   assert_contains "$out" "Update mode added file: $overmind_cli_path"
   assert_contains "$out" "ASDLC workspace update completed: $asdlc_root"
@@ -1030,23 +1014,21 @@ test_first_init_machine_update_mode_repairs_missing_commands_without_overwriting
   assert_file_exists "$common_lib_path"
   assert_file_exists "$class_repo_paths_lib_path"
   assert_file_exists "$readiness_lib_path"
-  assert_file_exists "$sibling_lister_lib_path"
-  assert_file_exists "$attach_lib_path"
-  assert_file_exists "$sync_repo_lib_path"
+  assert_file_not_exists "$obsolete_sibling_lister_lib_path"
+  assert_file_not_exists "$attach_lib_path"
+  assert_file_not_exists "$obsolete_sync_repo_lib_path"
+  assert_file_exists "$operator_lib_path"
   assert_file_executable "$class_repo_paths_lib_path"
   assert_file_executable "$readiness_lib_path"
-  assert_file_executable "$sibling_lister_lib_path"
-  assert_file_executable "$attach_lib_path"
-  assert_file_executable "$sync_repo_lib_path"
   assert_file_exists "$add_cmd_path"
   assert_file_exists "$update_cmd_path"
-  assert_file_exists "$scanner_cmd_path"
+  assert_file_not_exists "$scanner_cmd_path"
   assert_file_exists "$stack_blueprints_cmd_path"
-  assert_file_exists "$feature_orchestrator_cmd_path"
+  assert_file_not_exists "$feature_orchestrator_cmd_path"
+  assert_file_not_exists "$contract_reconciliation_cmd_path"
   assert_file_exists "$common_contract_cmd_path"
-  assert_file_exists "$contract_reconciliation_cmd_path"
   assert_file_exists "$register_worker_cmd_path"
-  assert_file_exists "$feature_br_cmd_path"
+  assert_file_not_exists "$feature_br_cmd_path"
   assert_file_not_exists "$asdlc_root/.commands/feature_user_br_clarification.sh"
   assert_file_not_exists "$asdlc_root/.commands/feature_br_check_ears_readiness.sh"
   assert_file_not_exists "$feature_contract_delta_rule_path"
@@ -1081,22 +1063,16 @@ test_first_init_machine_update_mode_repairs_missing_commands_without_overwriting
   assert_file_not_exists "$implementation_plan_semantic_review_cmd_path"
   assert_file_exists "$assign_workers_cmd_path"
   assert_file_executable "$update_cmd_path"
-  assert_file_executable "$scanner_cmd_path"
   assert_file_executable "$stack_blueprints_cmd_path"
-  assert_file_executable "$feature_orchestrator_cmd_path"
   assert_file_executable "$common_contract_cmd_path"
-  assert_file_executable "$contract_reconciliation_cmd_path"
   assert_file_executable "$register_worker_cmd_path"
-  assert_file_executable "$feature_br_cmd_path"
   assert_file_executable "$assign_workers_cmd_path"
   assert_equal "$metadata_before" "$(cat "$metadata_path")"
   assert_equal "$add_cmd_before" "$(cat "$add_cmd_path")"
   assert_file_exists "$sentinel_project_file"
   assert_contains "$(cat "$update_cmd_path")" "ASDLC_PROJECTS_DIR_DEFAULT=\"$asdlc_root/projects\""
-  assert_contains "$(cat "$scanner_cmd_path")" "ASDLC_PROJECTS_DIR_DEFAULT=\"$asdlc_root/projects\""
   assert_contains "$(cat "$register_worker_cmd_path")" "ASDLC_PROJECTS_DIR_DEFAULT=\"$asdlc_root/projects\""
   assert_contains "$(cat "$assign_workers_cmd_path")" "ASDLC_PROJECTS_DIR_DEFAULT=\"$asdlc_root/projects\""
-  assert_contains "$(cat "$feature_br_cmd_path")" 'TEMPLATE_FILE=".templates/feature_br_summary_TEMPLATE.md"'
   assert_file_not_exists "$stale_br_to_ears_rule_path"
   assert_file_not_exists "$stale_requirements_ears_helper_path"
   assert_file_not_exists "$stale_requirements_ears_review_rule_path"
@@ -1139,14 +1115,14 @@ OUT
   quickrun="$(cat "$quickrun_path")"
   assert_not_contains "$quickrun" "legacy quickrun content"
   assert_contains "$quickrun" "## 3. Continue Toward Implementation"
-  assert_contains "$quickrun" '`overmind-plan-semantic-review` skills are staged for supported runners'
-  assert_contains "$quickrun" ".commands/project_add_feature_e2e.sh"
-  assert_contains "$quickrun" ".commands/project_add_feature_e2e.sh --path projects/<project-id>"
-  assert_contains "$quickrun" 'During phase 4.1, the orchestrator starts a Codex repo-br-scan session (when a class repo is ready) followed by a task-to-BR session using the installed skills; when `user_br_input.md` is missing, Codex asks for a local story file or Jira ticket. During phase 4.2, the orchestrator starts the BR-clarification skill and then runs the deterministic readiness check. During phase 5, the orchestrator starts the requirements-EARS skill. During optional phase 5.1, the orchestrator starts the EARS-review skill. During phase 6, it syncs ready repositories and starts the contract-delta skill.'
-  assert_contains "$quickrun" '.commands/project_add_feature_e2e.sh --resume 4.2'
-  assert_contains "$quickrun" ".commands/project_add_feature_e2e.sh --path projects/<project-id> --resume 8.2"
-  assert_contains "$quickrun" 'If `--path` is omitted, the script auto-selects the only project under `projects/`'
-  assert_contains "$quickrun" "discovers unfinished feature folders for the project first"
+  assert_contains "$quickrun" '`overmind-contract-reconciliation` skills are staged for supported runners'
+  assert_contains "$quickrun" "node .overmind/overmind.js run"
+  assert_contains "$quickrun" "node .overmind/overmind.js run --path projects/<project-id>"
+  assert_contains "$quickrun" 'During phase 4.1, the orchestrator starts a Codex repo-br-scan session (when a class repo is ready) followed by a task-to-BR session using the installed skills. During phase 4.2, it starts the BR-clarification skill and then runs the deterministic readiness check. During phase 5, it starts the requirements-EARS skill. During optional phase 5.1, it starts the EARS-review skill. During phase 6, it syncs ready repositories and starts the contract-delta skill.'
+  assert_contains "$quickrun" 'node .overmind/overmind.js run --resume 4.2'
+  assert_contains "$quickrun" "node .overmind/overmind.js run --path projects/<project-id> --resume 8.2"
+  assert_contains "$quickrun" 'If `--path` is omitted, the command auto-selects the only project under `projects/`'
+  assert_contains "$quickrun" "discovers unfinished feature folders for the project"
   assert_contains "$quickrun" "asks whether to start a new feature or continue one of the unfinished features"
   assert_contains "$quickrun" ".commands/project_register_worker.sh --path projects/<project-id>"
   assert_contains "$quickrun" "projects/<project-id>/workers.yaml"
@@ -1169,7 +1145,7 @@ OUT
   assert_contains "$quickrun" ".commands/feature_assing_workers.sh --feature_path projects/<project-id>/<feature-folder>"
   assert_contains "$quickrun" 'This command writes `#### Assigned:` for every plan step with a class-matched worker UUID or `ERROR: no active worker available for class <class>`.'
   assert_contains "$quickrun" "node .overmind/overmind.js gate surface-map projects/<project-id>/<feature-folder> --class <backend|frontend|mobile>"
-  assert_contains "$quickrun" 'step_state_<feature-folder>.md'
+  assert_contains "$quickrun" 'Status is read-only; stdout is the canonical machine-consumable output.'
 }
 
 test_first_init_machine_update_mode_preserves_existing_external_sources_yaml() {
@@ -1229,23 +1205,19 @@ test_first_init_machine_update_mode_recreates_commands_directory_when_missing() 
   assert_contains "$out" "asdlc folder already exists, switch to update mode"
   assert_contains "$out" "Update mode added file: $asdlc_root/.commands/project_setup_add_new_project.sh"
   assert_contains "$out" "Update mode added file: $asdlc_root/.commands/project_setup_update_project.sh"
-  assert_contains "$out" "Update mode added file: $asdlc_root/.commands/init_progress_scanner.sh"
   assert_contains "$out" "Update mode added file: $asdlc_root/.commands/init_common_contract_definition.sh"
-  assert_contains "$out" "Update mode added file: $asdlc_root/.commands/project_contract_reconciliation.sh"
   assert_contains "$out" "Update mode added file: $asdlc_root/.commands/project_register_worker.sh"
-  assert_contains "$out" "Update mode added file: $asdlc_root/.commands/feature_br_scaffold.sh"
-  assert_contains "$out" "Update mode added file: $asdlc_root/.commands/project_add_feature_e2e.sh"
   assert_contains "$out" "Update mode added file: $asdlc_root/.commands/feature_assing_workers.sh"
   assert_contains "$out" "ASDLC workspace update completed: $asdlc_root"
   assert_dir_exists "$asdlc_root/.commands"
   assert_file_exists "$asdlc_root/.commands/project_setup_add_new_project.sh"
   assert_file_exists "$asdlc_root/.commands/project_setup_update_project.sh"
-  assert_file_exists "$asdlc_root/.commands/init_progress_scanner.sh"
+  assert_file_not_exists "$asdlc_root/.commands/init_progress_scanner.sh"
   assert_file_exists "$asdlc_root/.commands/init_common_contract_definition.sh"
-  assert_file_exists "$asdlc_root/.commands/project_contract_reconciliation.sh"
+  assert_file_not_exists "$asdlc_root/.commands/project_contract_reconciliation.sh"
   assert_file_exists "$asdlc_root/.commands/project_register_worker.sh"
-  assert_file_exists "$asdlc_root/.commands/feature_br_scaffold.sh"
-  assert_file_exists "$asdlc_root/.commands/project_add_feature_e2e.sh"
+  assert_file_not_exists "$asdlc_root/.commands/feature_br_scaffold.sh"
+  assert_file_not_exists "$asdlc_root/.commands/project_add_feature_e2e.sh"
   assert_file_not_exists "$asdlc_root/.commands/feature_user_br_clarification.sh"
   assert_file_not_exists "$asdlc_root/.commands/feature_br_check_ears_readiness.sh"
   assert_file_not_exists "$asdlc_root/.commands/feature_br_to_ears.sh"
@@ -1259,20 +1231,14 @@ test_first_init_machine_update_mode_recreates_commands_directory_when_missing() 
   assert_file_exists "$asdlc_root/.commands/feature_assing_workers.sh"
   assert_file_executable "$asdlc_root/.commands/project_setup_add_new_project.sh"
   assert_file_executable "$asdlc_root/.commands/project_setup_update_project.sh"
-  assert_file_executable "$asdlc_root/.commands/init_progress_scanner.sh"
   assert_file_executable "$asdlc_root/.commands/init_common_contract_definition.sh"
-  assert_file_executable "$asdlc_root/.commands/project_contract_reconciliation.sh"
   assert_file_executable "$asdlc_root/.commands/project_register_worker.sh"
-  assert_file_executable "$asdlc_root/.commands/feature_br_scaffold.sh"
-  assert_file_executable "$asdlc_root/.commands/project_add_feature_e2e.sh"
   assert_file_executable "$asdlc_root/.commands/feature_assing_workers.sh"
   assert_contains "$(cat "$asdlc_root/.commands/project_setup_add_new_project.sh")" "ASDLC_PROJECTS_DIR_DEFAULT=\"$asdlc_root/projects\""
   assert_contains "$(cat "$asdlc_root/.commands/project_setup_update_project.sh")" "ASDLC_PROJECTS_DIR_DEFAULT=\"$asdlc_root/projects\""
-  assert_contains "$(cat "$asdlc_root/.commands/init_progress_scanner.sh")" "ASDLC_PROJECTS_DIR_DEFAULT=\"$asdlc_root/projects\""
   assert_contains "$(cat "$asdlc_root/.commands/init_common_contract_definition.sh")" "ASDLC_PROJECTS_DIR_DEFAULT=\"$asdlc_root/projects\""
   assert_contains "$(cat "$asdlc_root/.commands/project_register_worker.sh")" "ASDLC_PROJECTS_DIR_DEFAULT=\"$asdlc_root/projects\""
   assert_contains "$(cat "$asdlc_root/.commands/feature_assing_workers.sh")" "ASDLC_PROJECTS_DIR_DEFAULT=\"$asdlc_root/projects\""
-  assert_contains "$(cat "$asdlc_root/.commands/feature_br_scaffold.sh")" 'TEMPLATE_FILE=".templates/feature_br_summary_TEMPLATE.md"'
   assert_feature_requirements_and_plan_commands_use_staged_runtime_assets "$asdlc_root"
 }
 
@@ -1515,76 +1481,6 @@ test_add_new_project_allows_dirty_worktree() {
   assert_equal "1" "$(count_project_records "$asdlc_root/asdlc_metadata.yaml")"
 }
 
-test_staged_scanner_reads_selected_feature_path() {
-  local repo_dir="$TMP_ROOT/repo-staged-scanner-feature-path"
-  mkdir -p "$repo_dir"
-  setup_git_repo_with_identity "$repo_dir"
-
-  local bootstrap_parent="$TMP_ROOT/asdlc-home-staged-scanner-feature-path"
-  local asdlc_root=""
-  asdlc_root="$(bootstrap_asdlc_workspace "$repo_dir" "$bootstrap_parent")"
-
-  local add_out=""
-  add_out="$(
-    cd "$TMP_ROOT" &&
-    printf 'Scanner Demo\n1\n5\n2\n2\n' | "$asdlc_root/.commands/project_setup_add_new_project.sh" 2>&1
-  )"
-  assert_contains "$add_out" "Created ASDLC project folder: $asdlc_root/projects/"
-
-  local project_id=""
-  local project_dir=""
-  local feature_dir=""
-  local state_path=""
-  project_id="$(extract_last_project_uuid "$asdlc_root/asdlc_metadata.yaml")"
-  project_dir="$asdlc_root/projects/$project_id"
-  feature_dir="$project_dir/feature-scan"
-  mkdir -p "$feature_dir"
-  state_path="$project_dir/step_state_feature-scan.md"
-
-  cat >"$project_dir/init_progress_definition.yaml" <<'EOF'
-meta_info:
-  project_classes:
-    - backend
-
-steps:
-  - step_number: 1
-    phase_name: "init"
-    step_name: "Project-level marker"
-    finished_only_if_artefacts_present:
-      - file: "ready_project.md"
-  - step_number: 2
-    phase_name: "feature"
-    step_name: "Feature-level marker"
-    finished_only_if_artefacts_present:
-      - file: "ready_feature.md"
-        special_folder: "/overmind/product"
-EOF
-
-  local first_scan=""
-  first_scan="$(
-    cd "$TMP_ROOT" &&
-    "$asdlc_root/.commands/init_progress_scanner.sh" --path "$feature_dir"
-  )"
-  assert_contains "$first_scan" "---- PROJECT LEVEL TASKS ----"
-  assert_contains "$first_scan" "- [ ] 1 Project-level marker"
-  assert_contains "$first_scan" "- [ ] 2 Feature-level marker"
-  assert_contains "$first_scan" "next step: 1 (Project-level marker)"
-  assert_file_exists "$state_path"
-
-  echo "ready" >"$project_dir/ready_project.md"
-  echo "ready" >"$feature_dir/ready_feature.md"
-  local second_scan=""
-  second_scan="$(
-    cd "$TMP_ROOT" &&
-    "$asdlc_root/.commands/init_progress_scanner.sh" --path "$feature_dir"
-  )"
-  assert_contains "$second_scan" "---- PROJECT LEVEL TASKS ----"
-  assert_contains "$second_scan" "- [x] 1 Project-level marker"
-  assert_contains "$second_scan" "- [x] 2 Feature-level marker"
-  assert_contains "$second_scan" "next step: none"
-  assert_file_exists "$state_path"
-}
-
 test_add_new_project_retries_invalid_repo_path_until_valid() {
   local repo_dir="$TMP_ROOT/repo-add-project-path-retry"
   mkdir -p "$repo_dir"
@@ -1817,30 +1713,6 @@ EOF
   assert_equal "0" "$(count_project_records "$asdlc_root/asdlc_metadata.yaml")"
 }
 
-test_staged_br_structuring_commands_require_staged_location() {
-  local repo_dir="$TMP_ROOT/repo-staged-br-command-guard"
-  mkdir -p "$repo_dir"
-  setup_git_repo_with_identity "$repo_dir"
-
-  local bootstrap_parent="$TMP_ROOT/asdlc-home-staged-br-command-guard"
-  local asdlc_root=""
-  asdlc_root="$(bootstrap_asdlc_workspace "$repo_dir" "$bootstrap_parent")"
-
-  local copied_script="$TMP_ROOT/feature_br_scaffold-nonstaged.sh"
-  cp "$asdlc_root/.commands/feature_br_scaffold.sh" "$copied_script"
-  chmod +x "$copied_script"
-
-  local status=0
-  local out=""
-  set +e
-  out="$("$copied_script" --path "$TMP_ROOT/some-feature-path" 2>&1)"
-  status=$?
-  set -e
-
-  assert_nonzero_status "$status"
-  assert_contains "$out" "Run this command from ASDLC staged path: <asdlc>/.commands/"
-}
-
 test_update_project_requires_staged_command_location() {
   local repo_dir="$TMP_ROOT/repo-update-project-staged-guard"
   mkdir -p "$repo_dir"
@@ -1874,7 +1746,6 @@ test_first_init_machine_fails_when_asdlc_exists_without_metadata
 test_add_new_project_creates_record_workspace_and_class_repo_metadata_from_staged_command
 test_add_new_project_does_not_require_git_repository
 test_add_new_project_allows_dirty_worktree
-test_staged_scanner_reads_selected_feature_path
 test_add_new_project_retries_invalid_repo_path_until_valid
 test_add_new_project_class_menu_shrinks_until_only_done_option_remains
 test_add_new_project_requires_at_least_one_project_class_before_done
@@ -1883,7 +1754,6 @@ test_add_new_project_rejects_empty_feature_name
 test_add_new_project_rejects_feature_name_without_alnum
 test_add_new_project_requires_staged_command_location
 test_add_new_project_rejects_metadata_with_top_level_sections_after_projects
-test_staged_br_structuring_commands_require_staged_location
 test_update_project_requires_staged_command_location
 
 echo "All project_setup_asdlc helper tests passed."

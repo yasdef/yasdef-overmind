@@ -30,6 +30,6 @@ Divergence policy recorded at attach time.
 
 ### Lifecycle
 
-Classes start `"deferred"` (blueprint-backed) and transition to `"ready"` (repo-backed) independently. At feature start, `project_add_feature_e2e.sh` prompts for every deferred class; a valid operator-provided repo path attaches the class and records `policy: "C"`, while blank input leaves it deferred.
+Classes start `"deferred"` (blueprint-backed) and transition to `"ready"` (repo-backed) independently. `node .overmind/overmind.js project reconcile --path <project-path>` attaches a deferred class from a valid operator-provided repo path, records `policy: "C"`, and reconciles ready classes; `node .overmind/overmind.js run` detects deferred or unreconciled classes and refuses with that project-level command as guidance.
 
 `project_type_code` records how the project started and is not read by feature-phase steps.

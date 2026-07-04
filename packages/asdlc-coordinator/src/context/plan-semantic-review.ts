@@ -7,6 +7,7 @@ import {
   resolveFeatureWithinWorkspace
 } from "../parse/index.js";
 import type { ContextResult } from "../types/index.js";
+import { buildReadOnlyInputManifest } from "./read-only-inputs.js";
 
 const SUPPORTED_CLASSES = new Set(["backend", "frontend", "mobile"]);
 const VALID_CLASSES = new Set([...SUPPORTED_CLASSES, "infrastructure"]);
@@ -70,6 +71,7 @@ export function buildPlanSemanticReviewContext(
       prerequisitePath,
       ...surfaceMaps.map(({ file }) => file)
     ];
+    const readOnlyManifest = buildReadOnlyInputManifest(readOnlyInputs, workspaceRoot);
     const lines = [
       "# plan-semantic-review context",
       "",
@@ -87,7 +89,7 @@ export function buildPlanSemanticReviewContext(
       "- implementation_plan_semantic_review_golden_example_asset: assets/implementation_plan_semantic_review_GOLDEN_EXAMPLE.md",
       "",
       "## Read-Only Inputs",
-      ...readOnlyInputs.map((file) => `- read_only_input: ${displayPath(file, workspaceRoot)}`),
+      ...readOnlyManifest.lines,
       "",
       "## Active Repo Classes",
       ...(activeClasses.length > 0 ? activeClasses.map((item) => `- ${item}`) : ["- none"]),
@@ -96,7 +98,7 @@ export function buildPlanSemanticReviewContext(
       `- ${featurePath}/implementation_plan.md`,
       `- ${featurePath}/implementation_plan_semantic_review.md`
     ];
-    return { exitCode: 0, text: `${lines.join("\n")}\n` };
+    return { exitCode: 0, text: `${lines.join("\n")}\n`, readOnlyInputs: readOnlyManifest.paths };
   } catch (err) {
     return contextError(err instanceof Error ? err.message : String(err));
   }

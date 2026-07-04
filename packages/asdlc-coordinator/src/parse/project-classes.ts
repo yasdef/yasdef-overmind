@@ -1,6 +1,12 @@
 import { readFileSync } from "node:fs";
 
 import { stripQuotes } from "./markdown.js";
+export { readProjectDefinitionMetadata } from "./project-definition.js";
+export type {
+  ClassRepoPath,
+  ProjectClassState,
+  ProjectDefinitionMetadata
+} from "./project-definition.js";
 
 export function parseImplementationSlicesProjectClasses(definitionPath: string): string[] {
   const classes: string[] = [];

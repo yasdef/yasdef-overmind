@@ -7,6 +7,7 @@ import {
   resolveFeatureWithinWorkspace
 } from "../parse/index.js";
 import type { ContextResult } from "../types/index.js";
+import { buildReadOnlyInputManifest } from "./read-only-inputs.js";
 
 const SURFACE_CLASSES = new Set(["backend", "frontend", "mobile"]);
 const VALID_PROJECT_CLASSES = new Set([...SURFACE_CLASSES, "infrastructure"]);
@@ -75,6 +76,7 @@ export function buildImplementationSlicesContext(
       ...surfaceMaps.map((surface) => surface.file)
     ];
     if (isFile(prerequisiteGapsPath)) readOnly.push(prerequisiteGapsPath);
+    const readOnlyInputs = buildReadOnlyInputManifest(readOnly, workspaceRoot);
     const lines = [
       "# implementation-slices context",
       "",
@@ -94,7 +96,7 @@ export function buildImplementationSlicesContext(
       "- implementation_slices_golden_example_asset: assets/implementation_slices_GOLDEN_EXAMPLE.md",
       "",
       "## Read-Only Inputs",
-      ...readOnly.map((file) => `- read_only_input: ${displayPath(file, workspaceRoot)}`),
+      ...readOnlyInputs.lines,
       "",
       "## Active Repo Classes",
       ...surfaceMaps.map(
@@ -104,7 +106,7 @@ export function buildImplementationSlicesContext(
       "## Allowed Write Surface",
       `- ${featurePath}/implementation_slices.md`
     ];
-    return { exitCode: 0, text: `${lines.join("\n")}\n` };
+    return { exitCode: 0, text: `${lines.join("\n")}\n`, readOnlyInputs: readOnlyInputs.paths };
   } catch (err) {
     return contextError(err instanceof Error ? err.message : String(err));
   }

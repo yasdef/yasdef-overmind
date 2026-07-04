@@ -17,7 +17,8 @@ const PACKAGED_SKILLS = [
   "overmind-implementation-slices",
   "overmind-prerequisite-gaps",
   "overmind-implementation-plan",
-  "overmind-plan-semantic-review"
+  "overmind-plan-semantic-review",
+  "overmind-contract-reconciliation"
 ] as const;
 
 // Skills whose source directory intentionally has no assets/ subdirectory.

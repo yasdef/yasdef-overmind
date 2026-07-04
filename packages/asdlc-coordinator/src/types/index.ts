@@ -1,5 +1,12 @@
 export type GateExitCode = 0 | 1 | 2;
 
+export interface Diagnostic {
+  severity: "error" | "warning";
+  source: string;
+  reason: string;
+  stepId?: string;
+}
+
 export interface GateResult {
   exitCode: GateExitCode;
   passMessage: string;
@@ -10,6 +17,7 @@ export interface GateResult {
 export interface ContextResult {
   exitCode: 0 | 2;
   text?: string;
+  readOnlyInputs?: string[];
   errorMessage?: string;
   verbatim?: boolean;
 }

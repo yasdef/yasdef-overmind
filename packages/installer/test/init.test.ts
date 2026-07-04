@@ -44,7 +44,8 @@ const ALL_SKILLS = [
   "overmind-implementation-slices",
   "overmind-prerequisite-gaps",
   "overmind-implementation-plan",
-  "overmind-plan-semantic-review"
+  "overmind-plan-semantic-review",
+  "overmind-contract-reconciliation"
 ] as const;
 const RUNNER_DIRS = [".codex", ".claude"] as const;
 const SKILL_ASSET_CHECKS: Record<(typeof ALL_SKILLS)[number], string[]> = {
@@ -89,6 +90,10 @@ const SKILL_ASSET_CHECKS: Record<(typeof ALL_SKILLS)[number], string[]> = {
   "overmind-plan-semantic-review": [
     "implementation_plan_semantic_review_TEMPLATE.md",
     "implementation_plan_semantic_review_GOLDEN_EXAMPLE.md"
+  ],
+  "overmind-contract-reconciliation": [
+    "common_contract_definition_TEMPLATE.md",
+    "common_contract_definition_GOLDEN_EXAMPLE.md"
   ]
 };
 
@@ -398,6 +403,63 @@ test("fresh install exposes contract-delta skill, assets, commands, and final li
     }
   });
 });
+
+test("fresh install exposes contract-reconciliation skill, assets, commands, and final lines only in SKILL.md", () => {
+  withProject((root) => {
+    installProject(root);
+    const successLine =
+      "Contract reconciliation phase is finished. Nothing else to do now; press Ctrl-C so orchestrator can start the next phase";
+    const infeasibleLine =
+      "contract reconciliation gate cannot pass with current repository evidence. Please provide instructions what to do, or adjust inputs and rerun this phase";
+
+    for (const runnerDir of RUNNER_DIRS) {
+      const skillDir = path.join(root, runnerDir, "skills", "overmind-contract-reconciliation");
+      const skillText = readFileSync(path.join(skillDir, "SKILL.md"), "utf8");
+      assert.match(
+        skillText,
+        /node \.overmind\/overmind\.js context contract-reconciliation <project-path> --class <class>/
+      );
+      assert.match(
+        skillText,
+        /node \.overmind\/overmind\.js gate contract-reconciliation <project-path>/
+      );
+      // Inlined durable rule content and ownership constraints.
+      assert.match(skillText, /Out-of-scope classes are untouchable/);
+      assert.match(skillText, /Do not modify `init_progress_definition\.yaml`/);
+      assert.match(skillText, /approve, reject, or revise/);
+      assert.equal(skillText.includes(successLine), true);
+      assert.equal(skillText.includes(infeasibleLine), true);
+      assert.equal(
+        existsSync(path.join(skillDir, "assets", "common_contract_definition_TEMPLATE.md")),
+        true
+      );
+      assert.equal(
+        existsSync(path.join(skillDir, "assets", "common_contract_definition_GOLDEN_EXAMPLE.md")),
+        true
+      );
+      assert.equal(existsSync(path.join(skillDir, "overmind.js")), false);
+    }
+  });
+});
+
+for (const missing of ["SKILL.md", "assets"] as const) {
+  test(`installProject writes no runner targets when overmind-contract-reconciliation ${missing} is missing`, () => {
+    const payload = path.join(packagedSkillSourceDir("overmind-contract-reconciliation"), missing);
+    const backup = `${payload}.bak`;
+    renameSync(payload, backup);
+    try {
+      withProject((root) => {
+        assert.throws(() => installProject(root), /Skill payload missing/);
+        for (const skillName of ALL_SKILLS)
+          for (const runnerDir of RUNNER_DIRS) {
+            assert.equal(existsSync(path.join(root, runnerDir, "skills", skillName)), false);
+          }
+      });
+    } finally {
+      renameSync(backup, payload);
+    }
+  });
+}
 
 test("fresh install runs task-to-br capture and context from golden summary plus story source", () => {
   withProject((root) => {

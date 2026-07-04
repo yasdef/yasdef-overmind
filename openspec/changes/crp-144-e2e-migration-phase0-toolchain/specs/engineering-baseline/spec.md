@@ -21,11 +21,11 @@ The repository SHALL provide a single ESLint flat config at the repository root 
 
 ### Requirement: Prettier formatting and editorconfig
 
-Prettier SHALL be the sole code formatter for the repository, configured at the root and accompanied by a `.editorconfig` file. A `format:check` capability SHALL verify formatting without writing changes.
+Prettier SHALL be the sole formatter for TypeScript and toolchain configuration files, configured at the root and accompanied by a `.editorconfig` file. Formatting coverage SHALL include `packages/*/{src,test}/**/*.ts`, each workspace's `package.json` and `tsconfig.json`, and the named root package/toolchain files in the root `format:check` script. Markdown, YAML, templates, and golden examples are outside this formatting contract. A `format:check` capability SHALL verify the scoped files without writing changes.
 
 #### Scenario: Format check detects unformatted code
 
-- **WHEN** a developer runs the root `format:check` script against code that violates Prettier's formatting
+- **WHEN** a developer runs the root `format:check` script against a scoped TypeScript or toolchain configuration file that violates Prettier's formatting
 - **THEN** the command exits non-zero and names the offending files without modifying them
 
 #### Scenario: Editorconfig present at root
@@ -63,7 +63,7 @@ Each workspace and the repository root SHALL provide `typecheck`, `lint`, and `f
 
 ### Requirement: Local full-suite verification gate
 
-Enforcement SHALL be local and agent-driven, not remote CI. The repository root SHALL provide a single aggregate command `npm run verify` that runs, in order, typecheck → lint → format-check → build → test. The test stage SHALL run the TypeScript workspace suites AND the surviving `tests/ai_scripts/*.sh` suites; the command SHALL fail if any stage fails. The command SHALL report coverage without gating on a threshold. Both agent instruction files — `AGENTS.md` (Codex) and `CLAUDE.md` (Claude) — SHALL mandate running `npm run verify` and confirming it green before a change is treated as complete. The change SHALL NOT add a remote CI workflow and SHALL NOT add git hooks.
+Verification SHALL be local, not remote CI. The repository root SHALL provide a single aggregate command `npm run verify` that runs, in order, typecheck → lint → format-check → build → test. The test stage SHALL run the TypeScript workspace suites AND the surviving `tests/ai_scripts/*.sh` suites; the command SHALL fail if any stage fails. The command SHALL report coverage without gating on a threshold, and a green local run SHALL be the completion criterion for this change and later migration slices. Agent-specific instruction files (`AGENTS.md` and `CLAUDE.md`) SHALL remain gitignored local configuration and outside the versioned change. The change SHALL NOT add a remote CI workflow and SHALL NOT add git hooks.
 
 #### Scenario: verify runs all stages in order
 
@@ -75,10 +75,10 @@ Enforcement SHALL be local and agent-driven, not remote CI. The repository root 
 - **WHEN** the `verify` test stage runs
 - **THEN** it executes the TypeScript workspace test suites and the `tests/ai_scripts/*.sh` suites, and both must pass
 
-#### Scenario: Both agents mandate the gate
+#### Scenario: Agent instruction files remain local-only
 
-- **WHEN** `AGENTS.md` and `CLAUDE.md` are inspected
-- **THEN** each instructs its agent to run `npm run verify` and confirm it green before treating a change as complete
+- **WHEN** the change and repository ignore rules are inspected
+- **THEN** `AGENTS.md` and `CLAUDE.md` are gitignored and absent from the versioned change
 
 #### Scenario: Coverage is report-only
 

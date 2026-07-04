@@ -1,7 +1,7 @@
 # Init Progress Definition
 
 Single source of truth (Mermaid embedded below).
-Operational note: `project_add_feature_e2e.sh [--path projects/<project-id>]` runs the business requirements scaffold, resolves `feature_path`, calls `init_progress_scanner.sh` each run, then continues from scanner `next step` (or `--resume <step>`). When `--path` is omitted, the script uses the only project under `projects/` or prompts the user to choose one.
+Operational note: `node .overmind/overmind.js run [--path projects/<project-id>]` runs the business requirements scaffold, resolves `feature_path`, evaluates selected-feature progress through the in-process sequencing core each run, then continues from the canonical next step (or `--resume <step>`). When `--path` is omitted, the command uses the only project under `projects/` or prompts the user to choose one. The last selected feature is cached in `projects/<project-id>/.overmind_feature_state.json`.
 
 ```mermaid
 sequenceDiagram

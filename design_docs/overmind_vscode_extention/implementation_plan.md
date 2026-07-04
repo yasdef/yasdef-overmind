@@ -1,7 +1,5 @@
 # Implementation Plan - Overmind VS Code Extension
 
-> **Partially superseded (2026-07-03).** This plan predates the e2e orchestrator migration: script-launching steps (Run Scanner action, Create Feature / Continue E2E terminal actions, script allow-list work) target `.commands/*.sh` scripts that the migration deletes in favor of `overmind status/run/scaffold/project reconcile` and the in-process coordinator core. Do not restart implementation from this plan; consult the mapping in `design_docs/e2e_orchestrator_migration/03_target_architecture.md ### Supersession of the extension design docs`. Full revision of this plan is scheduled in `design_docs/e2e_orchestrator_migration/04_migration_plan.md ## Slice 5 — Cleanup + extension enablement`.
-
 Use one shared implementation plan for the whole extension. Keep v1 read-only and defer mutation until dashboard behavior is stable.
 
 ### Step 1.1 Scaffold VS Code Extension Project [Requirement 1] [NFR 1]
@@ -18,7 +16,7 @@ Use one shared implementation plan for the whole extension. Keep v1 read-only an
 ### Step 1.2 Implement ASDLC Workspace Detection [Requirement 1]
 #### Repo: extension
 #### Depends on: 1.1
-#### Evidence: gap/Requirement-1, comp/asdlc-scanner
+#### Evidence: gap/Requirement-1, comp/coordinator-read-model
 #### Preserved Surface: workspace selection / empty state
 - [ ] Detect `asdlc_metadata.yaml` in workspace folders.
 - [ ] Handle no workspace, one workspace, and multiple ASDLC workspaces.
@@ -26,28 +24,26 @@ Use one shared implementation plan for the whole extension. Keep v1 read-only an
 - [ ] Add diagnostics for missing or invalid ASDLC metadata.
 - [ ] Test workspace detection with fixtures.
 
-### Step 1.3 Build Read-Only ASDLC Scanner [Requirement 2] [Requirement 3] [Requirement 6]
+### Step 1.3 Bind the Read-Only Coordinator Model [Requirement 2] [Requirement 3] [Requirement 6]
 #### Repo: extension
 #### Depends on: 1.2
-#### Evidence: comp/asdlc-scanner
-#### Preserved Surface: read-only local filesystem index
-- [ ] Parse `asdlc_metadata.yaml`.
-- [ ] Parse project `init_progress_definition.yaml`.
-- [ ] Discover feature folders using `feature_br_summary.md`.
-- [ ] Detect expected project-level and feature-level artifacts.
-- [ ] Isolate parse and permission errors per file.
-- [ ] Produce normalized dashboard JSON.
-- [ ] Add fixture-backed unit tests.
+#### Evidence: comp/coordinator-read-model
+#### Preserved Surface: read-only in-process progress model
+- [ ] Import only `asdlc-coordinator/workspace` and `asdlc-coordinator/sequencing`.
+- [ ] Resolve runtime, project, and feature paths through `workspace/`.
+- [ ] Compute `ProgressReport` through `sequencing/` for every discovered feature.
+- [ ] Obtain `FeatureSummary` through the existing `toFeatureSummary(report)` projection.
+- [ ] Carry coordinator diagnostics into a degraded but renderable dashboard model.
+- [ ] Add fixture-backed unit tests proving every declared step contributes to the projection totals.
 
 ### Step 1.4 Implement Readiness Engine [Requirement 4]
 #### Repo: extension
 #### Depends on: 1.3
-#### Evidence: comp/readiness-engine
+#### Evidence: comp/feature-summary-projection
 #### Preserved Surface: project and feature readiness badges
-- [ ] Define readiness states: `ready`, `in_progress`, `blocked`, `deferred`, `unknown`.
-- [ ] Compute repo/class readiness from `meta_info.class_repo_paths`.
-- [ ] Compute feature readiness from artifacts and checklist state when available.
-- [ ] Compute project readiness from project steps and feature summaries.
+- [ ] Reuse readiness states from the canonical `FeatureSummary` projection.
+- [ ] Compute feature readiness from the coordinator `ProgressReport`.
+- [ ] Compute project presentation from coordinator workspace/sequencing results.
 - [ ] Add tests for complete, partial, missing, deferred, and invalid states.
 
 ### Step 2.1 Build Webview Dashboard [Requirement 2] [Requirement 3] [Requirement 4]
@@ -58,7 +54,7 @@ Use one shared implementation plan for the whole extension. Keep v1 read-only an
 - [ ] Render project list with project readiness and repo/class readiness.
 - [ ] Render feature list per project with readiness and missing artifacts.
 - [ ] Add project and feature detail views.
-- [ ] Add empty, loading, stale, and error states.
+- [ ] Add empty, loading, degraded, and error states.
 - [ ] Keep UI local and read-only for v1.
 - [ ] Smoke test dashboard against the example ASDLC workspace.
 
@@ -76,48 +72,48 @@ Use one shared implementation plan for the whole extension. Keep v1 read-only an
 ### Step 2.3 Add Refresh and File Watchers [Requirement 6] [NFR 3] [NFR 4]
 #### Repo: extension
 #### Depends on: 2.1
-#### Evidence: gap/Requirement-6, comp/asdlc-scanner
-#### Preserved Surface: refresh action and stale-state indicator
-- [ ] Add manual refresh action.
-- [ ] Add file watchers for ASDLC metadata, project metadata, step state, and feature artifacts.
-- [ ] Mark dashboard stale when relevant files change during active scans.
-- [ ] Add output channel diagnostics for scan lifecycle.
-- [ ] Verify UI remains responsive during scans.
+#### Evidence: gap/Requirement-6, comp/coordinator-read-model
+#### Preserved Surface: fresh in-process progress recomputation
+- [ ] Add manual refresh that invokes `sequencing/` in process.
+- [ ] Add file watchers for ASDLC metadata, project metadata, and feature artifacts.
+- [ ] Trigger a fresh computation when relevant files change; persist no stale scanner state.
+- [ ] Add output channel diagnostics for computation lifecycle.
+- [ ] Verify UI remains responsive during recomputation.
 
-### Step 3.1 Add Safe Script Action Framework [Requirement 7] [Requirement 9] [NFR 2]
+### Step 3.1 Add Safe Overmind Action Framework [Requirement 7] [Requirement 9] [NFR 2]
 #### Repo: extension
 #### Depends on: 2.3
 #### Evidence: comp/action-controller, sig-001, sig-002
-#### Preserved Surface: terminal-launched Overmind actions
-- [ ] Define an allow-list of script actions.
+#### Preserved Surface: coordinator-backed and terminal-hosted Overmind actions
+- [ ] Define an allow-list of shipped `overmind` verbs.
 - [ ] Validate active ASDLC, project, and feature paths before action execution.
-- [ ] Require confirmation before mutating script actions.
-- [ ] Construct commands only from validated paths and known script names.
-- [ ] Launch interactive scripts in visible VS Code terminals.
+- [ ] Require confirmation before mutating actions.
+- [ ] Check `.overmind/overmind.js` or the bundled coordinator core before CLI action execution.
+- [ ] Route deterministic actions to coordinator primitives and model sessions to terminal-hosted `overmind run`.
 - [ ] Add mocked terminal tests for command construction.
 
-### Step 3.2 Add First Script Buttons [Requirement 7]
+### Step 3.2 Add First Overmind Actions [Requirement 7]
 #### Repo: extension
 #### Depends on: 3.1
 #### Evidence: comp/action-controller
 #### Preserved Surface: dashboard action buttons
-- [ ] Add `Run Scanner` action for selected feature where applicable.
-- [ ] Add `Create Feature / Continue E2E` terminal action for selected project.
-- [ ] Add `Create Project` terminal action for the ASDLC workspace.
+- [ ] Use in-process `sequencing/` recomputation for read-only status; provide no terminal scanner action.
+- [ ] Add Create Feature through the `overmind scaffold feature` primitive.
+- [ ] Add Continue E2E through terminal-hosted `overmind run`.
+- [ ] Postpone Create Project until a shared coordinator primitive or shipped `overmind` verb exists.
 - [ ] Refresh dashboard after terminal action completion when completion can be detected.
 - [ ] Keep terminal output visible to the operator for interactive prompts.
 
-### Step 4.1 Identify Non-Interactive Script Contracts [Requirement 8]
-#### Repo: shell-runtime
+### Step 4.1 Bind Coordinator Action Contracts [Requirement 8]
+#### Repo: asdlc-coordinator
 #### Depends on: 3.2
-#### Evidence: comp/script-contracts
-#### Preserved Surface: existing Overmind script behavior
-- [ ] List scripts that should become Webview form-driven.
-- [ ] Identify required inputs, validation rules, outputs, and failure modes.
-- [ ] Decide whether each action should keep terminal mode or receive a non-interactive script contract.
-- [ ] Record that task-to-BR capture already has a non-interactive shared-core contract: `overmind capture task-to-br`.
-- [ ] Do not add new script flags until requirements are explicit.
-- [ ] Capture accepted script contract changes in future Overmind artifacts.
+#### Evidence: comp/coordinator-action-contracts
+#### Preserved Surface: shared coordinator behavior
+- [ ] List deterministic actions that should become Webview form-driven.
+- [ ] Bind their inputs, validation, outputs, and failures to capture/scaffold primitives and `InteractionPort`.
+- [ ] Keep model-session actions in terminal-hosted `overmind run`.
+- [ ] Record that task-to-BR capture already has a shared-core contract: `overmind capture task-to-br`.
+- [ ] Add no new CLI flags until requirements are explicit.
 
 ### Step 4.2 Add Task-To-BR Capture Form [Requirement 10] [NFR 2]
 #### Repo: extension
@@ -137,7 +133,7 @@ Use one shared implementation plan for the whole extension. Keep v1 read-only an
 #### Preserved Surface: BA/PO form-driven actions
 - [ ] Add form UI for the first approved non-interactive action.
 - [ ] Validate form input in Webview and extension host.
-- [ ] Call the approved script contract or fall back to terminal mode.
+- [ ] Call the approved coordinator primitive or use terminal-hosted `overmind run` for model sessions.
 - [ ] Show success, cancellation, and failure states.
 - [ ] Refresh dashboard after successful action completion.
 

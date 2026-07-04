@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { displayPath, resolveFeatureWithinWorkspace, stripQuotes } from "../parse/index.js";
 import type { ContextResult } from "../types/index.js";
+import { buildReadOnlyInputManifest } from "./read-only-inputs.js";
 
 const SURFACE_CLASSES = new Set(["backend", "frontend", "mobile"]);
 const VALID_PROJECT_CLASSES = new Set([...SURFACE_CLASSES, "infrastructure"]);
@@ -101,6 +102,7 @@ export function buildTechnicalRequirementsContext(
       contractPath,
       ...surfaceMaps.map((surface) => surface.file)
     ];
+    const readOnlyInputs = buildReadOnlyInputManifest(readOnly, workspaceRoot);
     const lines = [
       "# technical-requirements context",
       "",
@@ -119,7 +121,7 @@ export function buildTechnicalRequirementsContext(
       "- technical_requirements_golden_example_asset: assets/technical_requirements_GOLDEN_EXAMPLE.md",
       "",
       "## Read-Only Inputs",
-      ...readOnly.map((file) => `- read_only_input: ${displayPath(file, workspaceRoot)}`),
+      ...readOnlyInputs.lines,
       "",
       "## Active Surface-Map Classes",
       ...surfaceMaps.map(
@@ -129,7 +131,7 @@ export function buildTechnicalRequirementsContext(
       "## Allowed Write Surface",
       `- ${featurePath}/technical_requirements.md`
     ];
-    return { exitCode: 0, text: `${lines.join("\n")}\n` };
+    return { exitCode: 0, text: `${lines.join("\n")}\n`, readOnlyInputs: readOnlyInputs.paths };
   } catch (err) {
     return contextError(err instanceof Error ? err.message : String(err));
   }

@@ -8,6 +8,7 @@ import {
 } from "../parse/index.js";
 import { listCommittedSiblingFeatures } from "../repo/index.js";
 import type { ContextResult } from "../types/index.js";
+import { buildReadOnlyInputManifest } from "./read-only-inputs.js";
 
 const SUPPORTED_CLASSES = new Set(["backend", "frontend", "mobile"]);
 const VALID_CLASSES = new Set([...SUPPORTED_CLASSES, "infrastructure"]);
@@ -55,6 +56,7 @@ export function buildPrerequisiteGapsContext(
       .filter(isFile);
     const featurePath = displayPath(featureDir, workspaceRoot);
     const readOnly = [definitionPath, requirementsPath, technicalPath, slicesPath, ...siblingPlans];
+    const readOnlyInputs = buildReadOnlyInputManifest(readOnly, workspaceRoot);
     const lines = [
       "# prerequisite-gaps context",
       "",
@@ -74,7 +76,7 @@ export function buildPrerequisiteGapsContext(
       "- prerequisite_gaps_golden_example_asset: assets/prerequisite_gaps_GOLDEN_EXAMPLE.md",
       "",
       "## Read-Only Inputs",
-      ...readOnly.map((file) => `- read_only_input: ${displayPath(file, workspaceRoot)}`),
+      ...readOnlyInputs.lines,
       "",
       "## Active Repo Classes",
       ...activeClasses.map((klass) => `- ${klass}`),
@@ -82,7 +84,7 @@ export function buildPrerequisiteGapsContext(
       "## Allowed Write Surface",
       `- ${featurePath}/prerequisite_gaps.md`
     ];
-    return { exitCode: 0, text: `${lines.join("\n")}\n` };
+    return { exitCode: 0, text: `${lines.join("\n")}\n`, readOnlyInputs: readOnlyInputs.paths };
   } catch (err) {
     return contextError(err instanceof Error ? err.message : String(err));
   }

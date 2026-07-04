@@ -23,12 +23,12 @@ after this script finishes, the staged ASDLC commands live under your generated 
    - Initialize Repo ASDLC Metadata: create `init_progress_definition.yaml` with project type, classes, and repo/path metadata.
    - Define Project Stack Blueprints For Active Classes: for type A only, approve stack blueprints with `.commands/init_project_stack_blueprints.sh --path projects/<project-id>`.
    - Create Cross-Repository Contract Definition For This Project: create project-level `common_contract_definition.md` with `.commands/init_common_contract_definition.sh --path projects/<project-id>`.
-   - Initialize and Enrich Business Requirements Structuring: start feature planning with `.commands/project_add_feature_e2e.sh --path projects/<project-id>`.
-   - `project_add_feature_e2e.sh` (see p.5 below) uses the scanner to block feature progression when an earlier project step is incomplete. For a brand-new feature, it may create the business requirements scaffold before reporting the missing earlier step.
+   - Initialize and Enrich Business Requirements Structuring: start feature planning with `node .overmind/overmind.js run --path projects/<project-id>`.
+   - `overmind run` (see p.5 below) refuses feature progression when an earlier project step is incomplete or a class repo is deferred or unreconciled, and directs the operator to `node .overmind/overmind.js project reconcile --path projects/<project-id>`.
 
 --- here we finished on project level and go to feature level ---
 
-5. to create a feature end-to-end run orchestrator `.commands/project_add_feature_e2e.sh --path projects/<project-id>` and it will guide you through the process, on some step you would need to save story or epic as a source within feature folder in .txt or .md file
+5. to create a feature end-to-end run orchestrator `node .overmind/overmind.js run --path projects/<project-id>` and it will guide you through the process, on some step you would need to save story or epic as a source within feature folder in .txt or .md file
 6. when you are finished - please-please take a look at requirements_ears.md and implementation_plan.md yourself. It's the most critical part of future implementation and we don't have to rely on AI here completely. If you need to change or fix something - just run your usual agent, point it to the files and ask it to make changes.
 --- here we finished with feature planning, but who will work it out? ---
 7. register new workers with `.commands/project_register_worker.sh`, one run per worker with a strict class (backend|frontend|mobile|infrastructure). Currently orchestrator can't distribute tasks across multiple workers of same class so it doesn't make sense to register 2 workers of same class (2 backend for example)
@@ -46,7 +46,7 @@ you can manualy run scripts for different steps after asdlc folder init, check
 - `state: "deferred"` — no repo attached; planning skips this class for scan-dependent steps and resolves from blueprint or placeholder.
 - `state: "ready"` — repo is attached and scannable; planning scans this class. Recorded alongside `path` (absolute filesystem path) and `policy` (see below).
 
-At feature start, `project_add_feature_e2e.sh` prompts for every deferred class. Entering a valid repo path attaches it, transitions the class to `ready`, and records `policy: "C"`; leaving the prompt blank keeps the class deferred. The operator-provided path is the only attach source.
+Attaching a deferred class repo (entering a valid path, which transitions the class to `ready` and records `policy: "C"`) and reconciling ready classes run through `node .overmind/overmind.js project reconcile --path <project-path>`. `overmind run` detects deferred or unreconciled classes and refuses with that guidance; the project-level reconciliation flow owns attachment and reconciliation. The operator-provided path is the only attach source.
 
 ### Policy C — divergence semantics
 
@@ -85,7 +85,7 @@ A dead-but-undeleted feature folder keeps emitting promises and any dependent st
 
 ### First-attach contract reconciliation — stopgap (D6)
 
-When a class first attaches (`project_contract_reconciliation.sh --path <project-path>`), `common_contract_definition.md` was authored from blueprint intent and was never reality-checked. A one-time reconciliation diffs it against the as-built API; the operator resolves interactively. This is a **stopgap** that clears the blueprint-era backlog once per class attach; ongoing drift is the feedback loop's job (deferred).
+When a class first attaches (`node .overmind/overmind.js project reconcile --path <project-path>`), `common_contract_definition.md` was authored from blueprint intent and was never reality-checked. A one-time reconciliation diffs it against the as-built API; the operator resolves interactively. This is a **stopgap** that clears the blueprint-era backlog once per class attach; ongoing drift is the feedback loop's job (deferred).
 
 ## Most critical issues
 - coordinator (overmind) can't distribute tasks for multiple workers (f.e. 2 backend)
@@ -131,15 +131,17 @@ Scripts working on **project level** require:
 - `--path <asdlc/projects/<project-id>>`
 - `init_common_contract_definition.sh`
 - `project_register_worker.sh`
-- `project_add_feature_e2e.sh`
-- `feature_br_scaffold.sh`
+
+The feature workflow and standalone scaffold run through the bundled CLI, not staged shell commands:
+- `node .overmind/overmind.js run [--path <asdlc/projects/<project-id>>] [--resume <step>]`
+- `node .overmind/overmind.js scaffold feature --path <asdlc/projects/<project-id>>`
 
 Scripts working on **feature level** require:
 - `--feature_path <asdlc/projects/<project-id>/<feature-folder>>`
 - `feature_assing_workers.sh`
 
-Feature-level exception:
-- `init_progress_scanner.sh` works on a feature folder but expects `--path <asdlc/projects/<project-id>/<feature-folder>>`.
+Progress status is read-only and accepts either scope:
+- `node .overmind/overmind.js status <asdlc/projects/<project-id>[/<feature-folder>]>`
 
 `--feature_path` must:
 - exist and be a directory
@@ -180,20 +182,17 @@ sources:
 - `overmind/scripts/project_mgmt/project_setup_update_project.sh`
   Staged command (`<asdlc>/.commands/project_setup_update_project.sh`) that attaches a repo path to an existing project's deferred class. Interactive flow: pick project → pick deferred class → enter repo path (validates and resolves to absolute path) → persists `state: "ready"` + `path` in `init_progress_definition.yaml`. If the project is type A and all classes become `ready` after the attach, optionally prompts to reclassify to type B or C. Any prompt accepts `q` to quit cleanly without mutation.
 
-- `overmind/scripts/project_mgmt/init_progress_scanner.sh`
-  Requires `--path <asdlc/projects/<project-id>/<feature-folder>>`, reads project `init_progress_definition.yaml`, writes `projects/<project-id>/step_state_<feature-folder>.md` with project-level + selected-feature checklist status, and keeps stdout as the canonical machine-consumable scan output.
-
 - `overmind/scripts/init_common_contract_definition.sh`
   Staged-runtime command (`<asdlc>/.commands/init_common_contract_definition.sh --path <asdlc/projects/<project-id>>`) that builds project-level `common_contract_definition.md` from usable ready repositories.
 
 - `overmind/scripts/project_mgmt/project_register_worker.sh`
   Staged command (`<asdlc>/.commands/project_register_worker.sh --path <asdlc/projects/<project-id>>`) that interactively registers one worker class (`backend`, `frontend`, `mobile`, `infrastructure`) and appends an active worker record into `<project>/workers.yaml` using canonical `meta_info.project_id`.
 
-- `overmind/scripts/feature_br_scaffold.sh`
-  Staged command (`<asdlc>/.commands/feature_br_scaffold.sh --path <asdlc/projects/<project-id>>`) that creates a feature folder and seeds `feature_br_summary.md`.
+- `overmind scaffold feature` (bundled CLI verb)
+  `node .overmind/overmind.js scaffold feature --path <asdlc/projects/<project-id>>` creates a feature folder and seeds `feature_br_summary.md`, returning the created path as a typed result.
 
-- `overmind/scripts/project_mgmt/project_add_feature_e2e.sh`
-  Staged command (`<asdlc>/.commands/project_add_feature_e2e.sh --path <asdlc/projects/<project-id>> [--resume <step>]`) that discovers unfinished project feature folders first, asks whether to start a new feature or continue one of the unfinished features, keeps `projects/<project-id>/.project_add_feature_e2e_state.env` only as a last-selected cache, runs `init_progress_scanner.sh` for the selected feature, and orchestrates confirmed execution through Implementation Plan Semantic Review.
+- `overmind run` (bundled CLI verb)
+  `node .overmind/overmind.js run [--path <asdlc/projects/<project-id>>] [--resume <step>]` discovers unfinished project feature folders first, asks whether to start a new feature or continue one of the unfinished features, keeps `projects/<project-id>/.overmind_feature_state.json` only as a last-selected cache, reads selected-feature progress through the in-process sequencing core, and orchestrates confirmed execution through Implementation Plan Semantic Review. It refuses before feature work when project-level initialization, class-repo attach, or reconciliation is pending and directs the operator to `node .overmind/overmind.js project reconcile --path <project-path>`.
 
 - `packages/installer/_data/skills/overmind-task-to-br/SKILL.md`
   Installed skill that drives task-to-BR via `node .overmind/overmind.js capture task-to-br <feature-path> ...`, `node .overmind/overmind.js context task-to-br <feature-path>`, and `node .overmind/overmind.js gate task-to-br <feature-path>`.
