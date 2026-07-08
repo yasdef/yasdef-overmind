@@ -116,6 +116,40 @@ Required flow:
   node .overmind/overmind.js context contract-delta projects/project-a/feature-alpha
 - Use the exact gate command below when the skill tells you to validate:
   node .overmind/overmind.js gate contract-delta projects/project-a/feature-alpha`,
+  "stack-blueprint": `Load and follow the overmind-stack-blueprint skill for this project class.
+
+Runtime bindings:
+- ASDLC workspace root: /runtime
+- Current working directory for all commands: /runtime
+- Project path: projects/project-a/feature-alpha
+- Target class: backend
+- Target stack blueprint artifact: projects/project-a/feature-alpha/project_stack_blueprint_backend.md
+- Overmind CLI: .overmind/overmind.js
+
+Required flow:
+- Load and follow the overmind-stack-blueprint skill.
+- Assemble deterministic context with:
+  node .overmind/overmind.js context stack-blueprint projects/project-a/feature-alpha --class backend
+- Use the exact gate command below when the skill tells you to validate:
+  node .overmind/overmind.js gate stack-blueprint projects/project-a/feature-alpha/project_stack_blueprint_backend.md
+- The model owns the gate loop; this orchestrator does not run the gate.`,
+  "common-contract": `Load and follow the overmind-common-contract skill for this project.
+
+Runtime bindings:
+- ASDLC workspace root: /runtime
+- Current working directory for all commands: /runtime
+- Project path: projects/project-a/feature-alpha
+- Target common contract artifact: projects/project-a/feature-alpha/common_contract_definition.md
+- Overmind CLI: .overmind/overmind.js
+
+Required flow:
+- Load and follow the overmind-common-contract skill.
+- Assemble deterministic context with:
+  node .overmind/overmind.js context common-contract projects/project-a/feature-alpha
+- Write only common_contract_definition.md; never modify init_progress_definition.yaml, stack blueprints, or attached repos.
+- Use the exact gate command below when the skill tells you to validate:
+  node .overmind/overmind.js gate common-contract projects/project-a/feature-alpha
+- The model owns the gate loop; this orchestrator does not run the gate.`,
   "surface-map": `Load and follow the overmind-surface-map skill for this feature and class.
 
 Runtime bindings:
@@ -230,7 +264,7 @@ Required flow:
 - The model owns both gate loops; this orchestrator does not run either gate.`
 };
 
-test("buildSessionPrompt preserves parity across all 13 session phases", () => {
+test("buildSessionPrompt preserves parity across all 15 session phases", () => {
   const actions = STEP_CATALOG.flatMap((step) => step.actions).filter(
     (
       action
@@ -238,12 +272,15 @@ test("buildSessionPrompt preserves parity across all 13 session phases", () => {
       action.kind === "session"
   );
 
-  assert.equal(actions.length, 13);
+  assert.equal(actions.length, 15);
 
   for (const action of actions) {
     const prompt = buildSessionPrompt(action, {
       ...BASE_BINDINGS,
-      targetClass: action.skillName === "surface-map" ? "backend" : undefined
+      targetClass:
+        action.skillName === "surface-map" || action.skillName === "stack-blueprint"
+          ? "backend"
+          : undefined
     });
     assert.equal(prompt, EXPECTED_PROMPTS[action.skillName]);
     assert.doesNotMatch(prompt, /final response/i);

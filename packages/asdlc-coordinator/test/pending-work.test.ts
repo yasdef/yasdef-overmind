@@ -21,7 +21,12 @@ test("pending project initialization refuses with step-specific guidance", async
       if (result.pending?.kind === "init") {
         assert.equal(result.pending.stepId, "2");
         assert.ok(
-          result.pending.guidance.some((line) => /init_common_contract_definition\.sh/.test(line))
+          result.pending.guidance.some((line) =>
+            line.includes(`overmind project init --path ${projectPathRel}`)
+          )
+        );
+        assert.ok(
+          !result.pending.guidance.some((line) => /init_common_contract_definition\.sh/.test(line))
         );
       }
     }
@@ -44,7 +49,12 @@ test("pending step 1.1 emits stack-blueprint guidance", async () => {
       if (result.pending?.kind === "init") {
         assert.equal(result.pending.stepId, "1.1");
         assert.ok(
-          result.pending.guidance.some((line) => /init_project_stack_blueprints\.sh/.test(line))
+          result.pending.guidance.some((line) =>
+            line.includes(`overmind project init --path ${projectPathRel}`)
+          )
+        );
+        assert.ok(
+          !result.pending.guidance.some((line) => /init_project_stack_blueprints\.sh/.test(line))
         );
       }
     }

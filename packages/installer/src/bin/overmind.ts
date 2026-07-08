@@ -9,10 +9,21 @@ if (command !== "init" || extra !== undefined) {
 } else {
   try {
     const result = installProject(process.cwd());
-    process.stdout.write(
-      `Installed overmind CLI to ${relative(result.projectRoot, result.cliPath)}\n`
-    );
-    process.stdout.write(`Installed skill to ${relative(result.projectRoot, result.skillPath)}\n`);
+    process.stdout.write("Overmind workspace bootstrap complete.\n");
+    process.stdout.write(`CLI: ${relative(result.projectRoot, result.cliPath)}\n`);
+    process.stdout.write(`Skills: ${result.skillPaths.length} installed\n`);
+    for (const skillPath of result.skillPaths) {
+      process.stdout.write(`- ${relative(result.projectRoot, skillPath)}\n`);
+    }
+    process.stdout.write("Runtime templates:\n");
+    for (const templatePath of result.templatePaths) {
+      process.stdout.write(`- ${relative(result.projectRoot, templatePath)}\n`);
+    }
+    process.stdout.write("Setup defaults:\n");
+    for (const setupPath of result.setupPaths) {
+      process.stdout.write(`- ${relative(result.projectRoot, setupPath)}\n`);
+    }
+    process.stdout.write(`Quick run: ${relative(result.projectRoot, result.quickrunPath)}\n`);
     process.exitCode = 0;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

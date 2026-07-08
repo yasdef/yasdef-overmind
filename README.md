@@ -2,6 +2,7 @@
 
 Overmind contains coordinator artifacts, bootstrap definitions, and helper scripts for the active ASDLC flow.
 Its main functions:
+
 - convert a usual epic/story to business requirements (EARS format) and an implementation plan (those 2 artifacts are input for any workers)
 - manage (register/deregister/assign tasks) workers in a project
 - consume feedback from workers and adjust feature plans according to it (currently not implemented)
@@ -11,31 +12,32 @@ This repository contains the standalone Overmind project. The original extractio
 ## Quick start
 
 0. Read this carefully:
+
 - ⚠️ This is pre-alpha — things may break. Use at your own risk. Take precautions before integrating this repo into your project!
+
 1. clone `yasdef-overmind` to your local machine
-2. run `npm install` and `npm run build` from the repo root, then run `overmind/scripts/project_mgmt/project_setup_first_init_machine.sh` to establish and set up the asdlc folder for future project work - you need to provide the place where exactly the asdlc folder will exist in your system,
-after this script finishes, the staged ASDLC commands live under your generated `asdlc/` workspace, the shared gate/context CLI is staged at `.overmind/overmind.js`, and packaged Overmind skills are staged into the supported `.codex/skills/` and `.claude/skills/` runner directories; later updates can be pulled from this repo and re-applied by running the same setup script again
-3. in asdlc folder run `.commands/project_setup_add_new_project.sh` to create a new project. This creates `projects/<project-id>/`, seeds `init_progress_definition.yaml`, initializes that project folder as its own git repository, and creates the first commit. On this step you may provide paths to project repos, for example backend and frontend (if they exist), if it's a completely new project you may optionally configure per-class stack guidance sources in `init_progress_definition.yaml`; if absent, the system falls back to model proposals during stack blueprint authoring. You can always add or change this info later in projects/<project_id>/init_progress_definition.yaml (see meta_info part).
-3-a. it's possible to setup MCP server for stack blueprint authoring and MCP placeholder enrichment. To do this, first set knowledgebase mcp to your codex cli (see codex docs), second - after asdlc directory will be established - add this MCP to .setup/external_sources.yaml
+2. run `npm install`, `npm run build`, and `npm run setup` from the repo root to bootstrap an ASDLC workspace with `.overmind/overmind.js`, packaged Overmind skills in `.codex/skills/` and `.claude/skills/`, runtime templates in `.templates/`, setup defaults in `.setup/`, `asdlc_metadata.yaml`, `projects/`, and `quickrun.md`.
+3. in asdlc folder run `node .overmind/overmind.js project create` to create a new project. This creates `projects/<project-id>/`, seeds `init_progress_definition.yaml`, initializes that project folder as its own git repository, and creates the first commit. On this step you may provide paths to project repos, for example backend and frontend (if they exist), if it's a completely new project you may optionally configure per-class stack guidance sources in `init_progress_definition.yaml`; if absent, the system falls back to model proposals during stack blueprint authoring. Deferred or newly attached class repositories are handled later with `node .overmind/overmind.js project reconcile --path projects/<project-id>`.
+   3-a. it's possible to setup MCP server for stack blueprint authoring and MCP placeholder enrichment. To do this, first set knowledgebase mcp to your codex cli (see codex docs), second - after asdlc directory will be established - add this MCP to .setup/external_sources.yaml
 4. finish required project-level init before feature work:
    - Type A projects: Initialize Repo ASDLC Metadata -> Define Project Stack Blueprints For Active Classes -> Create Cross-Repository Contract Definition For This Project -> start feature.
    - Type B/C projects: Initialize Repo ASDLC Metadata -> Create Cross-Repository Contract Definition For This Project -> start feature.
    - Initialize Repo ASDLC Metadata: create `init_progress_definition.yaml` with project type, classes, and repo/path metadata.
-   - Define Project Stack Blueprints For Active Classes: for type A only, approve stack blueprints with `.commands/init_project_stack_blueprints.sh --path projects/<project-id>`.
-   - Create Cross-Repository Contract Definition For This Project: create project-level `common_contract_definition.md` with `.commands/init_common_contract_definition.sh --path projects/<project-id>`.
+   - Define Project Stack Blueprints For Active Classes: for type A only, approve stack blueprints with `node .overmind/overmind.js project init --path projects/<project-id>`.
+   - Create Cross-Repository Contract Definition For This Project: create project-level `common_contract_definition.md` with `node .overmind/overmind.js project init --path projects/<project-id>`.
    - Initialize and Enrich Business Requirements Structuring: start feature planning with `node .overmind/overmind.js run --path projects/<project-id>`.
-   - `overmind run` (see p.5 below) refuses feature progression when an earlier project step is incomplete or a class repo is deferred or unreconciled, and directs the operator to `node .overmind/overmind.js project reconcile --path projects/<project-id>`.
+   - `overmind run` (see p.5 below) refuses feature progression when an earlier project init step is incomplete and directs the operator to `node .overmind/overmind.js project init --path projects/<project-id>`. It directs deferred or unreconciled class repos to `node .overmind/overmind.js project reconcile --path projects/<project-id>`.
 
 --- here we finished on project level and go to feature level ---
 
 5. to create a feature end-to-end run orchestrator `node .overmind/overmind.js run --path projects/<project-id>` and it will guide you through the process, on some step you would need to save story or epic as a source within feature folder in .txt or .md file
 6. when you are finished - please-please take a look at requirements_ears.md and implementation_plan.md yourself. It's the most critical part of future implementation and we don't have to rely on AI here completely. If you need to change or fix something - just run your usual agent, point it to the files and ask it to make changes.
---- here we finished with feature planning, but who will work it out? ---
-7. register new workers with `.commands/project_register_worker.sh`, one run per worker with a strict class (backend|frontend|mobile|infrastructure). Currently orchestrator can't distribute tasks across multiple workers of same class so it doesn't make sense to register 2 workers of same class (2 backend for example)
+   --- here we finished with feature planning, but who will work it out? ---
+7. register new workers with `node .overmind/overmind.js worker register --path projects/<project-id>`, one run per worker with a strict class (backend|frontend|mobile|infrastructure).
 8. now give worker uuid to the developer responsible for that worker so he can finish registration from his side
-9. when `implementation_plan.md` is ready for a feature, run `.commands/feature_assing_workers.sh --feature_path projects/<project-id>/<feature-folder>` to fill `#### Assigned:` for each step based on class-matched active workers
+9. when `implementation_plan.md` is ready for a feature, run `node .overmind/overmind.js worker assign --feature-path projects/<project-id>/<feature-folder>` to fill `#### Assigned:` for each step based on class-matched active workers, dependency holds, or missing-worker markers
 
-you can manualy run scripts for different steps after asdlc folder init, check  
+you can manually run TypeScript CLI commands for different steps after asdlc folder init, check
 
 ## Conceptual model
 
@@ -73,7 +75,7 @@ The chain is demand-driven: it runs only for surfaces this feature's requirement
 
 All planning repo scans (task-to-BR scan, feature contract delta, surface mapping, and prerequisite-gap analysis) read the **committed default branch only**. Worker branches and uncommitted edits are invisible to planning; their content is represented by promises instead. **Implied discipline: accepted work must be merged to the repo's default branch before the next feature plans against it.**
 
-Scripts enforce this gate: a ready class repo that is not on its default branch or has uncommitted changes is refused before scanning, with a clear `BLOCKED:` message directing the operator to merge or check out the default branch.
+Coordinator commands enforce this gate: a ready class repo that is not on its default branch or has uncommitted changes is refused before scanning, with a clear `BLOCKED:` message directing the operator to merge or check out the default branch.
 
 ### Promise tier and concurrency (D7)
 
@@ -88,8 +90,9 @@ A dead-but-undeleted feature folder keeps emitting promises and any dependent st
 When a class first attaches (`node .overmind/overmind.js project reconcile --path <project-path>`), `common_contract_definition.md` was authored from blueprint intent and was never reality-checked. A one-time reconciliation diffs it against the as-built API; the operator resolves interactively. This is a **stopgap** that clears the blueprint-era backlog once per class attach; ongoing drift is the feedback loop's job (deferred).
 
 ## Most critical issues
+
 - coordinator (overmind) can't distribute tasks for multiple workers (f.e. 2 backend)
-- coordinator (overmind) unable to take worker's output (see ai_audit.sh) and re-design implementation plan based on this new tasks
+- coordinator (overmind) unable to take worker output and redesign implementation plans from feedback
 - type B-specific planning distinctions (interactive divergence review) are not yet enforced — tracked as phase 2
 - we need to read epic/story from jira, current way - add them as a text/md files can remain optional but not main
 - ASDLC workspace artifacts currently live only in the local filesystem; there is no built-in artifact versioning flow yet
@@ -97,6 +100,7 @@ When a class first attaches (`node .overmind/overmind.js project reconcile --pat
 ## Release-notes
 
 V-0.0.1
+
 - inint mode to setup asdlc folder in file system with all necessary scripts, rules etc
 - add projects, add repos to project, scan repos for project metainfo
 - add workers to project (types: backend|frontend|mobile|infra)
@@ -104,66 +108,74 @@ V-0.0.1
 - assign workers to implementation plan
 
 V-0.0.2
+
 - planning flow significantly improved
 
 V-0.0.3
+
 - add blueprints on project level
 - unblocked new projects (type-A) creation
 - add cross-class transport section
 - add MCP as a source for type-A projects
 
 V-0.0.4
+
 - multiple flow improvements and bug fixes
 
 V-0.0.5 (current)
+
 - per-class blueprint→repo transition: classes attach independently at feature start; `project_type_code` no longer drives feature-phase steps
 - permanent per-layer evidence chain (repo scan → in-flight promise → blueprint → placeholder) with dated blueprint citations
 - policy C divergence tagging when a materialized repo layer diverges from its blueprint
 - concurrency-aware planning: sibling-feature promises, cross-feature `#### Depends on:`, and assignment holds for unmerged dependencies
 - one-time contract reconciliation at first repo attach
 
+## Bundled CLI Input Contract
 
-## Staged Commands Input Contract
+Project-level CLI commands require:
 
-All staged commands are expected to run from `<asdlc>/.commands/`.
-
-Scripts working on **project level** require:
 - `--path <asdlc/projects/<project-id>>`
-- `init_common_contract_definition.sh`
-- `project_register_worker.sh`
 
-The feature workflow and standalone scaffold run through the bundled CLI, not staged shell commands:
+The feature workflow and standalone scaffold run through the bundled CLI:
+
+- `node .overmind/overmind.js project init --path <asdlc/projects/<project-id>>`
 - `node .overmind/overmind.js run [--path <asdlc/projects/<project-id>>] [--resume <step>]`
 - `node .overmind/overmind.js scaffold feature --path <asdlc/projects/<project-id>>`
+- `node .overmind/overmind.js worker register --path <asdlc/projects/<project-id>>`
+- `node .overmind/overmind.js worker assign --feature-path <asdlc/projects/<project-id>/<feature-folder>>`
 
-Scripts working on **feature level** require:
-- `--feature_path <asdlc/projects/<project-id>/<feature-folder>>`
-- `feature_assing_workers.sh`
+Worker assignment feature paths use:
+
+- `--feature-path <asdlc/projects/<project-id>/<feature-folder>>`
 
 Progress status is read-only and accepts either scope:
+
 - `node .overmind/overmind.js status <asdlc/projects/<project-id>[/<feature-folder>]>`
 
-`--feature_path` must:
+`--feature-path` must:
+
 - exist and be a directory
 - be inside ASDLC `projects/`
 - contain `feature_br_summary.md`
 
 Project worker data lives in:
+
 - `projects/<project-id>/workers.yaml`
 
 ## Notes
 
 - The staged ASDLC workspace itself is just a normal folder and is not initialized as a git repository.
-- `project_setup_add_new_project.sh` does not require git state for the staged ASDLC workspace.
+- `node .overmind/overmind.js project create` does not require git state for the staged ASDLC workspace.
 - Each newly created ASDLC project folder under `projects/<project-id>/` is initialized as its own git repository with an initial commit containing `init_progress_definition.yaml`.
-- Quality helper scripts live under `overmind/scripts/helper/`.
-- Script tests are in `tests/ai_scripts/`.
+- Quality gates are TypeScript CLI validators exposed through `node .overmind/overmind.js gate ...`.
+- Tests run through `npm test` and `npm run verify`.
 - Task-to-BR runs through the installed `overmind-task-to-br` skill backed by `.overmind/overmind.js`, not a staged shell command. The CLI owns deterministic capture of `user_br_input.md` via `node .overmind/overmind.js capture task-to-br <feature-path> --source-file <path>` or `--jira <ticket>` before context/gate. Jira capture records the ticket marker; the skill/context step owns MCP fetch and persistence of fetched story text.
 - BR clarification runs through the installed `overmind-br-clarification` skill backed by `node .overmind/overmind.js context br-clarification <feature-path>` and `node .overmind/overmind.js gate br-clarification <feature-path>`. EARS readiness is deterministic: `node .overmind/overmind.js readiness br-clarification <feature-path>`.
 - BR-to-EARS runs through the installed `overmind-requirements-ears` skill backed by `node .overmind/overmind.js context requirements-ears <feature-path>` and `node .overmind/overmind.js gate requirements-ears <feature-path>`.
 - EARS review runs through the installed `overmind-ears-review` skill backed by `node .overmind/overmind.js context ears-review <feature-path>` and `node .overmind/overmind.js gate ears-review <feature-path>`.
-- ASDLC setup/update requires the built bundle at `packages/asdlc-coordinator/dist/overmind.js`; run `npm install` and `npm run build` before `overmind/scripts/project_mgmt/project_setup_first_init_machine.sh`.
+- ASDLC setup requires the built bundle at `packages/asdlc-coordinator/dist/overmind.js`; run `npm install`, `npm run build`, and then `npm run setup` from the repo root or `node /path/to/yasdef-overmind/packages/installer/dist/src/bin/overmind.js init` from a target workspace.
 - example of external_sources configuraqtion for knowledge base MCP
+
 ```
 sources:
   - name: yasdef-knowledge-kb
@@ -171,22 +183,22 @@ sources:
     description: Approved stack blueprints, architecture references, and project bootstrap conventions
 ```
 
-## Scripts
+## Runtime CLI And Skills
 
-- `overmind/scripts/project_mgmt/project_setup_first_init_machine.sh`
-  Bootstraps or updates ASDLC workspace under `<selected_parent>/asdlc`. Stages the shared CLI `.overmind/overmind.js` plus every packaged Overmind skill into the supported runner skill directories `.codex/skills/` and `.claude/skills/`. In update mode, it repairs missing staged commands, repairs missing or stale runner skill folders from canonical source, refreshes `quickrun.md`, and synchronizes only whitelisted support assets (`.rules`, `.templates`, `.golden_examples`, `.helper`, `.setup`).
+- `overmind init` / `npm run setup`
+  Bootstraps a fresh ASDLC workspace through `packages/installer`: `.overmind/overmind.js`, packaged skills for `.codex` and `.claude`, runtime templates, setup defaults, `asdlc_metadata.yaml`, `projects/`, and generated `quickrun.md`.
 
-- `overmind/scripts/project_mgmt/project_setup_add_new_project.sh`
-  Staged command (`<asdlc>/.commands/project_setup_add_new_project.sh`) that creates a new project record + project folder, seeds `init_progress_definition.yaml`, initializes `projects/<project-id>/` as a git repository, and creates the first commit.
+- `overmind project create` (bundled CLI verb)
+  `node .overmind/overmind.js project create` interactively creates a new project record + project folder, seeds `init_progress_definition.yaml`, initializes `projects/<project-id>/` as a git repository, and creates the first commit.
 
-- `overmind/scripts/project_mgmt/project_setup_update_project.sh`
-  Staged command (`<asdlc>/.commands/project_setup_update_project.sh`) that attaches a repo path to an existing project's deferred class. Interactive flow: pick project → pick deferred class → enter repo path (validates and resolves to absolute path) → persists `state: "ready"` + `path` in `init_progress_definition.yaml`. If the project is type A and all classes become `ready` after the attach, optionally prompts to reclassify to type B or C. Any prompt accepts `q` to quit cleanly without mutation.
+- `overmind project reconcile` (bundled CLI verb)
+  `node .overmind/overmind.js project reconcile [--path <asdlc/projects/<project-id>>]` attaches deferred class repositories and runs the one-time common-contract reconciliation flow. With no `--path`, it auto-selects the only project or prompts for one when multiple projects exist.
 
-- `overmind/scripts/init_common_contract_definition.sh`
-  Staged-runtime command (`<asdlc>/.commands/init_common_contract_definition.sh --path <asdlc/projects/<project-id>>`) that builds project-level `common_contract_definition.md` from usable ready repositories.
+- `overmind project init` (bundled CLI verb)
+  `node .overmind/overmind.js project init --path <asdlc/projects/<project-id>>` runs the next pending project init step. Type A projects run per-class `overmind-stack-blueprint` sessions and `overmind gate stack-blueprint`; every project type runs the `overmind-common-contract` session and the TypeScript common-contract gate before committing the initialization baseline.
 
-- `overmind/scripts/project_mgmt/project_register_worker.sh`
-  Staged command (`<asdlc>/.commands/project_register_worker.sh --path <asdlc/projects/<project-id>>`) that interactively registers one worker class (`backend`, `frontend`, `mobile`, `infrastructure`) and appends an active worker record into `<project>/workers.yaml` using canonical `meta_info.project_id`.
+- `overmind worker register` (bundled CLI verb)
+  `node .overmind/overmind.js worker register --path <asdlc/projects/<project-id>>` interactively registers one worker class (`backend`, `frontend`, `mobile`, `infrastructure`) and appends an active worker record into `<project>/workers.yaml` using canonical `meta_info.project_id`.
 
 - `overmind scaffold feature` (bundled CLI verb)
   `node .overmind/overmind.js scaffold feature --path <asdlc/projects/<project-id>>` creates a feature folder and seeds `feature_br_summary.md`, returning the created path as a typed result.
@@ -236,5 +248,5 @@ sources:
 - `overmind-plan-semantic-review` skill
   Installed under `.codex/skills/` and `.claude/skills/`. It assembles Step 8.4 bindings with `node .overmind/overmind.js context plan-semantic-review <feature-path>`, validates the review ledger with `node .overmind/overmind.js gate plan-semantic-review <feature-path>`, and revalidates plan changes with the implementation-plan gate. It asks which findings to apply, updates `implementation_plan.md`, and records decisions in `implementation_plan_semantic_review.md`.
 
-- `overmind/scripts/feature_assing_workers.sh`
-  Staged command (`<asdlc>/.commands/feature_assing_workers.sh --feature_path <.../feature-folder>`) that requires a ready parseable `implementation_plan.md`, resolves active workers strictly by step repo class, asks for one class worker when multiple are available, and writes deterministic `#### Assigned:` values (worker UUID or class-scoped error message) on every step.
+- `overmind worker assign` (bundled CLI verb)
+  `node .overmind/overmind.js worker assign --feature-path <asdlc/projects/<project-id>/<feature-folder>>` requires an assignment-ready `implementation_plan.md`, resolves active workers strictly by step repo class, asks for one class worker when multiple are available, and writes deterministic `#### Assigned:` values (worker UUID, no-active-worker marker, or dependency hold marker) on every step.

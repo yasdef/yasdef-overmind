@@ -6,15 +6,12 @@ import { spawnSync } from "node:child_process";
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { validateContractReconciliation } from "../src/validate/contract-reconciliation.js";
+import {
+  validateContractReconciliation,
+  validateInitialCommonContract
+} from "../src/validate/contract-reconciliation.js";
 
 const bundlePath = fileURLToPath(new URL("../overmind.js", import.meta.url));
-const shellHelper = fileURLToPath(
-  new URL(
-    "../../../../overmind/scripts/helper/check_common_contract_definition_quality.sh",
-    import.meta.url
-  )
-);
 
 function withProject(fn: (projectDir: string) => void): void {
   const root = mkdtempSync(path.join(tmpdir(), "overmind-contract-reconciliation-"));
@@ -73,12 +70,6 @@ function validContract(): string {
 
 function writeContract(projectDir: string, content: string): void {
   writeFileSync(path.join(projectDir, "common_contract_definition.md"), content);
-}
-
-/** Run the retained shell helper against a target file; returns its exit code. */
-function shellExit(targetPath: string): number {
-  const result = spawnSync("bash", [shellHelper, targetPath], { encoding: "utf8" });
-  return result.status ?? 1;
 }
 
 test("contract-reconciliation gate accepts a complete common contract", () => {
@@ -143,12 +134,7 @@ test("contract-reconciliation gate distinguishes runtime failures (exit 2)", (t)
   });
 });
 
-test("interim shell and TypeScript gates agree on shared fixtures", (t) => {
-  const probe = spawnSync("bash", ["--version"], { encoding: "utf8" });
-  if (probe.status !== 0) {
-    t.skip("bash unavailable");
-    return;
-  }
+test("initial common-contract adapter matches reconciliation gate classifications", () => {
   withProject((projectDir) => {
     const fixtures: string[] = [
       validContract(),
@@ -158,14 +144,13 @@ test("interim shell and TypeScript gates agree on shared fixtures", (t) => {
       validContract().replace("- decision_1: adopt api as source of truth", "")
     ];
     for (const content of fixtures) {
-      const target = path.join(projectDir, "common_contract_definition.md");
       writeContract(projectDir, content);
       const ts = validateContractReconciliation(projectDir).exitCode;
-      const shell = shellExit(target);
+      const init = validateInitialCommonContract(projectDir).exitCode;
       assert.equal(
         ts,
-        shell,
-        `classification drift: ts=${ts} shell=${shell} for fixture starting: ${content.slice(0, 40)}`
+        init,
+        `classification drift: reconciliation=${ts} initial=${init} for fixture starting: ${content.slice(0, 40)}`
       );
     }
   });
@@ -183,11 +168,9 @@ test("contract-reconciliation gate CLI passes and reports missing lines", () => 
     assert.match(ok.stdout, /quality gate passed/);
 
     writeContract(projectDir, validContract().replace("- project_id: PROJ-1", "- project_id: "));
-    const bad = spawnSync(
-      process.execPath,
-      [bundlePath, "gate", "contract-reconciliation", projectDir],
-      { encoding: "utf8" }
-    );
+    const bad = spawnSync(process.execPath, [bundlePath, "gate", "common-contract", projectDir], {
+      encoding: "utf8"
+    });
     assert.equal(bad.status, 1);
     assert.match(bad.stdout, /missing: quality gate failed: /);
   });

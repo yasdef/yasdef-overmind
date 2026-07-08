@@ -2,14 +2,37 @@
 
 Use one shared implementation plan for the whole extension. Keep v1 read-only and defer mutation until dashboard behavior is stable.
 
+Checked items below were delivered by the e2e migration Slice 5 (`crp-149-migration-phase5-cleanup-extension`) as the workspace package `packages/vscode-extension`: a read-only activity-bar tree view backed by the coordinator read model, with watcher-driven refresh.
+
+## CRP Breakdown
+
+Proposed 2026-07-11. The remaining steps land as six OpenSpec changes; steps too thin to verify
+alone are paired so every change is operator-visible and `npm run verify`-green.
+
+| CRP | Steps | Scope |
+|---|---|---|
+| CRP-158 workspace detection & readiness completion | rest of 1.2 + 1.4 | Multi-workspace handling, active-workspace preference, detection fixtures, project-level presentation, full readiness test matrix (complete/partial/missing/deferred/invalid). Read-model only, no UI change. |
+| CRP-159 webview dashboard | 2.1 + rest of 2.3 | Webview replacing the tree view: project list with repo/class readiness, per-project feature list, detail views, empty/loading/degraded/error states; manual refresh command and output-channel diagnostics folded in. |
+| CRP-160 artifact open actions | 2.2 | First webview→extension-host message channel, artifact records, open-in-editor with disabled state for missing artifacts. Separate because it establishes the message-passing contract every later action reuses. |
+| CRP-161 safe action framework + first actions | 3.1 + 3.2 | Verb allow-list, path validation, mutation confirmations, coordinator-vs-terminal routing, plus Create Feature (`overmind scaffold feature`) and Continue E2E (terminal-hosted `overmind run`). Merged: the framework alone has no observable behavior to verify. |
+| CRP-162 coordinator action contracts + task-to-BR capture form | 4.1 + 4.2 | Contract binding in `asdlc-coordinator` plus its first consumer, the task-to-BR capture form. Merged: the contract's only proof is a consumer. |
+| CRP-163 package & internal release | rest of 1.1 + 5.1 | `.vsix` packaging, extension-host launch verification, install docs, cross-platform smoke, release checklist. |
+
+Step 4.3 (guided webview forms) is absorbed by CRP-162 — the capture form is the first form and
+establishes the pattern; 4.3 becomes its own change only when a concrete second non-interactive
+action is approved.
+
+Recommended order: CRP-158 → CRP-159 → CRP-163 (early internal dogfooding of the read-only
+dashboard; step 5.1 depends only on 2.3) → CRP-160 → CRP-161 → CRP-162.
+
 ### Step 1.1 Scaffold VS Code Extension Project [Requirement 1] [NFR 1]
 #### Repo: extension
 #### Depends on: none
 #### Evidence: comp/extension-scaffold
 #### Preserved Surface: VS Code command palette and extension activation
-- [ ] Create TypeScript VS Code extension scaffold under `overmind_vscode_extention`.
-- [ ] Add package metadata, activation events, extension entrypoint, and build/test scripts.
-- [ ] Add a basic command: `Overmind: Open Dashboard`.
+- [x] Create TypeScript VS Code extension scaffold as the workspace package `packages/vscode-extension`.
+- [x] Add package metadata, activation events, extension entrypoint, and build/test scripts.
+- [x] Add a read-only dashboard entrypoint: the activity-bar view `overmind.dashboard` (shipped instead of an `Overmind: Open Dashboard` palette command; the v1 manifest contributes no commands).
 - [ ] Add packaging path for local `.vsix` distribution.
 - [ ] Verify extension launches in VS Code extension host.
 
@@ -18,10 +41,10 @@ Use one shared implementation plan for the whole extension. Keep v1 read-only an
 #### Depends on: 1.1
 #### Evidence: gap/Requirement-1, comp/coordinator-read-model
 #### Preserved Surface: workspace selection / empty state
-- [ ] Detect `asdlc_metadata.yaml` in workspace folders.
+- [x] Detect `asdlc_metadata.yaml` in workspace folders (through coordinator `workspace/detectRuntimeRoot` from the first workspace folder).
 - [ ] Handle no workspace, one workspace, and multiple ASDLC workspaces.
 - [ ] Store only active workspace preference when needed.
-- [ ] Add diagnostics for missing or invalid ASDLC metadata.
+- [x] Add diagnostics for missing or invalid ASDLC metadata (coordinator diagnostics carried into the dashboard model and rendered as rows).
 - [ ] Test workspace detection with fixtures.
 
 ### Step 1.3 Bind the Read-Only Coordinator Model [Requirement 2] [Requirement 3] [Requirement 6]
@@ -29,22 +52,22 @@ Use one shared implementation plan for the whole extension. Keep v1 read-only an
 #### Depends on: 1.2
 #### Evidence: comp/coordinator-read-model
 #### Preserved Surface: read-only in-process progress model
-- [ ] Import only `asdlc-coordinator/workspace` and `asdlc-coordinator/sequencing`.
-- [ ] Resolve runtime, project, and feature paths through `workspace/`.
-- [ ] Compute `ProgressReport` through `sequencing/` for every discovered feature.
-- [ ] Obtain `FeatureSummary` through the existing `toFeatureSummary(report)` projection.
-- [ ] Carry coordinator diagnostics into a degraded but renderable dashboard model.
-- [ ] Add fixture-backed unit tests proving every declared step contributes to the projection totals.
+- [x] Import only `asdlc-coordinator/workspace` and `asdlc-coordinator/sequencing` (enforced by the `package-contract` test).
+- [x] Resolve runtime, project, and feature paths through `workspace/`.
+- [x] Compute `ProgressReport` through `sequencing/` for every discovered feature.
+- [x] Obtain `FeatureSummary` through the existing `toFeatureSummary(report)` projection.
+- [x] Carry coordinator diagnostics into a degraded but renderable dashboard model.
+- [x] Add fixture-backed unit tests proving every declared step contributes to the projection totals.
 
 ### Step 1.4 Implement Readiness Engine [Requirement 4]
 #### Repo: extension
 #### Depends on: 1.3
 #### Evidence: comp/feature-summary-projection
 #### Preserved Surface: project and feature readiness badges
-- [ ] Reuse readiness states from the canonical `FeatureSummary` projection.
-- [ ] Compute feature readiness from the coordinator `ProgressReport`.
+- [x] Reuse readiness states from the canonical `FeatureSummary` projection.
+- [x] Compute feature readiness from the coordinator `ProgressReport`.
 - [ ] Compute project presentation from coordinator workspace/sequencing results.
-- [ ] Add tests for complete, partial, missing, deferred, and invalid states.
+- [ ] Add tests for complete, partial, missing, deferred, and invalid states (delivered tests cover ready, blocked, and unknown only).
 
 ### Step 2.1 Build Webview Dashboard [Requirement 2] [Requirement 3] [Requirement 4]
 #### Repo: extension
@@ -75,8 +98,8 @@ Use one shared implementation plan for the whole extension. Keep v1 read-only an
 #### Evidence: gap/Requirement-6, comp/coordinator-read-model
 #### Preserved Surface: fresh in-process progress recomputation
 - [ ] Add manual refresh that invokes `sequencing/` in process.
-- [ ] Add file watchers for ASDLC metadata, project metadata, and feature artifacts.
-- [ ] Trigger a fresh computation when relevant files change; persist no stale scanner state.
+- [x] Add file watchers for ASDLC metadata, project metadata, and feature artifacts (`asdlc_metadata.yaml` and `projects/**/*` watchers).
+- [x] Trigger a fresh computation when relevant files change; persist no stale scanner state.
 - [ ] Add output channel diagnostics for computation lifecycle.
 - [ ] Verify UI remains responsive during recomputation.
 

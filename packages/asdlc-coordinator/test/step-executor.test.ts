@@ -247,6 +247,47 @@ test("executeStep verifies guards even when the agent exits non-zero", async () 
   });
 });
 
+test("executeStep applies step 2 read-only guards from common-contract context", async () => {
+  await withRunnerWorkspace(async ({ root, projectDir }) => {
+    const protectedFile = path.join(projectDir, "project_stack_blueprint_backend.md");
+    const deps = baseDeps({
+      agentRunner: {
+        run: async () => {
+          writeFileSync(path.join(projectDir, "common_contract_definition.md"), "# contract\n");
+          writeFileSync(protectedFile, "# modified blueprint\n");
+          return { exitCode: 0 };
+        }
+      },
+      classListContext: {
+        "common-contract": () =>
+          ({
+            exitCode: 0,
+            text: "common-contract context",
+            readOnlyInputs: [path.relative(root, protectedFile)]
+          }) satisfies ContextResult
+      }
+    });
+
+    const result = await executeStep(
+      step("2"),
+      {
+        step: step("2"),
+        runtimeRoot: root,
+        featurePath: path.relative(root, projectDir),
+        overmindCliPath: ".overmind/overmind.js",
+        classes: ["backend"]
+      },
+      deps
+    );
+
+    assert.equal(result.ok, false);
+    assert.match(
+      result.diagnostics.map((item) => item.reason).join("\n"),
+      /fromContext guard violation/
+    );
+  });
+});
+
 test("executeStep surfaces an agent launch failure as an actionable failed step", async () => {
   await withRunnerWorkspace(async ({ root, featurePath }) => {
     const deps = baseDeps({
@@ -281,7 +322,7 @@ test("executeStep surfaces an agent launch failure as an actionable failed step"
   });
 });
 
-test("executeStep fails before spawn when fromContext emits no read-only inputs", async () => {
+test("executeStep allows an empty fromContext read-only input set", async () => {
   await withRunnerWorkspace(async ({ root, featurePath }) => {
     let agentCalls = 0;
     const result = await executeStep(
@@ -312,9 +353,8 @@ test("executeStep fails before spawn when fromContext emits no read-only inputs"
       })
     );
 
-    assert.equal(result.ok, false);
-    assert.equal(agentCalls, 0);
-    assert.match(result.diagnostics[0]!.reason, /context emitted no read-only inputs/);
+    assert.equal(result.ok, true);
+    assert.equal(agentCalls, 1);
   });
 });
 

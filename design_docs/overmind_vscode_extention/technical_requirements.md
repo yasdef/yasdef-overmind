@@ -155,9 +155,9 @@ ASDLC Workspace
 ### Component: extension-scaffold
 - repo: extension
 - component_kind: config
-- relevant_paths: `overmind_vscode_extention/package.json`, `overmind_vscode_extention/src/extension.ts`
+- relevant_paths: `packages/vscode-extension/package.json`, `packages/vscode-extension/src/extension.ts`
 - requirement_refs: Requirement 1, NFR 1
-- current_state: Missing.
+- current_state: Scaffolded by the e2e migration Slice 5 (`crp-149-migration-phase5-cleanup-extension`) as a read-only tree-view package; Webview registration and VSIX packaging still missing.
 - required_behavior: Provide VS Code extension activation, commands, Webview registration, and extension packaging.
 - gap_to_close: Scaffold extension project with TypeScript, linting, tests, and VSIX packaging.
 - dependency_notes: Must be established before coordinator read-model and UI work.

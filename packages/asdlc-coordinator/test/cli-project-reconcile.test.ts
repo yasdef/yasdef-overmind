@@ -162,6 +162,47 @@ test("multiple projects offer selection with a finish choice that exits zero", a
   );
 });
 
+test("interactive project selection shows reconciliation guidance and decline aborts cleanly", async () => {
+  await withWorkspace(
+    {
+      projects: {
+        a: { backend: { state: "ready", repoPath: "/x", reconciled: true } },
+        b: { backend: { state: "ready", repoPath: "/y", reconciled: true } }
+      }
+    },
+    async (root) => {
+      const agent = new StubAgentRunner(0);
+      const { code, out } = await run(["project", "reconcile"], root, {
+        interaction: new StubInteraction(["b", false]),
+        agentRunner: agent
+      });
+      assert.equal(code, 0);
+      assert.match(out.stdout, /full project reconciliation flow, not just a repo attach/);
+      assert.match(out.stdout, /Aborted: no changes made to project 'b'/);
+      assert.equal(agent.specs.length, 0);
+    }
+  );
+});
+
+test("EOF at interactive reconciliation confirmation aborts cleanly", async () => {
+  await withWorkspace(
+    {
+      projects: {
+        a: { backend: { state: "ready", repoPath: "/x", reconciled: true } },
+        b: { backend: { state: "ready", repoPath: "/y", reconciled: true } }
+      }
+    },
+    async (root) => {
+      const { code, out } = await run(["project", "reconcile"], root, {
+        interaction: new StubInteraction(["a"]),
+        agentRunner: new StubAgentRunner(0)
+      });
+      assert.equal(code, 0);
+      assert.match(out.stdout, /Aborted: no changes made to project 'a'/);
+    }
+  );
+});
+
 test("closed input during selection exits zero", async () => {
   await withWorkspace(
     {

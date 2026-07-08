@@ -10,13 +10,13 @@
     "packages/*"
   ],
   "scripts": {
+    "setup": "node packages/installer/dist/src/bin/overmind.js init",
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "format:check": "npm run format:check --workspaces --if-present && prettier --check package.json tsconfig.base.json eslint.config.js .prettierrc.json",
-    "test": "npm run test:ts && npm run test:shell",
+    "test": "npm run test:ts",
     "test:ts": "npm run test --workspaces --if-present",
-    "test:shell": "bash -c 'for suite in tests/ai_scripts/*.sh; do bash \"$suite\" || exit 1; done'",
     "verify": "npm run typecheck && npm run lint && npm run format:check && npm run build && npm test"
   },
   "devDependencies": {

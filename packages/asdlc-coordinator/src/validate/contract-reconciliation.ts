@@ -5,11 +5,10 @@ import { readRequiredTextFile, resolveInputPath } from "../parse/index.js";
 import type { GateResult } from "../types/index.js";
 
 /**
- * TypeScript port of `check_common_contract_definition_quality.sh` (D5). Validates
- * `<project>/common_contract_definition.md` preserving the shell helper's stable exit
- * classification: `0` structurally/semantically valid, `1` recoverable content issues
- * with `quality gate failed: ...` messages, `2` missing/unreadable runtime inputs. Shared
- * parity fixtures drive this and the retained shell helper so their checks cannot drift.
+ * Validates `<project>/common_contract_definition.md` with the stable gate
+ * classification: `0` structurally/semantically valid, `1` recoverable content
+ * issues with `quality gate failed: ...` messages, `2` missing/unreadable runtime
+ * inputs.
  */
 
 const SECTION_HEADINGS: Array<{ id: Section; test: RegExp; label: string }> = [
@@ -100,6 +99,10 @@ export function validateContractReconciliation(inputPath: string, cwd = process.
   } catch (err) {
     return gateError(err instanceof Error ? err.message : String(err));
   }
+}
+
+export function validateInitialCommonContract(inputPath: string, cwd = process.cwd()): GateResult {
+  return validateContractReconciliation(inputPath, cwd);
 }
 
 interface RepositoryBlock {

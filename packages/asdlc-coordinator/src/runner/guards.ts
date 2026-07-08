@@ -22,16 +22,6 @@ export function validateReadOnlyGuardsBeforeSession(
     return [];
   }
 
-  if (resolvedFromContext.length === 0) {
-    return [
-      {
-        severity: "error",
-        source: "session-guards",
-        reason: "fromContext guard violation: context emitted no read-only inputs."
-      }
-    ];
-  }
-
   return resolvedFromContext.flatMap((file) =>
     existsSync(file)
       ? []

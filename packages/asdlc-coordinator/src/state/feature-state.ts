@@ -7,9 +7,6 @@ import type { Diagnostic } from "../types/index.js";
 /** Basename of the per-project JSON feature-state cache (replaces the shell `.env`). */
 export const FEATURE_STATE_FILE_NAME = ".overmind_feature_state.json";
 
-/** Basename of the retired shell state cache; recognized only to be ignored. */
-export const LEGACY_FEATURE_STATE_FILE_NAME = ".project_add_feature_e2e_state.env";
-
 export type FeatureStateReadState = "valid" | "stale" | "missing";
 
 export interface FeatureStateReadResult {

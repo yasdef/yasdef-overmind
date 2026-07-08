@@ -2,9 +2,11 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   renameSync,
   rmSync,
+  statSync,
   writeFileSync
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -17,9 +19,26 @@ import assert from "node:assert/strict";
 import { installProject } from "../src/index.js";
 
 // Mirror init.ts packageRoot(): from dist/test/init.test.js up to packages/installer.
-function packagedSkillSourceDir(skillName: string): string {
+function packageRoot(): string {
   const moduleDir = path.dirname(fileURLToPath(import.meta.url));
-  return path.resolve(moduleDir, "..", "..", "_data", "skills", skillName);
+  return path.resolve(moduleDir, "..", "..");
+}
+
+function packagedSkillSourceDir(skillName: string): string {
+  return path.join(packageRoot(), "_data", "skills", skillName);
+}
+
+function packagedTemplateSourcePath(templateName: string): string {
+  return path.join(packageRoot(), "_data", "templates", templateName);
+}
+
+function packagedSetupSourcePath(setupName: string): string {
+  return path.join(packageRoot(), "_data", "setup", setupName);
+}
+
+function installerBinPath(): string {
+  const moduleDir = path.dirname(fileURLToPath(import.meta.url));
+  return path.resolve(moduleDir, "..", "src", "bin", "overmind.js");
 }
 
 function withProject(fn: (root: string) => void): void {
@@ -37,6 +56,8 @@ const ALL_SKILLS = [
   "overmind-br-clarification",
   "overmind-requirements-ears",
   "overmind-ears-review",
+  "overmind-stack-blueprint",
+  "overmind-common-contract",
   "overmind-contract-delta",
   "overmind-surface-map",
   "overmind-surface-map-enrich",
@@ -48,6 +69,11 @@ const ALL_SKILLS = [
   "overmind-contract-reconciliation"
 ] as const;
 const RUNNER_DIRS = [".codex", ".claude"] as const;
+const RUNTIME_TEMPLATES = [
+  "init_progress_definition_TEMPLATE.yaml",
+  "feature_br_summary_TEMPLATE.md"
+] as const;
+const SETUP_DEFAULTS = ["models.md", "external_sources.yaml"] as const;
 const SKILL_ASSET_CHECKS: Record<(typeof ALL_SKILLS)[number], string[]> = {
   "overmind-task-to-br": ["feature_br_summary_TEMPLATE.md"],
   "overmind-repo-br-scan": ["feature_br_summary_TEMPLATE.md"],
@@ -59,6 +85,18 @@ const SKILL_ASSET_CHECKS: Record<(typeof ALL_SKILLS)[number], string[]> = {
   "overmind-ears-review": [
     "requirements_ears_review_TEMPLATE.md",
     "requirements_ears_review_GOLDEN_EXAMPLE.md"
+  ],
+  "overmind-stack-blueprint": [
+    "project_stack_blueprint_be_TEMPLATE.md",
+    "project_stack_blueprint_fe_TEMPLATE.md",
+    "project_stack_blueprint_mobile_TEMPLATE.md",
+    "project_stack_blueprint_be_GOLDEN_EXAMPLE.md",
+    "project_stack_blueprint_fe_GOLDEN_EXAMPLE.md",
+    "project_stack_blueprint_mobile_GOLDEN_EXAMPLE.md"
+  ],
+  "overmind-common-contract": [
+    "common_contract_definition_TEMPLATE.md",
+    "common_contract_definition_GOLDEN_EXAMPLE.md"
   ],
   "overmind-contract-delta": [
     "feature_contract_delta_TEMPLATE.md",
@@ -97,6 +135,30 @@ const SKILL_ASSET_CHECKS: Record<(typeof ALL_SKILLS)[number], string[]> = {
   ]
 };
 
+function assertWorkspaceUnwritten(root: string): void {
+  assert.deepEqual(readdirSync(root), []);
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function listShellFiles(root: string, options: { prune?: Set<string> } = {}): string[] {
+  const found: string[] = [];
+  if (!existsSync(root)) return found;
+  for (const entry of readdirSync(root)) {
+    const fullPath = path.join(root, entry);
+    const stat = statSync(fullPath);
+    if (stat.isDirectory()) {
+      if (options.prune?.has(entry)) continue;
+      found.push(...listShellFiles(fullPath, options));
+    } else if (entry.endsWith(".sh")) {
+      found.push(fullPath);
+    }
+  }
+  return found;
+}
+
 for (const missing of ["SKILL.md", "assets"] as const) {
   test(`installProject writes no runner targets when overmind-plan-semantic-review ${missing} is missing`, () => {
     const payload = path.join(packagedSkillSourceDir("overmind-plan-semantic-review"), missing);
@@ -116,7 +178,7 @@ for (const missing of ["SKILL.md", "assets"] as const) {
   });
 }
 
-test("overmind init installs the bundled CLI and both skills into Codex and Claude", () => {
+test("overmind init installs the full workspace bootstrap payload", () => {
   withProject((root) => {
     const result = installProject(root);
 
@@ -152,8 +214,232 @@ test("overmind init installs the bundled CLI and both skills into Codex and Clau
       RUNNER_DIRS.map((runnerDir) => path.join(root, runnerDir, "skills", skillName))
     );
     assert.deepEqual(result.skillPaths, expectedSkillPaths);
-    assert.equal(result.skillPath, path.join(root, ".claude", "skills", "overmind-task-to-br"));
+
+    for (const templateName of RUNTIME_TEMPLATES) {
+      const target = path.join(root, ".templates", templateName);
+      assert.equal(
+        readFileSync(target, "utf8"),
+        readFileSync(packagedTemplateSourcePath(templateName), "utf8")
+      );
+    }
+    assert.deepEqual(
+      result.templatePaths,
+      RUNTIME_TEMPLATES.map((templateName) => path.join(root, ".templates", templateName))
+    );
+
+    for (const setupName of SETUP_DEFAULTS) {
+      const target = path.join(root, ".setup", setupName);
+      assert.equal(
+        readFileSync(target, "utf8"),
+        readFileSync(packagedSetupSourcePath(setupName), "utf8")
+      );
+    }
+    assert.deepEqual(
+      result.setupPaths,
+      SETUP_DEFAULTS.map((setupName) => path.join(root, ".setup", setupName))
+    );
+
+    assert.equal(
+      readFileSync(path.join(root, "asdlc_metadata.yaml"), "utf8"),
+      'meta:\n  description: "this repo is for asdlc projects management"\nprojects:\n'
+    );
+    assert.equal(existsSync(path.join(root, "projects")), true);
+    assert.equal(existsSync(result.quickrunPath), true);
+    assert.equal(result.quickrunPath, path.join(root, "quickrun.md"));
+    assert.equal(existsSync(path.join(root, ".commands")), false);
+    assert.equal(existsSync(path.join(root, ".helper")), false);
+    assert.equal(existsSync(path.join(root, ".rules")), false);
+    assert.equal(existsSync(path.join(root, ".golden_examples")), false);
   });
+});
+
+test("fresh install exposes project init skills with migrated rule parity", () => {
+  withProject((root) => {
+    installProject(root);
+    const stackSuccessLine =
+      "Project stack blueprint class session is finished for <target_class>. Nothing else to do now; press Ctrl-C so orchestrator can continue project init";
+    const commonSuccessLine =
+      "Common contract definition phase is finished. Nothing else to do now; press Ctrl-C so orchestrator can start the next phase";
+    const commonInfeasibleLine =
+      "common contract definition gate cannot pass with current repository evidence. Please provide instructions what to do, or adjust requirements and rerun this phase";
+
+    for (const runnerDir of RUNNER_DIRS) {
+      const stackSkillDir = path.join(root, runnerDir, "skills", "overmind-stack-blueprint");
+      const stackText = readFileSync(path.join(stackSkillDir, "SKILL.md"), "utf8");
+      assert.match(
+        stackText,
+        /node \.overmind\/overmind\.js context stack-blueprint <project> --class <backend\|frontend\|mobile>/
+      );
+      assert.match(stackText, /Run the exact `gate_command` from context after every write/);
+      assert.match(stackText, /Do not silently choose a default/);
+      assert.match(
+        stackText,
+        /Do not write `project_stack_blueprint_<class>\.md` until the operator explicitly approves/
+      );
+      assert.match(stackText, /Cross-Class Transport\/Contract Approach/);
+      assert.match(stackText, /<to be defined during first feature implementation plan>/);
+      assert.equal(stackText.includes(stackSuccessLine), true);
+
+      const commonSkillDir = path.join(root, runnerDir, "skills", "overmind-common-contract");
+      const commonText = readFileSync(path.join(commonSkillDir, "SKILL.md"), "utf8");
+      assert.match(commonText, /node \.overmind\/overmind\.js context common-contract <project>/);
+      assert.match(commonText, /Run the exact `gate_command` from context after every write/);
+      assert.match(commonText, /contract-local alignment status/);
+      assert.match(commonText, /Do not invent contract surfaces/);
+      assert.match(commonText, /source_repo_count` from context/);
+      assert.match(commonText, /Cross-Class Transport\/Contract Approach Mirror/);
+      assert.equal(commonText.includes(commonSuccessLine), true);
+      assert.equal(commonText.includes(commonInfeasibleLine), true);
+    }
+  });
+});
+
+test("overmind init preserves operator setup defaults and metadata on reinstall", () => {
+  withProject((root) => {
+    installProject(root);
+    const customModels = "task_to_br | codex | custom-model\n";
+    const customSources = "sources:\n  - name: local-kb\n    type: stack_knowledge_base\n";
+    const customMetadata = "meta:\n  version: custom\nprojects:\n  - project: existing\n";
+    writeFileSync(path.join(root, ".setup", "models.md"), customModels);
+    writeFileSync(path.join(root, ".setup", "external_sources.yaml"), customSources);
+    writeFileSync(path.join(root, "asdlc_metadata.yaml"), customMetadata);
+    writeFileSync(
+      path.join(root, ".templates", "feature_br_summary_TEMPLATE.md"),
+      "stale template\n"
+    );
+
+    installProject(root);
+
+    assert.equal(readFileSync(path.join(root, ".setup", "models.md"), "utf8"), customModels);
+    assert.equal(
+      readFileSync(path.join(root, ".setup", "external_sources.yaml"), "utf8"),
+      customSources
+    );
+    assert.equal(readFileSync(path.join(root, "asdlc_metadata.yaml"), "utf8"), customMetadata);
+    assert.equal(
+      readFileSync(path.join(root, ".templates", "feature_br_summary_TEMPLATE.md"), "utf8"),
+      readFileSync(packagedTemplateSourcePath("feature_br_summary_TEMPLATE.md"), "utf8")
+    );
+    assert.equal(existsSync(path.join(root, ".commands")), false);
+    assert.equal(existsSync(path.join(root, ".helper")), false);
+    assert.equal(existsSync(path.join(root, ".rules")), false);
+    assert.equal(existsSync(path.join(root, ".golden_examples")), false);
+    assert.equal(
+      readFileSync(path.join(root, ".overmind", "overmind.js"), "utf8").includes(
+        "ASDLC_PROJECTS_DIR_DEFAULT"
+      ),
+      false
+    );
+  });
+});
+
+for (const templateName of RUNTIME_TEMPLATES) {
+  test(`installProject fails before writing workspace files when ${templateName} is missing`, () => {
+    const sourcePath = packagedTemplateSourcePath(templateName);
+    const backup = `${sourcePath}.bak`;
+    renameSync(sourcePath, backup);
+    try {
+      withProject((root) => {
+        assert.throws(() => installProject(root), /Runtime template source not found/);
+        assertWorkspaceUnwritten(root);
+      });
+    } finally {
+      renameSync(backup, sourcePath);
+    }
+  });
+}
+
+for (const setupName of SETUP_DEFAULTS) {
+  test(`installProject fails before writing workspace files when ${setupName} is missing`, () => {
+    const sourcePath = packagedSetupSourcePath(setupName);
+    const backup = `${sourcePath}.bak`;
+    renameSync(sourcePath, backup);
+    try {
+      withProject((root) => {
+        assert.throws(() => installProject(root), /Setup default source not found/);
+        assertWorkspaceUnwritten(root);
+      });
+    } finally {
+      renameSync(backup, sourcePath);
+    }
+  });
+}
+
+test("installed CLI executes and runtime templates land at coordinator default paths", () => {
+  withProject((root) => {
+    installProject(root);
+    const result = spawnSync(process.execPath, [path.join(root, ".overmind", "overmind.js")], {
+      cwd: root,
+      encoding: "utf8"
+    });
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /overmind <run\|project create\|project init/);
+    assert.equal(
+      existsSync(path.join(root, ".templates", "init_progress_definition_TEMPLATE.yaml")),
+      true
+    );
+    assert.equal(existsSync(path.join(root, ".templates", "feature_br_summary_TEMPLATE.md")), true);
+  });
+});
+
+test("generated quickrun and install-bin output name TypeScript commands only", () => {
+  withProject((root) => {
+    installProject(root);
+    const quickrun = readFileSync(path.join(root, "quickrun.md"), "utf8");
+    for (const expected of [
+      "node .overmind/overmind.js project create",
+      "node .overmind/overmind.js project reconcile",
+      "node .overmind/overmind.js project init",
+      "node .overmind/overmind.js worker register",
+      "node .overmind/overmind.js worker assign",
+      "node .overmind/overmind.js run",
+      "node .overmind/overmind.js scaffold feature",
+      "node .overmind/overmind.js status",
+      "node .overmind/overmind.js context task-to-br",
+      "node .overmind/overmind.js gate task-to-br"
+    ]) {
+      assert.match(quickrun, new RegExp(escapeRegExp(expected)));
+    }
+    assert.doesNotMatch(quickrun, /\.sh\b/);
+
+    const output = spawnSync(process.execPath, [installerBinPath(), "init"], {
+      cwd: root,
+      encoding: "utf8"
+    });
+    assert.equal(output.status, 0);
+    assert.match(output.stdout, /Overmind workspace bootstrap complete\./);
+    assert.match(output.stdout, /CLI: \.overmind\/overmind\.js/);
+    assert.match(output.stdout, /Runtime templates:/);
+    assert.match(output.stdout, /Setup defaults:/);
+    assert.match(output.stdout, /Quick run: quickrun\.md/);
+    assert.doesNotMatch(output.stdout, /\.sh\b/);
+    assert.equal(output.stderr, "");
+  });
+});
+
+test("repository and installer payload contain no shell files", () => {
+  const repoRoot = path.resolve(packageRoot(), "..", "..");
+  const gitWorktree = spawnSync("git", ["rev-parse", "--is-inside-work-tree"], {
+    cwd: repoRoot,
+    encoding: "utf8"
+  });
+
+  if (gitWorktree.status === 0 && gitWorktree.stdout.trim() === "true") {
+    const versionedShellFiles = spawnSync("git", ["ls-files", "*.sh"], {
+      cwd: repoRoot,
+      encoding: "utf8"
+    });
+    assert.equal(versionedShellFiles.status, 0);
+    assert.equal(versionedShellFiles.stdout.trim(), "");
+  }
+
+  assert.deepEqual(
+    ["packages", "overmind", "tests"].flatMap((entry) =>
+      listShellFiles(path.join(repoRoot, entry), { prune: new Set(["node_modules", "dist"]) })
+    ),
+    []
+  );
+  assert.deepEqual(listShellFiles(path.join(packageRoot(), "_data")), []);
 });
 
 test("plan-semantic-review skill asks once per ledger decision round", () => {

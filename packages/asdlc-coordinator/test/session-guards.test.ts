@@ -33,11 +33,10 @@ test("fromContext guard reports modified read-only input", () => {
   });
 });
 
-test("fromContext guard fails before session when context emits no read-only inputs", () => {
+test("fromContext guard allows an empty emitted read-only input set", () => {
   const diagnostics = validateReadOnlyGuardsBeforeSession([{ mode: "fromContext" }], []);
 
-  assert.equal(diagnostics.length, 1);
-  assert.match(diagnostics[0]!.reason, /context emitted no read-only inputs/);
+  assert.deepEqual(diagnostics, []);
 });
 
 test("fromContext guard fails before session when a protected input is missing", () => {

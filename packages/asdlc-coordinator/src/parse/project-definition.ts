@@ -13,6 +13,7 @@ export interface ClassRepoPath {
 }
 
 export interface ProjectDefinitionMetadata {
+  projectId?: string;
   projectTypeCode?: string;
   projectClasses: string[];
   classRepoPaths: Record<string, ClassRepoPath>;
@@ -175,6 +176,9 @@ export function readProjectDefinitionMetadata(definitionPath: string): ProjectDe
   }
 
   const meta = lines.slice(metaStart + 1, stepsStart);
+  const projectIdLine = meta.find((line) => /^\s{2}project_id:\s*/.test(line));
+  if (projectIdLine) result.projectId = scalar(projectIdLine.replace(/^\s{2}project_id:\s*/, ""));
+
   const typeLine = meta.find((line) => /^\s{2}project_type_code:\s*/.test(line));
   if (typeLine)
     result.projectTypeCode = scalar(typeLine.replace(/^\s{2}project_type_code:\s*/, ""));

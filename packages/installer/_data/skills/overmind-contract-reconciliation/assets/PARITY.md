@@ -16,7 +16,7 @@ is missing an owner; architecture-driven changes are called out.
 | old prompt — gate command | `gate contract-reconciliation <project>` | `src/validate/contract-reconciliation.ts` | ported |
 | old prompt — cannot-pass final line | exact blocker line | `SKILL.md` (only place) | kept |
 | old prompt — success final line | exact success line | `SKILL.md` (only place) | kept |
-| `check_common_contract_definition_quality.sh` | all 0/1/2 checks | `validateCommonContractContent` | ported; shell retained + parity-locked |
+| initial common-contract gate | all 0/1/2 checks | `validateCommonContractContent` | ported; shell retired |
 | `common_contract_definition_TEMPLATE.md` | structure reference | `assets/common_contract_definition_TEMPLATE.md` | copied |
 | `common_contract_definition_GOLDEN_EXAMPLE.md` | style reference | `assets/common_contract_definition_GOLDEN_EXAMPLE.md` | copied |
 | definition immutability guard (`cmp`) | `init_progress_definition.yaml` unchanged | catalog `mustExistUnchanged` guard | ported |

@@ -76,6 +76,28 @@ export function resolveProjectPath(inputPath: string, projectsRoot: string): Pat
   );
 }
 
+export function resolveRepoPath(inputPath: string): PathResult {
+  if (inputPath.trim() === "") return failure(inputPath, "Repo path cannot be empty.");
+  let stat;
+  try {
+    stat = statSync(inputPath);
+  } catch {
+    return failure(inputPath, `Repo path does not exist: ${inputPath}`);
+  }
+  if (!stat.isDirectory()) return failure(inputPath, `Repo path is not a directory: ${inputPath}`);
+  try {
+    if (readdirSync(inputPath).length === 0) {
+      return failure(inputPath, `Repo path must point to a non-empty directory: ${inputPath}`);
+    }
+    return { path: realpathSync(inputPath), diagnostics: [] };
+  } catch (error) {
+    return failure(
+      inputPath,
+      `Unable to resolve repo path: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}
+
 export function discoverFeatures(projectRoot: string): {
   paths: string[];
   diagnostics: Diagnostic[];

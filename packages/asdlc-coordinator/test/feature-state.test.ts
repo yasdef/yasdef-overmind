@@ -7,7 +7,6 @@ import assert from "node:assert/strict";
 
 import {
   FEATURE_STATE_FILE_NAME,
-  LEGACY_FEATURE_STATE_FILE_NAME,
   readFeatureState,
   writeFeatureState
 } from "../src/state/index.js";
@@ -48,6 +47,17 @@ test("write persists an atomic JSON cache and read round-trips it", () => {
 
 test("missing cache is reported as missing without diagnostics", () => {
   withProject((root, project) => {
+    const result = readFeatureState(root, project);
+    assert.equal(result.state, "missing");
+    assert.equal(result.diagnostics.length, 0);
+  });
+});
+
+test("non-cache files do not count as a feature-state cache", () => {
+  withProject((root, project) => {
+    writeFileSync(path.join(project, ".project_add_feature_e2e_state.env"), "FEATURE_PATH=x\n");
+    writeFileSync(path.join(project, "notes.txt"), "not a cache\n");
+
     const result = readFeatureState(root, project);
     assert.equal(result.state, "missing");
     assert.equal(result.diagnostics.length, 0);
@@ -97,17 +107,6 @@ test("a cross-project feature path is treated as stale", () => {
       JSON.stringify({ featurePath: path.relative(root, otherFeature) })
     );
     assert.equal(readFeatureState(root, project).state, "stale");
-  });
-});
-
-test("legacy env state is ignored, not migrated", () => {
-  withProject((root, project) => {
-    writeFileSync(
-      path.join(project, LEGACY_FEATURE_STATE_FILE_NAME),
-      "FEATURE_PATH=projects/p/feature-a\n"
-    );
-    const result = readFeatureState(root, project);
-    assert.equal(result.state, "missing");
   });
 });
 

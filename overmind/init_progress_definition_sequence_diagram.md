@@ -1,7 +1,7 @@
 # Init Progress Definition
 
 Single source of truth (Mermaid embedded below).
-Operational note: `node .overmind/overmind.js run [--path projects/<project-id>]` runs the business requirements scaffold, resolves `feature_path`, evaluates selected-feature progress through the in-process sequencing core each run, then continues from the canonical next step (or `--resume <step>`). When `--path` is omitted, the command uses the only project under `projects/` or prompts the user to choose one. The last selected feature is cached in `projects/<project-id>/.overmind_feature_state.json`.
+Operational note: `node .overmind/overmind.js project init --path projects/<project-id>` owns init steps 1.1 and 2 through the TypeScript coordinator and generic executor. `node .overmind/overmind.js run [--path projects/<project-id>]` runs the business requirements scaffold, resolves `feature_path`, evaluates selected-feature progress through the in-process sequencing core each run, then continues from the canonical next step (or `--resume <step>`). When `--path` is omitted, the command uses the only project under `projects/` or prompts the user to choose one. The last selected feature is cached in `projects/<project-id>/.overmind_feature_state.json`.
 
 ```mermaid
 sequenceDiagram
@@ -23,7 +23,7 @@ sequenceDiagram
     alt Type A
       PO->>KB: 1.1 Request stack-family guidance per active class
       KB-->>PO: Stack-family options or unavailable
-      PO->>PO: 1.1 Approve stack-family blueprints → project_stack_blueprint_class.md
+      PO->>PO: 1.1 Approve stack-family blueprints via overmind project init → project_stack_blueprint_class.md
     else Type B/C
       PO->>PO: 1.1 skipped
     end
@@ -40,7 +40,7 @@ sequenceDiagram
       PO->>PO: 2.1 Read approved stack blueprints as context
     end
 
-    PO->>PO: 2.3 Common Contracts Definition → common_contract_definition.md
+    PO->>PO: 2.3 Common Contracts Definition via overmind project init → common_contract_definition.md
     Note over PO: Commit the project initialization baseline: init definition + applicable stack blueprints + common contract.
   end
 

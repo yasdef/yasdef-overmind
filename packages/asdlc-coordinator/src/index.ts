@@ -14,6 +14,7 @@ export * from "./sequencing/index.js";
 export * from "./state/index.js";
 export * from "./types/index.js";
 export * from "./validate/index.js";
+export * from "./workers/index.js";
 export * from "./workspace/index.js";
 
 export function getBundledOvermindPath(): string {

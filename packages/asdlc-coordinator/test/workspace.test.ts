@@ -9,6 +9,7 @@ import {
   discoverFeatures,
   discoverProjects,
   inferProjectFromFeature,
+  resolveRepoPath,
   resolveProjectPath
 } from "../src/workspace/index.js";
 
@@ -54,5 +55,23 @@ test("workspace data problems degrade to diagnostics", () => {
     const noRoot = detectRuntimeRoot(tmpdir());
     assert.equal(noRoot.path, undefined);
     assert.equal(noRoot.diagnostics.length, 1);
+  });
+});
+
+test("repo path resolver requires a non-empty directory and returns a canonical path", () => {
+  fixture((root) => {
+    const repo = path.join(root, "repos", "api");
+    const empty = path.join(root, "repos", "empty");
+    const file = path.join(root, "repos", "file.txt");
+    mkdirSync(repo, { recursive: true });
+    mkdirSync(empty, { recursive: true });
+    writeFileSync(path.join(repo, "README.md"), "repo\n");
+    writeFileSync(file, "not a directory\n");
+
+    assert.equal(resolveRepoPath("   ").path, undefined);
+    assert.equal(resolveRepoPath(path.join(root, "missing")).path, undefined);
+    assert.equal(resolveRepoPath(file).path, undefined);
+    assert.equal(resolveRepoPath(empty).path, undefined);
+    assert.equal(resolveRepoPath(repo).path, realpathSync(repo));
   });
 });

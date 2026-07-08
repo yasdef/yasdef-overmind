@@ -13,6 +13,8 @@ import {
   buildPrerequisiteGapsContext,
   buildRepoBrScanContext,
   buildRequirementsEarsContext,
+  buildCommonContractInitContext,
+  buildStackBlueprintContext,
   buildSurfaceMapContext,
   buildSurfaceMapEnrichContext,
   buildTaskToBrContext,
@@ -127,11 +129,15 @@ export const defaultStepExecutorDeps: StepExecutorDeps = {
       buildImplementationSlicesContext(featurePath, cwd),
     "prerequisite-gaps": (featurePath, cwd) => buildPrerequisiteGapsContext(featurePath, cwd),
     "implementation-plan": (featurePath, cwd) => buildImplementationPlanContext(featurePath, cwd),
-    "plan-semantic-review": (featurePath, cwd) => buildPlanSemanticReviewContext(featurePath, cwd)
+    "plan-semantic-review": (featurePath, cwd) => buildPlanSemanticReviewContext(featurePath, cwd),
+    "stack-blueprint": (projectPath, cwd, klass) =>
+      buildStackBlueprintContext(projectPath, klass!, cwd)
   },
   classListContext: {
     "contract-reconciliation": (projectPath, classes, cwd) =>
-      buildContractReconciliationContext(projectPath, classes, cwd)
+      buildContractReconciliationContext(projectPath, classes, cwd),
+    "common-contract": (projectPath, classes, cwd) =>
+      buildCommonContractInitContext(projectPath, classes, cwd)
   },
   sync: {
     "repo-br-scan": (featurePath, cwd) => syncRepoBrScanStep(featurePath, cwd),

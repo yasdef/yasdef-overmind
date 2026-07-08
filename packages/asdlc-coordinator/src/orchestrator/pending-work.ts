@@ -106,10 +106,8 @@ function initGuidance(stepId: string, stepName: string, projectPathRel: string):
     `Project init is incomplete: next required project step is ${stepId} (${stepName}).`,
     "overmind run starts at feature step 3 and cannot continue until earlier project steps are complete."
   ];
-  if (stepId === "1.1") {
-    lines.push("Run:", `  .commands/init_project_stack_blueprints.sh --path ${projectPathRel}`);
-  } else if (stepId === "2") {
-    lines.push("Run:", `  .commands/init_common_contract_definition.sh --path ${projectPathRel}`);
+  if (stepId === "1.1" || stepId === "2") {
+    lines.push("Run:", `  overmind project init --path ${projectPathRel}`);
   } else {
     lines.push(`Complete project step ${stepId} before rerunning overmind run.`);
   }

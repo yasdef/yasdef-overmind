@@ -155,6 +155,22 @@ export interface ProjectGitPort {
   commitOwnedPaths(root: string, paths: string[], message: string): CommitResult;
 }
 
+export type ProjectInitResult =
+  | { kind: "ok"; appliedFallbackName: boolean; appliedFallbackEmail: boolean }
+  | { kind: "unavailable" }
+  | { kind: "initFailed"; exitCode: number; stderr: string }
+  | { kind: "identityFailed"; field: "user.name" | "user.email"; exitCode: number; stderr: string }
+  | { kind: "stageFailed"; exitCode: number; stderr: string }
+  | { kind: "commitFailed"; exitCode: number; stderr: string };
+
+export interface ProjectInitGitPort {
+  initAndCommitDefinition(root: string, definitionFileName: string): ProjectInitResult;
+}
+
+export const PROJECT_INIT_COMMIT_MESSAGE = "Initialize ASDLC project workspace";
+export const PROJECT_GIT_FALLBACK_USER_NAME = "Overmind ASDLC";
+export const PROJECT_GIT_FALLBACK_USER_EMAIL = "overmind-asdlc@local.invalid";
+
 /** Parse `git status --porcelain` output into repo-relative paths (handles renames). */
 function parsePorcelainPaths(stdout: string): string[] {
   const paths: string[] = [];
@@ -226,5 +242,59 @@ export class RepoGitProjectAdapter implements ProjectGitPort {
     return remaining.length === 0
       ? { kind: "committed" }
       : { kind: "dirtyAfterCommit", paths: remaining };
+  }
+}
+
+export class RepoGitProjectInitAdapter implements ProjectInitGitPort {
+  constructor(private readonly run: GitRunner = defaultGitRunner) {}
+
+  private available(): boolean {
+    return this.run(".", ["--version"]).status === 0;
+  }
+
+  initAndCommitDefinition(root: string, definitionFileName: string): ProjectInitResult {
+    if (!this.available()) return { kind: "unavailable" };
+    const init = this.run(root, ["init", "-q"]);
+    if (init.status !== 0) {
+      return { kind: "initFailed", exitCode: init.status, stderr: init.stderr };
+    }
+
+    const nameProbe = this.run(root, ["config", "user.name"]);
+    let appliedFallbackName = false;
+    if (nameProbe.status !== 0 || nameProbe.stdout.trim() === "") {
+      const setName = this.run(root, ["config", "user.name", PROJECT_GIT_FALLBACK_USER_NAME]);
+      if (setName.status !== 0) {
+        return {
+          kind: "identityFailed",
+          field: "user.name",
+          exitCode: setName.status,
+          stderr: setName.stderr
+        };
+      }
+      appliedFallbackName = true;
+    }
+
+    const emailProbe = this.run(root, ["config", "user.email"]);
+    let appliedFallbackEmail = false;
+    if (emailProbe.status !== 0 || emailProbe.stdout.trim() === "") {
+      const setEmail = this.run(root, ["config", "user.email", PROJECT_GIT_FALLBACK_USER_EMAIL]);
+      if (setEmail.status !== 0) {
+        return {
+          kind: "identityFailed",
+          field: "user.email",
+          exitCode: setEmail.status,
+          stderr: setEmail.stderr
+        };
+      }
+      appliedFallbackEmail = true;
+    }
+
+    const add = this.run(root, ["add", "--", definitionFileName]);
+    if (add.status !== 0) return { kind: "stageFailed", exitCode: add.status, stderr: add.stderr };
+    const commit = this.run(root, ["commit", "-qm", PROJECT_INIT_COMMIT_MESSAGE]);
+    if (commit.status !== 0) {
+      return { kind: "commitFailed", exitCode: commit.status, stderr: commit.stderr };
+    }
+    return { kind: "ok", appliedFallbackName, appliedFallbackEmail };
   }
 }

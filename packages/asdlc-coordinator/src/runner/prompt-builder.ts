@@ -127,6 +127,48 @@ const PROMPT_RECIPES: Record<string, PromptRecipe> = {
       `  node ${bindings.overmindCliPath} gate contract-delta ${bindings.featurePath}`
     ]
   },
+  "stack-blueprint": {
+    intro: () => "Load and follow the overmind-stack-blueprint skill for this project class.",
+    runtimeBindings: (bindings) => [
+      `- ASDLC workspace root: ${bindings.runtimeRoot}`,
+      `- Current working directory for all commands: ${bindings.runtimeRoot}`,
+      `- Project path: ${bindings.featurePath}`,
+      `- Target class: ${bindings.targetClass ?? "<missing-class>"}`,
+      `- Target stack blueprint artifact: ${bindings.featurePath}/project_stack_blueprint_${bindings.targetClass ?? "<missing-class>"}.md`,
+      `- Overmind CLI: ${bindings.overmindCliPath}`
+    ],
+    requiredFlow: (bindings) => [
+      "- Load and follow the overmind-stack-blueprint skill.",
+      "- Assemble deterministic context with:",
+      `  node ${bindings.overmindCliPath} context stack-blueprint ${bindings.featurePath} --class ${bindings.targetClass ?? "<missing-class>"}`,
+      "- Use the exact gate command below when the skill tells you to validate:",
+      `  node ${bindings.overmindCliPath} gate stack-blueprint ${bindings.featurePath}/project_stack_blueprint_${bindings.targetClass ?? "<missing-class>"}.md`,
+      "- The model owns the gate loop; this orchestrator does not run the gate."
+    ]
+  },
+  "common-contract": {
+    intro: () => "Load and follow the overmind-common-contract skill for this project.",
+    runtimeBindings: (bindings) => [
+      `- ASDLC workspace root: ${bindings.runtimeRoot}`,
+      `- Current working directory for all commands: ${bindings.runtimeRoot}`,
+      `- Project path: ${bindings.featurePath}`,
+      `- Target common contract artifact: ${bindings.featurePath}/common_contract_definition.md`,
+      `- Overmind CLI: ${bindings.overmindCliPath}`
+    ],
+    requiredFlow: (bindings) => [
+      "- Load and follow the overmind-common-contract skill.",
+      "- Assemble deterministic context with:",
+      `  node ${bindings.overmindCliPath} context common-contract ${bindings.featurePath}${(
+        bindings.classes ?? []
+      )
+        .map((klass) => ` --class ${klass}`)
+        .join("")}`,
+      "- Write only common_contract_definition.md; never modify init_progress_definition.yaml, stack blueprints, or attached repos.",
+      "- Use the exact gate command below when the skill tells you to validate:",
+      `  node ${bindings.overmindCliPath} gate common-contract ${bindings.featurePath}`,
+      "- The model owns the gate loop; this orchestrator does not run the gate."
+    ]
+  },
   "surface-map": {
     intro: () => "Load and follow the overmind-surface-map skill for this feature and class.",
     runtimeBindings: (bindings) => [

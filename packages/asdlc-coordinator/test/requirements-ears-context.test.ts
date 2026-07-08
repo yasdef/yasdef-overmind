@@ -110,7 +110,7 @@ test("overmind context requirements-ears uses common usage and unknown-step erro
       encoding: "utf8"
     });
     assert.equal(missingArg.status, 2);
-    assert.match(missingArg.stderr, /ERROR: Usage: overmind context <step> <feature_path>/);
+    assert.match(missingArg.stderr, /ERROR: Usage: overmind context <step> <path>/);
 
     const unknown = spawnSync(
       process.execPath,

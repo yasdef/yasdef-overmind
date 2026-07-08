@@ -61,7 +61,9 @@ export const STEP_CATALOG: StepDefinition[] = [
     optional: false,
     perClass: true,
     resumeAliases: [],
-    actions: []
+    actions: [
+      session("stack-blueprint", "project_stack_blueprint", ["project_stack_blueprint_<class>.md"])
+    ]
   },
   {
     id: "2",
@@ -69,7 +71,11 @@ export const STEP_CATALOG: StepDefinition[] = [
     optional: false,
     perClass: false,
     resumeAliases: [],
-    actions: []
+    actions: [
+      session("common-contract", "common_contract_definition", ["common_contract_definition.md"], {
+        readOnlyGuards: contextGuard
+      })
+    ]
   },
   {
     id: "3",

@@ -19,27 +19,38 @@ npm test
 
 `npm run build` creates ignored `dist/` output under `packages/*/`, including `packages/asdlc-coordinator/dist/overmind.js`.
 
-## 3. Bootstrap Or Refresh ASDLC Workspace
+## 3. Bootstrap ASDLC Workspace
 
 From this repo root, after `npm install` and `npm run build`:
 
-```bash
-overmind/scripts/project_mgmt/project_setup_first_init_machine.sh
+```text
+npm run setup
 ```
 
-The setup stages `packages/asdlc-coordinator/dist/overmind.js` into the ASDLC workspace as `.overmind/overmind.js`, plus packaged skills into the supported runner skill directories. The current set includes `overmind-task-to-br`, `overmind-repo-br-scan`, `overmind-br-clarification`, `overmind-requirements-ears`, `overmind-ears-review`, `overmind-contract-delta`, and `overmind-contract-reconciliation`.
+The setup installs `packages/asdlc-coordinator/dist/overmind.js` into the ASDLC workspace as `.overmind/overmind.js`, plus packaged skills, runtime templates, setup defaults, `asdlc_metadata.yaml`, `projects/`, and generated `quickrun.md`.
 
 - `.overmind/overmind.js`
 - `.codex/skills/overmind-task-to-br/`
 - `.claude/skills/overmind-task-to-br/`
 - `.codex/skills/overmind-contract-delta/`
 - `.claude/skills/overmind-contract-delta/`
+- `.codex/skills/overmind-stack-blueprint/`
+- `.claude/skills/overmind-stack-blueprint/`
+- `.codex/skills/overmind-common-contract/`
+- `.claude/skills/overmind-common-contract/`
+- `.templates/init_progress_definition_TEMPLATE.yaml`
+- `.templates/feature_br_summary_TEMPLATE.md`
+- `.setup/models.md`
+- `.setup/external_sources.yaml`
+- `asdlc_metadata.yaml`
+- `projects/`
+- `quickrun.md`
 
 ## 4. Install Overmind Into A Runtime Project
 
 From the target project root:
 
-```bash
+```text
 node /path/to/yasdef-overmind/packages/installer/dist/src/bin/overmind.js init
 ```
 
@@ -50,6 +61,17 @@ This creates:
 - `.claude/skills/overmind-task-to-br/`
 - `.codex/skills/overmind-contract-delta/`
 - `.claude/skills/overmind-contract-delta/`
+- `.codex/skills/overmind-stack-blueprint/`
+- `.claude/skills/overmind-stack-blueprint/`
+- `.codex/skills/overmind-common-contract/`
+- `.claude/skills/overmind-common-contract/`
+- `.templates/init_progress_definition_TEMPLATE.yaml`
+- `.templates/feature_br_summary_TEMPLATE.md`
+- `.setup/models.md`
+- `.setup/external_sources.yaml`
+- `asdlc_metadata.yaml`
+- `projects/`
+- `quickrun.md`
 
 ## 5. Run Task-To-BR Helpers
 
@@ -78,7 +100,13 @@ The feature orchestrator runs `sync` before loading `overmind-contract-delta`; t
 
 ## 7. Run Project Reconciliation
 
-Project-level repo attachment and common-contract reconciliation are a separate command from the feature flow (`overmind run`). From the installed ASDLC workspace root:
+Project creation, repo attachment, and common-contract reconciliation use the bundled CLI. From the installed ASDLC workspace root, create a project with:
+
+```bash
+node .overmind/overmind.js project create
+```
+
+Project-level repo attachment and common-contract reconciliation are a separate command from the feature flow (`overmind run`):
 
 ```bash
 node .overmind/overmind.js project reconcile [--path <project>]
@@ -91,3 +119,24 @@ With no `--path`, project selection mirrors `overmind run`: a single project aut
 - For git-backed projects, requires a clean project worktree before mutating, restricts the reconciliation unit to `init_progress_definition.yaml` and `common_contract_definition.md`, rolls back on unexpected changes, and offers a `Commit reconciliation results? [y/N]` prompt that commits exactly those two files with message `Reconcile contract and attach repos`. Non-git projects reconcile without a commit prompt.
 
 `overmind run` refuses feature work while any class is deferred or ready-unreconciled and points at `overmind project reconcile --path <project>`. `contract_reconciled: true` is the sole completion source; legacy `.contract_reconciled_<class>` markers are ignored.
+
+Project init steps 1.1 and 2 run through the bundled CLI and TypeScript gates:
+
+```bash
+node .overmind/overmind.js project init --path projects/<project-id>
+node .overmind/overmind.js gate stack-blueprint projects/<project-id>/project_stack_blueprint_backend.md
+node .overmind/overmind.js gate common-contract projects/<project-id>
+```
+
+`project init` selects the next pending project init step. Type A projects run stack-blueprint sessions before the common-contract session; type B/C projects advance directly to the common-contract session.
+
+## 8. Register And Assign Workers
+
+From the installed ASDLC workspace root:
+
+```bash
+node .overmind/overmind.js worker register --path projects/<project-id>
+node .overmind/overmind.js worker assign --feature-path projects/<project-id>/<feature-folder>
+```
+
+Registration writes `projects/<project-id>/workers.yaml` and reports the generated worker UUID. Assignment rewrites `#### Assigned:` lines in the feature `implementation_plan.md`.

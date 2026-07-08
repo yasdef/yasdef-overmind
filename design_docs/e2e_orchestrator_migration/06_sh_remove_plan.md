@@ -1,11 +1,36 @@
 # E2E Orchestrator Migration — 6. Shell Removal Plan
 
-## Objective
+## Framing: this finishes the rewrite; it is not a compatibility migration
 
-Complete the repository-wide transition from shell orchestration to the existing TypeScript coordinator,
-packaged skills, and TypeScript installer. The end state has no versioned or package-staged `.sh` files.
+Overmind has never been installed. No persistent ASDLC workspace exists anywhere — not an
+operator install, not an internal one, not a developer one. There is nothing deployed to upgrade,
+no old shell setup that must stay runnable, and no backward-compatibility surface to protect.
 
-This plan starts from the current implementation and the contracts in:
+The remaining `.sh` files are the last scaffolding from the pre-TypeScript world. They are behavior
+*reference*, not a contract to reproduce line-for-line. We delete them and write the correct
+TypeScript in their place — the same way we would if this were code we had just written today and
+were now cleaning up.
+
+Three consequences shape the whole plan:
+
+- **No parity ceremony.** No "prove parity before deletion", no responsibility-inventory-as-blocking-gate,
+  no cross-slice parity gates, no monotonically shrinking transitional allow-list. Delete each shell
+  file when its TypeScript owner lands, and delete its shell test with it.
+- **No transitional shell to keep alive.** The feature orchestrator (CRP-144–149) is already
+  TypeScript; the surfaces below are standalone. Nothing consumes them at runtime, so there is no
+  ordering constraint imposed by "keep the e2e testable". Order is chosen for architectural cohesion,
+  not to keep old behavior running.
+- **The bar is architecture, not the shell.** The target is architecture-correct, best-practices
+  TypeScript aligned with `03_target_architecture.md` and `04_migration_plan.md` — exactly the standard
+  the already-migrated code holds. The spec of record is the **artifact contracts**
+  (`overmind/templates/init_progress_definition_TEMPLATE.yaml`, gate `0/1/2` semantics, per-class
+  templates and golden examples, project metadata/git fixtures), not the shell implementation. The
+  shell is a hint about intent; where it is awkward or accidental, we do the right thing instead of
+  copying it.
+
+## Inputs
+
+The end state reuses the contracts and already-migrated surfaces in:
 
 - `design_docs/e2e_orchestrator_migration/01_current_e2e_functional_inventory.md`
 - `design_docs/e2e_orchestrator_migration/02_responsibility_translation_map.md`
@@ -15,264 +40,206 @@ This plan starts from the current implementation and the contracts in:
 - `overmind/init_progress_definition_sequence_diagram.md`
 - `overmind/templates/init_progress_definition_TEMPLATE.yaml`
 
-`design_docs/e2e_orchestrator_migration/05_parity_reconciliation.md` and CRP-144 through CRP-149 are
-closed migration history, not inputs to the new slice specifications. Their implemented TypeScript
-surfaces remain the baseline and are reused.
+`05_parity_reconciliation.md` and CRP-144–149 are closed history. Their TypeScript surfaces
+(`workspace/`, `sequencing/`, `config/`, `runner/`, `orchestrator/`, `git/`, the generic executor,
+the skill/executor architecture) are the baseline this plan extends and reuses rather than
+re-derives. `.setup/models.md` keeps its pipe-table format and is loaded only through the existing
+typed `config/runner-config.ts`; no new runner-config format is introduced.
 
-The current `.setup/models.md` format remains unchanged. This effort moves every remaining consumer to
-the existing typed loader; it does not introduce another runner-config format.
+## What is left
 
-## Current shell inventory
+Two surface-map validators (`check_feature_repo_surface_and_exec_context_{be,fe}_quality.sh`) are
+already deleted — their sole owner is `validate/surface-map.ts`. That leaves **13 production shell
+files and 11 shell test suites**, in four architectural groups:
 
-There are 15 production shell files and 11 shell test suites.
-
-| Current shell file | Current responsibility | Target owner | Removal slice |
+| Shell file | Old responsibility | TypeScript owner (target) | Unit |
 |---|---|---|---|
-| `overmind/scripts/helper/check_feature_repo_surface_and_exec_context_be_quality.sh` | Unstaged backend surface-map validator with no production consumer | Existing `validate/surface-map.ts` | 0 |
-| `overmind/scripts/helper/check_feature_repo_surface_and_exec_context_fe_quality.sh` | Unstaged frontend/mobile surface-map validator with no production consumer | Existing `validate/surface-map.ts` | 0 |
-| `overmind/scripts/common_libs/check_implementation_plan_readiness.sh` | Assignment-time implementation-plan shape check | `validate/worker-assignment.ts` | 1 |
-| `overmind/scripts/feature_assing_workers.sh` | Resolve active workers and rewrite plan assignments | `workers/assignment.ts` plus `overmind worker assign` | 1 |
-| `overmind/scripts/project_mgmt/project_register_worker.sh` | Register one active class worker | `workers/registry.ts` plus `overmind worker register` | 1 |
-| `overmind/scripts/project_mgmt/project_setup_add_new_project.sh` | Create project metadata, definition, folder, and initial git commit | `capture/project.ts` plus `overmind project create` | 2 |
-| `overmind/scripts/project_mgmt/project_setup_update_project.sh` | Select a project and delegate attach/reconciliation | Existing `overmind project reconcile` | 2 |
-| `overmind/scripts/common_libs/project_setup_common.sh` | Project type labels, YAML escaping, and repo-path resolution | `capture/project.ts`, `parse/`, and `workspace/` | 2 |
-| `overmind/scripts/helper/check_project_stack_blueprint_quality.sh` | Stack-blueprint structural quality gate | `validate/stack-blueprint.ts` plus `overmind gate stack-blueprint` | 3 |
-| `overmind/scripts/helper/check_common_contract_definition_quality.sh` | Common-contract structural quality gate | Existing `validate/contract-reconciliation.ts`, exposed for initial common-contract generation | 3 |
-| `overmind/scripts/helper/check_cross_class_peer_trigger.sh` | Compute the cross-class peer trigger | Existing `repo/cross-class-peer-trigger.ts` | 3 |
-| `overmind/scripts/common_libs/class_repo_paths.sh` | Read and validate class repo paths | Existing `parse/project-definition.ts`, `repo/collect-ready-paths.ts`, and `repo/attach.ts` | 3 |
-| `overmind/scripts/init_project_stack_blueprints.sh` | Init step 1.1 model orchestration | `overmind-stack-blueprint` skill plus generic executor | 3 |
-| `overmind/scripts/init_common_contract_definition.sh` | Init step 2 model orchestration | `overmind-common-contract` skill plus generic executor | 3 |
-| `overmind/scripts/project_mgmt/project_setup_first_init_machine.sh` | Bootstrap/update deployment boundary and runtime asset staging | `packages/installer` | 4 |
+| `scripts/feature_assing_workers.sh` | Resolve active workers, rewrite plan assignments | `workers/assignment.ts` + `overmind worker assign` | A |
+| `scripts/project_mgmt/project_register_worker.sh` | Register one active class worker | `workers/registry.ts` + `overmind worker register` | A |
+| `scripts/common_libs/check_implementation_plan_readiness.sh` | Assignment-time plan-shape check | `validate/worker-assignment.ts` | A |
+| `scripts/project_mgmt/project_setup_add_new_project.sh` | Create project metadata, definition, folder, initial commit | `capture/project.ts` + `overmind project create` | B |
+| `scripts/project_mgmt/project_setup_update_project.sh` | Select project, delegate attach/reconcile | Existing `overmind project reconcile` | B |
+| `scripts/common_libs/project_setup_common.sh` | Type labels, YAML escaping, repo-path resolution | `capture/project.ts`, `parse/`, `workspace/` | B |
+| `scripts/init_project_stack_blueprints.sh` | Init step 1.1 model orchestration | `overmind-stack-blueprint` skill + generic executor | C |
+| `scripts/init_common_contract_definition.sh` | Init step 2 model orchestration | `overmind-common-contract` skill + generic executor | C |
+| `scripts/helper/check_project_stack_blueprint_quality.sh` | Stack-blueprint quality gate | `validate/stack-blueprint.ts` + `overmind gate stack-blueprint` | C |
+| `scripts/helper/check_common_contract_definition_quality.sh` | Common-contract quality gate | Existing `validate/contract-reconciliation.ts`, exposed for initial generation | C |
+| `scripts/helper/check_cross_class_peer_trigger.sh` | Cross-class peer trigger | Existing `repo/cross-class-peer-trigger.ts` | C |
+| `scripts/common_libs/class_repo_paths.sh` | Read/validate class repo paths | Existing `parse/project-definition.ts`, `repo/collect-ready-paths.ts`, `repo/attach.ts` | C |
+| `scripts/project_mgmt/project_setup_first_init_machine.sh` | Deployment boundary + runtime asset staging | `packages/installer` | D |
 
-The shell test suites move with the production behavior they cover:
+The 11 shell test suites are deleted with the code they cover. They are not ported scenario-for-scenario;
+each unit's TypeScript tests are written to specify correct behavior against the artifact contracts,
+consulting the shell suites only where they capture a genuine edge case worth keeping.
 
-| Shell test suite | TypeScript destination |
-|---|---|
-| `check_implementation_plan_readiness_tests.sh` | `packages/asdlc-coordinator/test/worker-assignment-validator.test.ts` |
-| `feature_assign_workers_to_implementation_plan_tests.sh` | `packages/asdlc-coordinator/test/worker-assignment.test.ts` and CLI tests |
-| `register_worker_tests.sh` | `packages/asdlc-coordinator/test/worker-registry.test.ts` and CLI tests |
-| `project_setup_update_project_tests.sh` | Existing and extended project-reconciliation CLI/flow tests |
-| `class_repo_paths_coherence_tests.sh` | Project-definition, ready-path, and attach/coherence tests |
-| `check_project_stack_blueprint_quality_tests.sh` | `packages/asdlc-coordinator/test/stack-blueprint-validator.test.ts` |
-| `check_common_contract_definition_quality_tests.sh` | Common-contract validator tests |
-| `check_cross_class_peer_trigger_tests.sh` | Cross-class peer trigger tests |
-| `init_project_stack_blueprints_tests.sh` | Project-init executor, context, prompt, and CLI tests |
-| `init_common_contract_definition_tests.sh` | Project-init executor, context, guard, git, and CLI tests |
-| `project_setup_asdlc_tests.sh` | `packages/installer/test/workspace-install.test.ts` |
+## Target end state (from `03_target_architecture.md`)
 
-## Target architecture
-
-### Runtime commands
-
-The staged `.overmind/overmind.js` bundle is the only runtime command implementation. It owns these
-remaining operator surfaces:
+**Runtime commands.** The staged `.overmind/overmind.js` bundle is the only runtime entrypoint. It
+gains the remaining operator verbs on top of the existing `run | status | scaffold | capture | context
+| gate | sync | readiness | project reconcile` dispatch:
 
 - `overmind project create` — deterministic project creation.
-- `overmind project init --path <project>` — project init steps 1.1 and 2 through the generic executor.
-- `overmind project reconcile --path <project>` — existing attach and reconciliation flow.
+- `overmind project init --path <project>` — init steps 1.1 and 2 via the generic executor.
 - `overmind worker register --path <project>` — deterministic worker registration.
 - `overmind worker assign --feature-path <feature>` — deterministic plan assignment.
-- Existing `overmind run`, `status`, `scaffold`, `capture`, `context`, `gate`, `sync`, and `readiness`
-  surfaces remain the feature-flow entrypoints.
 
-Each new verb and option must be declared in its slice requirement artifacts before implementation. CLI
-adapters collect arguments and render results; reusable coordinator modules own parsing, mutation, and
-validation.
+CLI adapters collect arguments and render typed results; reusable coordinator modules own parsing,
+mutation, and validation. Every new verb/option is declared in its unit's requirement artifacts.
 
-### Model-owned init steps
+**Model-owned init steps.** Init steps 1.1 and 2 adopt the same skill + generic-executor architecture
+already used by feature steps — no bespoke launchers. Step 1.1 uses a packaged `overmind-stack-blueprint`
+skill (once per applicable active class, class-specific template + golden example as assets, model runs
+`overmind gate stack-blueprint` until `0`). Step 2 uses a packaged `overmind-common-contract` skill
+(binds ready-repo evidence and applicable blueprints, writes only `common_contract_definition.md`,
+model runs the common-contract gate until `0`). Applicability, per-class expansion, model selection,
+read-only guards, required outputs, and commit policy are typed catalog/executor data;
+`StepDefinition.actions` becomes non-empty for these steps. `overmind project init` selects the next
+pending project-init step from `ProgressReport` — no hand-written step branches.
 
-Project init steps adopt the same skill/executor architecture already used by feature steps:
+**Deterministic primitives.** Project creation, worker registration, and worker assignment are pure
+coordinator primitives, not skills. Operator decisions go through `InteractionPort`; clock, UUID, and
+git use injected ports for deterministic tests. Line-oriented YAML/Markdown mutation preserves unrelated
+content; each primitive returns a typed result with diagnostics and changed paths, and the CLI does no
+output parsing.
 
-- Step 1.1 uses a packaged `overmind-stack-blueprint` skill. It runs once per applicable active class,
-  receives its class-specific template and golden example as skill assets, and invokes
-  `overmind gate stack-blueprint` itself until the gate returns `0`.
-- Step 2 uses a packaged `overmind-common-contract` skill. It binds ready repository evidence and any
-  applicable stack blueprints, writes only `common_contract_definition.md`, and invokes the TypeScript
-  common-contract gate itself until the gate returns `0`.
-- `StepDefinition.actions` becomes non-empty for the init steps that the coordinator executes. Project
-  type applicability, per-class expansion, model selection, read-only guards, required outputs, and
-  checkpoint/commit policy are typed catalog/executor data.
-- The top-level `overmind project init` flow selects the next pending project init step from
-  `ProgressReport`; it does not introduce hand-written step launch branches.
+**Installer.** `packages/installer` becomes the fresh-workspace deployment boundary. `overmind init`
+installs `.overmind/overmind.js`, packaged skills for every supported runner, the runtime templates
+deterministic creation needs, and `.setup/models.md` + `.setup/external_sources.yaml` defaults. Operator
+guidance is generated/copied without shell heredocs. Because nothing was ever deployed, this is a
+fresh-install boundary only — no upgrade path, no deployed-shell cleanup, no historical staging inventory.
 
-Any change to init step ownership must update both
-`overmind/init_progress_definition_sequence_diagram.md` and
-`overmind/templates/init_progress_definition_TEMPLATE.yaml` in the same slice.
+## Work units
 
-### Deterministic project and worker operations
+Five independent OpenSpec changes. Units A, B, and C are mutually independent and may land in any
+order; unit D lands last among the shell units because it owns the fresh-install boundary and the final
+zero-shell state; unit E touches no shell and may land at any time. Each shell unit lands
+architecture-correct TypeScript, deletes its shell (implementation **and** tests) in the same change,
+and leaves `npm run verify` green.
 
-Project creation, worker registration, and worker assignment are coordinator primitives rather than
-skills. Their operator decisions use `InteractionPort`; clock, UUID generation, and git use injected
-ports so tests remain deterministic.
+### Unit A / CRP-151 — Worker lifecycle
 
-Line-oriented YAML/Markdown mutation must preserve unrelated content. Each primitive returns a typed
-result containing diagnostics and changed paths; the CLI performs no output parsing.
+Move all worker registration and assignment into deterministic coordinator modules.
 
-### Installer and deployed layout
+- Add typed worker registry parse/mutation (`workers/registry.ts`), assignment (`workers/assignment.ts`),
+  and the assignment-time plan-shape validator (`validate/worker-assignment.ts`), kept distinct from the
+  full implementation-plan quality gate.
+- Add `overmind worker register --path <project>` and `overmind worker assign --feature-path <feature>`.
+- Behavior the artifact contracts require: worker-class validation, UUID uniqueness, active-worker
+  filtering, multi-worker selection, missing-worker error markers, and preservation of unrelated plan
+  content. Injected clock/UUID/interaction ports (the worker primitives perform no git work; the
+  git seam in "Deterministic primitives" applies to project creation in unit B).
+- Delete `feature_assing_workers.sh`, `project_register_worker.sh`,
+  `check_implementation_plan_readiness.sh`, and their three shell suites; remove their command staging.
+- Update `README.md`/`QUICKRUN.md` and generated quick-run guidance to the new worker verbs.
 
-`packages/installer` becomes the only bootstrap/update deployment boundary. Its `overmind init` flow
-preserves the existing bootstrap-versus-update behavior while installing:
+### Unit B / CRP-152 — Project lifecycle (create + reconcile-only update)
 
-- `.overmind/overmind.js`;
-- packaged skills for every supported runner;
-- the two runtime templates required by deterministic project/feature creation;
-- preserved `.setup/models.md` and `.setup/external_sources.yaml` defaults.
+Replace project-setup commands with coordinator project-lifecycle verbs.
 
-The installer owns an explicit manifest and explicit legacy tombstones. Updating an existing workspace
-removes every package-owned legacy `.commands/*.sh`, `common_libs/*.sh`, and `.helper/*.sh` file. It
-removes now-empty package-owned directories and preserves unmanaged operator files.
+- Add the deterministic project-creation primitive (`capture/project.ts`) and `overmind project create`.
+  Contract to preserve: project ID/name normalization, type selection, ordered class selection,
+  ready/deferred repo capture, canonical path validation, `asdlc_metadata.yaml` append,
+  definition-template population, project-folder creation, project git init with local-identity
+  fallback, and the initial commit. Injected clock/UUID/interaction/temp-fixture/git ports.
+- Make the existing `overmind project reconcile` the sole update path; fold any still-useful
+  project-selection/operator-guidance behavior from the update wrapper into it.
+- Absorb the reusable helpers from `project_setup_common.sh` (type labels, YAML escaping, repo-path
+  resolution) into `capture/project.ts`, `parse/`, and `workspace/` where they architecturally belong.
+- Delete `project_setup_add_new_project.sh`, `project_setup_update_project.sh`,
+  `project_setup_common.sh`, and the update shell suite; remove their staging.
+- Update `README.md`/`QUICKRUN.md` and generated guidance to the project verbs.
 
-Operator guidance is generated or copied by the installer without shell heredocs. Runtime docs contain
-only the bundled TypeScript CLI entrypoints.
+### Unit C / CRP-153 — Project init steps 1.1 and 2
 
-## Migration slices
-
-Each slice is an independent OpenSpec change with a spec commit and an implementation commit. A slice
-deletes a shell implementation and its shell tests only after its TypeScript replacement passes the same
-behavior inventory. `npm run verify` is green after every implementation commit.
-
-### Slice 0 / candidate CRP-150 — Remove unowned shell validators and freeze the inventory
-
-**Goal:** eliminate shell files that already have a TypeScript owner and establish the exact closure
-inventory for later slices.
-
-- Confirm the backend and frontend surface-map helper scripts have no production, packaged-skill, or
-  staging consumer.
-- Confirm `validate/surface-map.ts` is the only surface-map quality implementation used by installed
-  skills and CLI gates.
-- Delete the two unowned surface-map helper scripts.
-- Record all remaining package-owned deployed shell filenames in the installer migration manifest. This
-  manifest is the direct-upgrade cleanup contract used by Slice 4.
-- Add a repository inventory test that reports unexpected new `.sh` production files while allowing the
-  explicitly listed transitional files until their owning slice lands. The allow-list shrinks in every
-  later slice and must be empty in Slice 4.
-
-**Acceptance:** the two orphan validators are gone; no active command or skill references them; the
-transitional shell inventory is exact and executable as a test.
-
-### Slice 1 / candidate CRP-151 — Worker registration and assignment
-
-**Goal:** move all worker lifecycle behavior into deterministic coordinator modules.
-
-- Add typed worker registry parsing/mutation and worker assignment modules.
-- Add `overmind worker register --path <project>` and
-  `overmind worker assign --feature-path <feature>`.
-- Preserve worker class validation, UUID uniqueness, active-worker filtering, multi-worker selection,
-  assignment-time plan-shape validation, missing-worker error markers, and unrelated plan content.
-- Keep the assignment readiness contract separate from the full implementation-plan quality gate; port
-  exactly the current assignment-time checks.
-- Port all worker/readiness shell scenarios to TypeScript tests before deleting their shell suites.
-- Remove worker command staging and add their deployed filenames to the explicit installer tombstones.
-- Delete `feature_assing_workers.sh`, `project_register_worker.sh`, and
-  `check_implementation_plan_readiness.sh`.
-- Update active operator docs and generated quick-run guidance to the new worker verbs.
-
-**Acceptance:** worker registration and assignment run through `.overmind/overmind.js`; no worker behavior
-depends on `common_libs`; direct CLI, mutation, decline, invalid-input, and multi-worker scenarios pass.
-
-### Slice 2 / candidate CRP-152 — Project creation and reconciliation-only update path
-
-**Goal:** replace project setup commands with coordinator project lifecycle verbs.
-
-- Add a deterministic project-creation primitive and `overmind project create`.
-- Preserve project ID/name normalization, type selection, ordered class selection, ready/deferred repo
-  capture, canonical path validation, `asdlc_metadata.yaml` append, definition-template population,
-  project-folder creation, project git initialization, local identity fallback, and initial commit.
-- Use injected clock, UUID, interaction, filesystem temp fixtures, and git ports in tests.
-- Make `overmind project reconcile` the sole update path for deferred-repo attachment and reconciliation;
-  port any wrapper-only project-selection and operator-guidance scenarios that are still required.
-- Port project creation/update support functions from `project_setup_common.sh` into the owning TypeScript
-  modules.
-- Remove the three command/lib staging entries and add their deployed filenames to installer tombstones.
-- Delete `project_setup_add_new_project.sh`, `project_setup_update_project.sh`, and
-  `project_setup_common.sh`, plus the update shell test suite.
-- Update `README.md`, `QUICKRUN.md`, and generated guidance to the project CLI verbs.
-
-**Acceptance:** a new project can be created and later reconciled without `.commands`; metadata and git
-fixtures match the existing contracts; an old deployed wrapper is removable during update.
-
-### Slice 3 / candidate CRP-153 — Project init steps 1.1 and 2
-
-**Goal:** migrate the last model-session shell orchestrators and every remaining helper/common library.
+Migrate the last model-session shell orchestrators and every remaining helper/common library.
 
 - Package `overmind-stack-blueprint` and `overmind-common-contract` skills with their templates, golden
   examples, and concise normative instructions.
-- Add stack-blueprint and initial-common-contract context builders and gate dispatch.
-- Reuse the existing cross-class peer trigger and common-contract validator; add only the initial-contract
-  adapter/alias needed to preserve its target-path and exit-code contract.
-- Port the stack-blueprint quality helper to a deterministic TypeScript validator with stable gate exit
-  codes `0`, `1`, and `2`.
-- Extend the catalog and generic executor for project-scoped, per-class init actions. Load every model row
-  through `config/runner-config.ts`.
-- Add `overmind project init --path <project>` with project-type applicability and next-pending-step
-  selection from `ProgressReport`.
-- Preserve the current model prompt bindings, per-class template choice, ready-repo and blueprint evidence,
+- Port `check_project_stack_blueprint_quality.sh` to a deterministic `validate/stack-blueprint.ts` with
+  stable `0/1/2` gate exit codes. Reuse the existing `repo/cross-class-peer-trigger.ts` and the
+  common-contract validator, adding only the initial-contract adapter/alias needed to preserve its
+  target-path and exit-code contract. Fold `class_repo_paths.sh` into the existing
+  `parse/project-definition.ts`, `repo/collect-ready-paths.ts`, and `repo/attach.ts`.
+- Extend the catalog and generic executor for project-scoped, per-class init actions; load every model
+  row through `config/runner-config.ts`. Add `overmind project init --path <project>` with project-type
+  applicability and next-pending-step selection from `ProgressReport`.
+- Contract to preserve: model prompt bindings, per-class template choice, ready-repo/blueprint evidence,
   no-peer behavior, read-only blueprint guards during common-contract creation, required outputs, and
-  project initialization commit behavior.
-- Update `overmind run` pending-work guidance to name `overmind project init`.
-- Update the init sequence diagram and init progress definition template together. Replace the literal
+  project-init commit behavior. Update `overmind run` pending-work guidance to name `overmind project init`.
+- Update `overmind/init_progress_definition_sequence_diagram.md` and
+  `overmind/templates/init_progress_definition_TEMPLATE.yaml` together; replace the literal
   `.helper/check_project_stack_blueprint_quality.sh` completion text with the TypeScript gate contract.
-- Port the five affected helper/init/coherence shell suites to focused TypeScript tests, including prompt
-  capture and executor tests that prove the model owns the gate loop.
-- Remove both init command staging entries, all three helper staging entries, and the remaining command-lib
-  entry. Add deployed filenames to installer tombstones.
 - Delete `init_project_stack_blueprints.sh`, `init_common_contract_definition.sh`,
   `check_project_stack_blueprint_quality.sh`, `check_common_contract_definition_quality.sh`,
-  `check_cross_class_peer_trigger.sh`, and `class_repo_paths.sh`.
+  `check_cross_class_peer_trigger.sh`, `class_repo_paths.sh`, and their six shell suites; remove all
+  their staging. TypeScript tests must include prompt-capture and executor tests proving the model owns
+  the gate loop.
 
-**Acceptance:** project init completes through skills plus the generic executor; `.setup/models.md` has no
-shell consumer; `.helper` and `common_libs` contain no package-managed runtime files; all gate and init
-tests are TypeScript.
+### Unit D / CRP-154 — Installer cutover and zero-shell closure
 
-### Slice 4 / candidate CRP-154 — TypeScript installer cutover and zero-shell closure
+Remove the final shell deployment boundary and all shell test infrastructure.
 
-**Goal:** remove the final shell deployment boundary and all shell test infrastructure.
+- Extend `packages/installer` from skill-only installation to complete fresh ASDLC workspace bootstrap:
+  runtime CLI, skill manifest, runtime templates, setup defaults, quick-run content, and the exact
+  support-asset manifest under installer ownership. Preserve required-source validation, executable CLI
+  installation, byte-for-byte skill installation, and generated guidance.
+- Write fresh-bootstrap installer tests (skill fan-out, CLI execution, generated guidance). Because
+  nothing was ever deployed, there is no upgrade/cleanup/injected-`ASDLC_PROJECTS_DIR` behavior to carry.
+- Add the source-repo setup invocation to `package.json`; update `README.md`, `QUICKRUN.md`, and
+  `AGENTS.md` to TypeScript/npm commands only.
+- Delete `project_setup_first_init_machine.sh` and `project_setup_asdlc_tests.sh`; remove all shell
+  staging code, `.commands`/`.helper`/`common_libs` creation, and root `test:shell` wiring. Remove
+  `tests/ai_scripts/` once empty.
+- Add a single end-state zero-shell assertion over versioned files and packaged assets (this replaces
+  the transitional inventory guard entirely — there is no longer a set of "allowed" shell files to track).
 
-- Extend `packages/installer` from skill-only installation to complete ASDLC workspace bootstrap/update.
-- Package the runtime CLI, skill manifest, runtime templates, setup defaults, quick-run content, exact
-  support-asset manifest, and legacy tombstones under installer ownership.
-- Preserve bootstrap/update detection, required-source validation, executable CLI installation,
-  byte-for-byte skill refresh, preserved operator-edited setup files, added-file notices, and exact managed
-  asset cleanup.
-- Add direct-upgrade tests from a pre-cutover workspace containing every legacy staged shell command,
-  helper, and common lib. Assert all tombstoned files are removed, still-supported runtime assets are
-  refreshed, and unmanaged operator files are preserved.
-- Port `project_setup_asdlc_tests.sh` to installer tests covering bootstrap, update, partial repair, stale
-  asset removal, skill fan-out, CLI execution, and generated guidance.
-- Add the source-repository setup invocation to `package.json` and update `README.md`, `QUICKRUN.md`, and
-  `AGENTS.md` to use TypeScript/npm commands only.
-- Delete `project_setup_first_init_machine.sh` and `project_setup_asdlc_tests.sh`.
-- Remove shell staging code, injected `ASDLC_PROJECTS_DIR` rewriting, `.commands` creation, `.helper`
-  creation, `common_libs` creation, and root `test:shell` wiring.
-- Replace the transitional inventory assertion with a hard zero-shell assertion over versioned files and
-  packaged assets.
+### Unit E / CRP-155 — Remove back-compat residue from the prior migration
 
-**Acceptance:** fresh bootstrap and direct update both work through `packages/installer`; the repository
-and package payload contain no `.sh`; `npm run verify` runs only TypeScript and Node-based tests.
+The e2e sh→TS migration (CRP-144–149) is otherwise clean, but two pieces of the same "recognize the old
+thing to keep compatibility" reflex leaked into the TypeScript. Applying the same fresh-install lens —
+nothing was ever installed, so there is no prior state and no prior caller to stay compatible with —
+both are dead ceremony and are deleted. This unit is independent of the shell files and may land in any
+order; it is listed here so the effort closes with zero back-compat residue, not just zero shell.
 
-## Cross-slice parity gates
+- **Retired shell `.env` feature-state cache.** `packages/asdlc-coordinator/src/state/feature-state.ts`
+  exports `LEGACY_FEATURE_STATE_FILE_NAME` (`.project_add_feature_e2e_state.env`) "recognized only to be
+  ignored", and `packages/asdlc-coordinator/test/feature-state.test.ts` has a
+  `"legacy env state is ignored, not migrated"` scenario that writes that file and asserts it is ignored.
+  Ignoring is already the default — production `readFeatureState` only reads
+  `.overmind_feature_state.json` and never references the constant — so both the constant and the test
+  only mean something if old `.env` files exist to be ignored, and none do (decision 4 in
+  `03_target_architecture.md ## Decisions`: the old `.env` is simply ignored, a run re-asks feature
+  selection once). Delete the exported constant and the dedicated test scenario.
+- **`InstallResult.skillPath` compatibility field.** `packages/installer/src/init.ts` keeps a singular
+  `skillPath` (the Claude `overmind-task-to-br` path) alongside `skillPaths[]` "retained from CRP-129",
+  wired through `packages/installer/src/bin/overmind.ts` (`Installed skill to <one path>`) and asserted
+  in `packages/installer/test/init.test.ts`. It is an internal interface that was never shipped, so no
+  caller depends on it, and the single-path CLI message is a vestige of an installer that now fans out
+  many skills. Drop the field, update the CLI to report the installed skills from `skillPaths`, and drop
+  the stale test assertion.
 
-Every removal slice must build a responsibility inventory from the shell implementation and its tests
-before deletion. The inventory resolves each behavior to one of:
+**Acceptance:** `LEGACY_FEATURE_STATE_FILE_NAME` and `InstallResult.skillPath` no longer exist; the CLI
+install output is derived from `skillPaths`; `npm run verify` is green. (The `technical-requirements.ts`
+section-6 "retired loose-entry format" reject rule is deliberately **kept** — it is a model-mistake
+guardrail, not deployment back-compat, and is not in scope here.)
 
-- a named TypeScript module and test;
-- a named skill instruction plus deterministic TypeScript context/gate contract;
-- a recorded behavior retirement approved in that slice's requirement artifacts.
+## Architecture invariants
 
-The following invariants block shell deletion when unresolved:
+These are quality rules the TypeScript must satisfy — not compatibility obligations. They hold in every
+unit:
 
-1. Deterministic validation remains executable and keeps stable `0/1/2` gate semantics where the model
-   consumes it.
-2. The model invokes and repairs against gates; coordinator orchestrators bind gate commands but do not
-   execute model-owned quality loops.
-3. Runtime mutation remains in typed coordinator/installer functions, not skill prose.
-4. Project, runtime-root, and class-repository git operations retain their distinct repository scopes.
-5. Existing deployed workspaces have a tested direct-upgrade path that removes package-owned shell files.
-6. Shell tests are deleted only in the slice that lands their TypeScript replacement.
+1. Deterministic validators the model consumes keep stable `0/1/2` gate semantics.
+2. The model invokes and repairs against gates; coordinator orchestrators bind gate commands but never
+   run the model-owned quality loop, and no unit introduces a bespoke launcher — new sessions are catalog
+   entries executed by the generic executor.
+3. Runtime mutation lives in typed coordinator/installer functions, never in skill prose, and preserves
+   unrelated file content (fixture-based byte-preservation assertions on every untouched block).
+4. Project, runtime-root, and class-repository git operations keep their distinct repository scopes.
+5. Skills carry prose + assets only; parsing, mutation, and gates are TypeScript.
 
-## Verification by slice
+## Verification
 
-Run the narrow package tests first, followed by:
+Per unit, narrow package tests first, then:
 
 ```text
 npm run typecheck
@@ -284,8 +251,7 @@ npm run verify
 git diff --check
 ```
 
-Before deleting any staged shell file, run an installer direct-upgrade fixture containing that filename.
-After Slice 4, run a repository/package scan equivalent to:
+At the end of unit D:
 
 ```text
 git ls-files '*.sh'
@@ -297,33 +263,15 @@ Both outputs must be empty.
 ## Definition of done
 
 1. No versioned source, test, skill asset, installer payload, or generated package asset has a `.sh`
-   filename.
-2. Fresh and updated ASDLC workspaces receive no package-managed shell command, helper, or common library.
-3. Direct update removes every known package-owned legacy `.sh` while preserving unmanaged operator files.
-4. Project creation, project init, project reconciliation, worker registration, worker assignment, feature
-   orchestration, status, scaffold, context, gates, sync, and readiness are TypeScript CLI/core surfaces.
-5. Init steps 1.1 and 2 run through packaged skills, the generic executor, typed runner config, deterministic
-   guards, and TypeScript gates.
-6. Every former shell test scenario has a named TypeScript owner or an approved retirement in its removal
-   slice; `tests/ai_scripts/` and `test:shell` are removed when empty.
-7. `overmind/init_progress_definition_sequence_diagram.md` and
-   `overmind/templates/init_progress_definition_TEMPLATE.yaml` describe the shipped project-init ownership
-   and completion commands.
-8. `README.md`, `QUICKRUN.md`, generated quick-run guidance, and `AGENTS.md` contain no active shell
-   invocation.
-9. `npm run verify` and installer fresh-install/direct-upgrade tests are green with
-   `packages/asdlc-coordinator` runtime dependencies still empty.
-
-## Main risks and controls
-
-- **Bootstrap cutover:** removing the setup shell too early would strand existing workspaces. Keep it until
-  the installer has fresh-bootstrap and direct-upgrade parity, then delete both paths in Slice 4.
-- **Project YAML preservation:** project creation and worker operations rewrite structured text. Use
-  fixture-based byte-preservation assertions for every unrelated block.
-- **Init-step semantic drift:** the two remaining init scripts combine prompts, model bindings, gates,
-  read-only guards, and git behavior. Port their responsibility inventories before writing the skills and
-  require prompt/gate/guard tests before deletion.
-- **Destructive deployed cleanup:** `.commands` and `common_libs` may contain operator files. Remove only
-  explicit package-owned tombstones and remove directories only when empty.
-- **CLI packaging ambiguity:** source-repository installer invocation and deployed `.overmind/overmind.js`
-  invocation occur in different locations. Document and test both exact commands in the installer slice.
+   filename; `tests/ai_scripts/` and `test:shell` are gone.
+2. Fresh ASDLC workspaces receive no package-managed shell command, helper, or common library.
+3. Project creation, project init, project reconcile, worker registration, worker assignment, and the
+   existing feature/status/scaffold/context/gate/sync/readiness surfaces are all TypeScript CLI/core.
+4. Init steps 1.1 and 2 run through packaged skills, the generic executor, typed runner config,
+   deterministic guards, and TypeScript gates.
+5. `overmind/init_progress_definition_sequence_diagram.md` and
+   `overmind/templates/init_progress_definition_TEMPLATE.yaml` describe the shipped project-init
+   ownership and completion commands; `README.md`, `QUICKRUN.md`, generated guidance, and `AGENTS.md`
+   contain no active shell invocation.
+6. `npm run verify` and the installer fresh-install tests are green, with `packages/asdlc-coordinator`
+   runtime `dependencies` still empty.
