@@ -7,16 +7,17 @@ import {
   renameSync,
   rmSync,
   statSync,
+  symlinkSync,
   writeFileSync
 } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { installProject } from "../src/index.js";
+import { classifyInstallTarget, installProject, resolveInstallTarget } from "../src/index.js";
 
 // Mirror init.ts packageRoot(): from dist/test/init.test.js up to packages/installer.
 function packageRoot(): string {
@@ -41,8 +42,21 @@ function installerBinPath(): string {
   return path.resolve(moduleDir, "..", "src", "bin", "overmind.js");
 }
 
+function bundledCliPath(): string {
+  return path.resolve(packageRoot(), "..", "asdlc-coordinator", "dist", "overmind.js");
+}
+
 function withProject(fn: (root: string) => void): void {
   const root = mkdtempSync(path.join(tmpdir(), "overmind-init-"));
+  try {
+    fn(root);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+function withTempRoot(fn: (root: string) => void): void {
+  const root = mkdtempSync(path.join(tmpdir(), "overmind-target-"));
   try {
     fn(root);
   } finally {
@@ -143,6 +157,14 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function runInstallerBin(cwd: string, input: string, args = ["init"]) {
+  return spawnSync(process.execPath, [installerBinPath(), ...args], {
+    cwd,
+    input,
+    encoding: "utf8"
+  });
+}
+
 function listShellFiles(root: string, options: { prune?: Set<string> } = {}): string[] {
   const found: string[] = [];
   if (!existsSync(root)) return found;
@@ -158,6 +180,80 @@ function listShellFiles(root: string, options: { prune?: Set<string> } = {}): st
   }
   return found;
 }
+
+test("classifyInstallTarget identifies clean installs, updates, and refused targets", () => {
+  withTempRoot((root) => {
+    const missing = path.join(root, "missing");
+    assert.deepEqual(classifyInstallTarget(missing), { kind: "clean-install" });
+
+    const empty = path.join(root, "empty");
+    mkdirSync(empty);
+    assert.deepEqual(classifyInstallTarget(empty), { kind: "clean-install" });
+
+    const metadataOnly = path.join(root, "metadata-only");
+    mkdirSync(metadataOnly);
+    writeFileSync(path.join(metadataOnly, "asdlc_metadata.yaml"), "projects:\n");
+    assert.deepEqual(classifyInstallTarget(metadataOnly), { kind: "update" });
+
+    const populatedWorkspace = path.join(root, "populated-workspace");
+    mkdirSync(populatedWorkspace);
+    writeFileSync(path.join(populatedWorkspace, "asdlc_metadata.yaml"), "projects:\n");
+    mkdirSync(path.join(populatedWorkspace, "projects"));
+    assert.deepEqual(classifyInstallTarget(populatedWorkspace), { kind: "update" });
+
+    const nonWorkspace = path.join(root, "non-workspace");
+    mkdirSync(nonWorkspace);
+    writeFileSync(path.join(nonWorkspace, "notes.txt"), "keep\n");
+    assert.deepEqual(classifyInstallTarget(nonWorkspace), { kind: "refuse-not-empty" });
+
+    const fileTarget = path.join(root, "target-file");
+    writeFileSync(fileTarget, "not a directory\n");
+    assert.deepEqual(classifyInstallTarget(fileTarget), { kind: "refuse-not-directory" });
+
+    const emptySymlinkTarget = path.join(root, "empty-symlink-target");
+    const emptySymlink = path.join(root, "empty-symlink");
+    mkdirSync(emptySymlinkTarget);
+    symlinkSync(emptySymlinkTarget, emptySymlink);
+    assert.deepEqual(classifyInstallTarget(emptySymlink), { kind: "clean-install" });
+
+    const workspaceSymlinkTarget = path.join(root, "workspace-symlink-target");
+    const workspaceSymlink = path.join(root, "workspace-symlink");
+    mkdirSync(workspaceSymlinkTarget);
+    writeFileSync(path.join(workspaceSymlinkTarget, "asdlc_metadata.yaml"), "projects:\n");
+    symlinkSync(workspaceSymlinkTarget, workspaceSymlink);
+    assert.deepEqual(classifyInstallTarget(workspaceSymlink), { kind: "update" });
+
+    const fileSymlink = path.join(root, "file-symlink");
+    symlinkSync(fileTarget, fileSymlink);
+    assert.deepEqual(classifyInstallTarget(fileSymlink), { kind: "refuse-not-directory" });
+
+    const danglingSymlink = path.join(root, "dangling-symlink");
+    symlinkSync(path.join(root, "missing-real-target"), danglingSymlink);
+    assert.deepEqual(classifyInstallTarget(danglingSymlink), { kind: "refuse-not-directory" });
+  });
+});
+
+test("resolveInstallTarget expands home and resolves relative paths against the invoking cwd", () => {
+  withTempRoot((root) => {
+    assert.equal(resolveInstallTarget("~"), homedir());
+    assert.equal(resolveInstallTarget("~/workspace"), path.join(homedir(), "workspace"));
+    assert.equal(
+      resolveInstallTarget("relative/workspace", root),
+      path.join(root, "relative", "workspace")
+    );
+  });
+});
+
+test("resolveInstallTarget rejects unsupported leading-tilde paths", () => {
+  assert.throws(() => resolveInstallTarget("~junk-workspace-test"), /Unsupported home path syntax/);
+  assert.throws(() => resolveInstallTarget("~user/asdlc"), /Unsupported home path syntax/);
+});
+
+test("installProject requires an explicit target directory", () => {
+  const installWithoutTarget = installProject as unknown as () => ReturnType<typeof installProject>;
+
+  assert.throws(() => installWithoutTarget(), /requires an explicit projectRoot/);
+});
 
 for (const missing of ["SKILL.md", "assets"] as const) {
   test(`installProject writes no runner targets when overmind-plan-semantic-review ${missing} is missing`, () => {
@@ -402,17 +498,220 @@ test("generated quickrun and install-bin output name TypeScript commands only", 
     }
     assert.doesNotMatch(quickrun, /\.sh\b/);
 
-    const output = spawnSync(process.execPath, [installerBinPath(), "init"], {
-      cwd: root,
-      encoding: "utf8"
-    });
+    const output = runInstallerBin(root, `${root}\n`);
     assert.equal(output.status, 0);
-    assert.match(output.stdout, /Overmind workspace bootstrap complete\./);
+    assert.match(output.stdout, new RegExp(`Overmind workspace updated: ${escapeRegExp(root)}`));
     assert.match(output.stdout, /CLI: \.overmind\/overmind\.js/);
     assert.match(output.stdout, /Runtime templates:/);
     assert.match(output.stdout, /Setup defaults:/);
     assert.match(output.stdout, /Quick run: quickrun\.md/);
     assert.doesNotMatch(output.stdout, /\.sh\b/);
+    assert.equal(output.stderr, "");
+  });
+});
+
+test("overmind init prompt installs at answered path instead of the child cwd", () => {
+  withTempRoot((root) => {
+    const childCwd = path.join(root, "child-cwd");
+    const target = path.join(root, "answered-workspace");
+    mkdirSync(childCwd);
+
+    const output = runInstallerBin(childCwd, `${target}\n`);
+
+    assert.equal(output.status, 0);
+    assert.match(output.stdout, /ASDLC workspace path:/);
+    assert.match(
+      output.stdout,
+      new RegExp(`Overmind workspace bootstrapped: ${escapeRegExp(target)}`)
+    );
+    assert.equal(existsSync(path.join(target, ".overmind", "overmind.js")), true);
+    assert.equal(existsSync(path.join(target, "asdlc_metadata.yaml")), true);
+    assert.deepEqual(readdirSync(childCwd), []);
+    assert.equal(output.stderr, "");
+  });
+});
+
+test("overmind init rejects extra arguments with usage and no prompt", () => {
+  withTempRoot((root) => {
+    const target = path.join(root, "should-not-be-read");
+
+    const output = runInstallerBin(root, `${target}\n`, ["init", target]);
+
+    assert.equal(output.status, 2);
+    assert.equal(output.stdout, "");
+    assert.match(output.stderr, /ERROR: Usage: overmind init/);
+    assert.equal(existsSync(target), false);
+  });
+});
+
+test("overmind init validates package payload before creating a missing target", () => {
+  withTempRoot((root) => {
+    const target = path.join(root, "missing-target");
+    const cliPath = bundledCliPath();
+    const backup = `${cliPath}.bak`;
+    renameSync(cliPath, backup);
+    try {
+      const output = runInstallerBin(root, `${target}\n`);
+
+      assert.equal(output.status, 2);
+      assert.match(output.stderr, /Bundled overmind CLI not found/);
+      assert.equal(existsSync(target), false);
+    } finally {
+      renameSync(backup, cliPath);
+    }
+  });
+});
+
+test("overmind init refuses file targets without writing", () => {
+  withTempRoot((root) => {
+    const target = path.join(root, "target-file");
+    writeFileSync(target, "operator file\n");
+
+    const output = runInstallerBin(root, `${target}\n`);
+
+    assert.equal(output.status, 2);
+    assert.match(output.stderr, new RegExp(`non-directory target: ${escapeRegExp(target)}`));
+    assert.equal(readFileSync(target, "utf8"), "operator file\n");
+  });
+});
+
+test("overmind init refuses dangling symlink targets without raw mkdir errors", () => {
+  withTempRoot((root) => {
+    const target = path.join(root, "dangling-symlink");
+    symlinkSync(path.join(root, "missing-real-target"), target);
+
+    const output = runInstallerBin(root, `${target}\n`);
+
+    assert.equal(output.status, 2);
+    assert.match(output.stderr, new RegExp(`non-directory target: ${escapeRegExp(target)}`));
+    assert.doesNotMatch(output.stderr, /EEXIST/);
+  });
+});
+
+test("overmind init installs through a symlink to an empty directory", () => {
+  withTempRoot((root) => {
+    const realTarget = path.join(root, "real-workspace");
+    const linkTarget = path.join(root, "linked-workspace");
+    mkdirSync(realTarget);
+    symlinkSync(realTarget, linkTarget);
+
+    const output = runInstallerBin(root, `${linkTarget}\n`);
+
+    assert.equal(output.status, 0);
+    assert.match(
+      output.stdout,
+      new RegExp(`Overmind workspace bootstrapped: ${escapeRegExp(linkTarget)}`)
+    );
+    assert.equal(existsSync(path.join(realTarget, ".overmind", "overmind.js")), true);
+    assert.equal(existsSync(path.join(realTarget, "asdlc_metadata.yaml")), true);
+  });
+});
+
+test("overmind init blank or closed input exits zero and writes nothing", () => {
+  withTempRoot((root) => {
+    const blankCwd = path.join(root, "blank-cwd");
+    const closedCwd = path.join(root, "closed-cwd");
+    mkdirSync(blankCwd);
+    mkdirSync(closedCwd);
+
+    const blank = runInstallerBin(blankCwd, "\n");
+    assert.equal(blank.status, 0);
+    assert.match(blank.stdout, /No ASDLC workspace target selected; nothing installed\./);
+    assert.deepEqual(readdirSync(blankCwd), []);
+    assert.equal(blank.stderr, "");
+
+    const closed = runInstallerBin(closedCwd, "");
+    assert.equal(closed.status, 0);
+    assert.match(closed.stdout, /No ASDLC workspace target selected; nothing installed\./);
+    assert.deepEqual(readdirSync(closedCwd), []);
+    assert.equal(closed.stderr, "");
+  });
+});
+
+test("overmind init refuses non-empty non-workspace answers without writing", () => {
+  withTempRoot((root) => {
+    const childCwd = path.join(root, "child-cwd");
+    const target = path.join(root, "non-workspace");
+    mkdirSync(childCwd);
+    mkdirSync(target);
+    writeFileSync(path.join(target, "notes.txt"), "operator data\n");
+
+    const output = runInstallerBin(childCwd, `${target}\n`);
+
+    assert.equal(output.status, 2);
+    assert.match(
+      output.stderr,
+      new RegExp(`non-empty non-workspace directory: ${escapeRegExp(target)}`)
+    );
+    assert.deepEqual(readdirSync(target), ["notes.txt"]);
+    assert.equal(readFileSync(path.join(target, "notes.txt"), "utf8"), "operator data\n");
+    assert.equal(existsSync(path.join(target, ".overmind")), false);
+  });
+});
+
+test("overmind init rejects unsupported leading-tilde answers without writing", () => {
+  withTempRoot((root) => {
+    const childCwd = path.join(root, "child-cwd");
+    mkdirSync(childCwd);
+
+    const output = runInstallerBin(childCwd, "~junk-workspace-test\n");
+
+    assert.equal(output.status, 2);
+    assert.match(output.stderr, /Unsupported home path syntax: ~junk-workspace-test/);
+    assert.deepEqual(readdirSync(childCwd), []);
+    assert.equal(existsSync(path.join(childCwd, "~junk-workspace-test")), false);
+  });
+});
+
+test("overmind init prompt reports update for an existing workspace", () => {
+  withProject((root) => {
+    installProject(root);
+
+    const output = runInstallerBin(path.dirname(root), `${root}\n`);
+
+    assert.equal(output.status, 0);
+    assert.match(output.stdout, new RegExp(`Overmind workspace updated: ${escapeRegExp(root)}`));
+    assert.equal(output.stderr, "");
+  });
+});
+
+test("overmind init prompt update refreshes payload and preserves operator-owned files", () => {
+  withProject((root) => {
+    installProject(root);
+    const customModels = "task_to_br | codex | custom-update-model\n";
+    const customSources = "sources:\n  - name: update-kb\n    type: stack_knowledge_base\n";
+    const customMetadata = "meta:\n  version: update-custom\nprojects:\n  - project: kept\n";
+    const projectFile = path.join(root, "projects", "kept", "notes.md");
+    const staleSkillFile = path.join(root, ".codex", "skills", "overmind-task-to-br", "stale.txt");
+    mkdirSync(path.dirname(projectFile), { recursive: true });
+    writeFileSync(path.join(root, ".setup", "models.md"), customModels);
+    writeFileSync(path.join(root, ".setup", "external_sources.yaml"), customSources);
+    writeFileSync(path.join(root, "asdlc_metadata.yaml"), customMetadata);
+    writeFileSync(projectFile, "operator project content\n");
+    writeFileSync(staleSkillFile, "stale package file\n");
+    writeFileSync(
+      path.join(root, ".templates", "feature_br_summary_TEMPLATE.md"),
+      "stale template\n"
+    );
+    writeFileSync(path.join(root, "quickrun.md"), "stale quickrun\n");
+
+    const output = runInstallerBin(path.dirname(root), `${root}\n`);
+
+    assert.equal(output.status, 0);
+    assert.match(output.stdout, new RegExp(`Overmind workspace updated: ${escapeRegExp(root)}`));
+    assert.equal(readFileSync(path.join(root, ".setup", "models.md"), "utf8"), customModels);
+    assert.equal(
+      readFileSync(path.join(root, ".setup", "external_sources.yaml"), "utf8"),
+      customSources
+    );
+    assert.equal(readFileSync(path.join(root, "asdlc_metadata.yaml"), "utf8"), customMetadata);
+    assert.equal(readFileSync(projectFile, "utf8"), "operator project content\n");
+    assert.equal(existsSync(staleSkillFile), false);
+    assert.equal(
+      readFileSync(path.join(root, ".templates", "feature_br_summary_TEMPLATE.md"), "utf8"),
+      readFileSync(packagedTemplateSourcePath("feature_br_summary_TEMPLATE.md"), "utf8")
+    );
+    assert.match(readFileSync(path.join(root, "quickrun.md"), "utf8"), /# ASDLC Quick Run/);
     assert.equal(output.stderr, "");
   });
 });

@@ -1,4 +1,15 @@
-import { chmodSync, cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  cpSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync
+} from "node:fs";
+import { homedir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -49,7 +60,67 @@ export interface InstallResult {
   quickrunPath: string;
 }
 
-export function installProject(projectRoot = process.cwd()): InstallResult {
+export type InstallTargetClassification =
+  | { kind: "clean-install" }
+  | { kind: "update" }
+  | { kind: "refuse-not-empty" }
+  | { kind: "refuse-not-directory" };
+
+export function classifyInstallTarget(targetPath: string): InstallTargetClassification {
+  let pathEntryStat: ReturnType<typeof lstatSync>;
+  try {
+    pathEntryStat = lstatSync(targetPath);
+  } catch (error) {
+    if (isNodeError(error) && error.code === "ENOENT") {
+      return { kind: "clean-install" };
+    }
+    throw error;
+  }
+
+  let targetStat = pathEntryStat;
+  if (pathEntryStat.isSymbolicLink()) {
+    try {
+      targetStat = statSync(targetPath);
+    } catch (error) {
+      if (isNodeError(error) && error.code === "ENOENT") {
+        return { kind: "refuse-not-directory" };
+      }
+      throw error;
+    }
+  }
+
+  if (!targetStat.isDirectory()) {
+    return { kind: "refuse-not-directory" };
+  }
+
+  if (existsSync(path.join(targetPath, "asdlc_metadata.yaml"))) {
+    return { kind: "update" };
+  }
+
+  return readdirSync(targetPath).length === 0
+    ? { kind: "clean-install" }
+    : { kind: "refuse-not-empty" };
+}
+
+export function resolveInstallTarget(inputPath: string, cwd = process.cwd()): string {
+  const trimmed = inputPath.trim();
+  if (trimmed === "~") {
+    return homedir();
+  }
+  if (trimmed.startsWith("~/")) {
+    return path.resolve(homedir(), trimmed.slice(2));
+  }
+  if (trimmed.startsWith("~")) {
+    throw new Error(`Unsupported home path syntax: ${trimmed}. Use ~ or ~/.`);
+  }
+  return path.resolve(cwd, trimmed);
+}
+
+export function installProject(projectRoot: string): InstallResult {
+  if (projectRoot === undefined) {
+    throw new Error("installProject requires an explicit projectRoot");
+  }
+
   const resolvedProjectRoot = path.resolve(projectRoot);
   const bundledCliPath = getBundledOvermindPath();
   const pkgRoot = packageRoot();
@@ -255,4 +326,8 @@ node .overmind/overmind.js context plan-semantic-review projects/<project-id>/<f
 function packageRoot(): string {
   const moduleDir = path.dirname(fileURLToPath(import.meta.url));
   return path.resolve(moduleDir, "..", "..");
+}
+
+function isNodeError(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error && "code" in error;
 }

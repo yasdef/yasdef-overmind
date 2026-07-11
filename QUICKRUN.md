@@ -19,7 +19,7 @@ npm test
 
 `npm run build` creates ignored `dist/` output under `packages/*/`, including `packages/asdlc-coordinator/dist/overmind.js`.
 
-## 3. Bootstrap ASDLC Workspace
+## 3. Bootstrap Or Update ASDLC Workspace
 
 From this repo root, after `npm install` and `npm run build`:
 
@@ -27,34 +27,19 @@ From this repo root, after `npm install` and `npm run build`:
 npm run setup
 ```
 
-The setup installs `packages/asdlc-coordinator/dist/overmind.js` into the ASDLC workspace as `.overmind/overmind.js`, plus packaged skills, runtime templates, setup defaults, `asdlc_metadata.yaml`, `projects/`, and generated `quickrun.md`.
-
-- `.overmind/overmind.js`
-- `.codex/skills/overmind-task-to-br/`
-- `.claude/skills/overmind-task-to-br/`
-- `.codex/skills/overmind-contract-delta/`
-- `.claude/skills/overmind-contract-delta/`
-- `.codex/skills/overmind-stack-blueprint/`
-- `.claude/skills/overmind-stack-blueprint/`
-- `.codex/skills/overmind-common-contract/`
-- `.claude/skills/overmind-common-contract/`
-- `.templates/init_progress_definition_TEMPLATE.yaml`
-- `.templates/feature_br_summary_TEMPLATE.md`
-- `.setup/models.md`
-- `.setup/external_sources.yaml`
-- `asdlc_metadata.yaml`
-- `projects/`
-- `quickrun.md`
-
-## 4. Install Overmind Into A Runtime Project
-
-From the target project root:
+Or run the built installer bin from any directory:
 
 ```text
 node /path/to/yasdef-overmind/packages/installer/dist/src/bin/overmind.js init
 ```
 
-This creates:
+The installer prompts:
+
+```text
+ASDLC workspace path:
+```
+
+Answer with the ASDLC workspace target path. A missing path or empty directory is bootstrapped; an existing workspace containing `asdlc_metadata.yaml` is updated; a non-empty non-workspace directory is refused without writes. The setup installs `packages/asdlc-coordinator/dist/overmind.js` into the selected ASDLC workspace as `.overmind/overmind.js`, plus packaged skills, runtime templates, setup defaults, `asdlc_metadata.yaml`, `projects/`, and generated `quickrun.md`.
 
 - `.overmind/overmind.js`
 - `.codex/skills/overmind-task-to-br/`
@@ -73,7 +58,7 @@ This creates:
 - `projects/`
 - `quickrun.md`
 
-## 5. Run Task-To-BR Helpers
+## 4. Run Task-To-BR Helpers
 
 From the installed project root:
 
@@ -86,7 +71,7 @@ node .overmind/overmind.js gate task-to-br <feature-path>
 
 The skill owns the loop: capture `user_br_input.md` when missing, run context, update `feature_br_summary.md` and `missing_br_data.md`, run gate, repair on exit `1`, stop on exit `2`. Jira capture records `jira:<ticket>` first; context then tells the agent to fetch and persist the story text through a configured Jira MCP source.
 
-## 6. Run Contract-Delta Helpers
+## 5. Run Contract-Delta Helpers
 
 From the installed ASDLC workspace root:
 
@@ -98,7 +83,7 @@ node .overmind/overmind.js gate contract-delta <feature-path>
 
 The feature orchestrator runs `sync` before loading `overmind-contract-delta`; the skill owns the context/write/gate/repair loop.
 
-## 7. Run Project Reconciliation
+## 6. Run Project Reconciliation
 
 Project creation, repo attachment, and common-contract reconciliation use the bundled CLI. From the installed ASDLC workspace root, create a project with:
 
@@ -130,7 +115,7 @@ node .overmind/overmind.js gate common-contract projects/<project-id>
 
 `project init` selects the next pending project init step. Type A projects run stack-blueprint sessions before the common-contract session; type B/C projects advance directly to the common-contract session.
 
-## 8. Register And Assign Workers
+## 7. Register And Assign Workers
 
 From the installed ASDLC workspace root:
 

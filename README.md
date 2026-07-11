@@ -16,7 +16,7 @@ This repository contains the standalone Overmind project. The original extractio
 - ⚠️ This is pre-alpha — things may break. Use at your own risk. Take precautions before integrating this repo into your project!
 
 1. clone `yasdef-overmind` to your local machine
-2. run `npm install`, `npm run build`, and `npm run setup` from the repo root to bootstrap an ASDLC workspace with `.overmind/overmind.js`, packaged Overmind skills in `.codex/skills/` and `.claude/skills/`, runtime templates in `.templates/`, setup defaults in `.setup/`, `asdlc_metadata.yaml`, `projects/`, and `quickrun.md`.
+2. run `npm install`, `npm run build`, and `npm run setup` from the repo root, then answer the `ASDLC workspace path:` prompt. A missing path or empty directory is bootstrapped; an existing workspace containing `asdlc_metadata.yaml` is updated. The selected ASDLC workspace receives `.overmind/overmind.js`, packaged Overmind skills in `.codex/skills/` and `.claude/skills/`, runtime templates in `.templates/`, setup defaults in `.setup/`, `asdlc_metadata.yaml`, `projects/`, and `quickrun.md`.
 3. in asdlc folder run `node .overmind/overmind.js project create` to create a new project. This creates `projects/<project-id>/`, seeds `init_progress_definition.yaml`, initializes that project folder as its own git repository, and creates the first commit. On this step you may provide paths to project repos, for example backend and frontend (if they exist), if it's a completely new project you may optionally configure per-class stack guidance sources in `init_progress_definition.yaml`; if absent, the system falls back to model proposals during stack blueprint authoring. Deferred or newly attached class repositories are handled later with `node .overmind/overmind.js project reconcile --path projects/<project-id>`.
    3-a. it's possible to setup MCP server for stack blueprint authoring and MCP placeholder enrichment. To do this, first set knowledgebase mcp to your codex cli (see codex docs), second - after asdlc directory will be established - add this MCP to .setup/external_sources.yaml
 4. finish required project-level init before feature work:
@@ -173,7 +173,7 @@ Project worker data lives in:
 - BR clarification runs through the installed `overmind-br-clarification` skill backed by `node .overmind/overmind.js context br-clarification <feature-path>` and `node .overmind/overmind.js gate br-clarification <feature-path>`. EARS readiness is deterministic: `node .overmind/overmind.js readiness br-clarification <feature-path>`.
 - BR-to-EARS runs through the installed `overmind-requirements-ears` skill backed by `node .overmind/overmind.js context requirements-ears <feature-path>` and `node .overmind/overmind.js gate requirements-ears <feature-path>`.
 - EARS review runs through the installed `overmind-ears-review` skill backed by `node .overmind/overmind.js context ears-review <feature-path>` and `node .overmind/overmind.js gate ears-review <feature-path>`.
-- ASDLC setup requires the built bundle at `packages/asdlc-coordinator/dist/overmind.js`; run `npm install`, `npm run build`, and then `npm run setup` from the repo root or `node /path/to/yasdef-overmind/packages/installer/dist/src/bin/overmind.js init` from a target workspace.
+- ASDLC setup requires the built bundle at `packages/asdlc-coordinator/dist/overmind.js`; run `npm install`, `npm run build`, and then `npm run setup` from the repo root, or run `node /path/to/yasdef-overmind/packages/installer/dist/src/bin/overmind.js init` from any directory. Both commands prompt for the ASDLC workspace path.
 - example of external_sources configuraqtion for knowledge base MCP
 
 ```
@@ -186,7 +186,7 @@ sources:
 ## Runtime CLI And Skills
 
 - `overmind init` / `npm run setup`
-  Bootstraps a fresh ASDLC workspace through `packages/installer`: `.overmind/overmind.js`, packaged skills for `.codex` and `.claude`, runtime templates, setup defaults, `asdlc_metadata.yaml`, `projects/`, and generated `quickrun.md`.
+  Prompts for an ASDLC workspace path, then bootstraps a missing or empty workspace or updates an existing workspace containing `asdlc_metadata.yaml` through `packages/installer`: `.overmind/overmind.js`, packaged skills for `.codex` and `.claude`, runtime templates, setup defaults, `asdlc_metadata.yaml`, `projects/`, and generated `quickrun.md`.
 
 - `overmind project create` (bundled CLI verb)
   `node .overmind/overmind.js project create` interactively creates a new project record + project folder, seeds `init_progress_definition.yaml`, initializes `projects/<project-id>/` as a git repository, and creates the first commit.

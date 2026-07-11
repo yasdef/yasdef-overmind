@@ -103,10 +103,12 @@ content; each primitive returns a typed result with diagnostics and changed path
 output parsing.
 
 **Installer.** `packages/installer` becomes the fresh-workspace deployment boundary. `overmind init`
-installs `.overmind/overmind.js`, packaged skills for every supported runner, the runtime templates
-deterministic creation needs, and `.setup/models.md` + `.setup/external_sources.yaml` defaults. Operator
-guidance is generated/copied without shell heredocs. Because nothing was ever deployed, this is a
-fresh-install boundary only — no upgrade path, no deployed-shell cleanup, no historical staging inventory.
+prompts for the ASDLC workspace path, bootstraps a missing or empty target, and updates an existing
+workspace identified by `asdlc_metadata.yaml`. It installs or refreshes `.overmind/overmind.js`,
+packaged skills for every supported runner, the runtime templates deterministic creation needs, and
+`.setup/models.md` + `.setup/external_sources.yaml` defaults. Operator guidance is generated/copied
+without shell heredocs. The update branch is the package-owned asset refresh path — no deployed-shell
+cleanup and no historical staging inventory.
 
 ## Work units
 
