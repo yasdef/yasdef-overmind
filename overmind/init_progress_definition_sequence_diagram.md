@@ -1,7 +1,7 @@
 # Init Progress Definition
 
 Single source of truth (Mermaid embedded below).
-Operational note: `node .overmind/overmind.js project init --path projects/<project-id>` owns init steps 1.1 and 2 through the TypeScript coordinator and generic executor. `node .overmind/overmind.js run [--path projects/<project-id>]` runs the business requirements scaffold, resolves `feature_path`, evaluates selected-feature progress through the in-process sequencing core each run, then continues from the canonical next step (or `--resume <step>`). When `--path` is omitted, the command uses the only project under `projects/` or prompts the user to choose one. The last selected feature is cached in `projects/<project-id>/.overmind_feature_state.json`.
+Operational note: `node .overmind/overmind.js project init --path projects/<project-id>` owns init steps 1.1 and 2 through the TypeScript coordinator and generic executor. For type A projects it commits the step 1.1 stack baseline before asking `Continue with common contract definition? [Y/n]`; yes continues into step 2, no pauses with step 2 pending and the same command resumes directly. `node .overmind/overmind.js run [--path projects/<project-id>]` runs the business requirements scaffold, resolves `feature_path`, evaluates selected-feature progress through the in-process sequencing core each run, then continues from the canonical next step (or `--resume <step>`). When `--path` is omitted, the command uses the only project under `projects/` or prompts the user to choose one. The last selected feature is cached in `projects/<project-id>/.overmind_feature_state.json`.
 
 ```mermaid
 sequenceDiagram
@@ -24,6 +24,13 @@ sequenceDiagram
       PO->>KB: 1.1 Request stack-family guidance per active class
       KB-->>PO: Stack-family options or unavailable
       PO->>PO: 1.1 Approve stack-family blueprints via overmind project init → project_stack_blueprint_class.md
+      PO->>PO: 1.1 Approve agent guidelines derived from each blueprint → project_agents_md_claude_md_class.md
+      PO->>PO: Commit finalized stack baseline
+      alt Continue with common contract definition? [Y/n]
+        PO->>PO: Yes/blank starts step 2 in the same invocation
+      else No or closed input
+        PO->>PO: Pause successfully; rerun project init to resume step 2
+      end
     else Type B/C
       PO->>PO: 1.1 skipped
     end
@@ -37,11 +44,11 @@ sequenceDiagram
         FE-->>PO: FE/MB contract evidence
       end
     else Type A
-      PO->>PO: 2.1 Read approved stack blueprints as context
+      PO->>PO: 2.1 Confirm approved stack blueprints and agent guidelines are present
     end
 
     PO->>PO: 2.3 Common Contracts Definition via overmind project init → common_contract_definition.md
-    Note over PO: Commit the project initialization baseline: init definition + applicable stack blueprints + common contract.
+    Note over PO: Commit final repository initialization baseline: init definition + common contract + applicable stack baseline already present in HEAD.
   end
 
   rect rgb(247, 248, 240)
@@ -76,10 +83,10 @@ sequenceDiagram
     and Technical tracks
       par
         BE->>BE: 7. BE surface map → project_surface_struct_resp_map_backend.md
-        Note over BE: in: init_progress_definition.yaml + requirements_ears.md + feature_contract_delta.md + committed sibling plans.<br/>Evidence per row: repo scan (state ready) → in-flight promises → blueprint planned → placeholder.<br/>All repo scans read the default branch only.
+        Note over BE: in: init_progress_definition.yaml + requirements_ears.md + feature_contract_delta.md + committed sibling plans.<br/>Evidence per row: repo scan (state ready) → in-flight promises → policy A blueprint planned → placeholder.<br/>Deferred policy B/C classes without repo evidence remain unavailable.<br/>All repo scans read the default branch only.
       and
         FE->>FE: 7. FE/MB surface map → project_surface_struct_resp_map_frontend/mobile.md
-        Note over FE: Same inputs + committed sibling plans.<br/>Evidence per row: repo scan (state ready) → in-flight promises → blueprint planned → placeholder.
+        Note over FE: Same inputs + committed sibling plans.<br/>Evidence per row: repo scan (state ready) → in-flight promises → policy A blueprint planned → placeholder.<br/>Deferred policy B/C classes without repo evidence remain unavailable.
       end
 
       opt 7.1 Optional MCP placeholder enrichment

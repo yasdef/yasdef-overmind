@@ -3,6 +3,7 @@ import path from "node:path";
 
 import {
   applyClassAttachment,
+  type ProjectClassPolicy,
   readProjectDefinitionMetadata
 } from "../parse/project-definition.js";
 import type { Diagnostic } from "../types/index.js";
@@ -22,14 +23,15 @@ function fail(reason: string): AttachResult {
 /**
  * Deterministic TypeScript class-repo attach primitive (D3), replacing
  * `persist_class_repo_attach.sh` without shell or awk. Validates the project, class,
- * and repo inputs; writes `state: "ready"`, canonical `path`, and `policy: "C"`;
+ * and repo inputs; writes `state: "ready"`, canonical `path`, and the selected policy;
  * clears the class's `contract_reconciled` completion state; preserves unrelated
  * definition content; and validates the resulting class record for coherence.
  */
 export function attachClassRepo(
   projectRoot: string,
   className: string,
-  repoPathInput: string
+  repoPathInput: string,
+  policy: ProjectClassPolicy
 ): AttachResult {
   const definitionPath = path.join(projectRoot, DEFINITION_FILE);
   if (!existsSync(definitionPath) || !statSync(definitionPath).isFile()) {
@@ -61,7 +63,7 @@ export function attachClassRepo(
     );
   }
 
-  const mutation = applyClassAttachment(content, className, resolvedRepoPath);
+  const mutation = applyClassAttachment(content, className, resolvedRepoPath, policy);
   if ("error" in mutation) {
     return fail(`${mutation.error} (${definitionPath})`);
   }
@@ -114,6 +116,14 @@ export function validateClassRecordCoherence(
     reason: `class_repo_paths coherence failed for class '${className}': ${reason}`
   });
   const repoPath = (entry.path ?? "").trim();
+  if (entry.policy !== "A" && entry.policy !== "B" && entry.policy !== "C") {
+    return coherenceFail(
+      `policy must be present and one of A, B, or C, got '${entry.policy ?? "unset"}'`
+    );
+  }
+  if (entry.policy === "A" && (entry.state !== "deferred" || repoPath !== "")) {
+    return coherenceFail("policy A requires state deferred and an empty path");
+  }
   if (entry.state === "ready") {
     if (repoPath === "") return coherenceFail("state ready requires non-empty path");
     if (!existsSync(repoPath) || !statSync(repoPath).isDirectory()) {
@@ -132,9 +142,6 @@ export function validateClassRecordCoherence(
     if (repoPath !== "") return coherenceFail("state deferred requires empty or absent path");
   } else {
     return coherenceFail(`state must be ready or deferred, got '${entry.state ?? "unset"}'`);
-  }
-  if (entry.policy !== undefined && entry.policy !== "B" && entry.policy !== "C") {
-    return coherenceFail(`policy must be B or C when present, got '${entry.policy}'`);
   }
   return undefined;
 }

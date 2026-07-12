@@ -22,6 +22,7 @@ const PACKAGED_SKILLS = [
   "overmind-requirements-ears",
   "overmind-ears-review",
   "overmind-stack-blueprint",
+  "overmind-agents-md",
   "overmind-common-contract",
   "overmind-contract-delta",
   "overmind-surface-map",
@@ -260,6 +261,21 @@ This ASDLC workspace was initialized at:
 
 Run commands from this workspace root.
 
+## First-Time Happy Path
+
+Use this path when starting from an empty ASDLC workspace:
+
+\`\`\`text
+node .overmind/overmind.js project create
+node .overmind/overmind.js project add-class
+node .overmind/overmind.js project reconcile --path projects/<project-id>
+node .overmind/overmind.js project init --path projects/<project-id>
+node .overmind/overmind.js run --path projects/<project-id>
+node .overmind/overmind.js status projects/<project-id>
+\`\`\`
+
+Replace \`<project-id>\` with the project folder created under \`projects/\`. \`project init\` owns the project initialization flow: type A projects define stack blueprints and agent guidelines first, commit the stack baseline, then render \`Continue with common contract definition? [Y/n]\`. Answer yes or press Enter to continue into common contract definition in the same command; answer no to pause cleanly and resume step 2 later with the same \`project init --path projects/<project-id>\` command. Type B/C projects start common contract definition directly. \`run\` is the single feature-creation entrypoint: select "Start a new feature" to create the feature and continue into the workflow, then fill in the generated feature inputs.
+
 ## Installed Runtime
 
 - CLI: \`.overmind/overmind.js\`
@@ -278,9 +294,15 @@ ${skillList}
 
 \`\`\`text
 node .overmind/overmind.js project create
+node .overmind/overmind.js project add-class
 node .overmind/overmind.js project reconcile [--path projects/<project-id>]
 node .overmind/overmind.js project init --path projects/<project-id>
 \`\`\`
+
+- \`project create\`: create a new project entry and folder under \`projects/\`.
+- \`project add-class\`: add a project class so the workflow knows which system surface or domain area the project covers.
+- \`project reconcile [--path projects/<project-id>]\`: sync project metadata and folders after creating or editing project details.
+- \`project init --path projects/<project-id>\`: run project initialization through the stack-baseline checkpoint and common-contract baseline before feature work.
 
 ## Feature Commands
 
@@ -288,10 +310,15 @@ node .overmind/overmind.js project init --path projects/<project-id>
 node .overmind/overmind.js run
 node .overmind/overmind.js run --path projects/<project-id>
 node .overmind/overmind.js run --path projects/<project-id> --resume <step>
-node .overmind/overmind.js scaffold feature --path projects/<project-id>
 node .overmind/overmind.js status projects/<project-id>
 node .overmind/overmind.js status projects/<project-id>/<feature-folder>
 \`\`\`
+
+- \`run\`: continue the next available workflow step for the active/default project context.
+- \`run --path projects/<project-id>\`: run the next workflow step for a specific project.
+- \`run --path projects/<project-id> --resume <step>\`: resume from a named workflow step after fixing inputs or reviewing output.
+- \`status projects/<project-id>\`: show project-level progress across features and workflow steps.
+- \`status projects/<project-id>/<feature-folder>\`: show detailed progress for one feature.
 
 ## Worker Commands
 
@@ -299,6 +326,9 @@ node .overmind/overmind.js status projects/<project-id>/<feature-folder>
 node .overmind/overmind.js worker register --path projects/<project-id>
 node .overmind/overmind.js worker assign --feature-path projects/<project-id>/<feature-folder>
 \`\`\`
+
+- \`worker register --path projects/<project-id>\`: register the current agent/session as available to work on a project.
+- \`worker assign --feature-path projects/<project-id>/<feature-folder>\`: assign registered worker context to a specific feature.
 
 ## Skill Context And Gates
 
@@ -320,6 +350,23 @@ node .overmind/overmind.js context prerequisite-gaps projects/<project-id>/<feat
 node .overmind/overmind.js context implementation-plan projects/<project-id>/<feature-folder>
 node .overmind/overmind.js context plan-semantic-review projects/<project-id>/<feature-folder>
 \`\`\`
+
+- \`capture task-to-br ... --source-file <story-file>\`: import a story or task brief into the feature's business-requirements workflow.
+- \`context task-to-br ...\`: build the model context for turning the task into a business-requirements brief.
+- \`gate task-to-br ...\`: validate the task-to-business-requirements output before continuing.
+- \`context br-clarification ...\`: build context for clarifying open business-requirements questions.
+- \`readiness br-clarification ...\`: check whether clarification is complete enough to proceed.
+- \`context requirements-ears ...\`: build context for converting business requirements into EARS requirements.
+- \`context contract-delta ...\`: build context for the contract delta step.
+- \`gate contract-delta ...\`: validate the contract delta output.
+- \`context surface-map ... --class <class>\`: build context for mapping the touched system surface for one class.
+- \`gate surface-map ... --class <class>\`: validate the surface map for one class.
+- \`context technical-requirements ...\`: build context for technical requirements.
+- \`gate technical-requirements ...\`: validate technical requirements before planning implementation.
+- \`context implementation-slices ...\`: build context for breaking the work into implementation slices.
+- \`context prerequisite-gaps ...\`: build context for identifying missing prerequisites.
+- \`context implementation-plan ...\`: build context for the implementation plan.
+- \`context plan-semantic-review ...\`: build context for reviewing plan consistency and completeness.
 `;
 }
 

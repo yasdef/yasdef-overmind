@@ -2,11 +2,13 @@ import path from "node:path";
 
 import { scaffoldFeature, type ScaffoldClock } from "../capture/scaffold-feature.js";
 import { loadRunnerConfig, resolveRunnerPhase } from "../config/index.js";
+import { RepoGitProjectAdapter, type ProjectGitPort } from "../git/index.js";
 import type { InteractionPort } from "../interaction/index.js";
 import {
   buildBrClarificationContext,
   buildContractDeltaContext,
   buildEarsReviewContext,
+  buildAgentsMdContext,
   buildImplementationPlanContext,
   buildImplementationSlicesContext,
   buildPlanSemanticReviewContext,
@@ -104,6 +106,7 @@ export interface StepExecutorDeps {
   readiness: Record<string, ReadinessFn>;
   write: Record<string, WriteFn>;
   /** Ports consumed by interactive write primitives (scaffold-feature). */
+  projectGit: ProjectGitPort;
   interaction?: InteractionPort;
   clock?: ScaffoldClock;
   emit?: (line: string) => void;
@@ -122,6 +125,7 @@ export const defaultStepExecutorDeps: StepExecutorDeps = {
     "ears-review": (featurePath, cwd) => buildEarsReviewContext(featurePath, cwd),
     "contract-delta": (featurePath, cwd) => buildContractDeltaContext(featurePath, cwd),
     "surface-map": (featurePath, cwd, klass) => buildSurfaceMapContext(featurePath, klass!, cwd),
+    "agents-md": (projectPath, cwd, klass) => buildAgentsMdContext(projectPath, klass!, cwd),
     "surface-map-enrich": (featurePath, cwd) => buildSurfaceMapEnrichContext(featurePath, cwd),
     "technical-requirements": (featurePath, cwd) =>
       buildTechnicalRequirementsContext(featurePath, cwd),
@@ -149,18 +153,20 @@ export const defaultStepExecutorDeps: StepExecutorDeps = {
     "br-clarification-readiness": (featurePath, cwd) =>
       runBrClarificationReadiness(featurePath, cwd)
   },
+  projectGit: new RepoGitProjectAdapter(),
   write: {
     "scaffold-feature": async (bindings, deps) => {
-      if (!deps.interaction || !deps.clock || !bindings.projectPath) {
+      if (!deps.interaction || !deps.clock || !deps.projectGit || !bindings.projectPath) {
         return {
           exitCode: 2,
           errorMessage:
-            "scaffold-feature requires interaction, clock, and a project binding; wire them before dispatching step 3."
+            "scaffold-feature requires interaction, clock, projectGit, and a project binding; wire them before dispatching step 3."
         };
       }
       const result = await scaffoldFeature(bindings.runtimeRoot, bindings.projectPath, {
         interaction: deps.interaction,
         clock: deps.clock,
+        projectGit: deps.projectGit,
         ...(deps.emit ? { emit: deps.emit } : {})
       });
       if (!result.featurePath || result.diagnostics.length > 0) {
@@ -246,22 +252,34 @@ async function executeSessionAction(
     }
   }
 
-  const classListFn = deps.classListContext?.[action.skillName];
-  let contextResult: ContextResult;
-  if (classListFn) {
-    const projectAbs = path.join(bindings.runtimeRoot, bindings.featurePath);
-    contextResult = classListFn(projectAbs, bindings.classes ?? [], bindings.runtimeRoot);
-  } else {
-    const contextFn = deps.context[action.skillName];
-    if (!contextFn) {
-      diagnostics.push(unknownActionDiagnostic("context", action.skillName));
-      return { action, status: "failed", exitCode: 2, diagnostics };
+  // The context result is consumed only by from-context read-only guards, so build it before the
+  // session only when the action declares such a guard; otherwise the pre-call is dead work and,
+  // for skills that own their own capture loop (task-to-br), a circular precondition. Project-level
+  // class-list sessions (D4) are the exception: their builder validates the class->repo bindings
+  // before launch, so keep the pre-call whenever a class-list builder is registered for the skill.
+  const needsContext =
+    action.readOnlyGuards.some((guard) => guard.mode === "fromContext") ||
+    deps.classListContext?.[action.skillName] !== undefined;
+  let resolvedFromContext: string[] = [];
+  if (needsContext) {
+    const classListFn = deps.classListContext?.[action.skillName];
+    let contextResult: ContextResult;
+    if (classListFn) {
+      const projectAbs = path.join(bindings.runtimeRoot, bindings.featurePath);
+      contextResult = classListFn(projectAbs, bindings.classes ?? [], bindings.runtimeRoot);
+    } else {
+      const contextFn = deps.context[action.skillName];
+      if (!contextFn) {
+        diagnostics.push(unknownActionDiagnostic("context", action.skillName));
+        return { action, status: "failed", exitCode: 2, diagnostics };
+      }
+      contextResult = contextFn(bindings.featurePath, bindings.runtimeRoot, bindings.targetClass);
     }
-    contextResult = contextFn(bindings.featurePath, bindings.runtimeRoot, bindings.targetClass);
-  }
-  if (contextResult.exitCode !== 0) {
-    diagnostics.push(resultDiagnostic("context", action.skillName, contextResult));
-    return { action, status: "failed", exitCode: contextResult.exitCode, diagnostics };
+    if (contextResult.exitCode !== 0) {
+      diagnostics.push(resultDiagnostic("context", action.skillName, contextResult));
+      return { action, status: "failed", exitCode: contextResult.exitCode, diagnostics };
+    }
+    resolvedFromContext = resolveContextReadOnlyInputs(contextResult, bindings);
   }
 
   const loadedConfig = deps.loadRunnerConfig(resolveModelsPath(bindings));
@@ -279,7 +297,6 @@ async function executeSessionAction(
     return { action, status: "failed", exitCode: 2, diagnostics };
   }
 
-  const resolvedFromContext = resolveContextReadOnlyInputs(contextResult, bindings);
   diagnostics.push(
     ...validateReadOnlyGuardsBeforeSession(action.readOnlyGuards, resolvedFromContext)
   );

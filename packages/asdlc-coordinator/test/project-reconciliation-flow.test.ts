@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -11,7 +11,7 @@ import type {
   ReconciliationSessionResult
 } from "../src/orchestrator/run-project-reconciliation-flow.js";
 import { readProjectDefinitionMetadata } from "../src/parse/project-definition.js";
-import type { ProjectGitPort, WorktreeStatus } from "../src/git/index.js";
+import type { PathInspectionResult, ProjectGitPort, WorktreeStatus } from "../src/git/index.js";
 import { InteractionClosedError, type InteractionPort } from "../src/interaction/index.js";
 
 function initGitRepo(dir: string): string {
@@ -81,6 +81,72 @@ function passThroughGit(): ProjectGitPort {
   };
 }
 
+function validCommonContract(): string {
+  return `# Common Contract Definition
+
+## 1. Document Meta
+- project_id: PROJ-1
+- source_repo_count: 1
+- last_updated: 2026-06-27
+- confidence_level: high
+
+## 2. Source Repository Evidence
+### Repository: api
+- class: backend
+- repo_path: /repos/api
+- contract_evidence_summary: reviewed routes
+- key_surfaces_reviewed: /users
+- notes: none
+
+## 3. Common Contract Baseline
+### Contract: users-api
+- contract_kind: http_api
+- interaction_mode: sync
+- producer_repositories: api
+- consumer_repositories: web
+- contract_surface: GET /users
+- contract_status: aligned
+- source_of_truth: api
+- canonical_shape: request: {} -> response: {id, name}
+- shared_types: User
+- trust_boundary: internal
+- compatibility_rule: additive-only
+- planning_implication: none
+- notes: none
+
+## 4. Reconciliation Decisions
+- decision_1: adopt api as source of truth
+
+## 5. Known Risks / Uncertainties
+- uncertainty_1: none
+
+## 6. Common Planning Signals
+- prep_1: wire consumer tests
+`;
+}
+
+function pendingSharedCheckpointInspection(): PathInspectionResult {
+  return {
+    kind: "ok",
+    paths: [
+      {
+        path: "init_progress_definition.yaml",
+        hasHeadVersion: true,
+        staged: false,
+        unstaged: false,
+        untracked: false
+      },
+      {
+        path: "common_contract_definition.md",
+        hasHeadVersion: true,
+        staged: false,
+        unstaged: true,
+        untracked: false
+      }
+    ]
+  };
+}
+
 function baseDeps(
   ctx: Ctx,
   overrides: Partial<ProjectReconciliationDeps> & {
@@ -95,8 +161,8 @@ function baseDeps(
     runReconciliationSession:
       overrides.runReconciliationSession ??
       (async (): Promise<ReconciliationSessionResult> => ({ ok: true, diagnostics: [] })),
-    emit: () => {},
-    emitError: () => {},
+    emit: overrides.emit ?? (() => {}),
+    emitError: overrides.emitError ?? (() => {}),
     ...(overrides.attach ? { attach: overrides.attach } : {})
   };
 }
@@ -136,14 +202,224 @@ test("no pending work is a side-effect-free success with no git or session calls
   );
 });
 
+test("pending shared checkpoint commit completes when no reconciliation work remains", async () => {
+  await withProject(
+    `    backend:
+      state: "ready"
+      path: "/x"
+      policy: "C"
+      contract_reconciled: true`,
+    async (ctx) => {
+      writeFileSync(
+        path.join(ctx.projectDir, "common_contract_definition.md"),
+        validCommonContract()
+      );
+      const emitted: string[] = [];
+      let worktreeCalls = 0;
+      let sessionCalls = 0;
+      let committedPaths: string[] = [];
+
+      const outcome = await runProjectReconciliationFlow(
+        baseDeps(ctx, {
+          interaction: fakeInteraction([], [true]),
+          git: {
+            worktreeStatus: () => {
+              worktreeCalls += 1;
+              return { kind: "clean" };
+            },
+            changedPaths: () => ({ kind: "ok", paths: ["common_contract_definition.md"] }),
+            inspectPaths: () => pendingSharedCheckpointInspection(),
+            commitOwnedPaths: (_root, paths) => {
+              committedPaths = paths;
+              return { kind: "committed" };
+            }
+          },
+          runReconciliationSession: async () => {
+            sessionCalls += 1;
+            return { ok: true, diagnostics: [] };
+          },
+          emit: (line) => emitted.push(line)
+        })
+      );
+
+      assert.deepEqual(outcome, { kind: "completed", committed: true });
+      assert.deepEqual(committedPaths, [
+        "init_progress_definition.yaml",
+        "common_contract_definition.md"
+      ]);
+      assert.equal(worktreeCalls, 0);
+      assert.equal(sessionCalls, 0);
+      assert.ok(emitted.some((line) => line.includes("Committed reconciliation unit")));
+      assert.ok(!emitted.some((line) => line.includes("No pending project reconciliation work")));
+    }
+  );
+});
+
+test("pending shared checkpoint commit continues remaining reconciliation work", async () => {
+  await withProject(
+    `    backend:
+      state: "ready"
+      path: "/x"
+      policy: "C"
+      contract_reconciled: false`,
+    async (ctx) => {
+      writeFileSync(
+        path.join(ctx.projectDir, "common_contract_definition.md"),
+        validCommonContract()
+      );
+      const emitted: string[] = [];
+      let worktreeCalls = 0;
+      let changedCalls = 0;
+      let sessionClasses: string[] = [];
+      const commits: string[][] = [];
+
+      const outcome = await runProjectReconciliationFlow(
+        baseDeps(ctx, {
+          interaction: fakeInteraction([], [true, true]),
+          git: {
+            worktreeStatus: () => {
+              worktreeCalls += 1;
+              return { kind: "clean" };
+            },
+            changedPaths: () => {
+              changedCalls += 1;
+              return {
+                kind: "ok",
+                paths:
+                  changedCalls === 1
+                    ? ["init_progress_definition.yaml"]
+                    : ["init_progress_definition.yaml", "common_contract_definition.md"]
+              };
+            },
+            inspectPaths: () => pendingSharedCheckpointInspection(),
+            commitOwnedPaths: (_root, paths) => {
+              commits.push(paths);
+              return { kind: "committed" };
+            }
+          },
+          runReconciliationSession: async (classes) => {
+            sessionClasses = classes;
+            return { ok: true, diagnostics: [] };
+          },
+          emit: (line) => emitted.push(line)
+        })
+      );
+
+      assert.deepEqual(outcome, { kind: "completed", committed: true });
+      assert.deepEqual(commits, [
+        ["init_progress_definition.yaml", "common_contract_definition.md"],
+        ["init_progress_definition.yaml", "common_contract_definition.md"]
+      ]);
+      assert.equal(worktreeCalls, 1);
+      assert.deepEqual(sessionClasses, ["backend"]);
+      assert.ok(emitted.some((line) => line.includes("Committed reconciliation unit")));
+      assert.ok(emitted.some((line) => line.includes("Reconciling 1 pending class(es): backend")));
+      const metadata = readProjectDefinitionMetadata(ctx.definitionPath);
+      assert.equal(metadata.classRepoPaths.backend!.contractReconciled, true);
+    }
+  );
+});
+
+test("pending shared checkpoint validates reconciliation content before commit", async () => {
+  await withProject(
+    `    backend:
+      state: "ready"
+      path: "/x"
+      policy: "C"
+      contract_reconciled: true`,
+    async (ctx) => {
+      let commitCalls = 0;
+
+      const outcome = await runProjectReconciliationFlow(
+        baseDeps(ctx, {
+          interaction: fakeInteraction([], [true]),
+          git: {
+            worktreeStatus: () => ({ kind: "clean" }),
+            changedPaths: () => ({ kind: "ok", paths: ["common_contract_definition.md"] }),
+            inspectPaths: () => pendingSharedCheckpointInspection(),
+            commitOwnedPaths: () => {
+              commitCalls += 1;
+              return { kind: "committed" };
+            }
+          },
+          runReconciliationSession: async () => {
+            throw new Error("session should not run for a pending shared checkpoint");
+          }
+        })
+      );
+
+      assert.equal(outcome.kind, "failed");
+      assert.equal(commitCalls, 0);
+      if (outcome.kind === "failed") {
+        assert.ok(
+          outcome.diagnostics.some((diagnostic) =>
+            diagnostic.reason.includes("Pending shared reconciliation checkpoint is invalid")
+          )
+        );
+      }
+    }
+  );
+});
+
+test("pending shared checkpoint commit failure remains fatal", async () => {
+  await withProject(
+    `    backend:
+      state: "ready"
+      path: "/x"
+      policy: "C"
+      contract_reconciled: true`,
+    async (ctx) => {
+      writeFileSync(
+        path.join(ctx.projectDir, "common_contract_definition.md"),
+        validCommonContract()
+      );
+
+      const outcome = await runProjectReconciliationFlow(
+        baseDeps(ctx, {
+          interaction: fakeInteraction([], [true]),
+          git: {
+            worktreeStatus: () => ({ kind: "clean" }),
+            changedPaths: () => ({ kind: "ok", paths: ["common_contract_definition.md"] }),
+            inspectPaths: () => pendingSharedCheckpointInspection(),
+            commitOwnedPaths: () => ({
+              kind: "commitFailed",
+              exitCode: 1,
+              stderr: "commit refused"
+            })
+          },
+          runReconciliationSession: async () => {
+            throw new Error("session should not run for a pending shared checkpoint");
+          }
+        })
+      );
+
+      assert.equal(outcome.kind, "failed");
+      if (outcome.kind === "failed") {
+        assert.ok(
+          outcome.diagnostics.some((diagnostic) => diagnostic.reason.includes("Commit failed"))
+        );
+        assert.ok(
+          !outcome.diagnostics.some((diagnostic) => diagnostic.reason.includes("No pending"))
+        );
+      }
+    }
+  );
+});
+
 test("ordered prompts, blank defer, and all attaches precede one reconciliation session", async () => {
   await withProject(
     `    backend:
       state: "deferred"
+      path: ""
+      policy: "B"
     frontend:
       state: "deferred"
+      path: ""
+      policy: "B"
     mobile:
-      state: "deferred"`,
+      state: "deferred"
+      path: ""
+      policy: "B"`,
     async (ctx) => {
       const backend = ctx.repo("api");
       const frontend = ctx.repo("web");
@@ -151,7 +427,7 @@ test("ordered prompts, blank defer, and all attaches precede one reconciliation 
       let sessionClasses: string[] = [];
       const outcome = await runProjectReconciliationFlow(
         baseDeps(ctx, {
-          interaction: fakeInteraction([backend, "", ctx.repo("app")], [false]),
+          interaction: fakeInteraction(["C", backend, "B", "", "C", ctx.repo("app")], [false]),
           git: {
             worktreeStatus: () => ({ kind: "clean" }),
             changedPaths: () => ({ kind: "ok", paths: ["init_progress_definition.yaml"] }),
@@ -162,8 +438,11 @@ test("ordered prompts, blank defer, and all attaches precede one reconciliation 
             // Confirm all attaches happened before the session ran.
             const meta = readProjectDefinitionMetadata(ctx.definitionPath);
             assert.equal(meta.classRepoPaths.backend!.state, "ready");
+            assert.equal(meta.classRepoPaths.backend!.policy, "C");
             assert.equal(meta.classRepoPaths.mobile!.state, "ready");
+            assert.equal(meta.classRepoPaths.mobile!.policy, "C");
             assert.equal(meta.classRepoPaths.frontend!.state, "deferred");
+            assert.equal(meta.classRepoPaths.frontend!.policy, "B");
             return { ok: true, diagnostics: [] };
           }
         })
@@ -179,6 +458,8 @@ test("exactly one retry after an invalid path, then the class stays deferred", a
   await withProject(
     `    backend:
       state: "deferred"
+      path: ""
+      policy: "B"
     frontend:
       state: "ready"
       path: "/y"
@@ -189,7 +470,7 @@ test("exactly one retry after an invalid path, then the class stays deferred", a
       const interaction: InteractionPort = {
         async input() {
           inputCount += 1;
-          return "/not/a/repo"; // always invalid
+          return inputCount === 1 ? "C" : "/not/a/repo"; // policy once, path twice
         },
         async confirm() {
           return false;
@@ -207,12 +488,208 @@ test("exactly one retry after an invalid path, then the class stays deferred", a
           }
         })
       );
-      // Two attempts (initial + one retry), no third prompt.
-      assert.equal(inputCount, 2);
+      // Policy prompt plus two path attempts (initial + one retry), no third path prompt.
+      assert.equal(inputCount, 3);
       // backend stayed deferred, frontend already reconciled => no pending session.
       assert.equal(outcome.kind, "noPendingWork");
       const meta = readProjectDefinitionMetadata(ctx.definitionPath);
       assert.equal(meta.classRepoPaths.backend!.state, "deferred");
+      assert.equal(meta.classRepoPaths.backend!.path, "");
+      assert.equal(meta.classRepoPaths.backend!.policy, "C");
+    }
+  );
+});
+
+test("blank policy prompt keeps existing B policy and still asks for repo path", async () => {
+  await withProject(
+    `    backend:
+      state: "deferred"
+      path: ""
+      policy: "B"`,
+    async (ctx) => {
+      const repo = ctx.repo("api");
+      let sessionClasses: string[] = [];
+      const outcome = await runProjectReconciliationFlow(
+        baseDeps(ctx, {
+          interaction: fakeInteraction(["", repo], [false]),
+          git: {
+            worktreeStatus: () => ({ kind: "clean" }),
+            changedPaths: () => ({ kind: "ok", paths: ["init_progress_definition.yaml"] }),
+            commitOwnedPaths: () => ({ kind: "committed" })
+          },
+          runReconciliationSession: async (classes) => {
+            sessionClasses = classes;
+            return { ok: true, diagnostics: [] };
+          }
+        })
+      );
+
+      assert.equal(outcome.kind, "stoppedByOperator");
+      assert.deepEqual(sessionClasses, ["backend"]);
+      const meta = readProjectDefinitionMetadata(ctx.definitionPath);
+      assert.equal(meta.classRepoPaths.backend!.state, "ready");
+      assert.equal(meta.classRepoPaths.backend!.policy, "B");
+      assert.equal(meta.classRepoPaths.backend!.path, realpathSync(repo));
+    }
+  );
+});
+
+test("exactly one retry after an invalid policy, then the class stays unchanged", async () => {
+  await withProject(
+    `    backend:
+      state: "deferred"
+      path: ""
+      policy: "B"
+    frontend:
+      state: "ready"
+      path: "/y"
+      policy: "C"
+      contract_reconciled: true`,
+    async (ctx) => {
+      let inputCount = 0;
+      const emitted: string[] = [];
+      const errors: string[] = [];
+      const before = readFileSync(ctx.definitionPath, "utf8");
+      const interaction: InteractionPort = {
+        async input() {
+          inputCount += 1;
+          return inputCount === 1 ? "X" : "Y";
+        },
+        async confirm() {
+          return false;
+        },
+        async select() {
+          throw new Error("no");
+        }
+      };
+      const outcome = await runProjectReconciliationFlow(
+        baseDeps(ctx, {
+          interaction,
+          git: passThroughGit(),
+          runReconciliationSession: async () => {
+            throw new Error("session should not run when nothing pending");
+          },
+          emit: (line) => emitted.push(line),
+          emitError: (line) => errors.push(line)
+        })
+      );
+      assert.equal(inputCount, 2);
+      assert.equal(outcome.kind, "noPendingWork");
+      assert.equal(readFileSync(ctx.definitionPath, "utf8"), before);
+      assert.ok(emitted.some((line) => line.includes("one attempt remaining")));
+      assert.ok(emitted.some((line) => line.includes("unchanged policy")));
+      assert.equal(errors.length, 2);
+    }
+  );
+});
+
+test("selected policy is recorded when input closes before a repo path", async () => {
+  await withProject(
+    `    backend:
+      state: "deferred"
+      path: ""
+      policy: "B"
+    frontend:
+      state: "ready"
+      path: "/y"
+      policy: "C"
+      contract_reconciled: true`,
+    async (ctx) => {
+      const outcome = await runProjectReconciliationFlow(
+        baseDeps(ctx, {
+          interaction: fakeInteraction(["C", null], []),
+          git: passThroughGit(),
+          runReconciliationSession: async () => {
+            throw new Error("session should not run when no class is ready");
+          }
+        })
+      );
+      assert.equal(outcome.kind, "noPendingWork");
+      const meta = readProjectDefinitionMetadata(ctx.definitionPath);
+      assert.equal(meta.classRepoPaths.backend!.state, "deferred");
+      assert.equal(meta.classRepoPaths.backend!.path, "");
+      assert.equal(meta.classRepoPaths.backend!.policy, "C");
+    }
+  );
+});
+
+test("policy A deferred class can stay unchanged during reconciliation", async () => {
+  await withProject(
+    `    backend:
+      state: "deferred"
+      path: ""
+      policy: "A"
+    frontend:
+      state: "ready"
+      path: "/y"
+      policy: "C"
+      contract_reconciled: true`,
+    async (ctx) => {
+      let inputCount = 0;
+      const outcome = await runProjectReconciliationFlow(
+        baseDeps(ctx, {
+          interaction: {
+            async input() {
+              inputCount += 1;
+              return "";
+            },
+            async confirm() {
+              return false;
+            },
+            async select() {
+              throw new Error("no");
+            }
+          },
+          git: passThroughGit(),
+          runReconciliationSession: async () => {
+            throw new Error("session should not run when no class is ready-unreconciled");
+          }
+        })
+      );
+      assert.equal(outcome.kind, "noPendingWork");
+      assert.equal(inputCount, 1);
+      const meta = readProjectDefinitionMetadata(ctx.definitionPath);
+      assert.equal(meta.classRepoPaths.backend!.state, "deferred");
+      assert.equal(meta.classRepoPaths.backend!.path, "");
+      assert.equal(meta.classRepoPaths.backend!.policy, "A");
+    }
+  );
+});
+
+test("blank at policy prompt leaves the class record unchanged and prompts again on later runs", async () => {
+  await withProject(
+    `    backend:
+      state: "deferred"
+      path: ""
+      policy: "B"`,
+    async (ctx) => {
+      const before = readFileSync(ctx.definitionPath, "utf8");
+      const first = await runProjectReconciliationFlow(
+        baseDeps(ctx, {
+          interaction: fakeInteraction([""], []),
+          git: passThroughGit(),
+          runReconciliationSession: async () => {
+            throw new Error("session should not run");
+          }
+        })
+      );
+      assert.equal(first.kind, "noPendingWork");
+      assert.equal(readFileSync(ctx.definitionPath, "utf8"), before);
+
+      const second = await runProjectReconciliationFlow(
+        baseDeps(ctx, {
+          interaction: fakeInteraction(["A"], []),
+          git: passThroughGit(),
+          runReconciliationSession: async () => {
+            throw new Error("session should not run");
+          }
+        })
+      );
+      assert.equal(second.kind, "noPendingWork");
+      assert.equal(
+        readProjectDefinitionMetadata(ctx.definitionPath).classRepoPaths.backend!.policy,
+        "A"
+      );
     }
   );
 });
@@ -221,6 +698,8 @@ test("existing ready-unreconciled class joins the batch and successful session s
   await withProject(
     `    backend:
       state: "deferred"
+      path: ""
+      policy: "B"
     frontend:
       state: "ready"
       path: "__FRONTEND__"
@@ -236,7 +715,7 @@ test("existing ready-unreconciled class joins the batch and successful session s
       let sessionClasses: string[] = [];
       const outcome = await runProjectReconciliationFlow(
         baseDeps(ctx, {
-          interaction: fakeInteraction([backendRepo], [true]),
+          interaction: fakeInteraction(["B", backendRepo], [true]),
           git: {
             worktreeStatus: () => ({ kind: "clean" }),
             changedPaths: () => ({ kind: "ok", paths: ["init_progress_definition.yaml"] }),
@@ -251,6 +730,7 @@ test("existing ready-unreconciled class joins the batch and successful session s
       assert.equal(outcome.kind, "completed");
       assert.deepEqual(sessionClasses.sort(), ["backend", "frontend"]);
       const meta = readProjectDefinitionMetadata(ctx.definitionPath);
+      assert.equal(meta.classRepoPaths.backend!.policy, "B");
       assert.equal(meta.classRepoPaths.backend!.contractReconciled, true);
       assert.equal(meta.classRepoPaths.frontend!.contractReconciled, true);
     }

@@ -133,6 +133,20 @@ export type ChangedPathsResult =
   | { kind: "ok"; paths: string[] }
   | InspectionFailure;
 
+export interface PathGitInspection {
+  path: string;
+  hasHeadVersion: boolean;
+  staged: boolean;
+  unstaged: boolean;
+  untracked: boolean;
+}
+
+export type PathInspectionResult =
+  | { kind: "unavailable" }
+  | { kind: "notWorktree" }
+  | { kind: "ok"; paths: PathGitInspection[] }
+  | InspectionFailure;
+
 /** Result of committing exactly the owned reconciliation paths (D7). */
 export type CommitResult =
   | { kind: "committed" }
@@ -151,6 +165,7 @@ export type CommitResult =
 export interface ProjectGitPort {
   worktreeStatus(root: string): WorktreeStatus;
   changedPaths(root: string): ChangedPathsResult;
+  inspectPaths?(root: string, paths: string[]): PathInspectionResult;
   commitOwnedPaths(root: string, paths: string[], message: string): CommitResult;
 }
 
@@ -180,6 +195,26 @@ function parsePorcelainPaths(stdout: string): string[] {
     paths.push(renameIndex >= 0 ? entry.slice(renameIndex + 4) : entry);
   }
   return paths;
+}
+
+function parsePathPorcelain(
+  stdout: string
+): Map<string, Pick<PathGitInspection, "staged" | "unstaged" | "untracked">> {
+  const byPath = new Map<string, Pick<PathGitInspection, "staged" | "unstaged" | "untracked">>();
+  for (const rawLine of stdout.split("\n")) {
+    if (rawLine.trim() === "") continue;
+    const x = rawLine[0] ?? " ";
+    const y = rawLine[1] ?? " ";
+    const entry = rawLine.slice(3);
+    const renameIndex = entry.indexOf(" -> ");
+    const statusPath = renameIndex >= 0 ? entry.slice(renameIndex + 4) : entry;
+    byPath.set(statusPath, {
+      staged: x !== " " && x !== "?",
+      unstaged: y !== " ",
+      untracked: x === "?" && y === "?"
+    });
+  }
+  return byPath;
 }
 
 export class RepoGitProjectAdapter implements ProjectGitPort {
@@ -225,6 +260,33 @@ export class RepoGitProjectAdapter implements ProjectGitPort {
     return { kind: "ok", paths: parsePorcelainPaths(status.stdout) };
   }
 
+  inspectPaths(root: string, paths: string[]): PathInspectionResult {
+    if (!this.available()) return { kind: "unavailable" };
+    const probe = this.probeWorktree(root);
+    if (probe !== "worktree") return probe === "notWorktree" ? { kind: "notWorktree" } : probe;
+    const status = this.run(root, ["status", "--porcelain", "--", ...paths]);
+    if (status.status !== 0) {
+      return { kind: "inspectionFailed", exitCode: status.status, stderr: status.stderr };
+    }
+    const changed = parsePathPorcelain(status.stdout);
+    return {
+      kind: "ok",
+      paths: paths.map((pathspec) => {
+        const head = this.run(root, ["cat-file", "-e", `HEAD:${pathspec}`]);
+        const state = changed.get(pathspec) ?? {
+          staged: false,
+          unstaged: false,
+          untracked: false
+        };
+        return {
+          path: pathspec,
+          hasHeadVersion: head.status === 0,
+          ...state
+        };
+      })
+    };
+  }
+
   commitOwnedPaths(root: string, paths: string[], message: string): CommitResult {
     if (!this.available()) return { kind: "unavailable" };
     const probe = this.probeWorktree(root);
@@ -235,8 +297,10 @@ export class RepoGitProjectAdapter implements ProjectGitPort {
     if (commit.status !== 0) {
       return { kind: "commitFailed", exitCode: commit.status, stderr: commit.stderr };
     }
-    const after = this.run(root, ["status", "--porcelain"]);
-    if (after.status !== 0) return { kind: "dirtyAfterCommit", paths: [], stderr: after.stderr };
+    const after = this.run(root, ["status", "--porcelain", "--", ...paths]);
+    if (after.status !== 0) {
+      return { kind: "inspectionFailed", exitCode: after.status, stderr: after.stderr };
+    }
     const remaining = parsePorcelainPaths(after.stdout);
     return remaining.length === 0
       ? { kind: "committed" }

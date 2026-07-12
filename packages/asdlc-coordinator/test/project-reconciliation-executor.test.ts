@@ -9,6 +9,7 @@ import { loadRunnerConfig, resolveRunnerPhase } from "../src/config/index.js";
 import { buildContractReconciliationContext } from "../src/context/index.js";
 import {
   buildSessionPrompt,
+  defaultStepExecutorDeps,
   executeStep,
   type AgentRunner,
   type StepExecutorDeps
@@ -76,6 +77,7 @@ function deps(agentRunner: AgentRunner): StepExecutorDeps {
     },
     sync: {},
     readiness: {},
+    projectGit: defaultStepExecutorDeps.projectGit,
     write: {}
   };
 }

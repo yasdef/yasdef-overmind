@@ -37,12 +37,12 @@ Project creation SHALL copy `.templates/init_progress_definition_TEMPLATE.yaml` 
 
 ### Requirement: Project creation captures project type and class membership only
 
-Project creation SHALL require a project type selection resolved to `A`, `B`, or `C` (mapped respectively to `New project`, `Existing project with partial context`, `Existing project with code-first context`). It SHALL let the operator select any number of project classes — including none — from `backend`, `frontend`, `mobile`, and `infrastructure`, recorded in canonical order without duplicates. Each selected class SHALL be written as `state: "deferred"`, `path: ""`, and `policy: "A"`. Creation SHALL NOT request or validate a repository path, and SHALL report that `overmind project reconcile` binds repositories.
+Project creation SHALL require a project type selection resolved to `A`, `B`, or `C` (mapped respectively to `New project`, `Existing project with partial context`, `Existing project with code-first context`). It SHALL let the operator select any number of project classes — including none — from `backend`, `frontend`, `mobile`, and `infrastructure`, recorded in canonical order without duplicates. Each selected class SHALL be written as `state: "deferred"`, `path: ""`, and `policy: "A"`. Creation SHALL NOT request or validate a repository path, and SHALL report that `overmind project reconcile` binds repositories when existing repositories are available.
 
 #### Scenario: Selected classes are deferred with no repository
 
 - **WHEN** the operator selects `frontend` and `backend`
-- **THEN** `project_classes` lists `backend` before `frontend`, both classes record `state: "deferred"`, an empty `path`, and `policy: "A"`, no repository path is requested, and the operator is directed to `overmind project reconcile`
+- **THEN** `project_classes` lists `backend` before `frontend`, both classes record `state: "deferred"`, an empty `path`, and `policy: "A"`, no repository path is requested, and the operator is told that `overmind project reconcile` binds existing repositories
 
 #### Scenario: A project may be created with no classes
 

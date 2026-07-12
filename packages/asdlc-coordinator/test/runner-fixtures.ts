@@ -28,6 +28,7 @@ export async function withRunnerWorkspace(
     [
       "repo_analyse | codex | gpt-5.4 | --config | model_reasoning_effort='high'",
       "project_stack_blueprint | codex | gpt-5.4",
+      "project_agents_md_claude_md | codex | gpt-5.4",
       "common_contract_definition | codex | gpt-5.4",
       "task_to_br | codex | gpt-5.4",
       "user_br_clarification | codex | gpt-5.4",

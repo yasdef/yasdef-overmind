@@ -119,7 +119,7 @@ test("RepoGitProjectAdapter reports clean/dirty/notWorktree and commits owned pa
     const committed = adapter.commitOwnedPaths(
       projectDir,
       ["init_progress_definition.yaml", "common_contract_definition.md"],
-      "Reconcile contract and attach repos"
+      "Update project reconciliation state"
     );
     assert.equal(committed.kind, "committed");
     assert.equal(adapter.worktreeStatus(projectDir).kind, "clean");
@@ -136,7 +136,7 @@ test("dirty project refuses before any mutation", async () => {
       definitionPath,
       readFileSync(definitionPath, "utf8").replace(
         /state: "ready"[\s\S]*?policy: "C"/,
-        'state: "deferred"'
+        'state: "deferred"\n      path: ""\n      policy: "B"'
       )
     );
     let sessionRan = false;
@@ -290,7 +290,7 @@ test("confirmed commit stages exactly the two owned paths", async () => {
       "init_progress_definition.yaml",
       "common_contract_definition.md"
     ]);
-    assert.equal(committedMessage, "Reconcile contract and attach repos");
+    assert.equal(committedMessage, "Update project reconciliation state");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -434,7 +434,7 @@ test("baseline inspection failure fails before any mutation", async () => {
       definitionPath,
       readFileSync(definitionPath, "utf8").replace(
         /state: "ready"[\s\S]*?policy: "C"/,
-        'state: "deferred"'
+        'state: "deferred"\n      path: ""\n      policy: "B"'
       )
     );
     let sessionRan = false;

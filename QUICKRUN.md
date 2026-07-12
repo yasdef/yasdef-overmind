@@ -48,6 +48,8 @@ Answer with the ASDLC workspace target path. A missing path or empty directory i
 - `.claude/skills/overmind-contract-delta/`
 - `.codex/skills/overmind-stack-blueprint/`
 - `.claude/skills/overmind-stack-blueprint/`
+- `.codex/skills/overmind-agents-md/`
+- `.claude/skills/overmind-agents-md/`
 - `.codex/skills/overmind-common-contract/`
 - `.claude/skills/overmind-common-contract/`
 - `.templates/init_progress_definition_TEMPLATE.yaml`
@@ -83,12 +85,18 @@ node .overmind/overmind.js gate contract-delta <feature-path>
 
 The feature orchestrator runs `sync` before loading `overmind-contract-delta`; the skill owns the context/write/gate/repair loop.
 
-## 6. Run Project Reconciliation
+## 6. Create Projects, Manage Classes, And Reconcile
 
-Project creation, repo attachment, and common-contract reconciliation use the bundled CLI. From the installed ASDLC workspace root, create a project with:
+Project creation, class membership, repo attachment, and common-contract reconciliation use the bundled CLI. From the installed ASDLC workspace root, create a project with:
 
 ```bash
 node .overmind/overmind.js project create
+```
+
+Creation asks for the project name, project type, and class list. Selected classes start as policy `A`: deferred with empty repo paths, intentionally repo-less, and allowed to start feature work. To add a missing class later, or reset a wrongly bound class back to that policy `A` state, run:
+
+```bash
+node .overmind/overmind.js project add-class
 ```
 
 Project-level repo attachment and common-contract reconciliation are a separate command from the feature flow (`overmind run`):
@@ -99,21 +107,25 @@ node .overmind/overmind.js project reconcile [--path <project>]
 
 With no `--path`, project selection mirrors `overmind run`: a single project auto-selects, multiple projects prompt with a finish choice, and finishing or a closed input exits zero without changes. The command:
 
-- Prompts each deferred class in definition order to attach a local git repo (blank keeps it deferred; one retry after an invalid path).
+- Prompts deferred classes for policy. Keeping `A` leaves the class deferred and non-blocking; choosing `B` or `C` asks for a local git repo path (blank keeps it deferred with the selected policy; one retry after an invalid path).
 - Runs one `overmind-contract-reconciliation` session over every ready class whose `contract_reconciled` is not yet true, then sets that flag only on success.
-- For git-backed projects, requires a clean project worktree before mutating, restricts the reconciliation unit to `init_progress_definition.yaml` and `common_contract_definition.md`, rolls back on unexpected changes, and offers a `Commit reconciliation results? [y/N]` prompt that commits exactly those two files with message `Reconcile contract and attach repos`. Non-git projects reconcile without a commit prompt.
+- For git-backed projects, requires a clean project worktree before mutating, restricts the reconciliation unit to `init_progress_definition.yaml` and `common_contract_definition.md`, rolls back on unexpected changes, and offers a `Commit reconciliation results? [y/N]` prompt that commits exactly those two files with message `Update project reconciliation state`. Non-git projects reconcile without a commit prompt.
 
-`overmind run` refuses feature work while any class is deferred or ready-unreconciled and points at `overmind project reconcile --path <project>`. `contract_reconciled: true` is the sole completion source; legacy `.contract_reconciled_<class>` markers are ignored.
+`overmind run` allows deferred policy `A` classes, refuses deferred policy `B`/`C` classes until repo paths are bound, and refuses ready-unreconciled classes until contract reconciliation finishes. `contract_reconciled: true` is the sole completion source; legacy `.contract_reconciled_<class>` markers are ignored.
 
 Project init steps 1.1 and 2 run through the bundled CLI and TypeScript gates:
 
 ```bash
 node .overmind/overmind.js project init --path projects/<project-id>
 node .overmind/overmind.js gate stack-blueprint projects/<project-id>/project_stack_blueprint_backend.md
+node .overmind/overmind.js context agents-md projects/<project-id> --class backend
+node .overmind/overmind.js gate agents-md projects/<project-id>/project_agents_md_claude_md_backend.md
 node .overmind/overmind.js gate common-contract projects/<project-id>
 ```
 
-`project init` selects the next pending project init step. Type A projects run stack-blueprint sessions before the common-contract session; type B/C projects advance directly to the common-contract session.
+`project init` selects the next pending project init step. Type A projects run a stack-blueprint session and then an agents-md session for each active class before the common-contract session; type B/C projects advance directly to the common-contract session.
+For type A projects, Overmind commits the step `1.1` stack baseline, prints `Continue with common contract definition? [Y/n]`, and continues into common contract definition on yes or blank input. Answering no pauses successfully; resume later with `node .overmind/overmind.js project init --path projects/<project-id>`.
+Feature scaffolding refuses pending init or reconciliation checkpoints and prints the owning command (`project init` or `project reconcile`) before creating feature files.
 
 ## 7. Register And Assign Workers
 

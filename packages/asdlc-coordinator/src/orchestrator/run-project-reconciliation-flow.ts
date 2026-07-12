@@ -1,11 +1,17 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
-import { applyContractReconciledFlags, readProjectDefinitionMetadata } from "../parse/index.js";
+import {
+  applyContractReconciledFlags,
+  applyDeferredClassPolicy,
+  readProjectDefinitionMetadata,
+  type ProjectClassPolicy
+} from "../parse/index.js";
 import { attachClassRepo, type AttachResult } from "../repo/index.js";
 import type { CommitResult, ProjectGitPort } from "../git/index.js";
 import { InteractionClosedError, type InteractionPort } from "../interaction/index.js";
 import type { Diagnostic } from "../types/index.js";
+import { validateContractReconciliation } from "../validate/index.js";
 
 import {
   OWNED_RECONCILIATION_FILES,
@@ -14,7 +20,7 @@ import {
 } from "./project-transaction.js";
 
 const DEFINITION_FILE = "init_progress_definition.yaml";
-const COMMIT_MESSAGE = "Reconcile contract and attach repos";
+const COMMIT_MESSAGE = "Update project reconciliation state";
 
 /** Result of the shared-executor reconciliation session for one class-list binding. */
 export interface ReconciliationSessionResult {
@@ -28,7 +34,12 @@ export interface ProjectReconciliationDeps {
   interaction: InteractionPort;
   git: ProjectGitPort;
   /** Attach primitive (D3); defaults to the real `attachClassRepo`. */
-  attach?: (projectRoot: string, className: string, repoPath: string) => AttachResult;
+  attach?: (
+    projectRoot: string,
+    className: string,
+    repoPath: string,
+    policy: ProjectClassPolicy
+  ) => AttachResult;
   /** One shared-executor reconciliation session over the full pending class list (D4). */
   runReconciliationSession: (classes: string[]) => Promise<ReconciliationSessionResult>;
   emit: (line: string) => void;
@@ -61,7 +72,7 @@ function pendingReadyClasses(metadata: ReturnType<typeof readProjectDefinitionMe
 /**
  * The `overmind project reconcile` use case (D1). Order: validate project; if a mutation
  * may occur, establish the clean project-worktree baseline; prompt every deferred class in
- * definition order (blank/closed defers, one retry after an invalid attempt); recompute
+ * definition order (blank keeps the current policy, closed defers, one retry after invalid input); recompute
  * pending ready/unreconciled classes; run one reconciliation session for the full list; set
  * every covered `contract_reconciled` flag only on success; verify owned paths; then offer a
  * y/N commit. Returns a typed outcome; the CLI owns rendering and exit codes.
@@ -77,10 +88,29 @@ export async function runProjectReconciliationFlow(
     return { kind: "startupError", diagnostics: initial.diagnostics };
   }
 
-  const deferred = deferredClasses(initial);
-  const pendingBefore = pendingReadyClasses(initial);
+  let current = initial;
+  let sharedCheckpointCommitted = false;
+  const sharedCheckpoint = await handlePendingSharedCheckpoint(deps);
+  if (sharedCheckpoint.kind === "failed" || sharedCheckpoint.kind === "stoppedByOperator") {
+    return sharedCheckpoint;
+  }
+  if (sharedCheckpoint.kind === "committed") {
+    sharedCheckpointCommitted = true;
+    current = readProjectDefinitionMetadata(definitionPath);
+    if (!current.parsed) {
+      return { kind: "startupError", diagnostics: current.diagnostics };
+    }
+  }
+
+  const deferred = deferredClasses(current);
+  const pendingBefore = pendingReadyClasses(current);
   if (deferred.length === 0 && pendingBefore.length === 0) {
-    deps.emit("No pending project reconciliation work: every class is ready and reconciled.");
+    if (sharedCheckpointCommitted) {
+      return { kind: "completed", committed: true };
+    }
+    deps.emit(
+      "No pending project reconciliation work: no existing class repositories need binding or contract reconciliation."
+    );
     return { kind: "noPendingWork" };
   }
 
@@ -113,7 +143,7 @@ export async function runProjectReconciliationFlow(
     };
   }
 
-  // Attach every deferred class in definition order (D1).
+  // Review every deferred class in definition order (D1).
   for (const className of deferred) {
     await attachDeferredClass(className, deps, attach, definitionPath);
   }
@@ -256,6 +286,74 @@ export async function runProjectReconciliationFlow(
   return finalizeCommit(deps, isGit, /* sessionRan */ true, ownedChanged);
 }
 
+async function handlePendingSharedCheckpoint(
+  deps: ProjectReconciliationDeps
+): Promise<
+  | { kind: "none" }
+  | { kind: "committed" }
+  | { kind: "stoppedByOperator" }
+  | { kind: "failed"; diagnostics: Diagnostic[] }
+> {
+  const inspected = deps.git.inspectPaths?.(deps.projectRoot, [...OWNED_RECONCILIATION_FILES]);
+  if (!inspected || inspected.kind !== "ok") return { kind: "none" };
+  const common = inspected.paths.find((entry) => entry.path === "common_contract_definition.md");
+  const dirtyShared = inspected.paths.some(
+    (entry) => entry.staged || entry.unstaged || entry.untracked
+  );
+  if (!common?.hasHeadVersion || !dirtyShared) return { kind: "none" };
+
+  const changed = deps.git.changedPaths(deps.projectRoot);
+  if (changed.kind !== "ok") {
+    return {
+      kind: "failed",
+      diagnostics: [
+        error(
+          "project-reconcile",
+          `Unable to inspect pending shared reconciliation checkpoint (${describeInspectionFailure(changed)}).`
+        )
+      ]
+    };
+  }
+  const outside = changed.paths.filter(
+    (candidate) => !(OWNED_RECONCILIATION_FILES as readonly string[]).includes(candidate)
+  );
+  if (outside.length > 0) return { kind: "none" };
+
+  const metadata = readProjectDefinitionMetadata(path.join(deps.projectRoot, DEFINITION_FILE));
+  if (!metadata.parsed) return { kind: "failed", diagnostics: metadata.diagnostics };
+  const commonGate = validateContractReconciliation(deps.projectRoot);
+  if (commonGate.exitCode !== 0) {
+    return {
+      kind: "failed",
+      diagnostics: [
+        error(
+          "project-reconcile",
+          commonGate.exitCode === 1
+            ? `Pending shared reconciliation checkpoint is invalid: ${commonGate.problems.join("; ")}`
+            : `Pending shared reconciliation checkpoint cannot be validated: ${commonGate.errorMessage ?? "validation failed"}`
+        )
+      ]
+    };
+  }
+
+  const outcome = await finalizeCommit(deps, true, true, true);
+  if (outcome.kind === "completed") {
+    return { kind: "committed" };
+  }
+  if (outcome.kind === "failed" || outcome.kind === "stoppedByOperator") {
+    return outcome;
+  }
+  return {
+    kind: "failed",
+    diagnostics: [
+      error(
+        "project-reconcile",
+        "Pending shared reconciliation checkpoint did not produce a commit outcome."
+      )
+    ]
+  };
+}
+
 /** Describe a non-`ok` post-baseline changedPaths result for diagnostics. */
 function describeInspectionFailure(
   changed: Exclude<ReturnType<ProjectGitPort["changedPaths"]>, { kind: "ok" }>
@@ -274,9 +372,27 @@ function describeInspectionFailure(
 async function attachDeferredClass(
   className: string,
   deps: ProjectReconciliationDeps,
-  attach: (projectRoot: string, className: string, repoPath: string) => AttachResult,
+  attach: (
+    projectRoot: string,
+    className: string,
+    repoPath: string,
+    policy: ProjectClassPolicy
+  ) => AttachResult,
   definitionPath: string
 ): Promise<void> {
+  const policy = await promptClassPolicy(
+    className,
+    deps,
+    currentDeferredPolicy(definitionPath, className)
+  );
+  if (!policy) return;
+  if (policy === "A") {
+    if (!recordDeferredPolicy(definitionPath, className, policy, deps)) return;
+    deps.emit(`Class '${className}' remains deferred with policy A.`);
+    return;
+  }
+  if (!recordDeferredPolicy(definitionPath, className, policy, deps)) return;
+
   let attemptsLeft = 2;
   while (attemptsLeft > 0) {
     attemptsLeft -= 1;
@@ -288,13 +404,19 @@ async function attachDeferredClass(
         })
       ).trim();
     } catch (err) {
-      if (err instanceof InteractionClosedError) return; // closed => keep deferred
+      if (err instanceof InteractionClosedError) {
+        deps.emit(`Class '${className}' remains deferred with policy ${policy}.`);
+        return;
+      }
       throw err;
     }
-    if (response === "") return; // blank => keep deferred
+    if (response === "") {
+      deps.emit(`Class '${className}' remains deferred with policy ${policy}.`);
+      return;
+    }
 
     const snapshot = snapshotDefinition(definitionPath);
-    const result = attach(deps.projectRoot, className, response);
+    const result = attach(deps.projectRoot, className, response, policy);
     if (result.ok) {
       deps.emit(`Attached '${className}' -> ${result.resolvedRepoPath}`);
       return;
@@ -305,7 +427,65 @@ async function attachDeferredClass(
       deps.emit(`Retrying attach for '${className}' (one attempt remaining).`);
     }
   }
-  deps.emit(`Class '${className}' remains deferred.`);
+  deps.emit(`Class '${className}' remains deferred with policy ${policy}.`);
+}
+
+async function promptClassPolicy(
+  className: string,
+  deps: ProjectReconciliationDeps,
+  currentPolicy: ProjectClassPolicy | undefined
+): Promise<ProjectClassPolicy | undefined> {
+  let attemptsLeft = 2;
+  while (attemptsLeft > 0) {
+    attemptsLeft -= 1;
+    let response: string;
+    try {
+      response = (
+        await deps.interaction.input({
+          message: `Select policy for deferred class '${className}' (A/B/C, blank to keep unchanged):`
+        })
+      )
+        .trim()
+        .toUpperCase();
+    } catch (err) {
+      if (err instanceof InteractionClosedError) return undefined;
+      throw err;
+    }
+    if (response === "") return currentPolicy;
+    if (response === "A" || response === "B" || response === "C") return response;
+    deps.emitError(`Invalid policy for '${className}': ${response}. Use A, B, or C.`);
+    if (attemptsLeft > 0) {
+      deps.emit(`Retrying policy for '${className}' (one attempt remaining).`);
+    }
+  }
+  deps.emit(`Class '${className}' remains deferred with unchanged policy.`);
+  return undefined;
+}
+
+function currentDeferredPolicy(
+  definitionPath: string,
+  className: string
+): ProjectClassPolicy | undefined {
+  const metadata = readProjectDefinitionMetadata(definitionPath);
+  if (!metadata.parsed) return undefined;
+  const policy = metadata.classRepoPaths[className]?.policy;
+  return policy === "A" || policy === "B" || policy === "C" ? policy : undefined;
+}
+
+function recordDeferredPolicy(
+  definitionPath: string,
+  className: string,
+  policy: ProjectClassPolicy,
+  deps: Pick<ProjectReconciliationDeps, "emitError">
+): boolean {
+  const content = readFileSync(definitionPath, "utf8");
+  const mutation = applyDeferredClassPolicy(content, className, policy);
+  if ("error" in mutation) {
+    deps.emitError(mutation.error);
+    return false;
+  }
+  writeFileSync(definitionPath, mutation.content);
+  return true;
 }
 
 interface DefinitionSnapshot {
@@ -349,7 +529,10 @@ async function finalizeCommit(
 
   let confirmed: boolean;
   try {
-    confirmed = await deps.interaction.confirm({ message: "Commit reconciliation results? [y/N]" });
+    confirmed = await deps.interaction.confirm({
+      message: "Commit reconciliation results?",
+      defaultValue: false
+    });
   } catch (err) {
     if (err instanceof InteractionClosedError) {
       deps.emit("Commit declined (input closed); owned changes left uncommitted.");

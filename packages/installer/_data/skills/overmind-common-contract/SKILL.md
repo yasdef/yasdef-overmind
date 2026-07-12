@@ -118,4 +118,4 @@ If the gate cannot pass, end with exactly:
 
 If the gate passes, end with exactly:
 
-`Common contract definition phase is finished. Nothing else to do now; press Ctrl-C so orchestrator can start the next phase`
+`Common contract definition phase is finished. Nothing else to do now; press Ctrl-C so Overmind can finalize project initialization`

@@ -32,6 +32,7 @@ const PROJECT_TYPE_LABELS: Record<string, string> = {
 export interface ClassRepoOption {
   /** Omit to emit a class_repo_paths entry with no `state:` line. */
   state?: "ready" | "deferred";
+  policy?: "A" | "B" | "C";
   reconciled?: boolean;
   /** Absolute repo path; filled in by withWorkspace for ready classes. */
   repoPath?: string;
@@ -57,7 +58,14 @@ export function buildDefinition(options: DefinitionOptions = {}): string {
     .map(([className, entry]) => {
       const lines = [`    ${className}:`];
       if (entry.state) lines.push(`      state: "${entry.state}"`);
-      lines.push(`      path: "${entry.repoPath ?? `/tmp/${className}`}"`, `      policy: "C"`);
+      if (entry.state === "deferred") {
+        lines.push('      path: ""', `      policy: "${entry.policy ?? "A"}"`);
+      } else {
+        lines.push(
+          `      path: "${entry.repoPath ?? `/tmp/${className}`}"`,
+          `      policy: "${entry.policy ?? "C"}"`
+        );
+      }
       if (entry.reconciled !== undefined)
         lines.push(`      contract_reconciled: ${entry.reconciled}`);
       return lines.join("\n");
@@ -179,6 +187,8 @@ export class StubInteraction implements InteractionPort {
   public readonly log: string[] = [];
   /** Option values presented on each `select` call, for asserting hidden/offered choices. */
   public readonly selectRequests: string[][] = [];
+  /** Option labels presented on each `select` call, for asserting operator-facing copy. */
+  public readonly selectLabels: string[][] = [];
 
   constructor(private readonly script: Array<boolean | string>) {}
 
@@ -196,6 +206,7 @@ export class StubInteraction implements InteractionPort {
 
   async select<T extends string>(request: SelectRequest<T>): Promise<T> {
     this.selectRequests.push(request.options.map((option) => option.value));
+    this.selectLabels.push(request.options.map((option) => option.label));
     return String(this.next("select")) as T;
   }
 

@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import path from "node:path";
 
 import {
@@ -6,7 +6,11 @@ import {
   collectReadyRepoPaths,
   listCommittedSiblingFeatures
 } from "../repo/index.js";
-import { displayPath, resolveFeatureWithinWorkspace, stripQuotes } from "../parse/index.js";
+import {
+  displayPath,
+  readProjectDefinitionMetadata,
+  resolveFeatureWithinWorkspace
+} from "../parse/index.js";
 import type { ContextResult } from "../types/index.js";
 import type { SurfaceMapClass } from "../validate/surface-map.js";
 import { buildReadOnlyInputManifest } from "./read-only-inputs.js";
@@ -30,52 +34,6 @@ const CLASS_BINDINGS: Record<SurfaceMapClass, ClassBinding> = {
     goldenAsset: "assets/project_surface_struct_resp_map_fe_GOLDEN_EXAMPLE.md"
   }
 };
-
-function parseProjectClasses(definitionPath: string): string[] {
-  const lines = readFileSync(definitionPath, "utf8").split(/\r?\n/);
-  const classes: string[] = [];
-  let inMeta = false;
-  let inClasses = false;
-  const record = (raw: string): void => {
-    const value = stripQuotes(raw).toLowerCase();
-    if (value !== "" && !classes.includes(value)) {
-      classes.push(value);
-    }
-  };
-  for (const rawLine of lines) {
-    if (/^meta_info:\s*$/.test(rawLine)) {
-      inMeta = true;
-      continue;
-    }
-    if (/^steps:\s*$/.test(rawLine) && inMeta) {
-      break;
-    }
-    if (!inMeta) {
-      continue;
-    }
-    const inline = rawLine.match(/^\s{2}project_classes:\s*\[([^\]]*)\]\s*$/);
-    if (inline) {
-      for (const value of inline[1]!.split(",")) {
-        record(value);
-      }
-      inClasses = false;
-      continue;
-    }
-    if (/^\s{2}project_classes:\s*$/.test(rawLine)) {
-      inClasses = true;
-      continue;
-    }
-    if (inClasses) {
-      const item = rawLine.match(/^\s{4}-\s*(.*)$/);
-      if (item) {
-        record(item[1]!);
-        continue;
-      }
-      inClasses = false;
-    }
-  }
-  return classes;
-}
 
 export function buildSurfaceMapContext(
   inputPath: string,
@@ -106,18 +64,23 @@ export function buildSurfaceMapContext(
   }
 
   try {
-    const projectClasses = parseProjectClasses(definitionPath);
-    if (!projectClasses.includes(klass)) {
+    const metadata = readProjectDefinitionMetadata(definitionPath);
+    if (!metadata.parsed) {
+      return contextError(metadata.diagnostics.map((diagnostic) => diagnostic.reason).join("; "));
+    }
+    if (!metadata.projectClasses.includes(klass)) {
       return contextError(
         `Class '${klass}' is not an active meta_info.project_classes member in ${displayPath(definitionPath, workspaceRoot)}`
       );
     }
 
-    const readyRepo = collectReadyRepoPaths(definitionPath).find((repo) => repo.class === klass);
+    const classRepo = metadata.classRepoPaths[klass];
+    const readyRepo =
+      classRepo?.state === "ready"
+        ? collectReadyRepoPaths(definitionPath, [klass]).find((repo) => repo.class === klass)
+        : undefined;
+    const blueprintMode = classRepo?.state === "deferred" && classRepo.policy === "A";
     const blueprintPath = path.join(projectDir, `project_stack_blueprint_${klass}.md`);
-    // A blueprint is never retired: it remains read-only fallback evidence for
-    // unmaterialized layers whenever it exists, independent of whether a ready
-    // repo also exists. Its inclusion is gated on existence, not on fallback.
     const blueprintExists = existsSync(blueprintPath) && statSync(blueprintPath).isFile();
     let scanScopePath = "";
     if (readyRepo) {
@@ -126,9 +89,15 @@ export function buildSurfaceMapContext(
         return { exitCode: 2, errorMessage: stateResult.blockedMessage, verbatim: true };
       }
       scanScopePath = readyRepo.path;
+    } else if (classRepo?.state === "ready") {
+      return contextError(`Class '${klass}' has ready state but no usable repository path.`);
+    } else if (!blueprintMode) {
+      return contextError(
+        `Class '${klass}' is not analyzable from class_repo_paths: expected state 'ready' or state 'deferred' with policy 'A'.`
+      );
     } else if (!blueprintExists) {
       return contextError(
-        `Class '${klass}' has neither a ready repository nor a stack blueprint (${displayPath(blueprintPath, workspaceRoot)}); it is not analyzable`
+        `Required policy A stack blueprint not found: ${displayPath(blueprintPath, workspaceRoot)}`
       );
     }
 

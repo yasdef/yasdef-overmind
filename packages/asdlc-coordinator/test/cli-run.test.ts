@@ -209,11 +209,14 @@ test("with multiple projects the operator can select one and it becomes the targ
   });
 });
 
-test("scaffold requires --path", async () => {
-  await withWorkspace({}, async ({ root }) => {
-    const { code, out } = await run(["scaffold", "feature"], root, {});
-    assert.equal(code, 2);
-    assert.match(out.stderr, /Missing required option: --path/);
+test("removed scaffold verb is rejected as an unknown command", async () => {
+  await withWorkspace({}, async ({ root, projectDir, projectPathRel }) => {
+    const before = readdirSync(projectDir).length;
+    const { code, out } = await run(["scaffold", "feature", "--path", projectPathRel], root, {});
+    assert.notEqual(code, 0);
+    assert.match(out.stderr, /Usage: overmind/);
+    assert.doesNotMatch(out.stderr, /scaffold/);
+    assert.equal(readdirSync(projectDir).length, before);
   });
 });
 
@@ -247,19 +250,5 @@ test("a failed step exits one and prints the exact restart command", async () =>
     });
     assert.equal(code, 1);
     assert.match(out.stderr, new RegExp(`overmind run --path ${projectPathRel} --resume 8\\.4`));
-  });
-});
-
-test("standalone scaffold dispatch creates a feature and exits zero", async () => {
-  await withWorkspace({}, async ({ root, projectDir, projectPathRel }) => {
-    const before = readdirSync(projectDir).length;
-    const { code, out } = await run(["scaffold", "feature", "--path", projectPathRel], root, {
-      interaction: new StubInteraction(["FEAT-1", "New Thing"]),
-      clock: { now: () => 7 }
-    });
-    assert.equal(code, 0);
-    assert.match(out.stdout, /Created feature folder: /);
-    assert.equal(readdirSync(projectDir).length, before + 1);
-    assert.ok(readdirSync(projectDir).includes("new_thing-7"));
   });
 });

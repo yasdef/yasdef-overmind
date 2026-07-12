@@ -5,7 +5,6 @@ import type { ProjectInitGitPort, ProjectInitResult } from "../git/index.js";
 import type { InteractionPort } from "../interaction/index.js";
 import { escapeYamlDoubleQuoted } from "../parse/project-definition.js";
 import type { Diagnostic } from "../types/index.js";
-import { resolveRepoPath } from "../workspace/index.js";
 
 export interface ProjectCreationClock {
   now(): string;
@@ -54,7 +53,6 @@ export interface ProjectCreationResult {
 
 export type ProjectClass = "backend" | "frontend" | "mobile" | "infrastructure";
 export type ProjectTypeCode = "A" | "B" | "C";
-export type RepoPathState = { state: "ready" | "deferred"; path: string };
 
 export const PROJECT_CLASSES: readonly ProjectClass[] = [
   "backend",
@@ -106,9 +104,8 @@ export async function createProject(
   const normalizedName = normalizeProjectName(rawName);
   if (normalizedName === "") return fail("Project name must contain at least one letter or digit.");
 
-  const classes = await collectProjectClasses(deps.interaction);
-  const repoPathStates = await collectRepoPathStates(deps.interaction, classes, deps.emitError);
   const projectTypeCode = await selectProjectType(deps.interaction);
+  const classes = await collectProjectClasses(deps.interaction);
   const projectTypeLabel = PROJECT_TYPE_LABELS[projectTypeCode];
 
   const projectId = `${normalizedName}-${deps.uuid.next()}`;
@@ -121,8 +118,7 @@ export async function createProject(
     projectId,
     classes,
     projectTypeCode,
-    projectTypeLabel,
-    repoPathStates
+    projectTypeLabel
   });
   if (!definitionContent) {
     return fail(
@@ -192,54 +188,22 @@ async function collectProjectClasses(interaction: InteractionPort): Promise<Proj
       value: klass,
       label: klass
     }));
-    const canFinish = selected.size > 0;
     const answer = await interaction.select<ProjectClass | "__done__">({
       message: "Select project class to add:",
       options: [
         ...options,
         {
           value: "__done__",
-          label: canFinish ? "all done, nothing else to add" : "select at least one class first"
+          label:
+            selected.size > 0 ? "all done, nothing else to add" : "create without project classes"
         }
       ]
     });
     if (answer === "__done__") {
-      if (canFinish) return PROJECT_CLASSES.filter((klass) => selected.has(klass));
-      continue;
+      return PROJECT_CLASSES.filter((klass) => selected.has(klass));
     }
     selected.add(answer);
   }
-}
-
-async function collectRepoPathStates(
-  interaction: InteractionPort,
-  classes: ProjectClass[],
-  emitError?: (line: string) => void
-): Promise<Record<ProjectClass, RepoPathState>> {
-  const result = {} as Record<ProjectClass, RepoPathState>;
-  for (const klass of classes) {
-    const state = await interaction.select<"ready" | "deferred">({
-      message: `we need to add repo path in your system for ${klass}`,
-      options: [
-        { value: "ready", label: "yes, ready to add" },
-        { value: "deferred", label: "no, I'll add it later" }
-      ]
-    });
-    if (state === "deferred") {
-      result[klass] = { state: "deferred", path: "" };
-      continue;
-    }
-    for (;;) {
-      const input = await interaction.input({ message: `Enter repo path for ${klass}:` });
-      const resolved = resolveRepoPath(input);
-      if (resolved.path) {
-        result[klass] = { state: "ready", path: resolved.path };
-        break;
-      }
-      for (const diagnostic of resolved.diagnostics) emitError?.(diagnostic.reason);
-    }
-  }
-  return result;
 }
 
 function renderProjectDefinition(
@@ -249,7 +213,6 @@ function renderProjectDefinition(
     classes: ProjectClass[];
     projectTypeCode: ProjectTypeCode;
     projectTypeLabel: string;
-    repoPathStates: Record<ProjectClass, RepoPathState>;
   }
 ): string | undefined {
   const lines = template.split(/\r?\n/);
@@ -258,17 +221,17 @@ function renderProjectDefinition(
   const metaInfo = [
     "meta_info:",
     `  project_id: "${escapeYamlDoubleQuoted(values.projectId)}"`,
-    "  project_classes:",
+    values.classes.length === 0 ? "  project_classes: []" : "  project_classes:",
     ...values.classes.map((klass) => `    - ${klass}`),
     `  project_type_code: "${escapeYamlDoubleQuoted(values.projectTypeCode)}"`,
     `  project_type_label: "${escapeYamlDoubleQuoted(values.projectTypeLabel)}"`,
-    "  class_repo_paths:"
+    values.classes.length === 0 ? "  class_repo_paths: {}" : "  class_repo_paths:"
   ];
   for (const klass of values.classes) {
-    const state = values.repoPathStates[klass];
     metaInfo.push(`    ${klass}:`);
-    metaInfo.push(`      state: "${escapeYamlDoubleQuoted(state.state)}"`);
-    metaInfo.push(`      path: "${escapeYamlDoubleQuoted(state.path)}"`);
+    metaInfo.push('      state: "deferred"');
+    metaInfo.push('      path: ""');
+    metaInfo.push('      policy: "A"');
   }
 
   const metaStart = lines.slice(0, stepsIndex).findIndex((line) => /^meta_info:\s*$/.test(line));

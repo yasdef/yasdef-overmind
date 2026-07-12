@@ -1,28 +1,67 @@
 ## ADDED Requirements
 
-### Requirement: Reconcile captures class policy before a repository path
+### Requirement: Reconcile binds deferred existing-repository classes
 
-For each deferred class it prompts, `overmind project reconcile` SHALL first ask for the class policy: `A` (the repository will be generated), `B` (existing repository, partial context), or `C` (existing repository, code-first). Policy `A` SHALL record `policy: "A"` with `state: "deferred"` and an empty path, and SHALL NOT ask for a repository path. Policy `B` or `C` SHALL ask for a repository path under the existing validation and single-retry rules; a valid path SHALL record the selected policy with `state: "ready"` and the canonical absolute path, and a blank path SHALL record the selected policy while the class stays deferred with an empty path. Blank input or closed input at the policy prompt SHALL leave the class record unchanged. Reconcile SHALL be the only writer of class policy, repository path, and `ready` state.
+For each deferred class, `overmind project reconcile` SHALL ask for a class policy. Invalid policy input SHALL allow one retry; a second invalid policy input SHALL leave the class unchanged and skip repository path collection for that run. Selecting or keeping policy `A` SHALL leave the class deferred with an empty path and SHALL NOT request a repository path. Blank policy input on a class already carrying policy `B` or `C` SHALL keep that existing policy and continue to repository path collection. Selecting policy `B` (existing repository, partial context) or `C` (existing repository, code-first) SHALL record that policy before repository path collection, then ask for a repository path under the existing validation and single-retry rules. A valid path SHALL preserve the selected policy and record `state: "ready"` with the canonical absolute path. A blank path, closed input, or failed path validation SHALL leave the class deferred with an empty path and the selected policy. Reconcile SHALL be the only writer of repository path and `ready` state.
 
-#### Scenario: Policy A keeps the class deferred without a path prompt
+#### Scenario: Policy A can stay deferred without a path prompt
 
-- **WHEN** the operator answers `A` for a deferred `frontend` class
-- **THEN** `frontend` records `policy: "A"` with `state: "deferred"` and an empty path, and no repository path is requested
+- **WHEN** `frontend` is deferred with `policy: "A"`
+- **THEN** `overmind project reconcile` lets the operator keep `frontend` as policy `A` without prompting for a repository path
 
 #### Scenario: Policy C binds an existing repository
 
-- **WHEN** the operator answers `C` for a deferred `backend` class and supplies a valid non-empty directory
+- **WHEN** `backend` is deferred with `policy: "A"` and the operator selects `policy: "C"` with a valid non-empty directory
 - **THEN** `backend` records `policy: "C"`, `state: "ready"`, and the canonical absolute repository path
 
 #### Scenario: Selected policy is recorded, not hardcoded
 
-- **WHEN** the operator answers `B` and supplies a valid repository path
+- **WHEN** `backend` is deferred with `policy: "B"` and the operator supplies a valid repository path
 - **THEN** the class records `policy: "B"` rather than `policy: "C"`
 
-#### Scenario: Deferred class stays prompted on later runs
+#### Scenario: Blank policy keeps existing B or C binding intent
 
-- **WHEN** a class remains deferred after a reconcile run
+- **WHEN** `backend` is deferred with `policy: "B"` and the operator leaves the policy prompt blank
+- **THEN** `overmind project reconcile` keeps policy `B` and asks for the repository path
+
+#### Scenario: Deferred existing-repo class stays prompted on later runs
+
+- **WHEN** a policy `B` or `C` class remains deferred after a reconcile run
 - **THEN** the next `overmind project reconcile` run prompts that class again
+
+#### Scenario: Invalid policy input has one retry
+
+- **WHEN** the operator enters an invalid policy twice for a deferred class
+- **THEN** the class record remains unchanged and no repository path is requested for that class
+
+#### Scenario: Selected policy survives failed path binding
+
+- **WHEN** a deferred class selects policy `B` or `C` and repository path binding does not complete because input closes or validation fails
+- **THEN** the class remains deferred with an empty path and records the selected policy
+
+### Requirement: Feature runs distinguish repo binding from contract reconciliation
+
+`overmind run` SHALL allow feature work when a class is deferred with `policy: "A"`, because this means no existing repository is bound yet. It SHALL block deferred classes with `policy: "B"` or `policy: "C"` using repo-binding guidance. It SHALL separately block ready classes whose `contract_reconciled` is not true using contract-reconciliation guidance.
+
+#### Scenario: Deferred policy A does not block feature work
+
+- **WHEN** a project class is deferred with `policy: "A"`
+- **THEN** `overmind run` does not refuse feature selection because of that class
+
+#### Scenario: Deferred policy B or C blocks repo binding
+
+- **WHEN** a project class is deferred with `policy: "B"` or `policy: "C"`
+- **THEN** `overmind run` refuses before feature selection with guidance to bind the deferred repo path through `overmind project reconcile`
+
+#### Scenario: Malformed not-ready class rows block with incomplete-binding guidance
+
+- **WHEN** a project class is not ready and carries no `policy: "A"` decision
+- **THEN** `overmind run` refuses before feature selection with guidance to resolve the class repo binding through `overmind project reconcile`
+
+#### Scenario: Ready unreconciled class blocks contract reconciliation
+
+- **WHEN** a project class is ready and `contract_reconciled` is not true
+- **THEN** `overmind run` refuses before feature selection with guidance to reconcile the common contract through `overmind project reconcile`
 
 ## MODIFIED Requirements
 

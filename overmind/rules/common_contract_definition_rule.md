@@ -87,4 +87,4 @@ Must not own:
   - if gate cannot pass with current evidence and constraints, stop and end with this exact line:
     `common contract definition gate cannot pass with current repository evidence. Please provide instructions what to do, or adjust requirements and rerun this phase`
 - If gate passes, end final response with this exact last line:
-  `Common contract definition phase is finished. Nothing else to do now; press Ctrl-C so orchestrator can start the next phase`
+  `Common contract definition phase is finished. Nothing else to do now; press Ctrl-C so Overmind can finalize project initialization`

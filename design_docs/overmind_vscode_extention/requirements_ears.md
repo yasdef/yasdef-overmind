@@ -111,7 +111,7 @@ Scope: Local VS Code extension that provides BA/PO operators with a dashboard an
 **User Story:** As a technical operator, I want dashboard buttons to invoke supported Overmind actions, so that I can run workflow steps without typing commands.
 
 **Acceptance Criteria (EARS):**
-- WHERE actions are enabled, THE Overmind VS Code Extension SHALL invoke only allow-listed shipped verbs: read-only `overmind status`, deterministic `overmind scaffold feature`, and terminal-hosted `overmind run`.
+- WHERE actions are enabled, THE Overmind VS Code Extension SHALL invoke only allow-listed shipped verbs: read-only `overmind status` and terminal-hosted `overmind run`. Feature creation SHALL use the in-process `scaffoldFeature()` coordinator primitive, not a shipped verb.
 - WHEN `overmind run` requires interactive model sessions, THE Overmind VS Code Extension SHALL host it in a visible VS Code integrated terminal.
 - BEFORE invoking a mutating action, THE Overmind VS Code Extension SHALL show the exact project or feature path and ask for confirmation.
 - IF neither the workspace `.overmind/overmind.js` nor the bundled coordinator core is available, THEN THE Overmind VS Code Extension SHALL show a blocking action error.

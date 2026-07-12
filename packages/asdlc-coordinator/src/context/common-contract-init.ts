@@ -48,7 +48,16 @@ export function buildCommonContractInitContext(
           `Required type A stack blueprint is missing before step 2: ${displayPath(blueprint, workspaceRoot)}`
         );
       }
-      readOnlyPaths.push(blueprint);
+      const agentsMd = path.join(projectRoot, `project_agents_md_claude_md_${klass}.md`);
+      if (!existsSync(agentsMd) || !statSync(agentsMd).isFile()) {
+        return contextError(
+          `Required type A agent guidelines artifact is missing before step 2: ${displayPath(
+            agentsMd,
+            workspaceRoot
+          )}`
+        );
+      }
+      readOnlyPaths.push(blueprint, agentsMd);
       blueprintLines.push(`- ${klass}: ${displayPath(blueprint, workspaceRoot)}`);
       sourceRepositoryLabels.push(`${klass} blueprint`);
     }

@@ -15,23 +15,21 @@ steps:
         value: "project_type"
       - type: "user_input"
         value: "project_classes"
-      - type: "user_input"
-        value: "class_repo_paths for active project classes"
     finished_only_if_artefacts_present:
       - file: "init_progress_definition.yaml"
     finished_only_if_conditions_meet:
       - condition: "overmind/init_progress_definition.yaml exists as the repo-level ASDLC metadata source of truth."
-      - condition: "project_type_code, project_type_label, project_classes, and class_repo_paths for active project classes are persisted in overmind/init_progress_definition.yaml."
+      - condition: "project_type_code, project_type_label, project_classes, and deferred class_repo_paths rows for selected project classes are persisted in overmind/init_progress_definition.yaml."
       - condition: "project_type_code records how the project started and is not read by feature-phase steps."
 
   - step_number: 1.1
     phase_name: "init"
-    step_name: "Define Project Stack Blueprints For Active Classes"
+    step_name: "Define Project Stack Blueprints And Agent Guidelines For Active Classes"
     input_required:
       - type: "document"
         value: "init_progress_definition.yaml"
       - type: "user_input"
-        value: "approved stack blueprint conventions for each active type A stack class"
+        value: "approved stack blueprint conventions and agent guidelines for each active type A stack class"
     finished_only_if_artefacts_present:
       - file: "project_stack_blueprint_backend.md"
         required_if:
@@ -54,12 +52,35 @@ steps:
               equals: "A"
             project_classes:
               any_of: ["mobile"]
+      - file: "project_agents_md_claude_md_backend.md"
+        required_if:
+          meta_info:
+            project_type_code:
+              equals: "A"
+            project_classes:
+              any_of: ["backend"]
+      - file: "project_agents_md_claude_md_frontend.md"
+        required_if:
+          meta_info:
+            project_type_code:
+              equals: "A"
+            project_classes:
+              any_of: ["frontend"]
+      - file: "project_agents_md_claude_md_mobile.md"
+        required_if:
+          meta_info:
+            project_type_code:
+              equals: "A"
+            project_classes:
+              any_of: ["mobile"]
     finished_only_if_conditions_meet:
-      - condition: "For project type A, every active backend/frontend/mobile class has exactly one approved project_stack_blueprint_<class>.md at the project root."
+      - condition: "For project type A, every active backend/frontend/mobile class has exactly one approved project_stack_blueprint_<class>.md and one approved project_agents_md_claude_md_<class>.md at the project root."
       - condition: "For project types B and C, this step is not required and does not block Create Cross-Repository Contract Definition For This Project."
       - condition: "This step captures stable stack choices, layer folder conventions, and component archetypes without capturing feature-specific implementation work."
       - condition: "For project type A, every active backend blueprint with an in-project peer class (another backend, frontend, or mobile) includes a valid Cross-Class Transport/Contract Approach as defined by the project stack blueprint rule and the TypeScript stack-blueprint gate."
-      - condition: "overmind project init owns this step through the TypeScript generic executor and overmind gate stack-blueprint validates each project_stack_blueprint_<class>.md target."
+      - condition: "overmind project init owns this step through the TypeScript generic executor; overmind gate stack-blueprint validates each project_stack_blueprint_<class>.md target and overmind gate agents-md validates each project_agents_md_claude_md_<class>.md target."
+      - condition: "After every applicable type A class session returns, overmind project init checkpoints only the applicable project_stack_blueprint_<class>.md and project_agents_md_claude_md_<class>.md paths with commit message Finalize project stack baseline."
+      - condition: "After the stack baseline checkpoint, overmind project init asks Continue with common contract definition? [Y/n]; yes or blank starts Create Cross-Repository Contract Definition For This Project in the same invocation, while no or closed input pauses successfully with that step pending."
       - condition: "Cross-Class Transport/Contract Approach is a no-op when no in-project peer exists (lone backend or no backend) and for project types B and C."
 
   - step_number: 2
@@ -75,14 +96,15 @@ steps:
       - condition: "For project types B and C, active BE/FE/Mobile lines provide req/resp contract evidence to the Product Owner using the configured repo paths."
       - condition: "For project types B and C, class-specific contract inventory artifacts may be prepared as supporting evidence before reconciliation."
       - condition: "For project type A, common_contract_definition.md uses approved per-class project_stack_blueprint_<class>.md as read-only project context only, not as contract schema content, repository scan evidence, or surface-map evidence."
-      - condition: "For project type A, Create Cross-Repository Contract Definition For This Project cannot proceed until Define Project Stack Blueprints For Active Classes has produced every required active-class project_stack_blueprint_<class>.md and each one passes overmind gate stack-blueprint."
+      - condition: "For project type A, Create Cross-Repository Contract Definition For This Project cannot proceed until Define Project Stack Blueprints And Agent Guidelines For Active Classes has produced every required active-class project_stack_blueprint_<class>.md and project_agents_md_claude_md_<class>.md, and each one passes its gate."
       - condition: "common_contract_definition.md reconciles applicable cross-project contract overlaps, mismatches, and shared definitions."
       - condition: "When only one source is applicable by project class/type, common_contract_definition.md explicitly documents the single-source basis."
       - condition: "For project type A, when at least one in-project cross-class peer exists for the backend (another active backend, an active frontend, or an active mobile class), common_contract_definition.md reflects each active backend blueprint's Cross-Class Transport/Contract Approach verbatim; concrete values mirror as concrete values, the literal placeholder mirrors as the placeholder, and per-backend ownership is recorded by service_name or repo_name when more than one active backend exists."
       - condition: "For project type A, placeholder carry-through in Cross-Class Transport/Contract Approach does not block Create Cross-Repository Contract Definition For This Project."
       - condition: "For project type A with no in-project cross-class peer (lone backend or no active backend) and for project types B and C, common_contract_definition.md writes no Cross-Class Transport/Contract Approach mirror entries."
       - condition: "overmind project init owns this step through the TypeScript generic executor and the common-contract TypeScript gate validates common_contract_definition.md."
-      - condition: "On successful completion, the project git repository has a clean committed initialization baseline containing init_progress_definition.yaml, common_contract_definition.md, and every applicable project_stack_blueprint_<class>.md."
+      - condition: "On successful completion, the project git repository has a committed initialization baseline containing init_progress_definition.yaml, common_contract_definition.md, every applicable project_stack_blueprint_<class>.md, and every applicable project_agents_md_claude_md_<class>.md across the stack-baseline and final-baseline checkpoints."
+      - condition: "After common_contract_definition.md has a committed version in HEAD, changed shared project-definition paths are project reconciliation checkpoint work."
 
   - step_number: 3
     phase_name: "feature"
@@ -230,12 +252,12 @@ steps:
             project_classes:
               any_of: ["mobile"]
     finished_only_if_conditions_meet:
-      - condition: "Repo execution-context analysis runs one ready repo class at a time using the active repo path from meta_info.class_repo_paths.<class>.path."
+      - condition: "Repo execution-context analysis runs one backend, frontend, or mobile class at a time when class_repo_paths.<class> has state ready or has state deferred with policy A and the matching project_stack_blueprint_<class>.md file exists; deferred policy B/C classes and deferred policy A classes without that file remain unavailable."
       - condition: "Backend analysis produces project_surface_struct_resp_map_backend.md when backend class is active."
       - condition: "Frontend analysis produces project_surface_struct_resp_map_frontend.md when frontend class is active."
       - condition: "Mobile analysis produces project_surface_struct_resp_map_mobile.md when mobile class is active."
       - condition: "Surface-map evidence resolution satisfies the feature repo surface and execution context rule."
-      - condition: "project_surface_struct_resp_map_backend.md, project_surface_struct_resp_map_frontend.md, and project_surface_struct_resp_map_mobile.md capture feature-scoped repo context for their respective classes, grounded in project-level repo metadata."
+      - condition: "project_surface_struct_resp_map_backend.md, project_surface_struct_resp_map_frontend.md, and project_surface_struct_resp_map_mobile.md capture feature-scoped execution context for their respective classes, grounded in project-level repo metadata and the available repository or blueprint evidence."
       - condition: "These artifacts do not redefine stable cross-project contract governance already captured in common_contract_definition.md."
       - condition: "Every surface-map row in Key Parts of Repo and Their Responsibilities and in the feature-touched surfaces block carries both transport_layer and user_reachable_surface subfields."
 

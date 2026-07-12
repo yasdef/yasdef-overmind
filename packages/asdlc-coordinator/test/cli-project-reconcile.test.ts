@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -78,6 +78,9 @@ function withWorkspace(options: WsOptions, fn: (root: string) => Promise<void>):
       if (spec.state === "ready") {
         repoLines.push(`      path: "${spec.repoPath}"`);
         repoLines.push(`      policy: "C"`);
+      } else {
+        repoLines.push('      path: ""');
+        repoLines.push('      policy: "A"');
       }
       if (spec.reconciled) repoLines.push(`      contract_reconciled: true`);
     }
@@ -178,6 +181,7 @@ test("interactive project selection shows reconciliation guidance and decline ab
       });
       assert.equal(code, 0);
       assert.match(out.stdout, /full project reconciliation flow, not just a repo attach/);
+      assert.match(out.stdout, /overmind project add-class/);
       assert.match(out.stdout, /Aborted: no changes made to project 'b'/);
       assert.equal(agent.specs.length, 0);
     }
@@ -228,6 +232,26 @@ test("explicit invalid --path exits non-zero", async () => {
   });
 });
 
+test("project reconcile can bind a class created as policy A", async () => {
+  await withWorkspace({ projects: { p1: { backend: { state: "deferred" } } } }, async (root) => {
+    const repo = initGitRepo(path.join(root, "repos", "api"));
+    const projectDir = path.join(root, "projects", "p1");
+    const agent = new StubAgentRunner(0);
+    const { code, out } = await run(["project", "reconcile", "--path", projectDir], root, {
+      interaction: new StubInteraction(["C", repo]),
+      agentRunner: agent
+    });
+    assert.equal(code, 0);
+    assert.match(out.stdout, /Attached 'backend'/);
+    assert.equal(agent.specs.length, 1);
+    const definition = readFileSync(path.join(projectDir, "init_progress_definition.yaml"), "utf8");
+    assert.match(definition, /state: "ready"/);
+    assert.match(definition, /path: ".*repos\/api"/);
+    assert.match(definition, /policy: "C"/);
+    assert.match(definition, /contract_reconciled: true/);
+  });
+});
+
 test("git-backed success with confirmed commit exits zero and launches one agent", async () => {
   const root = mkdtempSync(path.join(tmpdir(), "overmind-cli-reconcile-ok-"));
   try {
@@ -270,7 +294,7 @@ steps:
     assert.equal(agent.specs.length, 1);
     // Definition committed with the reconciliation flag.
     const log = execFileSync("git", ["-C", projectDir, "log", "--oneline"], { encoding: "utf8" });
-    assert.match(log, /Reconcile contract and attach repos/);
+    assert.match(log, /Update project reconciliation state/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

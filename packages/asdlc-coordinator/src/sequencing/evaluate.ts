@@ -1,16 +1,18 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 
-import { readProjectDefinitionMetadata } from "../parse/project-definition.js";
+import { readProjectDefinitionMetadata, type ClassRepoPath } from "../parse/project-definition.js";
 import type { Diagnostic } from "../types/index.js";
 import { parseDeclaredSteps, type ArtifactCheck } from "./definition.js";
 import { STEP_CATALOG } from "./step-catalog.js";
 
 export type StepState = "done" | "pending" | "blocked";
+export type SurfaceMapAvailability = "ready-repo" | "type-a-blueprint" | "unavailable";
 
 export interface PerClassProgress {
   className: string;
   repoState?: "ready" | "deferred";
+  analysisAvailability: SurfaceMapAvailability;
   state: "done" | "pending";
   missingArtifacts: string[];
 }
@@ -36,6 +38,21 @@ export interface ProgressReport {
 }
 
 const FALLBACK_FEATURE_TITLE = "<feature not initialized>";
+
+function surfaceMapAvailability(
+  classRepo: ClassRepoPath | undefined,
+  blueprintPath: string
+): SurfaceMapAvailability {
+  if (classRepo?.state === "ready") return "ready-repo";
+  if (
+    classRepo?.state === "deferred" &&
+    classRepo.policy === "A" &&
+    existsSync(blueprintPath) &&
+    statSync(blueprintPath).isFile()
+  )
+    return "type-a-blueprint";
+  return "unavailable";
+}
 
 function resolveArtifact(
   projectRoot: string,
@@ -202,19 +219,24 @@ export function evaluate(
 
   const stepSeven = steps.find((step) => step.stepId === "7");
   if (stepSeven) {
-    stepSeven.perClass = metadata.projectClasses.map((className) => {
-      const artifactPath = path.join(
-        featureRoot ?? projectRoot,
-        `project_surface_struct_resp_map_${className}.md`
-      );
-      const done = existsSync(artifactPath);
-      return {
-        className,
-        repoState: metadata.classRepoPaths[className]?.state,
-        state: done ? "done" : "pending",
-        missingArtifacts: done ? [] : [artifactPath]
-      };
-    });
+    stepSeven.perClass = metadata.projectClasses
+      .filter((className) => className !== "infrastructure")
+      .map((className) => {
+        const artifactPath = path.join(
+          featureRoot ?? projectRoot,
+          `project_surface_struct_resp_map_${className}.md`
+        );
+        const done = existsSync(artifactPath);
+        const classRepo = metadata.classRepoPaths[className];
+        const blueprintPath = path.join(projectRoot, `project_stack_blueprint_${className}.md`);
+        return {
+          className,
+          repoState: classRepo?.state,
+          analysisAvailability: surfaceMapAvailability(classRepo, blueprintPath),
+          state: done ? "done" : "pending",
+          missingArtifacts: done ? [] : [artifactPath]
+        };
+      });
   }
 
   return {

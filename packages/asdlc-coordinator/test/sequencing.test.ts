@@ -66,6 +66,8 @@ test("catalog ids exactly match definition and feature actions are concrete", ()
     ["repo-br-scan", "task-to-br"]
   );
   assert.equal(scanActions[0]?.kind === "session" && scanActions[0].runIf, "hasReadyClassRepo");
+  const surfaceMap = STEP_CATALOG.find((step) => step.id === "7")!.actions[0];
+  assert.equal(surfaceMap?.kind === "session" && surfaceMap.runIf, undefined);
   assert.deepEqual(
     STEP_CATALOG.find((step) => step.id === "4.2")!.actions.map((action) => action.kind),
     ["session", "check"]
@@ -100,8 +102,91 @@ test("evaluate reports every step, filters classes, projects next step and summa
       report.steps.find((step) => step.stepId === "7")!.perClass?.[0]?.className,
       "backend"
     );
+    assert.equal(
+      report.steps.find((step) => step.stepId === "7")!.perClass?.[0]?.analysisAvailability,
+      "ready-repo"
+    );
     assert.match(formatChecklist(report), /--- FEATURE LEVEL TASKS Alpha ---/);
   });
+});
+
+test("type-A step 1.1 requires both stack blueprint and agents-md artifacts", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "sequencing-type-a-"));
+  const project = path.join(root, "projects", "p");
+  mkdirSync(project, { recursive: true });
+  writeFileSync(
+    path.join(project, "init_progress_definition.yaml"),
+    definition('["backend"]', "A")
+  );
+  writeFileSync(path.join(project, "project_stack_blueprint_backend.md"), "# blueprint\n");
+  try {
+    let report = evaluate(root, project);
+    assert.equal(report.steps.find((step) => step.stepId === "1.1")!.state, "pending");
+    assert.deepEqual(
+      report.steps
+        .find((step) => step.stepId === "1.1")!
+        .missingArtifacts.map((artifact) => path.basename(artifact)),
+      ["project_agents_md_claude_md_backend.md"]
+    );
+
+    writeFileSync(path.join(project, "project_agents_md_claude_md_backend.md"), "# agents\n");
+    report = evaluate(root, project);
+    assert.equal(report.steps.find((step) => step.stepId === "1.1")!.state, "done");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("step 7 reports surface-map classes and excludes infrastructure", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "sequencing-surface-classes-"));
+  const project = path.join(root, "projects", "p");
+  const feature = path.join(project, "feature-a");
+  mkdirSync(feature, { recursive: true });
+  writeFileSync(
+    path.join(project, "init_progress_definition.yaml"),
+    definition('["backend", "frontend", "mobile", "infrastructure"]', "A")
+  );
+  try {
+    const report = evaluate(root, project, feature);
+    assert.deepEqual(
+      report.steps.find((step) => step.stepId === "7")!.perClass?.map((item) => item.className),
+      ["backend", "frontend", "mobile"]
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("step 7 derives class availability from class_repo_paths state and policy", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "sequencing-surface-availability-"));
+  const project = path.join(root, "projects", "p");
+  const feature = path.join(project, "feature-a");
+  mkdirSync(feature, { recursive: true });
+  writeFileSync(
+    path.join(project, "init_progress_definition.yaml"),
+    definition('["backend", "frontend"]', "A")
+      .replace('      state: "ready"', '      state: "deferred"')
+      .replace('      path: "/tmp/backend"', '      path: ""')
+      .replace(
+        '      policy: "C"',
+        '      policy: "A"\n    frontend:\n      state: "deferred"\n      path: ""\n      policy: "B"'
+      )
+  );
+  writeFileSync(path.join(project, "project_stack_blueprint_backend.md"), "# blueprint\n");
+  try {
+    const perClass = evaluate(root, project, feature).steps.find(
+      (step) => step.stepId === "7"
+    )!.perClass;
+    assert.deepEqual(
+      perClass?.map((item) => [item.className, item.analysisAvailability]),
+      [
+        ["backend", "type-a-blueprint"],
+        ["frontend", "unavailable"]
+      ]
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("project prerequisites block feature work", () => {

@@ -8,6 +8,7 @@ import {
   buildContractDeltaContext,
   buildContractReconciliationContext,
   buildCommonContractInitContext,
+  buildAgentsMdContext,
   buildStackBlueprintContext,
   buildSurfaceMapContext,
   buildSurfaceMapEnrichContext,
@@ -18,7 +19,7 @@ import {
   buildPlanSemanticReviewContext
 } from "../context/index.js";
 import { runBrClarificationReadiness } from "../readiness/index.js";
-import { evaluate, formatChecklist, nextStep } from "../sequencing/index.js";
+import { evaluate, formatChecklist } from "../sequencing/index.js";
 import {
   syncContractDeltaStep,
   syncRepoBrScanStep,
@@ -33,6 +34,7 @@ import {
   validateEarsReview,
   validateContractDelta,
   validateContractReconciliation,
+  validateAgentsMd,
   validateInitialCommonContract,
   validateStackBlueprint,
   validateSurfaceMap,
@@ -52,7 +54,6 @@ import type {
 } from "../types/index.js";
 import type { SurfaceMapClass } from "../validate/surface-map.js";
 import { detectRuntimeRoot, discoverProjects, resolveProjectPath } from "../workspace/index.js";
-import { readProjectDefinitionMetadata } from "../parse/project-definition.js";
 import { loadRunnerConfig, resolveRunnerPhase } from "../config/index.js";
 import {
   createTtyInteractionPort,
@@ -65,7 +66,6 @@ import {
   RepoGitAdapter,
   RepoGitProjectAdapter,
   type CheckpointPort,
-  type CommitResult,
   type ProjectGitPort
 } from "../git/index.js";
 import { RepoGitProjectInitAdapter, type ProjectInitGitPort } from "../git/index.js";
@@ -76,15 +76,20 @@ import {
   type ProjectCreationClock,
   type TempFilePort
 } from "../capture/project.js";
+import {
+  manageProjectClassMembership,
+  type ProjectClassMembershipOutcome
+} from "../capture/project-class.js";
 import { resolveStep, STEP_CATALOG } from "../sequencing/step-catalog.js";
 import { PROJECT_RECONCILIATION_STEP } from "../sequencing/project-reconciliation.js";
-import { scaffoldFeature } from "../capture/scaffold-feature.js";
 import { registerWorker, type UuidGenerator } from "../workers/registry.js";
 import { assignWorkers } from "../workers/assignment.js";
 import {
   runFeatureFlow,
+  runProjectInitFlow,
   runProjectReconciliationFlow,
   type FeatureFlowOutcome,
+  type ProjectInitFlowOutcome,
   type ProjectReconciliationOutcome
 } from "../orchestrator/index.js";
 import type { Diagnostic } from "../types/index.js";
@@ -105,6 +110,7 @@ const gateRegistry: Record<string, (targetPath: string) => GateResult> = {
   "common-contract": validateInitialCommonContract,
   "contract-delta": validateContractDelta,
   "contract-reconciliation": validateContractReconciliation,
+  "agents-md": validateAgentsMd,
   "stack-blueprint": validateStackBlueprint,
   "br-clarification": validateBrClarification,
   "ears-review": validateEarsReview,
@@ -160,6 +166,7 @@ const classContextRegistry: Record<
   (featurePath: string, klass: SurfaceMapClass, cwd?: string) => ContextResult
 > = {
   "surface-map": buildSurfaceMapContext,
+  "agents-md": buildAgentsMdContext,
   "stack-blueprint": buildStackBlueprintContext
 };
 
@@ -272,18 +279,16 @@ export async function runCli(
   }
   if (command === "project") {
     if (step === "create") return runProjectCreate(argv.slice(4), streams, cwd, overrides);
+    if (step === "add-class") return runProjectAddClass(argv.slice(4), streams, cwd, overrides);
     if (step === "init") return runProjectInit(argv.slice(4), streams, cwd, overrides);
     if (step === "reconcile") return runProjectReconcile(argv.slice(4), streams, cwd, overrides);
     streams.stderr.write(
-      "ERROR: Usage: overmind project create | overmind project init --path <project> | overmind project reconcile [--path <project>]\n"
+      "ERROR: Usage: overmind project create | overmind project add-class | overmind project init --path <project> | overmind project reconcile [--path <project>]\n"
     );
     return 2;
   }
   if (command === "worker") {
     return runWorker(step, argv.slice(4), streams, cwd, overrides);
-  }
-  if (command === "scaffold") {
-    return runScaffold(step, argv.slice(4), streams, cwd, overrides);
   }
 
   if (command === "status") {
@@ -307,7 +312,7 @@ export async function runCli(
   }
 
   streams.stderr.write(
-    "ERROR: Usage: overmind <run|project create|project init|project reconcile|worker register|worker assign|scaffold|capture|context|gate|sync|readiness> ... | overmind status <path>\n"
+    "ERROR: Usage: overmind <run|project create|project add-class|project init|project reconcile|worker register|worker assign|capture|context|gate|sync|readiness> ... | overmind status <path>\n"
   );
   return 2;
 }
@@ -355,6 +360,7 @@ async function runProjectCreate(
     if (result.metadataPath) {
       streams.stdout.write(`Updated ASDLC metadata: ${result.metadataPath}\n`);
     }
+    streams.stdout.write("Bind project class repositories with: overmind project reconcile\n");
     return 0;
   } catch (error) {
     if (error instanceof InteractionClosedError) {
@@ -364,6 +370,91 @@ async function runProjectCreate(
       return 0;
     }
     throw error;
+  }
+}
+
+async function runProjectAddClass(
+  args: string[],
+  streams: OutputStreams,
+  cwd: string,
+  overrides: CliAdapterOverrides
+): Promise<number> {
+  if (args.length === 1 && (args[0] === "--help" || args[0] === "-h")) {
+    streams.stdout.write("Usage: overmind project add-class\n");
+    return 0;
+  }
+  if (args.length > 0) {
+    streams.stderr.write(`ERROR: Unknown project add-class argument: ${args[0]}\n`);
+    streams.stderr.write("Usage: overmind project add-class\n");
+    return 2;
+  }
+
+  const startPath = path.resolve(cwd);
+  const workspace = detectRuntimeRoot(startPath);
+  if (!workspace.path) {
+    renderDiagnostics(workspace.diagnostics, streams);
+    return 2;
+  }
+  const workspaceRoot = workspace.path;
+  const projectsRoot = path.join(workspaceRoot, "projects");
+  const interaction = overrides.interaction ?? createTtyInteractionPort();
+
+  let projectRoot: string;
+  const currentProject = resolveProjectPath(startPath, projectsRoot);
+  if (currentProject.path) {
+    projectRoot = currentProject.path;
+  } else {
+    const discovered = discoverProjects(projectsRoot);
+    if (discovered.paths.length === 0) {
+      streams.stderr.write(`ERROR: No projects found under ${projectsRoot}\n`);
+      return 2;
+    }
+    if (discovered.paths.length === 1) {
+      projectRoot = discovered.paths[0]!;
+    } else {
+      try {
+        const selected = await interaction.select({
+          message: "Choose project:",
+          options: discovered.paths.map((candidate) => ({
+            value: candidate,
+            label: path.relative(workspaceRoot, candidate)
+          }))
+        });
+        projectRoot = selected;
+      } catch (error) {
+        if (error instanceof InteractionClosedError) {
+          streams.stdout.write(
+            "Execution stopped: user input stream closed during project selection.\n"
+          );
+          return 0;
+        }
+        throw error;
+      }
+    }
+  }
+
+  const outcome = await manageProjectClassMembership({
+    projectRoot,
+    projectPathRel: path.relative(workspaceRoot, projectRoot),
+    interaction,
+    git: overrides.projectGit ?? new RepoGitProjectAdapter(),
+    emit: (line) => streams.stdout.write(`${line}\n`)
+  });
+  return mapProjectClassMembershipOutcomeToExit(outcome, streams);
+}
+
+function mapProjectClassMembershipOutcomeToExit(
+  outcome: ProjectClassMembershipOutcome,
+  streams: OutputStreams
+): number {
+  switch (outcome.kind) {
+    case "changed":
+    case "noChange":
+    case "stoppedByOperator":
+      return 0;
+    case "failed":
+      renderDiagnostics(outcome.diagnostics, streams);
+      return 1;
   }
 }
 
@@ -400,177 +491,63 @@ async function runProjectInit(
   }
   const projectRoot = project.path;
   const projectPathRel = path.relative(workspaceRoot, projectRoot);
-  const definitionPath = path.join(projectRoot, "init_progress_definition.yaml");
-  const metadata = readProjectDefinitionMetadata(definitionPath);
-  if (!metadata.parsed) {
-    renderDiagnostics(metadata.diagnostics, streams);
-    return 1;
-  }
-
-  const report = evaluate(workspaceRoot, projectRoot);
-  const next = nextStep(report);
-  if (!next || next.scope !== "project" || !isProjectInitStep(next.stepId)) {
-    streams.stdout.write("No pending project init step remains.\n");
-    return 0;
-  }
-  if (next.stepId === "1") {
-    streams.stderr.write(
-      "ERROR: Project metadata initialization is incomplete; create init_progress_definition.yaml before running project init.\n"
-    );
-    return 1;
-  }
-
-  const stepDef = STEP_CATALOG.find((candidate) => candidate.id === next.stepId);
-  if (!stepDef) {
-    streams.stderr.write(`ERROR: Unknown project init step selected: ${next.stepId}\n`);
-    return 2;
-  }
-
   const overmindCliPath = path.join(workspaceRoot, ".overmind", "overmind.js");
   const modelsPath = path.join(workspaceRoot, ".setup", "models.md");
+  const interaction = overrides.interaction ?? createTtyInteractionPort();
   const executorDeps = {
     ...defaultStepExecutorDeps,
-    agentRunner: overrides.agentRunner ?? new CodexAgentRunner()
+    agentRunner: overrides.agentRunner ?? new CodexAgentRunner(),
+    projectGit: overrides.projectGit ?? new RepoGitProjectAdapter()
   };
-  const activeStackClasses = metadata.projectClasses.filter((klass) =>
-    (SURFACE_CLASSES as readonly string[]).includes(klass)
-  ) as SurfaceMapClass[];
-  const dispatchClasses =
-    stepDef.perClass && next.stepId === "1.1" ? activeStackClasses : ([undefined] as const);
 
-  for (const klass of dispatchClasses) {
-    const result = await executeStep(
-      stepDef,
-      {
-        step: stepDef,
-        runtimeRoot: workspaceRoot,
-        featurePath: projectPathRel,
-        overmindCliPath,
-        modelsPath,
-        ...(klass ? { targetClass: klass } : {}),
-        classes: activeStackClasses
-      },
-      executorDeps
-    );
-    if (!result.ok) {
-      renderDiagnostics(result.diagnostics, streams);
-      return result.exitCode === 0 ? 1 : result.exitCode;
-    }
-  }
-
-  if (next.stepId === "2") {
-    const baselineGate = validateInitialCommonContract(projectRoot);
-    if (baselineGate.exitCode !== 0) {
-      renderBaselineGateFailure(baselineGate, streams);
-      return baselineGate.exitCode === 2 ? 2 : 1;
-    }
-    const commit = commitInitializationBaseline(
-      projectRoot,
-      metadata.projectTypeCode,
-      activeStackClasses,
-      overrides.projectGit ?? new RepoGitProjectAdapter()
-    );
-    if (commit.error) {
-      streams.stderr.write(`ERROR: ${commit.error}\n`);
-      return 1;
-    }
-    if (commit.message) streams.stdout.write(`${commit.message}\n`);
-  }
-
-  streams.stdout.write(`Completed project init step ${next.stepId}: ${next.name}\n`);
-  return 0;
-}
-
-function renderBaselineGateFailure(result: GateResult, streams: OutputStreams): void {
-  if (result.exitCode === 1) {
-    streams.stderr.write(
-      "ERROR: common-contract baseline validation failed before initialization commit.\n"
-    );
-    for (const problem of result.problems) {
-      streams.stderr.write(`common-contract: ${problem}\n`);
-    }
-    return;
-  }
-  streams.stderr.write(
-    `ERROR: common-contract baseline validation could not run before initialization commit: ${result.errorMessage ?? "Validation cannot run."}\n`
-  );
-}
-
-function isProjectInitStep(stepId: string): boolean {
-  return stepId === "1" || stepId === "1.1" || stepId === "2";
-}
-
-function commitInitializationBaseline(
-  projectRoot: string,
-  projectTypeCode: string | undefined,
-  activeStackClasses: SurfaceMapClass[],
-  git: ProjectGitPort
-): { message?: string; error?: string } {
-  const ownedPaths = [
-    "init_progress_definition.yaml",
-    "common_contract_definition.md",
-    ...(projectTypeCode === "A"
-      ? activeStackClasses.map((klass) => `project_stack_blueprint_${klass}.md`)
-      : [])
-  ];
-
-  const changed = git.changedPaths(projectRoot);
-  if (changed.kind !== "ok") {
-    return {
-      error: describeChangedPathsFailure(changed, projectRoot)
-    };
-  }
-  const unexpected = changed.paths.filter((candidate) => !ownedPaths.includes(candidate));
-  if (unexpected.length > 0) {
-    return {
-      error: `Project initialization created unexpected changes; baseline was not committed: ${unexpected.join(", ")}`
-    };
-  }
-  if (!changed.paths.some((candidate) => ownedPaths.includes(candidate))) {
-    return { message: "Project initialization baseline has no changes to commit." };
-  }
-
-  const commit = git.commitOwnedPaths(
+  const outcome = await runProjectInitFlow({
+    workspaceRoot,
     projectRoot,
-    ownedPaths,
-    "Finalize project initialization baseline"
-  );
-  if (commit.kind === "committed") {
-    return { message: "Committed project initialization baseline." };
-  }
-  return { error: describeCommitFailure(commit, projectRoot) };
+    projectPathRel,
+    overmindCliPath,
+    modelsPath,
+    interaction,
+    git: overrides.projectGit ?? new RepoGitProjectAdapter(),
+    executeStep: (step, bindings) => executeStep(step, bindings, executorDeps),
+    validateCommonContract: validateInitialCommonContract,
+    emit: (line) => streams.stdout.write(`${line}\n`)
+  });
+  return mapProjectInitOutcomeToExit(outcome, streams);
 }
 
-function describeChangedPathsFailure(
-  result: Exclude<ReturnType<ProjectGitPort["changedPaths"]>, { kind: "ok" }>,
-  projectRoot: string
-): string {
-  switch (result.kind) {
-    case "unavailable":
-      return "Project path must be a git repository to finalize initialization baseline: git not found in PATH.";
-    case "notWorktree":
-      return `Project path must be a git repository to finalize initialization baseline: ${projectRoot}`;
-    case "inspectionFailed":
-      return `Failed to validate project initialization baseline paths for ${projectRoot} (git exited ${result.exitCode}): ${result.stderr.trim()}`;
-  }
-}
-
-function describeCommitFailure(commit: CommitResult, projectRoot: string): string {
-  switch (commit.kind) {
-    case "committed":
-      return "committed";
-    case "unavailable":
-      return "Project path must be a git repository to finalize initialization baseline: git not found in PATH.";
-    case "notWorktree":
-      return `Project path must be a git repository to finalize initialization baseline: ${projectRoot}`;
-    case "stageFailed":
-      return `Failed to stage project initialization baseline for ${projectRoot}: git add exited ${commit.exitCode}: ${commit.stderr.trim()}`;
-    case "commitFailed":
-      return `Failed to commit project initialization baseline for ${projectRoot}: git commit exited ${commit.exitCode}: ${commit.stderr.trim()}`;
-    case "dirtyAfterCommit":
-      return `Project initialization baseline left unexpected uncommitted changes: ${commit.paths.join(", ")}`;
-    case "inspectionFailed":
-      return `Failed to verify project initialization baseline for ${projectRoot} (git exited ${commit.exitCode}): ${commit.stderr.trim()}`;
+function mapProjectInitOutcomeToExit(
+  outcome: ProjectInitFlowOutcome,
+  streams: OutputStreams
+): number {
+  switch (outcome.kind) {
+    case "completed":
+      streams.stdout.write(`${outcome.message}\n`);
+      return 0;
+    case "pausedAfterStep11":
+      streams.stdout.write("Project initialization paused after step 1.1.\n");
+      streams.stdout.write("Common contract definition remains pending.\n");
+      streams.stdout.write(`Resume with: ${outcome.resumeCommand}\n`);
+      return 0;
+    case "manualBaselineCommitRequired":
+      streams.stderr.write("Pending uncommitted project initialization artifacts detected:\n");
+      for (const artifactPath of outcome.paths) streams.stderr.write(`- ${artifactPath}\n`);
+      streams.stderr.write("\nIf these files are correct, commit them manually, then rerun:\n");
+      streams.stderr.write(`  ${outcome.resumeCommand}\n`);
+      streams.stderr.write("\nIf they are incorrect, roll back or remove them, then rerun:\n");
+      streams.stderr.write(`  ${outcome.resumeCommand}\n`);
+      return 1;
+    case "noPendingWork":
+      streams.stdout.write("No pending project init step remains.\n");
+      return 0;
+    case "changedAfterConfirmation":
+      streams.stderr.write(
+        "ERROR: Project initialization state changed after the continuation decision; no phase was started.\n"
+      );
+      streams.stderr.write(`Resume with: ${outcome.resumeCommand}\n`);
+      return 1;
+    case "failed":
+      renderDiagnostics(outcome.diagnostics, streams);
+      return outcome.exitCode ?? 1;
   }
 }
 
@@ -816,11 +793,16 @@ async function runProjectReconcile(
       "Updating class repositories runs the full project reconciliation flow, not just a repo attach.\n"
     );
     streams.stdout.write("'overmind project reconcile' will:\n");
-    streams.stdout.write("  - prompt for each deferred class repository to attach,\n");
+    streams.stdout.write(
+      "  - review deferred classes and bind selected policy B/C repositories,\n"
+    );
     streams.stdout.write(
       "  - run a one-time contract reconciliation session over newly ready classes, and\n"
     );
     streams.stdout.write("  - offer to commit the reconciliation results.\n");
+    streams.stdout.write(
+      "Use 'overmind project add-class' to add a class or reset an existing class before binding.\n"
+    );
     try {
       const confirmed = await interaction.confirm({
         message: `Proceed with attach + full reconciliation for project '${path.basename(projectRoot)}'?`
@@ -1026,7 +1008,8 @@ async function runRun(
     interaction,
     executorDeps: {
       ...defaultStepExecutorDeps,
-      agentRunner: overrides.agentRunner ?? new CodexAgentRunner()
+      agentRunner: overrides.agentRunner ?? new CodexAgentRunner(),
+      projectGit: overrides.projectGit ?? new RepoGitProjectAdapter()
     },
     checkpoint: overrides.checkpoint ?? new RepoGitAdapter(),
     clock: overrides.clock ?? { now: () => Math.floor(Date.now() / 1000) },
@@ -1091,65 +1074,6 @@ function mapOutcomeToExit(
           `  overmind run --path ${projectPathRel} --resume ${outcome.resumeStep}\n`
       );
       return 1;
-  }
-}
-
-async function runScaffold(
-  subcommand: string | undefined,
-  args: string[],
-  streams: OutputStreams,
-  cwd: string,
-  overrides: CliAdapterOverrides
-): Promise<number> {
-  if (subcommand !== "feature") {
-    streams.stderr.write("ERROR: Usage: overmind scaffold feature --path <project>\n");
-    return 2;
-  }
-  let pathInput: string | undefined;
-  for (let index = 0; index < args.length; index += 1) {
-    const arg = args[index];
-    if (arg === "--path") {
-      const value = args[index + 1];
-      if (value === undefined || value.startsWith("--")) {
-        streams.stderr.write("ERROR: Missing value for --path.\n");
-        return 2;
-      }
-      pathInput = value;
-      index += 1;
-      continue;
-    }
-    streams.stderr.write(`ERROR: Unknown scaffold argument: ${arg}\n`);
-    return 2;
-  }
-  if (!pathInput) {
-    streams.stderr.write("ERROR: Missing required option: --path <project>.\n");
-    return 2;
-  }
-
-  const startPath = path.resolve(cwd, pathInput);
-  const workspace = detectRuntimeRoot(startPath);
-  if (!workspace.path) {
-    renderDiagnostics(workspace.diagnostics, streams);
-    return 2;
-  }
-
-  try {
-    const result = await scaffoldFeature(workspace.path, startPath, {
-      interaction: overrides.interaction ?? createTtyInteractionPort(),
-      clock: overrides.clock ?? { now: () => Math.floor(Date.now() / 1000) },
-      emit: (line) => streams.stdout.write(`${line}\n`)
-    });
-    if (result.diagnostics.length > 0) {
-      renderDiagnostics(result.diagnostics, streams);
-      return 2;
-    }
-    return 0;
-  } catch (error) {
-    if (error instanceof InteractionClosedError) {
-      streams.stdout.write("Execution stopped: user input stream closed during scaffold input.\n");
-      return 0;
-    }
-    throw error;
   }
 }
 

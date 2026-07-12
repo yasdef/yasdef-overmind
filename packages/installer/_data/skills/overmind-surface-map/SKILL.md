@@ -17,7 +17,7 @@ Run these commands from the installed ASDLC workspace root. `<class>` is the cla
 node .overmind/overmind.js context surface-map <feature-path> --class <class>
 ```
 
-2. Read the emitted context block: the per-class binding (track label, template/golden assets, target artifact), the scan scope (a ready repository path, or a blueprint fallback when no repo is ready), the read-only inputs, and the exact gate command. Write only the bound target `<feature-path>/project_surface_struct_resp_map_<class>.md`.
+2. Read the emitted context block: the per-class binding (track label, template/golden assets, target artifact), the scan scope (a ready repository path, or a policy A blueprint fallback when no repo is ready), the read-only inputs, and the exact gate command. Write only the bound target `<feature-path>/project_surface_struct_resp_map_<class>.md`.
 
 3. Validate after every write or repair:
 
@@ -82,7 +82,7 @@ Asset paths are relative to this loaded skill directory. Use the asset the conte
 - The chain runs only for surfaces this feature's requirements touch; "absent" means this feature's need is not satisfied, never an inventory claim about the repo.
 - Repo scan evidence is available only when the context binds a ready repository path for the class; repo scan rows cite the concrete repository path.
 - In-flight feature promise evidence is available only when committed sibling plans are bound. Rows resolved from a sibling plan must carry the tag `(in-flight <feature-folder>)` and evidence must cite `<feature-folder>/implementation_plan.md step <step-id>`.
-- Blueprint evidence is available when an approved `project_stack_blueprint_<class>.md` exists; blueprint-derived values are planned structural evidence only, tagged `(planned)`, never presented as repository-proven code evidence, and citations append the blueprint `Meta` block `last_updated` exactly: `project_stack_blueprint_<class>.md §<n> (last_updated: <YYYY-MM-DD>)`. A blueprint is never retired; it remains fallback evidence for unmaterialized layers for the life of the project.
+- Blueprint evidence is available when `class_repo_paths.<class>` has `state: deferred` with `policy: A` and an approved `project_stack_blueprint_<class>.md` exists; blueprint-derived values are planned structural evidence only, tagged `(planned)`, never presented as repository-proven code evidence, and citations append the blueprint `Meta` block `last_updated` exactly: `project_stack_blueprint_<class>.md §<n> (last_updated: <YYYY-MM-DD>)`. An existing blueprint remains fallback evidence for unmaterialized layers after its class repository becomes ready.
 - For policy `C`, when a materialized repo layer diverges from `project_stack_blueprint_<class>.md ## 3. Layer Bindings`, resolve from repo evidence and add at most one optional passive bullet in that layer block, exactly `- divergent_from_blueprint: §<n>`. This field is optional, never required, never prompts, never blocks.
 - One source per row; do not mix repo, promise, blueprint, and placeholder sources in the same row. Every non-repo source must be tagged.
 - For `user_reachable_surface`, use an explicit union of applicable concrete tokens from `feature_contract_delta.md` plus concrete tokens from the row's selected tier; use `none` only when no applicable entry exists, never `<to be defined during implementation>` for this field.

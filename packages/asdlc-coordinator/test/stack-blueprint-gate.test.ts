@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { runCli } from "../src/cli/run.js";
+import { evaluate } from "../src/sequencing/index.js";
 import { validateStackBlueprint } from "../src/validate/stack-blueprint.js";
 
 const backendGolden = fileURLToPath(
@@ -13,6 +14,9 @@ const backendGolden = fileURLToPath(
     "../../../../overmind/golden_examples/project_stack_blueprint_be_GOLDEN_EXAMPLE.md",
     import.meta.url
   )
+);
+const initTemplate = fileURLToPath(
+  new URL("../../../../overmind/templates/init_progress_definition_TEMPLATE.yaml", import.meta.url)
 );
 
 async function withProject(fn: (projectDir: string) => void | Promise<void>): Promise<void> {
@@ -28,6 +32,16 @@ async function withProject(fn: (projectDir: string) => void | Promise<void>): Pr
 
 function validBackendBlueprint(): string {
   return readFileSync(backendGolden, "utf8");
+}
+
+function typeADefinition(): string {
+  return readFileSync(initTemplate, "utf8")
+    .replace("  project_classes: []", '  project_classes: ["backend"]')
+    .replace('  project_type_code: ""', '  project_type_code: "A"')
+    .replace(
+      "  class_repo_paths: {}",
+      '  class_repo_paths:\n    backend:\n      state: "ready"\n      path: "/tmp/backend"\n      policy: "C"'
+    );
 }
 
 test("stack-blueprint gate accepts a complete backend blueprint", async () => {
@@ -78,4 +92,25 @@ test("stack-blueprint gate CLI uses standard rendering", async () => {
     assert.equal(code, 0, out.stdout + out.stderr);
     assert.match(out.stdout, /quality gate passed/);
   });
+});
+
+test("type-A step 1.1 stays pending until the agents-md sibling artifact exists", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "overmind-stack-blueprint-step-"));
+  const projectDir = path.join(root, "projects", "p1");
+  mkdirSync(projectDir, { recursive: true });
+  writeFileSync(path.join(projectDir, "init_progress_definition.yaml"), typeADefinition());
+  writeFileSync(
+    path.join(projectDir, "project_stack_blueprint_backend.md"),
+    validBackendBlueprint()
+  );
+  try {
+    let report = evaluate(root, projectDir);
+    assert.equal(report.steps.find((step) => step.stepId === "1.1")!.state, "pending");
+
+    writeFileSync(path.join(projectDir, "project_agents_md_claude_md_backend.md"), "# agents\n");
+    report = evaluate(root, projectDir);
+    assert.equal(report.steps.find((step) => step.stepId === "1.1")!.state, "done");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });

@@ -133,6 +133,25 @@ Required flow:
 - Use the exact gate command below when the skill tells you to validate:
   node .overmind/overmind.js gate stack-blueprint projects/project-a/feature-alpha/project_stack_blueprint_backend.md
 - The model owns the gate loop; this orchestrator does not run the gate.`,
+  "agents-md": `Load and follow the overmind-agents-md skill for this project class.
+
+Runtime bindings:
+- ASDLC workspace root: /runtime
+- Current working directory for all commands: /runtime
+- Project path: projects/project-a/feature-alpha
+- Target class: backend
+- Target agents-md artifact: projects/project-a/feature-alpha/project_agents_md_claude_md_backend.md
+- Read-only source blueprint: projects/project-a/feature-alpha/project_stack_blueprint_backend.md
+- Overmind CLI: .overmind/overmind.js
+
+Required flow:
+- Load and follow the overmind-agents-md skill.
+- Assemble deterministic context with:
+  node .overmind/overmind.js context agents-md projects/project-a/feature-alpha --class backend
+- Use the exact gate command below when the skill tells you to validate:
+  node .overmind/overmind.js gate agents-md projects/project-a/feature-alpha/project_agents_md_claude_md_backend.md
+- Treat the source blueprint as read-only.
+- The model owns the gate loop; this orchestrator does not run the gate.`,
   "common-contract": `Load and follow the overmind-common-contract skill for this project.
 
 Runtime bindings:
@@ -264,7 +283,7 @@ Required flow:
 - The model owns both gate loops; this orchestrator does not run either gate.`
 };
 
-test("buildSessionPrompt preserves parity across all 15 session phases", () => {
+test("buildSessionPrompt preserves parity across all session phases", () => {
   const actions = STEP_CATALOG.flatMap((step) => step.actions).filter(
     (
       action
@@ -272,13 +291,15 @@ test("buildSessionPrompt preserves parity across all 15 session phases", () => {
       action.kind === "session"
   );
 
-  assert.equal(actions.length, 15);
+  assert.equal(actions.length, 16);
 
   for (const action of actions) {
     const prompt = buildSessionPrompt(action, {
       ...BASE_BINDINGS,
       targetClass:
-        action.skillName === "surface-map" || action.skillName === "stack-blueprint"
+        action.skillName === "surface-map" ||
+        action.skillName === "stack-blueprint" ||
+        action.skillName === "agents-md"
           ? "backend"
           : undefined
     });

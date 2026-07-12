@@ -57,12 +57,18 @@ export const STEP_CATALOG: StepDefinition[] = [
   },
   {
     id: "1.1",
-    label: "Define Project Stack Blueprints For Active Classes",
+    label: "Define Project Stack Blueprints And Agent Guidelines For Active Classes",
     optional: false,
     perClass: true,
     resumeAliases: [],
     actions: [
-      session("stack-blueprint", "project_stack_blueprint", ["project_stack_blueprint_<class>.md"])
+      session("stack-blueprint", "project_stack_blueprint", ["project_stack_blueprint_<class>.md"]),
+      session(
+        "agents-md",
+        "project_agents_md_claude_md",
+        ["project_agents_md_claude_md_<class>.md"],
+        { readOnlyGuards: contextGuard }
+      )
     ]
   },
   {
@@ -158,7 +164,7 @@ export const STEP_CATALOG: StepDefinition[] = [
         "surface-map",
         "feature_repo_surface_and_exec_context",
         ["project_surface_struct_resp_map_<class>.md"],
-        { requiresSync: true, runIf: "hasReadyClassRepo", readOnlyGuards: contextGuard }
+        { requiresSync: true, readOnlyGuards: contextGuard }
       )
     ]
   },

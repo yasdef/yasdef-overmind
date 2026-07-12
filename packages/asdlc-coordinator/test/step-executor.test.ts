@@ -8,6 +8,7 @@ import { STEP_CATALOG } from "../src/sequencing/index.js";
 import {
   StubAgentRunner,
   buildSessionPrompt,
+  defaultStepExecutorDeps,
   executeStep,
   type StepExecutorDeps
 } from "../src/runner/index.js";
@@ -30,6 +31,7 @@ function baseDeps(overrides: Partial<StepExecutorDeps> = {}): StepExecutorDeps {
     context: {},
     sync: {},
     readiness: {},
+    projectGit: defaultStepExecutorDeps.projectGit,
     write: {},
     ...overrides
   };
@@ -77,13 +79,59 @@ test("executeStep runs multi-action steps in declared order", async () => {
     );
 
     assert.equal(result.ok, true);
-    assert.deepEqual(order, [
-      "sync:repo-br-scan",
-      "context:repo-br-scan",
-      "agent:repo-br-scan",
-      "context:task-to-br",
-      "agent:task-to-br"
-    ]);
+    // repo-br-scan and task-to-br carry no from-context guard, so the executor launches them
+    // without pre-building their deterministic context.
+    assert.deepEqual(order, ["sync:repo-br-scan", "agent:repo-br-scan", "agent:task-to-br"]);
+  });
+});
+
+test("executeStep runs stack-blueprint then agents-md for a project class", async () => {
+  await withRunnerWorkspace(async ({ root, projectDir }) => {
+    const order: string[] = [];
+    const projectPath = path.relative(root, projectDir);
+    const deps = baseDeps({
+      agentRunner: {
+        run: async (spec) => {
+          if (spec.prompt.includes("overmind-stack-blueprint")) {
+            order.push("agent:stack-blueprint");
+            writeFileSync(path.join(projectDir, "project_stack_blueprint_backend.md"), "# bp\n");
+          } else if (spec.prompt.includes("overmind-agents-md")) {
+            order.push("agent:agents-md");
+            writeFileSync(
+              path.join(projectDir, "project_agents_md_claude_md_backend.md"),
+              "# agents\n"
+            );
+          }
+          return { exitCode: 0 };
+        }
+      },
+      context: {
+        "stack-blueprint": () => {
+          order.push("context:stack-blueprint");
+          return { exitCode: 0, text: "stack-blueprint context" };
+        },
+        "agents-md": () => {
+          order.push("context:agents-md");
+          return { exitCode: 0, text: "agents-md context" };
+        }
+      }
+    });
+
+    const result = await executeStep(
+      step("1.1"),
+      {
+        step: step("1.1"),
+        runtimeRoot: root,
+        featurePath: projectPath,
+        overmindCliPath: ".overmind/overmind.js",
+        targetClass: "backend"
+      },
+      deps
+    );
+
+    assert.equal(result.ok, true);
+    // stack-blueprint has no from-context guard, so only agents-md pre-builds its context.
+    assert.deepEqual(order, ["agent:stack-blueprint", "context:agents-md", "agent:agents-md"]);
   });
 });
 
@@ -127,28 +175,41 @@ test("executeStep stops after the first failing action", async () => {
     );
 
     assert.equal(result.ok, false);
-    assert.deepEqual(order, ["sync:repo-br-scan", "context:repo-br-scan", "agent:repo-br-scan"]);
+    assert.deepEqual(order, ["sync:repo-br-scan", "agent:repo-br-scan"]);
   });
 });
 
 test("executeStep skips runIf=false sessions as success", async () => {
-  await withRunnerWorkspace(async ({ root, featurePath }) => {
+  await withRunnerWorkspace(async ({ root, projectDir, featurePath }) => {
+    writeFileSync(
+      path.join(projectDir, "init_progress_definition.yaml"),
+      `meta_info:
+  project_type_code: A
+  project_classes:
+    - backend
+  class_repo_paths:
+    backend:
+      state: deferred
+      path: ""
+      policy: A
+steps:
+`
+    );
     const deps = baseDeps({
       context: {
-        "surface-map": () => {
+        "repo-br-scan": () => {
           throw new Error("context should not run");
         }
       }
     });
 
     const result = await executeStep(
-      step("7"),
+      step("4.1"),
       {
-        step: step("7"),
+        step: step("4.1"),
         runtimeRoot: root,
         featurePath,
-        overmindCliPath: ".overmind/overmind.js",
-        targetClass: "frontend"
+        overmindCliPath: ".overmind/overmind.js"
       },
       deps
     );
@@ -276,6 +337,96 @@ test("executeStep applies step 2 read-only guards from common-contract context",
         featurePath: path.relative(root, projectDir),
         overmindCliPath: ".overmind/overmind.js",
         classes: ["backend"]
+      },
+      deps
+    );
+
+    assert.equal(result.ok, false);
+    assert.match(
+      result.diagnostics.map((item) => item.reason).join("\n"),
+      /fromContext guard violation/
+    );
+  });
+});
+
+test("executeStep applies step 2 read-only guards to agents-md artifacts", async () => {
+  await withRunnerWorkspace(async ({ root, projectDir }) => {
+    const protectedFile = path.join(projectDir, "project_agents_md_claude_md_backend.md");
+    const deps = baseDeps({
+      agentRunner: {
+        run: async () => {
+          writeFileSync(path.join(projectDir, "common_contract_definition.md"), "# contract\n");
+          writeFileSync(protectedFile, "# modified agents\n");
+          return { exitCode: 0 };
+        }
+      },
+      classListContext: {
+        "common-contract": () =>
+          ({
+            exitCode: 0,
+            text: "common-contract context",
+            readOnlyInputs: [path.relative(root, protectedFile)]
+          }) satisfies ContextResult
+      }
+    });
+
+    const result = await executeStep(
+      step("2"),
+      {
+        step: step("2"),
+        runtimeRoot: root,
+        featurePath: path.relative(root, projectDir),
+        overmindCliPath: ".overmind/overmind.js",
+        classes: ["backend"]
+      },
+      deps
+    );
+
+    assert.equal(result.ok, false);
+    assert.match(
+      result.diagnostics.map((item) => item.reason).join("\n"),
+      /fromContext guard violation/
+    );
+  });
+});
+
+test("executeStep applies step 1.1 read-only guards from agents-md context", async () => {
+  await withRunnerWorkspace(async ({ root, projectDir }) => {
+    const protectedFile = path.join(projectDir, "project_stack_blueprint_backend.md");
+    const deps = baseDeps({
+      agentRunner: {
+        run: async (spec) => {
+          if (spec.prompt.includes("overmind-stack-blueprint")) {
+            writeFileSync(protectedFile, "# approved blueprint\n");
+          } else if (spec.prompt.includes("overmind-agents-md")) {
+            writeFileSync(
+              path.join(projectDir, "project_agents_md_claude_md_backend.md"),
+              "# agents\n"
+            );
+            writeFileSync(protectedFile, "# modified blueprint\n");
+          }
+          return { exitCode: 0 };
+        }
+      },
+      context: {
+        "stack-blueprint": () => ({ exitCode: 0, text: "stack-blueprint context" }),
+        "agents-md": () =>
+          ({
+            exitCode: 0,
+            text: "agents-md context",
+            readOnlyInputs: [path.relative(root, protectedFile)]
+          }) satisfies ContextResult
+      }
+    });
+
+    const result = await executeStep(
+      step("1.1"),
+      {
+        step: step("1.1"),
+        runtimeRoot: root,
+        featurePath: path.relative(root, projectDir),
+        overmindCliPath: ".overmind/overmind.js",
+        targetClass: "backend"
       },
       deps
     );
@@ -447,8 +598,113 @@ test("executeStep dispatches readiness checks and reports unknown deterministic 
   });
 });
 
-test("executeStep passes a single-class binding into the per-class surface-map session", async () => {
-  await withRunnerWorkspace(async ({ root, featurePath, featureDir }) => {
+test("session with no fromContext guard launches without building context", async () => {
+  await withRunnerWorkspace(async ({ root, featurePath }) => {
+    let contextCalls = 0;
+    let agentCalls = 0;
+    const stepDef = {
+      id: "custom-task-to-br",
+      label: "task-to-br only",
+      optional: false,
+      perClass: false,
+      resumeAliases: [],
+      actions: [
+        {
+          kind: "session" as const,
+          skillName: "task-to-br",
+          modelPhase: "task_to_br",
+          readOnlyGuards: [],
+          requiredOutputs: ["feature_br_summary.md"]
+        }
+      ]
+    };
+    const result = await executeStep(
+      stepDef,
+      { step: stepDef, runtimeRoot: root, featurePath, overmindCliPath: ".overmind/overmind.js" },
+      baseDeps({
+        agentRunner: {
+          run: async () => {
+            agentCalls += 1;
+            return { exitCode: 0 };
+          }
+        },
+        context: {
+          // A builder that would abort the step if the executor pre-called it.
+          "task-to-br": () => {
+            contextCalls += 1;
+            return { exitCode: 2, errorMessage: "Required file not found: user_br_input.md" };
+          }
+        }
+      })
+    );
+
+    assert.equal(result.ok, true);
+    assert.equal(contextCalls, 0);
+    assert.equal(agentCalls, 1);
+  });
+});
+
+test("session with a fromContext guard fails on a non-zero context exit and launches no session", async () => {
+  await withRunnerWorkspace(async ({ root, featurePath }) => {
+    let agentCalls = 0;
+    const stepDef = {
+      id: "custom-from-context",
+      label: "contract-delta only",
+      optional: false,
+      perClass: false,
+      resumeAliases: [],
+      actions: [
+        {
+          kind: "session" as const,
+          skillName: "contract-delta",
+          modelPhase: "feature_contract_delta",
+          readOnlyGuards: [{ mode: "fromContext" as const }],
+          requiredOutputs: []
+        }
+      ]
+    };
+    const result = await executeStep(
+      stepDef,
+      { step: stepDef, runtimeRoot: root, featurePath, overmindCliPath: ".overmind/overmind.js" },
+      baseDeps({
+        agentRunner: {
+          run: async () => {
+            agentCalls += 1;
+            return { exitCode: 0 };
+          }
+        },
+        context: {
+          "contract-delta": () => ({ exitCode: 2, errorMessage: "context builder blew up" })
+        }
+      })
+    );
+
+    assert.equal(result.ok, false);
+    assert.equal(result.exitCode, 2);
+    assert.equal(agentCalls, 0);
+    assert.match(
+      result.diagnostics.map((item) => item.reason).join("\n"),
+      /context builder blew up/
+    );
+  });
+});
+
+test("executeStep runs a blueprint-backed surface-map session without a ready class repo", async () => {
+  await withRunnerWorkspace(async ({ root, projectDir, featurePath, featureDir }) => {
+    writeFileSync(
+      path.join(projectDir, "init_progress_definition.yaml"),
+      `meta_info:
+  project_type_code: A
+  project_classes:
+    - backend
+  class_repo_paths:
+    backend:
+      state: deferred
+      path: ""
+      policy: A
+steps:
+`
+    );
     let prompt = "";
     const protectedFile = path.join(featureDir, "feature_contract_delta.md");
     const deps = baseDeps({

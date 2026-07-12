@@ -19,10 +19,11 @@ export interface PendingWorkResult {
 
 /**
  * Detect — never execute — project-level work that must be resolved before a
- * feature run (D2/D8). Pending initialization, deferred class-repo attachment, and
- * ready-but-unreconciled classes each refuse the run and point at `overmind project
- * reconcile`. `contract_reconciled: true` is the sole completion source; legacy
- * `.contract_reconciled_<class>` markers are ignored and never read or written.
+ * feature run (D2/D8). Pending initialization, deferred existing-repo binding, and
+ * ready-but-unreconciled classes refuse the run with specific guidance. Deferred
+ * policy A classes are intentionally repo-less and do not block feature work.
+ * `contract_reconciled: true` is the sole completion source; legacy markers are
+ * ignored and never read or written.
  */
 export function detectProjectPendingWork(
   workspaceRoot: string,
@@ -50,18 +51,18 @@ export function detectProjectPendingWork(
     };
   }
 
-  // 2) Class-repo attachment: any configured class whose state is not ready
-  // (explicitly deferred or missing a state) must be attached before feature work.
-  const notReady = Object.entries(metadata.classRepoPaths)
-    .filter(([, entry]) => entry.state !== "ready")
+  // 2) Existing-repo binding: policy B/C classes, or malformed rows without an
+  // intentional policy A decision, need repo binding before feature work.
+  const bindingPending = Object.entries(metadata.classRepoPaths)
+    .filter(([, entry]) => entry.state !== "ready" && entry.policy !== "A")
     .map(([className]) => className);
-  if (notReady.length > 0) {
+  if (bindingPending.length > 0) {
     return {
       diagnostics: report.diagnostics,
       pending: {
         kind: "attach",
-        classes: notReady,
-        guidance: attachGuidance(notReady, projectPathRel)
+        classes: bindingPending,
+        guidance: attachGuidance(bindingPending, projectPathRel)
       }
     };
   }
@@ -116,16 +117,16 @@ function initGuidance(stepId: string, stepName: string, projectPathRel: string):
 
 function attachGuidance(classes: string[], projectPathRel: string): string[] {
   return [
-    `Class repositories are not ready and must be attached before feature work: ${classes.join(", ")}.`,
-    "Attach deferred class repos and reconcile the common contract with:",
+    `Class repository binding records are incomplete: ${classes.join(", ")}.`,
+    "Resolve class repo binding before feature work with:",
     `  overmind project reconcile --path ${projectPathRel}`
   ];
 }
 
 function reconcileGuidance(classes: string[], projectPathRel: string): string[] {
   return [
-    `Ready class repositories are not reconciled yet: ${classes.join(", ")}.`,
-    "Run contract reconciliation with:",
+    `Ready class repositories need contract reconciliation before feature work: ${classes.join(", ")}.`,
+    "Reconcile the common contract with:",
     `  overmind project reconcile --path ${projectPathRel}`
   ];
 }

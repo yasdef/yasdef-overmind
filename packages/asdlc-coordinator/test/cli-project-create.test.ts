@@ -72,22 +72,9 @@ async function withRuntime(fn: (root: string) => Promise<void>): Promise<void> {
 
 test("project create renders typed success output", async () => {
   await withRuntime(async (root) => {
-    const emptyRepo = path.join(root, "repos", "empty");
-    const readyRepo = path.join(root, "repos", "ready");
-    mkdirSync(emptyRepo, { recursive: true });
-    mkdirSync(readyRepo, { recursive: true });
-    writeFileSync(path.join(readyRepo, "README.md"), "repo\n");
     const git = new StubProjectInitGit();
     const { code, out } = await run(["project", "create"], root, {
-      interaction: new StubInteraction([
-        "CLI Project",
-        "backend",
-        "__done__",
-        "ready",
-        emptyRepo,
-        readyRepo,
-        "A"
-      ]),
+      interaction: new StubInteraction(["CLI Project", "A", "backend", "__done__"]),
       projectClock: { now: () => "2026-07-09T12:00:00Z" },
       uuid: { next: () => "id-1" },
       projectInitGit: git
@@ -95,12 +82,31 @@ test("project create renders typed success output", async () => {
     assert.equal(code, 0);
     assert.match(out.stdout, /Created ASDLC project folder: .*cli_project-id-1/);
     assert.match(out.stdout, /Updated ASDLC metadata:/);
-    assert.match(out.stderr, /Repo path must point to a non-empty directory:/);
+    assert.match(out.stdout, /overmind project reconcile/);
+    assert.equal(out.stderr, "");
     assert.equal(git.calls.length, 1);
     assert.match(
       readFileSync(path.join(root, "asdlc_metadata.yaml"), "utf8"),
       /- project: cli_project-id-1/
     );
+  });
+});
+
+test("project create can create a project with no classes", async () => {
+  await withRuntime(async (root) => {
+    const { code } = await run(["project", "create"], root, {
+      interaction: new StubInteraction(["Classless", "C", "__done__"]),
+      projectClock: { now: () => "2026-07-09T12:00:00Z" },
+      uuid: { next: () => "id-2" },
+      projectInitGit: new StubProjectInitGit()
+    });
+    assert.equal(code, 0);
+    const definition = readFileSync(
+      path.join(root, "projects", "classless-id-2", "init_progress_definition.yaml"),
+      "utf8"
+    );
+    assert.match(definition, /  project_classes: \[\]\n  project_type_code: "C"/);
+    assert.match(definition, /  class_repo_paths: \{\}/);
   });
 });
 

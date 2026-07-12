@@ -61,14 +61,39 @@ test("pending step 1.1 emits stack-blueprint guidance", async () => {
   );
 });
 
-test("a deferred class repo refuses before feature selection naming overmind project reconcile", async () => {
+test("a deferred policy A class does not block feature selection", async () => {
   await withWorkspace(
     { definition: { classes: ["backend"], classRepoPaths: { backend: { state: "deferred" } } } },
+    ({ root, projectDir, projectPathRel }) => {
+      const result = detectProjectPendingWork(root, projectDir, projectPathRel);
+      assert.equal(result.pending, undefined);
+    }
+  );
+});
+
+test("a deferred policy B class blocks with repo-binding guidance", async () => {
+  await withWorkspace(
+    {
+      definition: {
+        classes: ["backend"],
+        classRepoPaths: { backend: { state: "deferred", policy: "B" } }
+      }
+    },
     ({ root, projectDir, projectPathRel }) => {
       const result = detectProjectPendingWork(root, projectDir, projectPathRel);
       assert.equal(result.pending?.kind, "attach");
       if (result.pending?.kind === "attach") {
         assert.deepEqual(result.pending.classes, ["backend"]);
+        assert.ok(
+          result.pending.guidance.some((line) =>
+            line.includes("Class repository binding records are incomplete: backend")
+          )
+        );
+        assert.ok(
+          result.pending.guidance.some((line) =>
+            line.includes("Resolve class repo binding before feature work")
+          )
+        );
         assert.ok(
           result.pending.guidance.some((line) =>
             line.includes(`overmind project reconcile --path ${projectPathRel}`)
@@ -90,7 +115,11 @@ test("a configured class repo with no state is treated as not-ready and refuses 
       assert.equal(result.pending?.kind, "attach");
       if (result.pending?.kind === "attach") {
         assert.deepEqual(result.pending.classes, ["backend"]);
-        assert.ok(result.pending.guidance.some((line) => /not ready/.test(line)));
+        assert.ok(
+          result.pending.guidance.some((line) =>
+            /Class repository binding records are incomplete/.test(line)
+          )
+        );
       }
     }
   );
@@ -104,6 +133,13 @@ test("a ready but unreconciled class refuses with overmind project reconcile gui
       assert.equal(result.pending?.kind, "reconcile");
       if (result.pending?.kind === "reconcile") {
         assert.deepEqual(result.pending.classes, ["backend"]);
+        assert.ok(
+          result.pending.guidance.some((line) =>
+            line.includes(
+              "Ready class repositories need contract reconciliation before feature work"
+            )
+          )
+        );
         assert.ok(
           result.pending.guidance.some((line) =>
             line.includes(`overmind project reconcile --path ${projectPathRel}`)

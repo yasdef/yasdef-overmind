@@ -8,7 +8,13 @@ import {
 } from "node:fs";
 import path from "node:path";
 
+import type { PathInspectionResult, ProjectGitPort } from "../git/index.js";
 import type { InteractionPort } from "../interaction/index.js";
+import { readProjectDefinitionMetadata } from "../parse/project-definition.js";
+import {
+  resolveProjectInitOwnership,
+  type ProjectInitOwnership
+} from "../orchestrator/project-init-ownership.js";
 import type { Diagnostic } from "../types/index.js";
 
 /** Injected clock; returns the Unix timestamp (seconds) appended to feature folder names. */
@@ -19,6 +25,7 @@ export interface ScaffoldClock {
 export interface ScaffoldFeatureDeps {
   interaction: InteractionPort;
   clock: ScaffoldClock;
+  projectGit: ProjectGitPort;
   /** Optional overrides used when the caller already has id/title (CLI/tests). */
   featureId?: string;
   featureTitle?: string;
@@ -105,6 +112,25 @@ export async function scaffoldFeature(
   const meta = readProjectTypeMeta(definitionPath);
   if (!meta) return fail("Unable to load project metadata for BR scaffold init.");
 
+  const projectPathRel = path.relative(runtimeRootResolved, projectRoot);
+  // Applicable step 1.1 stack/agent-guidelines paths (type A only) are part of the
+  // initial baseline the checkpoint gate must inspect, not just the shared files.
+  const ownership = resolveProjectInitOwnership(readProjectDefinitionMetadata(definitionPath));
+  const checkpoint = classifyPendingProjectCheckpoint(
+    projectRoot,
+    projectPathRel,
+    deps.projectGit,
+    ownership
+  );
+  if (checkpoint.kind === "blocked") {
+    return fail(checkpoint.reason);
+  }
+  if (checkpoint.kind === "pending") {
+    return fail(
+      `Pending ${checkpoint.boundary} checkpoint must be completed before feature scaffolding. Run ${checkpoint.command}.`
+    );
+  }
+
   const featureId = await requireInput(deps, "Feature ID:", deps.featureId, emit);
   const featureTitle = await requireInput(deps, "Feature title:", deps.featureTitle, emit);
 
@@ -153,6 +179,77 @@ export async function scaffoldFeature(
   emit(`Updated ${outputPath}`);
 
   return { featurePath, outputPath, notices, diagnostics: [] };
+}
+
+function classifyPendingProjectCheckpoint(
+  projectRoot: string,
+  projectPathRel: string,
+  projectGit: ProjectGitPort,
+  ownership: ProjectInitOwnership
+):
+  | { kind: "ready" }
+  | { kind: "blocked"; reason: string }
+  | { kind: "pending"; boundary: string; command: string } {
+  if (!projectGit.inspectPaths) {
+    return {
+      kind: "blocked",
+      reason: `Unable to inspect project checkpoint state before feature scaffolding for ${projectPathRel}: project Git adapter does not support path-scoped inspection. Resolve project Git inspection, then retry starting the feature with overmind run --path ${projectPathRel}.`
+    };
+  }
+
+  // Inspect the whole initial baseline: the shared project-definition files and,
+  // for type A, the applicable step 1.1 stack/agent-guidelines artifacts.
+  const inspect = projectGit.inspectPaths(projectRoot, ownership.initialBaselinePaths);
+  if (inspect.kind === "ok") {
+    const byPath = new Map(inspect.paths.map((entry) => [entry.path, entry]));
+    const common = byPath.get("common_contract_definition.md");
+    const dirtyShared = ownership.sharedProjectDefinitionPaths.some((candidate) => {
+      const entry = byPath.get(candidate);
+      return entry ? entry.staged || entry.unstaged || entry.untracked : false;
+    });
+
+    // Post-baseline shared-file change is a reconciliation checkpoint, taking
+    // precedence over pre-baseline init checkpoint state (crp-160 contract).
+    if (dirtyShared && common?.hasHeadVersion) {
+      return {
+        kind: "pending",
+        boundary: "project reconciliation",
+        command: `overmind project reconcile --path ${projectPathRel}`
+      };
+    }
+    // Pre-baseline init: the shared baseline is not committed, or an applicable
+    // step 1.1 artifact that already exists has no finalized checkpoint.
+    const step11CheckpointPending = ownership.step11Paths.some((candidate) => {
+      if (!existsSync(path.join(projectRoot, candidate))) return false;
+      const entry = byPath.get(candidate);
+      return entry ? !entry.hasHeadVersion : false;
+    });
+    if (dirtyShared || !common?.hasHeadVersion || step11CheckpointPending) {
+      return {
+        kind: "pending",
+        boundary: "project initialization",
+        command: `overmind project init --path ${projectPathRel}`
+      };
+    }
+    return { kind: "ready" };
+  }
+  return {
+    kind: "blocked",
+    reason: `Unable to inspect project checkpoint state before feature scaffolding for ${projectPathRel}: ${describePathInspectionFailure(inspect)}. Resolve project Git inspection, then retry starting the feature with overmind run --path ${projectPathRel}.`
+  };
+}
+
+function describePathInspectionFailure(
+  inspect: Exclude<PathInspectionResult, { kind: "ok" }>
+): string {
+  switch (inspect.kind) {
+    case "unavailable":
+      return "git is not available";
+    case "notWorktree":
+      return "project root is not a git worktree";
+    case "inspectionFailed":
+      return `git inspection failed with exit code ${inspect.exitCode}: ${inspect.stderr.trim()}`;
+  }
 }
 
 async function requireInput(

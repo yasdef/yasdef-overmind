@@ -289,14 +289,22 @@ async function runPhase7Loop(
     const completed = perClass
       .filter((item) => item.state === "done")
       .map((item) => item.className);
-    const pending = perClass.filter((item) => item.state !== "done").map((item) => item.className);
+    const pendingItems = perClass.filter((item) => item.state !== "done");
+    const pending = pendingItems.map((item) => item.className);
+    const analyzable = pendingItems
+      .filter((item) => item.analysisAvailability !== "unavailable")
+      .map((item) => item.className);
+    const unavailable = pendingItems
+      .filter((item) => item.analysisAvailability === "unavailable")
+      .map((item) => item.className);
 
     deps.emit(`Phase 7 class loop status for feature: ${featurePath}`);
     deps.emit(`Already picked/completed classes: ${formatClassList(completed)}`);
     deps.emit(`Pending classes: ${formatClassList(pending)}`);
+    deps.emit(`Deferred/unavailable classes: ${formatClassList(unavailable)}`);
 
     const options = [
-      ...(pending.length > 0 ? [{ value: "analyze", label: "Analyze one class now" }] : []),
+      ...(analyzable.length > 0 ? [{ value: "analyze", label: "Analyze one class now" }] : []),
       { value: "refresh", label: "Refresh class status" },
       { value: "forward", label: "contract delta finished lets move forward" }
     ];
@@ -317,13 +325,13 @@ async function runPhase7Loop(
 
     // analyze one class
     let selectedClass: string;
-    if (pending.length === 1) {
-      selectedClass = pending[0]!;
+    if (analyzable.length === 1) {
+      selectedClass = analyzable[0]!;
     } else {
       try {
         selectedClass = await deps.interaction.select({
           message: "Select a class to analyze now:",
-          options: pending.map((className) => ({ value: className, label: className }))
+          options: analyzable.map((className) => ({ value: className, label: className }))
         });
       } catch (error) {
         if (error instanceof InteractionClosedError) {

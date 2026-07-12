@@ -3,7 +3,6 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
-  realpathSync,
   renameSync,
   rmSync,
   writeFileSync
@@ -94,28 +93,18 @@ test("project name normalization matches the shell slug format", () => {
   assert.equal(normalizeProjectName("!!!"), "");
 });
 
-test("createProject captures classes, ready/deferred repo paths, metadata, definition, and git", async () => {
+test("createProject captures type and class membership without repository prompts", async () => {
   await withRuntime(async (root) => {
-    const repo = path.join(root, "repos", "backend");
-    mkdirSync(repo, { recursive: true });
-    writeFileSync(path.join(repo, "README.md"), "repo\n");
-    const badRepo = path.join(root, "repos", "empty");
-    mkdirSync(badRepo, { recursive: true });
-
     const errors: string[] = [];
     const temp = new RecordingTemp();
     const git = new RecordingProjectGit();
     const result = await createProject(root, {
       interaction: new StubInteraction([
         'My "New" Project',
+        "b",
         "frontend",
         "backend",
-        "__done__",
-        "ready",
-        badRepo,
-        repo,
-        "deferred",
-        "b"
+        "__done__"
       ]),
       clock: { now: () => "2026-07-09T12:00:00Z" },
       uuid: { next: () => "uuid-1" },
@@ -125,7 +114,7 @@ test("createProject captures classes, ready/deferred repo paths, metadata, defin
     });
 
     assert.equal(result.diagnostics.length, 0);
-    assert.deepEqual(errors, [`Repo path must point to a non-empty directory: ${badRepo}`]);
+    assert.deepEqual(errors, []);
     assert.equal(result.projectId, "my_new_project-uuid-1");
     assert.equal(result.changedPaths.length, 3);
     assert.ok(result.projectFolder);
@@ -143,11 +132,12 @@ test("createProject captures classes, ready/deferred repo paths, metadata, defin
     assert.match(definition, /  project_type_label: "Existing project with partial context"/);
     assert.match(
       definition,
-      new RegExp(
-        `    backend:\\n      state: "ready"\\n      path: "${escapeRegExp(realpathSync(repo))}"`
-      )
+      /    backend:\n      state: "deferred"\n      path: ""\n      policy: "A"/
     );
-    assert.match(definition, /    frontend:\n      state: "deferred"\n      path: ""/);
+    assert.match(
+      definition,
+      /    frontend:\n      state: "deferred"\n      path: ""\n      policy: "A"/
+    );
     assert.match(definition, /\nsteps:\n  - id: "1"\n/);
 
     const metadata = readFileSync(path.join(root, "asdlc_metadata.yaml"), "utf8");
@@ -160,15 +150,7 @@ test("createProject captures classes, ready/deferred repo paths, metadata, defin
 
 test("createProject re-prompts type and class selection until valid", async () => {
   await withRuntime(async (root) => {
-    const interaction = new StubInteraction([
-      "Name",
-      "__done__",
-      "backend",
-      "__done__",
-      "deferred",
-      "Z",
-      "3"
-    ]);
+    const interaction = new StubInteraction(["Name", "Z", "3", "backend", "__done__"]);
     const result = await createProject(root, {
       interaction,
       clock: { now: () => "2026-07-09T12:00:00Z" },
@@ -180,12 +162,22 @@ test("createProject re-prompts type and class selection until valid", async () =
     assert.equal(result.diagnostics.length, 0);
     assert.ok(interaction.selectRequests[0]!.includes("backend"));
     assert.ok(interaction.selectRequests[0]!.includes("__done__"));
-    assert.equal(interaction.selectRequests[1]!.includes("backend"), true);
-    assert.equal(interaction.selectRequests[2]!.includes("backend"), false);
+    assert.equal(interaction.selectRequests[1]!.includes("backend"), false);
 
     const definition = readFileSync(result.definitionPath!, "utf8");
     assert.match(definition, /  project_type_code: "C"/);
     assert.match(definition, /  project_classes:\n    - backend/);
+  });
+});
+
+test("createProject writes explicit empty collections with no classes", async () => {
+  await withRuntime(async (root) => {
+    const { result } = await create(root, ["Name", "A", "__done__"]);
+
+    assert.equal(result.diagnostics.length, 0);
+    const definition = readFileSync(result.definitionPath!, "utf8");
+    assert.match(definition, /  project_classes: \[\]\n/);
+    assert.match(definition, /  class_repo_paths: \{\}\n/);
   });
 });
 
@@ -196,7 +188,7 @@ test("createProject preserves unrelated template content before steps", async ()
       '# License header\nmeta_info:\n  project_id: ""\n  placeholder: true\nx-template-note: "preserve me"\nsteps:\n  - id: "1"\n'
     );
 
-    const { result } = await create(root, ["Name", "backend", "__done__", "deferred", "A"]);
+    const { result } = await create(root, ["Name", "A", "backend", "__done__"]);
 
     assert.equal(result.diagnostics.length, 0);
     const definition = readFileSync(result.definitionPath!, "utf8");
@@ -227,7 +219,7 @@ test("createProject fails without mutation on malformed metadata and existing fo
 
     writeFileSync(metadataPath, "meta:\nprojects:\n");
     mkdirSync(path.join(root, "projects", "name-uuid-1"));
-    const existing = await create(root, ["Name", "backend", "__done__", "deferred", "A"]);
+    const existing = await create(root, ["Name", "A", "backend", "__done__"]);
     assert.match(existing.result.diagnostics[0]!.reason, /already exists/);
     assert.equal(readFileSync(metadataPath, "utf8"), "meta:\nprojects:\n");
   });
@@ -237,7 +229,7 @@ test("git failure reports a diagnostic, cleans the folder, and leaves metadata u
   await withRuntime(async (root) => {
     const before = readFileSync(path.join(root, "asdlc_metadata.yaml"), "utf8");
     const git = new RecordingProjectGit({ kind: "commitFailed", exitCode: 1, stderr: "nope" });
-    const { result } = await create(root, ["Name", "backend", "__done__", "deferred", "A"], git);
+    const { result } = await create(root, ["Name", "A", "backend", "__done__"], git);
     assert.match(result.diagnostics[0]!.reason, /initial project git commit/);
     assert.equal(result.changedPaths.length, 0);
     assert.equal(readFileSync(path.join(root, "asdlc_metadata.yaml"), "utf8"), before);
@@ -292,7 +284,3 @@ test("RepoGitProjectInitAdapter applies fallback identity only when unset", () =
     false
   );
 });
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}

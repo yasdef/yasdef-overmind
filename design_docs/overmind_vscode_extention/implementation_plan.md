@@ -14,7 +14,7 @@ alone are paired so every change is operator-visible and `npm run verify`-green.
 | CRP-158 workspace detection & readiness completion | rest of 1.2 + 1.4 | Multi-workspace handling, active-workspace preference, detection fixtures, project-level presentation, full readiness test matrix (complete/partial/missing/deferred/invalid). Read-model only, no UI change. |
 | CRP-159 webview dashboard | 2.1 + rest of 2.3 | Webview replacing the tree view: project list with repo/class readiness, per-project feature list, detail views, empty/loading/degraded/error states; manual refresh command and output-channel diagnostics folded in. |
 | CRP-160 artifact open actions | 2.2 | First webview→extension-host message channel, artifact records, open-in-editor with disabled state for missing artifacts. Separate because it establishes the message-passing contract every later action reuses. |
-| CRP-161 safe action framework + first actions | 3.1 + 3.2 | Verb allow-list, path validation, mutation confirmations, coordinator-vs-terminal routing, plus Create Feature (`overmind scaffold feature`) and Continue E2E (terminal-hosted `overmind run`). Merged: the framework alone has no observable behavior to verify. |
+| CRP-161 safe action framework + first actions | 3.1 + 3.2 | Verb allow-list, path validation, mutation confirmations, coordinator-vs-terminal routing, plus Create Feature (in-process `scaffoldFeature()` primitive import) and Continue E2E (terminal-hosted `overmind run`). Merged: the framework alone has no observable behavior to verify. |
 | CRP-162 coordinator action contracts + task-to-BR capture form | 4.1 + 4.2 | Contract binding in `asdlc-coordinator` plus its first consumer, the task-to-BR capture form. Merged: the contract's only proof is a consumer. |
 | CRP-163 package & internal release | rest of 1.1 + 5.1 | `.vsix` packaging, extension-host launch verification, install docs, cross-platform smoke, release checklist. |
 
@@ -121,7 +121,7 @@ dashboard; step 5.1 depends only on 2.3) → CRP-160 → CRP-161 → CRP-162.
 #### Evidence: comp/action-controller
 #### Preserved Surface: dashboard action buttons
 - [ ] Use in-process `sequencing/` recomputation for read-only status; provide no terminal scanner action.
-- [ ] Add Create Feature through the `overmind scaffold feature` primitive.
+- [ ] Add Create Feature through the in-process `scaffoldFeature()` coordinator primitive import, supplying the form's feature ID and title and consuming the returned typed feature path.
 - [ ] Add Continue E2E through terminal-hosted `overmind run`.
 - [ ] Postpone Create Project until a shared coordinator primitive or shipped `overmind` verb exists.
 - [ ] Refresh dashboard after terminal action completion when completion can be detected.

@@ -24,6 +24,30 @@ test("TTY interaction port confirm preserves y/n semantics", async () => {
   assert.match(readOutput(output), /\[y\/n\]/);
 });
 
+test("TTY confirm renders default yes and accepts blank as yes", async () => {
+  const input = new PassThrough();
+  const output = new PassThrough();
+  const port = createTtyInteractionPort({ input, output });
+
+  input.end("\n");
+  const confirmed = await port.confirm({ message: "Continue?", defaultValue: true });
+
+  assert.equal(confirmed, true);
+  assert.match(readOutput(output), /Continue\? \[Y\/n\]/);
+});
+
+test("TTY confirm renders default no and accepts blank as no", async () => {
+  const input = new PassThrough();
+  const output = new PassThrough();
+  const port = createTtyInteractionPort({ input, output });
+
+  input.end("\n");
+  const confirmed = await port.confirm({ message: "Commit?", defaultValue: false });
+
+  assert.equal(confirmed, false);
+  assert.match(readOutput(output), /Commit\? \[y\/N\]/);
+});
+
 test("TTY confirm re-prompts on invalid input instead of declining", async () => {
   const input = new PassThrough();
   const output = new PassThrough();

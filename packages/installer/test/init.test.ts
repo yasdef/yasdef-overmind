@@ -71,6 +71,7 @@ const ALL_SKILLS = [
   "overmind-requirements-ears",
   "overmind-ears-review",
   "overmind-stack-blueprint",
+  "overmind-agents-md",
   "overmind-common-contract",
   "overmind-contract-delta",
   "overmind-surface-map",
@@ -107,6 +108,14 @@ const SKILL_ASSET_CHECKS: Record<(typeof ALL_SKILLS)[number], string[]> = {
     "project_stack_blueprint_be_GOLDEN_EXAMPLE.md",
     "project_stack_blueprint_fe_GOLDEN_EXAMPLE.md",
     "project_stack_blueprint_mobile_GOLDEN_EXAMPLE.md"
+  ],
+  "overmind-agents-md": [
+    "project_agents_md_claude_md_be_TEMPLATE.md",
+    "project_agents_md_claude_md_fe_TEMPLATE.md",
+    "project_agents_md_claude_md_mobile_TEMPLATE.md",
+    "project_agents_md_claude_md_be_GOLDEN_EXAMPLE.md",
+    "project_agents_md_claude_md_fe_GOLDEN_EXAMPLE.md",
+    "project_agents_md_claude_md_mobile_GOLDEN_EXAMPLE.md"
   ],
   "overmind-common-contract": [
     "common_contract_definition_TEMPLATE.md",
@@ -355,7 +364,7 @@ test("fresh install exposes project init skills with migrated rule parity", () =
     const stackSuccessLine =
       "Project stack blueprint class session is finished for <target_class>. Nothing else to do now; press Ctrl-C so orchestrator can continue project init";
     const commonSuccessLine =
-      "Common contract definition phase is finished. Nothing else to do now; press Ctrl-C so orchestrator can start the next phase";
+      "Common contract definition phase is finished. Nothing else to do now; press Ctrl-C so Overmind can finalize project initialization";
     const commonInfeasibleLine =
       "common contract definition gate cannot pass with current repository evidence. Please provide instructions what to do, or adjust requirements and rerun this phase";
 
@@ -385,6 +394,10 @@ test("fresh install exposes project init skills with migrated rule parity", () =
       assert.match(commonText, /source_repo_count` from context/);
       assert.match(commonText, /Cross-Class Transport\/Contract Approach Mirror/);
       assert.equal(commonText.includes(commonSuccessLine), true);
+      assert.equal(
+        commonText.includes("press Ctrl-C so orchestrator can start the next phase"),
+        false
+      );
       assert.equal(commonText.includes(commonInfeasibleLine), true);
     }
   });
@@ -469,7 +482,7 @@ test("installed CLI executes and runtime templates land at coordinator default p
       encoding: "utf8"
     });
     assert.equal(result.status, 2);
-    assert.match(result.stderr, /overmind <run\|project create\|project init/);
+    assert.match(result.stderr, /overmind <run\|project create\|project add-class\|project init/);
     assert.equal(
       existsSync(path.join(root, ".templates", "init_progress_definition_TEMPLATE.yaml")),
       true
@@ -483,20 +496,31 @@ test("generated quickrun and install-bin output name TypeScript commands only", 
     installProject(root);
     const quickrun = readFileSync(path.join(root, "quickrun.md"), "utf8");
     for (const expected of [
+      "## First-Time Happy Path",
+      "Use this path when starting from an empty ASDLC workspace:",
       "node .overmind/overmind.js project create",
-      "node .overmind/overmind.js project reconcile",
-      "node .overmind/overmind.js project init",
+      "node .overmind/overmind.js project add-class",
+      "node .overmind/overmind.js project reconcile --path projects/<project-id>",
+      "node .overmind/overmind.js project init --path projects/<project-id>",
+      "Continue with common contract definition? [Y/n]",
+      "answer no to pause cleanly and resume step 2 later",
       "node .overmind/overmind.js worker register",
       "node .overmind/overmind.js worker assign",
       "node .overmind/overmind.js run",
-      "node .overmind/overmind.js scaffold feature",
       "node .overmind/overmind.js status",
       "node .overmind/overmind.js context task-to-br",
-      "node .overmind/overmind.js gate task-to-br"
+      "node .overmind/overmind.js gate task-to-br",
+      "`project create`: create a new project entry and folder under `projects/`.",
+      "`run --path projects/<project-id>`: run the next workflow step for a specific project.",
+      "`context task-to-br ...`: build the model context for turning the task into a business-requirements brief."
     ]) {
       assert.match(quickrun, new RegExp(escapeRegExp(expected)));
     }
+    assert.doesNotMatch(quickrun, /Repeat project init/);
     assert.doesNotMatch(quickrun, /\.sh\b/);
+    // `run` is the single feature-creation entrypoint; `scaffold feature` is gone.
+    assert.doesNotMatch(quickrun, /scaffold feature/);
+    assert.match(quickrun, /node \.overmind\/overmind\.js run --path projects\/<project-id>/);
 
     const output = runInstallerBin(root, `${root}\n`);
     assert.equal(output.status, 0);

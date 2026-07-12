@@ -146,6 +146,27 @@ const PROMPT_RECIPES: Record<string, PromptRecipe> = {
       "- The model owns the gate loop; this orchestrator does not run the gate."
     ]
   },
+  "agents-md": {
+    intro: () => "Load and follow the overmind-agents-md skill for this project class.",
+    runtimeBindings: (bindings) => [
+      `- ASDLC workspace root: ${bindings.runtimeRoot}`,
+      `- Current working directory for all commands: ${bindings.runtimeRoot}`,
+      `- Project path: ${bindings.featurePath}`,
+      `- Target class: ${bindings.targetClass ?? "<missing-class>"}`,
+      `- Target agents-md artifact: ${bindings.featurePath}/project_agents_md_claude_md_${bindings.targetClass ?? "<missing-class>"}.md`,
+      `- Read-only source blueprint: ${bindings.featurePath}/project_stack_blueprint_${bindings.targetClass ?? "<missing-class>"}.md`,
+      `- Overmind CLI: ${bindings.overmindCliPath}`
+    ],
+    requiredFlow: (bindings) => [
+      "- Load and follow the overmind-agents-md skill.",
+      "- Assemble deterministic context with:",
+      `  node ${bindings.overmindCliPath} context agents-md ${bindings.featurePath} --class ${bindings.targetClass ?? "<missing-class>"}`,
+      "- Use the exact gate command below when the skill tells you to validate:",
+      `  node ${bindings.overmindCliPath} gate agents-md ${bindings.featurePath}/project_agents_md_claude_md_${bindings.targetClass ?? "<missing-class>"}.md`,
+      "- Treat the source blueprint as read-only.",
+      "- The model owns the gate loop; this orchestrator does not run the gate."
+    ]
+  },
   "common-contract": {
     intro: () => "Load and follow the overmind-common-contract skill for this project.",
     runtimeBindings: (bindings) => [

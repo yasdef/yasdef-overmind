@@ -32,7 +32,14 @@ function createRepo(root: string): string {
 
 function fixture(
   root: string,
-  opts: { repo?: boolean; blueprint?: boolean; classes?: string } = {}
+  opts: {
+    repo?: boolean;
+    blueprint?: boolean;
+    className?: "backend" | "frontend" | "mobile";
+    classes?: string;
+    policy?: "A" | "B" | "C";
+    typeCode?: string;
+  } = {}
 ): {
   project: string;
   feature: string;
@@ -43,13 +50,27 @@ function fixture(
   writeFileSync(path.join(feature, "requirements_ears.md"), "EARS\n");
   writeFileSync(path.join(feature, "feature_contract_delta.md"), "delta\n");
   const repo = opts.repo ? createRepo(root) : undefined;
+  const className = opts.className ?? "backend";
   const classes = opts.classes ?? "[backend, frontend]";
+  const classRepoPaths = opts.repo
+    ? `
+    ${className}:
+      state: ready
+      path: "${repo}"
+      policy: C`
+    : opts.blueprint || opts.policy
+      ? `
+    ${className}:
+      state: deferred
+      path: ""
+      policy: ${opts.policy ?? "A"}`
+      : " {}";
   writeFileSync(
     path.join(project, "init_progress_definition.yaml"),
-    `meta_info:\n  project_classes: ${classes}\n  project_type_code: A\n  class_repo_paths:${repo ? `\n    backend:\n      state: ready\n      path: "${repo}"` : " {}"}\nsteps: []\n`
+    `meta_info:\n  project_classes: ${classes}\n  project_type_code: ${opts.typeCode ?? "A"}\n  class_repo_paths:${classRepoPaths}\nsteps:\n`
   );
   if (opts.blueprint) {
-    writeFileSync(path.join(project, "project_stack_blueprint_backend.md"), "# blueprint\n");
+    writeFileSync(path.join(project, `project_stack_blueprint_${className}.md`), "# blueprint\n");
   }
   return { project, feature };
 }
@@ -88,7 +109,11 @@ test("surface-map context: backend with ready repo emits binding, scan scope, ma
 test("surface-map context: frontend uses fe assets", () => {
   const root = mkdtempSync(path.join(tmpdir(), "overmind-surface-context-fe-"));
   try {
-    const { project } = fixture(root, { classes: "[frontend]" });
+    const { project } = fixture(root, {
+      blueprint: true,
+      className: "frontend",
+      classes: "[frontend]"
+    });
     writeFileSync(path.join(project, "project_stack_blueprint_frontend.md"), "# fe blueprint\n");
     const result = buildSurfaceMapContext("projects/p1/feature-a", "frontend", root);
     assert.equal(result.exitCode, 0, result.errorMessage);
@@ -104,7 +129,11 @@ test("surface-map context: frontend uses fe assets", () => {
 test("surface-map context: mobile uses fe assets with a mobile target and gate", () => {
   const root = mkdtempSync(path.join(tmpdir(), "overmind-surface-context-mobile-"));
   try {
-    const { project } = fixture(root, { classes: "[mobile]" });
+    const { project } = fixture(root, {
+      blueprint: true,
+      className: "mobile",
+      classes: "[mobile]"
+    });
     writeFileSync(path.join(project, "project_stack_blueprint_mobile.md"), "# mobile blueprint\n");
     const result = buildSurfaceMapContext("projects/p1/feature-a", "mobile", root);
     assert.equal(result.exitCode, 0, result.errorMessage);
@@ -169,11 +198,39 @@ test("surface-map context: class not active or neither repo/blueprint exits 2", 
 
     const noEvidence = buildSurfaceMapContext("projects/p1/feature-a", "backend", root);
     assert.equal(noEvidence.exitCode, 2);
-    assert.match(noEvidence.errorMessage ?? "", /neither a ready repository nor a stack blueprint/);
+    assert.match(noEvidence.errorMessage ?? "", /not analyzable from class_repo_paths/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("surface-map context: deferred policy-A class requires its blueprint", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "overmind-surface-context-policy-a-missing-"));
+  try {
+    fixture(root, { classes: "[backend]", policy: "A" });
+    const result = buildSurfaceMapContext("projects/p1/feature-a", "backend", root);
+    assert.equal(result.exitCode, 2);
+    assert.match(result.errorMessage ?? "", /Required policy A stack blueprint not found/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+for (const policy of ["B", "C"] as const) {
+  test(`surface-map context: deferred policy-${policy} class cannot consume a stray blueprint`, () => {
+    const root = mkdtempSync(
+      path.join(tmpdir(), `overmind-surface-context-policy-${policy}-blueprint-`)
+    );
+    try {
+      fixture(root, { blueprint: true, classes: "[backend]", policy });
+      const result = buildSurfaceMapContext("projects/p1/feature-a", "backend", root);
+      assert.equal(result.exitCode, 2);
+      assert.match(result.errorMessage ?? "", /not analyzable from class_repo_paths/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+}
 
 test("surface-map context: feature path symlinked outside the workspace is rejected", () => {
   const root = mkdtempSync(path.join(tmpdir(), "overmind-surface-escape-"));

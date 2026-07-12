@@ -17,16 +17,16 @@ This repository contains the standalone Overmind project. The original extractio
 
 1. clone `yasdef-overmind` to your local machine
 2. run `npm install`, `npm run build`, and `npm run setup` from the repo root, then answer the `ASDLC workspace path:` prompt. A missing path or empty directory is bootstrapped; an existing workspace containing `asdlc_metadata.yaml` is updated. The selected ASDLC workspace receives `.overmind/overmind.js`, packaged Overmind skills in `.codex/skills/` and `.claude/skills/`, runtime templates in `.templates/`, setup defaults in `.setup/`, `asdlc_metadata.yaml`, `projects/`, and `quickrun.md`.
-3. in asdlc folder run `node .overmind/overmind.js project create` to create a new project. This creates `projects/<project-id>/`, seeds `init_progress_definition.yaml`, initializes that project folder as its own git repository, and creates the first commit. On this step you may provide paths to project repos, for example backend and frontend (if they exist), if it's a completely new project you may optionally configure per-class stack guidance sources in `init_progress_definition.yaml`; if absent, the system falls back to model proposals during stack blueprint authoring. Deferred or newly attached class repositories are handled later with `node .overmind/overmind.js project reconcile --path projects/<project-id>`.
+3. in asdlc folder run `node .overmind/overmind.js project create` to create a new project. This creates `projects/<project-id>/`, seeds `init_progress_definition.yaml`, initializes that project folder as its own git repository, and creates the first commit. Creation asks for project name, project type, and class membership only; selected classes start as policy `A` with empty repo paths, meaning feature work can proceed without repo evidence for those classes. Use `node .overmind/overmind.js project add-class` later to add a missing class or reset a wrongly bound class to policy `A`, then use `node .overmind/overmind.js project reconcile --path projects/<project-id>` when existing repositories need binding or ready repositories need contract reconciliation.
    3-a. it's possible to setup MCP server for stack blueprint authoring and MCP placeholder enrichment. To do this, first set knowledgebase mcp to your codex cli (see codex docs), second - after asdlc directory will be established - add this MCP to .setup/external_sources.yaml
 4. finish required project-level init before feature work:
-   - Type A projects: Initialize Repo ASDLC Metadata -> Define Project Stack Blueprints For Active Classes -> Create Cross-Repository Contract Definition For This Project -> start feature.
+   - Type A projects: Initialize Repo ASDLC Metadata -> Define Project Stack Blueprints And Agent Guidelines For Active Classes -> Create Cross-Repository Contract Definition For This Project -> start feature.
    - Type B/C projects: Initialize Repo ASDLC Metadata -> Create Cross-Repository Contract Definition For This Project -> start feature.
-   - Initialize Repo ASDLC Metadata: create `init_progress_definition.yaml` with project type, classes, and repo/path metadata.
-   - Define Project Stack Blueprints For Active Classes: for type A only, approve stack blueprints with `node .overmind/overmind.js project init --path projects/<project-id>`.
-   - Create Cross-Repository Contract Definition For This Project: create project-level `common_contract_definition.md` with `node .overmind/overmind.js project init --path projects/<project-id>`.
+   - Initialize Repo ASDLC Metadata: create `init_progress_definition.yaml` with project type, class membership, and deferred class metadata.
+   - Define Project Stack Blueprints And Agent Guidelines For Active Classes: for type A only, approve stack blueprints and per-class agent guidelines with `node .overmind/overmind.js project init --path projects/<project-id>`. Overmind commits the stack baseline, then asks `Continue with common contract definition? [Y/n]`.
+   - Create Cross-Repository Contract Definition For This Project: create project-level `common_contract_definition.md` with the same `node .overmind/overmind.js project init --path projects/<project-id>` command. If you answered no at the continuation prompt, rerun that command to resume directly at step 2.
    - Initialize and Enrich Business Requirements Structuring: start feature planning with `node .overmind/overmind.js run --path projects/<project-id>`.
-   - `overmind run` (see p.5 below) refuses feature progression when an earlier project init step is incomplete and directs the operator to `node .overmind/overmind.js project init --path projects/<project-id>`. It directs deferred or unreconciled class repos to `node .overmind/overmind.js project reconcile --path projects/<project-id>`.
+   - `overmind run` (see p.5 below) refuses feature progression when an earlier project init step is incomplete and directs the operator to `node .overmind/overmind.js project init --path projects/<project-id>`. It directs deferred policy `B`/`C` class repos to repository binding and ready-unreconciled class repos to contract reconciliation with `node .overmind/overmind.js project reconcile --path projects/<project-id>`.
 
 --- here we finished on project level and go to feature level ---
 
@@ -45,16 +45,18 @@ you can manually run TypeScript CLI commands for different steps after asdlc fol
 
 `project_type_code` records how the project started (A = greenfield with blueprints; B/C = existing repo) and is **not read by feature-phase steps**. Classes transition independently from blueprint-backed to repo-backed on their own timeline. Each class's attachment state is tracked in `meta_info.class_repo_paths.<class>`:
 
-- `state: "deferred"` — no repo attached; planning skips this class for scan-dependent steps and resolves from blueprint or placeholder.
+- `state: "deferred"` — no repo attached. With `policy: "A"`, planning may proceed and skips this class for scan-dependent steps. With `policy: "B"` or `policy: "C"`, an existing repository is expected and feature work blocks until a path is bound.
 - `state: "ready"` — repo is attached and scannable; planning scans this class. Recorded alongside `path` (absolute filesystem path) and `policy` (see below).
 
-Attaching a deferred class repo (entering a valid path, which transitions the class to `ready` and records `policy: "C"`) and reconciling ready classes run through `node .overmind/overmind.js project reconcile --path <project-path>`. `overmind run` detects deferred or unreconciled classes and refuses with that guidance; the project-level reconciliation flow owns attachment and reconciliation. The operator-provided path is the only attach source.
+Class membership is managed by `node .overmind/overmind.js project create` and `node .overmind/overmind.js project add-class`. Both commands produce policy `A` deferred classes, which do not block feature work. Repository binding and contract reconciliation run through `node .overmind/overmind.js project reconcile --path <project-path>`. Reconcile can keep a deferred class as policy `A`, or convert it to policy `B`/`C`, bind a valid repo path, and transition it to `ready`. `overmind run` blocks deferred `B`/`C` classes with repo-binding guidance and blocks ready-unreconciled classes with contract-reconciliation guidance.
 
 ### Policy C — divergence semantics
 
-**Policy `C`** (the default at attach time): the repo is authoritative. A layer that is materialized in the repo but diverges from the blueprint is still resolved from the repo — silently tagged `divergent_from_blueprint: §<n>` (the matching blueprint Layer Bindings block). Blueprint is consulted only when the layer is entirely absent from the repo. Choosing `C` is an informed governance declaration; the system honors it without second-guessing.
+**Policy `A`**: the repository will be generated later; the class remains deferred with an empty path.
 
-Policy `B` (planned, phase 2): an interactive divergence review for structural mismatches, built on the Implementation Plan Semantic Review pattern.
+**Policy `B`**: existing repository with partial context. Type B-specific planning distinctions are tracked for later enforcement.
+
+**Policy `C`**: existing repository with code-first context. A layer that is materialized in the repo but diverges from the blueprint is still resolved from the repo — silently tagged `divergent_from_blueprint: §<n>` (the matching blueprint Layer Bindings block). Blueprint is consulted only when the layer is entirely absent from the repo. Choosing `C` is an informed governance declaration; the system honors it without second-guessing.
 
 ### Evidence resolution chain (D3)
 
@@ -132,15 +134,17 @@ V-0.0.5 (current)
 
 ## Bundled CLI Input Contract
 
-Project-level CLI commands require:
+Project init requires:
 
 - `--path <asdlc/projects/<project-id>>`
 
-The feature workflow and standalone scaffold run through the bundled CLI:
+The feature workflow runs through the bundled CLI:
 
+- `node .overmind/overmind.js project create`
+- `node .overmind/overmind.js project add-class`
+- `node .overmind/overmind.js project reconcile [--path <asdlc/projects/<project-id>>]`
 - `node .overmind/overmind.js project init --path <asdlc/projects/<project-id>>`
 - `node .overmind/overmind.js run [--path <asdlc/projects/<project-id>>] [--resume <step>]`
-- `node .overmind/overmind.js scaffold feature --path <asdlc/projects/<project-id>>`
 - `node .overmind/overmind.js worker register --path <asdlc/projects/<project-id>>`
 - `node .overmind/overmind.js worker assign --feature-path <asdlc/projects/<project-id>/<feature-folder>>`
 
@@ -189,22 +193,25 @@ sources:
   Prompts for an ASDLC workspace path, then bootstraps a missing or empty workspace or updates an existing workspace containing `asdlc_metadata.yaml` through `packages/installer`: `.overmind/overmind.js`, packaged skills for `.codex` and `.claude`, runtime templates, setup defaults, `asdlc_metadata.yaml`, `projects/`, and generated `quickrun.md`.
 
 - `overmind project create` (bundled CLI verb)
-  `node .overmind/overmind.js project create` interactively creates a new project record + project folder, seeds `init_progress_definition.yaml`, initializes `projects/<project-id>/` as a git repository, and creates the first commit.
+  `node .overmind/overmind.js project create` interactively creates a new project record + project folder, records project type and class membership, seeds deferred class rows, initializes `projects/<project-id>/` as a git repository, and creates the first commit.
+
+- `overmind project add-class` (bundled CLI verb)
+  `node .overmind/overmind.js project add-class` interactively adds a missing class or resets an existing class to deferred with an empty path and policy `A`.
 
 - `overmind project reconcile` (bundled CLI verb)
-  `node .overmind/overmind.js project reconcile [--path <asdlc/projects/<project-id>>]` attaches deferred class repositories and runs the one-time common-contract reconciliation flow. With no `--path`, it auto-selects the only project or prompts for one when multiple projects exist.
+  `node .overmind/overmind.js project reconcile [--path <asdlc/projects/<project-id>>]` records class policy, attaches selected policy `B`/`C` repositories, and runs the one-time common-contract reconciliation flow. With no `--path`, it auto-selects the only project or prompts for one when multiple projects exist.
 
 - `overmind project init` (bundled CLI verb)
-  `node .overmind/overmind.js project init --path <asdlc/projects/<project-id>>` runs the next pending project init step. Type A projects run per-class `overmind-stack-blueprint` sessions and `overmind gate stack-blueprint`; every project type runs the `overmind-common-contract` session and the TypeScript common-contract gate before committing the initialization baseline.
+  `node .overmind/overmind.js project init --path <asdlc/projects/<project-id>>` runs project initialization through committed checkpoints. Type A projects run per-class `overmind-stack-blueprint` sessions followed by `overmind-agents-md` sessions, commit the stack baseline, and ask `Continue with common contract definition? [Y/n]`; yes continues in the same invocation, no exits successfully with step 2 pending. Every project type runs the `overmind-common-contract` session and the TypeScript common-contract gate before committing the initialization baseline.
+
+- `packages/installer/_data/skills/overmind-agents-md/SKILL.md`
+  Installed per-class type A project-init skill that creates or verifies `project_agents_md_claude_md_<class>.md` through `node .overmind/overmind.js context agents-md <project-path> --class <backend|frontend|mobile>` and `node .overmind/overmind.js gate agents-md <project-path>/project_agents_md_claude_md_<class>.md`.
 
 - `overmind worker register` (bundled CLI verb)
   `node .overmind/overmind.js worker register --path <asdlc/projects/<project-id>>` interactively registers one worker class (`backend`, `frontend`, `mobile`, `infrastructure`) and appends an active worker record into `<project>/workers.yaml` using canonical `meta_info.project_id`.
 
-- `overmind scaffold feature` (bundled CLI verb)
-  `node .overmind/overmind.js scaffold feature --path <asdlc/projects/<project-id>>` creates a feature folder and seeds `feature_br_summary.md`, returning the created path as a typed result.
-
 - `overmind run` (bundled CLI verb)
-  `node .overmind/overmind.js run [--path <asdlc/projects/<project-id>>] [--resume <step>]` discovers unfinished project feature folders first, asks whether to start a new feature or continue one of the unfinished features, keeps `projects/<project-id>/.overmind_feature_state.json` only as a last-selected cache, reads selected-feature progress through the in-process sequencing core, and orchestrates confirmed execution through Implementation Plan Semantic Review. It refuses before feature work when project-level initialization, class-repo attach, or reconciliation is pending and directs the operator to `node .overmind/overmind.js project reconcile --path <project-path>`.
+  `node .overmind/overmind.js run [--path <asdlc/projects/<project-id>>] [--resume <step>]` discovers unfinished project feature folders first, asks whether to start a new feature or continue one of the unfinished features, keeps `projects/<project-id>/.overmind_feature_state.json` only as a last-selected cache, reads selected-feature progress through the in-process sequencing core, and orchestrates confirmed execution through Implementation Plan Semantic Review. `run` is the single feature-creation entrypoint: selecting "Start a new feature" dispatches catalog step `3` through the deterministic action registry, which seeds `feature_br_summary.md`, records the created feature, and continues into the phase loop. It refuses before feature work when project-level initialization, class-repo attach, or reconciliation is pending, naming the exact command that owns the boundary: `node .overmind/overmind.js project init --path <project-path>` for pending initialization, or `node .overmind/overmind.js project reconcile --path <project-path>` for pending class-repo attach or reconciliation.
 
 - `packages/installer/_data/skills/overmind-task-to-br/SKILL.md`
   Installed skill that drives task-to-BR via `node .overmind/overmind.js capture task-to-br <feature-path> ...`, `node .overmind/overmind.js context task-to-br <feature-path>`, and `node .overmind/overmind.js gate task-to-br <feature-path>`.

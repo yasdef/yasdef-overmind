@@ -1,13 +1,17 @@
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import assert from "node:assert/strict";
 
 import { runFeatureFlow, type FeatureFlowDeps } from "../src/orchestrator/index.js";
-import type { StepBindings, StepResult } from "../src/runner/index.js";
+import {
+  defaultStepExecutorDeps,
+  type StepBindings,
+  type StepResult
+} from "../src/runner/index.js";
 import { StubAgentRunner } from "../src/runner/agent-runner.js";
 import type { StepDefinition } from "../src/sequencing/step-catalog.js";
-import { CHECKPOINT_LABELS } from "../src/git/index.js";
+import { CHECKPOINT_LABELS, type ProjectGitPort } from "../src/git/index.js";
 import {
   RecordingCheckpoint,
   StubInteraction,
@@ -329,6 +333,29 @@ test("step 4.1 skips repo-br-scan without a ready repo but still runs task-to-br
   );
 });
 
+test("step 4.1 launches task-to-br on a freshly scaffolded feature with no user_br_input.md", async () => {
+  await withWorkspace(
+    { definition: { classes: ["backend"], classRepoPaths: {} } },
+    async ({ root, projectDir, projectPathRel }) => {
+      // A freshly scaffolded feature: only feature_br_summary.md, no user_br_input.md.
+      seedFeature(projectDir, "wip-1");
+      const rel = path.join(projectPathRel, "wip-1");
+      const agent = new StubAgentRunner(0);
+      const interaction = new StubInteraction(["continue", rel, true, false]); // confirm 4.1, decline 4.2
+      const { deps } = baseDeps(root, projectDir, projectPathRel, interaction, {
+        resumeInput: "4.1",
+        // Real executor wiring: the production task-to-br context builder aborts on a missing
+        // user_br_input.md, so a pre-call would fail the step before the session launches.
+        executorDeps: { ...defaultStepExecutorDeps, agentRunner: agent }
+      });
+      const outcome = await runFeatureFlow(deps);
+      assert.equal(outcome.kind, "stoppedByOperator");
+      // repo-br-scan skipped (no ready repo); task-to-br launched exactly once.
+      assert.equal(agent.specs.length, 1);
+    }
+  );
+});
+
 test("step 4.1 runs repo-br-scan before task-to-br when a class repo is ready", async () => {
   await withWorkspace({}, async ({ root, projectDir, projectPathRel }) => {
     seedFeature(projectDir, "wip-1");
@@ -391,6 +418,81 @@ test("phase 7 analyze completes a class so it is no longer pending", async () =>
   });
 });
 
+test("phase 7 offers a deferred policy-A class for blueprint-backed analysis", async () => {
+  await withWorkspace(
+    {
+      definition: {
+        typeCode: "B",
+        classes: ["frontend"],
+        classRepoPaths: {
+          frontend: { state: "deferred", policy: "A" }
+        }
+      }
+    },
+    async ({ root, projectDir, projectPathRel }) => {
+      writeFileSync(
+        path.join(projectDir, "project_stack_blueprint_frontend.md"),
+        "# frontend blueprint\n"
+      );
+      seedFeature(projectDir, "wip-1");
+      const rel = path.join(projectPathRel, "wip-1");
+      const fake = fakeExecutor();
+      const interaction = new StubInteraction([
+        "continue",
+        rel,
+        true,
+        "analyze",
+        "forward",
+        false,
+        false
+      ]);
+      const { deps, lines } = baseDeps(root, projectDir, projectPathRel, interaction, {
+        resumeInput: "7",
+        executeStep: fake.execute
+      });
+
+      await runFeatureFlow(deps);
+
+      assert.ok(fake.calls.some((call) => call.id === "7" && call.targetClass === "frontend"));
+      assert.ok(lines.some((line) => line === "Deferred/unavailable classes: none"));
+    }
+  );
+});
+
+test("phase 7 does not offer a deferred policy-A class when its blueprint is missing", async () => {
+  await withWorkspace(
+    {
+      definition: {
+        typeCode: "B",
+        classes: ["frontend"],
+        classRepoPaths: {
+          frontend: { state: "deferred", policy: "A" }
+        }
+      }
+    },
+    async ({ root, projectDir, projectPathRel }) => {
+      seedFeature(projectDir, "wip-1");
+      const rel = path.join(projectPathRel, "wip-1");
+      const fake = fakeExecutor();
+      const interaction = new StubInteraction(["continue", rel, true, "forward", false, false]);
+      const { deps, lines } = baseDeps(root, projectDir, projectPathRel, interaction, {
+        resumeInput: "7",
+        executeStep: fake.execute
+      });
+
+      await runFeatureFlow(deps);
+
+      assert.ok(fake.calls.every((call) => call.id !== "7"));
+      assert.ok(lines.some((line) => line === "Deferred/unavailable classes: frontend"));
+      assert.ok(
+        interaction.selectRequests.some(
+          (options) => options.includes("forward") && !options.includes("analyze")
+        )
+      );
+    }
+  );
+});
+
 test("start-new scaffolds through the executor, persists the path, and finishes", async () => {
   await withWorkspace({}, async ({ root, projectDir, projectPathRel }) => {
     const fake = fakeExecutor({ scaffoldComplete: { projectDir, root, name: "new-feat-1" } });
@@ -436,7 +538,159 @@ test("refuses when project-level reconciliation is pending, before any feature w
       });
       const outcome = await runFeatureFlow(deps);
       assert.equal(outcome.kind, "refusedPendingWork");
+      if (outcome.kind === "refusedPendingWork") {
+        assert.ok(
+          outcome.guidance.some((line) =>
+            line.includes(`overmind project reconcile --path ${projectPathRel}`)
+          )
+        );
+      }
+      // Refused at the step 3 boundary: no feature ID/title prompt was consumed
+      // and no catalog step (including the scaffold write) was dispatched.
+      assert.equal(interaction.log.length, 0);
       assert.equal(fake.calls.length, 0);
     }
   );
+});
+
+test("refuses when project initialization is pending, before any feature work", async () => {
+  await withWorkspace(
+    {
+      initComplete: false,
+      definition: {
+        typeCode: "B",
+        classRepoPaths: { backend: { state: "ready", reconciled: true } }
+      }
+    },
+    async ({ root, projectDir, projectPathRel }) => {
+      const fake = fakeExecutor();
+      const interaction = new StubInteraction([]);
+      const { deps } = baseDeps(root, projectDir, projectPathRel, interaction, {
+        executeStep: fake.execute
+      });
+      const outcome = await runFeatureFlow(deps);
+      assert.equal(outcome.kind, "refusedPendingWork");
+      if (outcome.kind === "refusedPendingWork") {
+        assert.ok(
+          outcome.guidance.some((line) =>
+            line.includes(`overmind project init --path ${projectPathRel}`)
+          )
+        );
+      }
+      assert.equal(interaction.log.length, 0);
+      assert.equal(fake.calls.length, 0);
+    }
+  );
+});
+
+/**
+ * ProjectGitPort double whose `inspectPaths` reports a pending git-working-tree
+ * state, driving the step-3 checkpoint gate inside the real `scaffoldFeature`
+ * primitive (not a faked executor).
+ */
+function pendingCheckpointGit(
+  entryFor: (path: string) => {
+    hasHeadVersion: boolean;
+    staged: boolean;
+    unstaged: boolean;
+    untracked: boolean;
+  }
+): ProjectGitPort {
+  return {
+    worktreeStatus: () => ({ kind: "clean" }),
+    changedPaths: () => ({ kind: "ok", paths: [] }),
+    inspectPaths: (_root, paths) => ({
+      kind: "ok",
+      paths: paths.map((path) => ({ path, ...entryFor(path) }))
+    }),
+    commitOwnedPaths: () => ({ kind: "committed" })
+  };
+}
+
+// Setup where pre-flight detection passes (backend ready+reconciled, init
+// complete) so the flow reaches step 3, and the real scaffold primitive runs.
+const reachesStep3 = {
+  definition: { classRepoPaths: { backend: { state: "ready" as const, reconciled: true } } }
+};
+
+test("run step 3 boundary refuses a type-A interrupted init-only checkpoint via the real primitive", async () => {
+  await withWorkspace(
+    {
+      definition: {
+        typeCode: "A",
+        classes: ["backend"],
+        classRepoPaths: { backend: { state: "ready", reconciled: true } }
+      }
+    },
+    async ({ root, projectDir, projectPathRel }) => {
+      // Type-A step 1.1 stack + agent-guidelines artifacts exist, so pre-flight
+      // init detection reads step 1.1 as done and the flow reaches the step-3
+      // gate ("artifact progress has moved past step 1.1").
+      writeFileSync(path.join(projectDir, "project_stack_blueprint_backend.md"), "# blueprint\n");
+      writeFileSync(path.join(projectDir, "project_agents_md_claude_md_backend.md"), "# agents\n");
+      const before = readdirSync(projectDir);
+      // The shared project-definition files are clean and committed, but one
+      // applicable step 1.1 stack artifact has no finalized checkpoint -> the
+      // gate must still refuse (the interrupted init-only checkpoint the
+      // committed-common-contract proxy alone would miss).
+      const uncommittedStackPath = "project_stack_blueprint_backend.md";
+      const projectGit = pendingCheckpointGit((candidate) => ({
+        hasHeadVersion: candidate !== uncommittedStackPath,
+        staged: false,
+        unstaged: false,
+        untracked: candidate === uncommittedStackPath
+      }));
+      const interaction = new StubInteraction([true]); // confirm step 3 only
+      const { deps } = baseDeps(root, projectDir, projectPathRel, interaction, {
+        // Real executeStep (no override) with production executor wiring.
+        executorDeps: {
+          ...defaultStepExecutorDeps,
+          agentRunner: new StubAgentRunner(0),
+          projectGit
+        }
+      });
+      const outcome = await runFeatureFlow(deps);
+      assert.equal(outcome.kind, "failed");
+      if (outcome.kind === "failed") {
+        assert.equal(outcome.resumeStep, "3");
+        assert.ok(
+          outcome.diagnostics.some((diagnostic) =>
+            diagnostic.reason.includes(`overmind project init --path ${projectPathRel}`)
+          )
+        );
+      }
+      // Refused before the feature ID/title prompt and before any write.
+      assert.ok(interaction.log.every((line) => !line.startsWith("input:")));
+      assert.deepEqual(readdirSync(projectDir).sort(), before.sort());
+    }
+  );
+});
+
+test("run step 3 boundary refuses a declined reconciliation commit via the real primitive", async () => {
+  await withWorkspace(reachesStep3, async ({ root, projectDir, projectPathRel }) => {
+    const before = readdirSync(projectDir);
+    // A committed common contract plus a dirty shared path -> pending reconciliation.
+    const projectGit = pendingCheckpointGit((path) => ({
+      hasHeadVersion: true,
+      staged: false,
+      unstaged: path === "init_progress_definition.yaml",
+      untracked: false
+    }));
+    const interaction = new StubInteraction([true]); // confirm step 3 only
+    const { deps } = baseDeps(root, projectDir, projectPathRel, interaction, {
+      executorDeps: { ...defaultStepExecutorDeps, agentRunner: new StubAgentRunner(0), projectGit }
+    });
+    const outcome = await runFeatureFlow(deps);
+    assert.equal(outcome.kind, "failed");
+    if (outcome.kind === "failed") {
+      assert.equal(outcome.resumeStep, "3");
+      assert.ok(
+        outcome.diagnostics.some((diagnostic) =>
+          diagnostic.reason.includes(`overmind project reconcile --path ${projectPathRel}`)
+        )
+      );
+    }
+    assert.ok(interaction.log.every((line) => !line.startsWith("input:")));
+    assert.deepEqual(readdirSync(projectDir).sort(), before.sort());
+  });
 });

@@ -1,6 +1,9 @@
 # Phase | Command | Model | Extra Arg 1 (optional) | Extra Arg 2 (optional) | ...
+
 # Example: implementation | codex | gpt-5.2-codex | --config | model_reasoning_effort='high'
+
 # Tip for CRs that add a new overmind phase:
+
 # Start the request with `Use $overmind-new-pipeline-step ...` to enforce the full scaffold checklist.
 
 task_to_br | codex | gpt-5.4 | --config | model_reasoning_effort='high'
@@ -19,3 +22,4 @@ repo_analyse | codex | gpt-5.4 | --config | model_reasoning_effort='high'
 common_contract_definition | codex | gpt-5.4 | --config | model_reasoning_effort='high'
 project_contract_reconciliation | codex | gpt-5.4 | --config | model_reasoning_effort='high'
 project_stack_blueprint | codex | gpt-5.4 | --config | model_reasoning_effort='medium'
+project_agents_md_claude_md | codex | gpt-5.4 | --config | model_reasoning_effort='medium'

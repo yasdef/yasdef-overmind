@@ -2,6 +2,7 @@ import readline from "node:readline/promises";
 
 export interface ConfirmRequest {
   message: string;
+  defaultValue?: boolean;
 }
 
 export interface SelectOption<T extends string = string> {
@@ -47,16 +48,24 @@ export function createTtyInteractionPort(
 ): InteractionPort {
   return {
     async confirm(request) {
+      const suffix =
+        request.defaultValue === true
+          ? "[Y/n]"
+          : request.defaultValue === false
+            ? "[y/N]"
+            : "[y/n]";
       // Re-prompt on anything but y/yes/n/no (shell parity); EOF is a clean stop.
       return promptUntil(
         streams,
-        `${request.message} [y/n]`,
+        `${request.message} ${suffix}`,
         (answer) =>
           /^(y|yes)$/i.test(answer)
             ? { value: true }
             : /^(n|no)$/i.test(answer)
               ? { value: false }
-              : undefined,
+              : answer === "" && request.defaultValue !== undefined
+                ? { value: request.defaultValue }
+                : undefined,
         () => streams.output.write("Please answer yes or no.\n")
       );
     },

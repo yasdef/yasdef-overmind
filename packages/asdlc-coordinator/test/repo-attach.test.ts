@@ -5,7 +5,7 @@ import path from "node:path";
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { attachClassRepo } from "../src/repo/attach.js";
+import { attachClassRepo, validateClassRecordCoherence } from "../src/repo/attach.js";
 import { readProjectDefinitionMetadata } from "../src/parse/project-definition.js";
 
 function initGitRepo(dir: string): string {
@@ -43,20 +43,24 @@ steps:
 
 const deferredBoth = definition(`    backend:
       state: "deferred"
+      path: ""
+      policy: "A"
     frontend:
-      state: "deferred"`);
+      state: "deferred"
+      path: ""
+      policy: "A"`);
 
-test("valid attach writes policy C, ready state, and canonical path", () => {
+test("valid attach writes selected policy, ready state, and canonical path", () => {
   withProject(deferredBoth, ({ projectDir, root }) => {
     const repo = initGitRepo(path.join(root, "repos", "api"));
-    const result = attachClassRepo(projectDir, "backend", repo);
+    const result = attachClassRepo(projectDir, "backend", repo, "B");
     assert.equal(result.ok, true, result.diagnostics.map((d) => d.reason).join("; "));
     const meta = readProjectDefinitionMetadata(
       path.join(projectDir, "init_progress_definition.yaml")
     );
     const entry = meta.classRepoPaths.backend!;
     assert.equal(entry.state, "ready");
-    assert.equal(entry.policy, "C");
+    assert.equal(entry.policy, "B");
     assert.equal(entry.path, result.resolvedRepoPath);
     assert.equal(entry.contractReconciled, undefined);
     // Unrelated class and content preserved.
@@ -68,7 +72,7 @@ test("attach succeeds without a class blueprint file", () => {
   withProject(deferredBoth, ({ projectDir, root }) => {
     const repo = initGitRepo(path.join(root, "repos", "api"));
     // No project_stack_blueprint_backend.md exists.
-    assert.equal(attachClassRepo(projectDir, "backend", repo).ok, true);
+    assert.equal(attachClassRepo(projectDir, "backend", repo, "C").ok, true);
   });
 });
 
@@ -79,10 +83,12 @@ test("attach reattachment clears prior contract_reconciled", () => {
       policy: "C"
       contract_reconciled: true
     frontend:
-      state: "deferred"`);
+      state: "deferred"
+      path: ""
+      policy: "A"`);
   withProject(readyReconciled, ({ projectDir, root }) => {
     const repo = initGitRepo(path.join(root, "repos", "api-2"));
-    const result = attachClassRepo(projectDir, "backend", repo);
+    const result = attachClassRepo(projectDir, "backend", repo, "C");
     assert.equal(result.ok, true, result.diagnostics.map((d) => d.reason).join("; "));
     const meta = readProjectDefinitionMetadata(
       path.join(projectDir, "init_progress_definition.yaml")
@@ -97,7 +103,7 @@ test("attach reattachment clears prior contract_reconciled", () => {
 test("attach preserves unrelated definition content byte-for-byte outside the class block", () => {
   withProject(deferredBoth, ({ projectDir, root }) => {
     const repo = initGitRepo(path.join(root, "repos", "api"));
-    attachClassRepo(projectDir, "backend", repo);
+    attachClassRepo(projectDir, "backend", repo, "C");
     const content = readFileSync(path.join(projectDir, "init_progress_definition.yaml"), "utf8");
     assert.match(content, /project_type_code: A/);
     assert.match(content, /steps:\n {2}- id: "1"\n {4}status: "done"/);
@@ -109,7 +115,7 @@ test("attach rejects unknown class without changing the file", () => {
   withProject(deferredBoth, ({ projectDir, root }) => {
     const repo = initGitRepo(path.join(root, "repos", "api"));
     const before = readFileSync(path.join(projectDir, "init_progress_definition.yaml"), "utf8");
-    const result = attachClassRepo(projectDir, "mobile", repo);
+    const result = attachClassRepo(projectDir, "mobile", repo, "C");
     assert.equal(result.ok, false);
     assert.match(result.diagnostics[0]!.reason, /not found in class_repo_paths/);
     const after = readFileSync(path.join(projectDir, "init_progress_definition.yaml"), "utf8");
@@ -119,16 +125,65 @@ test("attach rejects unknown class without changing the file", () => {
 
 test("attach reports invalid repo paths with specific diagnostics", () => {
   withProject(deferredBoth, ({ projectDir, root }) => {
-    assert.match(attachClassRepo(projectDir, "backend", "   ").diagnostics[0]!.reason, /empty/);
     assert.match(
-      attachClassRepo(projectDir, "backend", "/no/such/dir").diagnostics[0]!.reason,
+      attachClassRepo(projectDir, "backend", "   ", "C").diagnostics[0]!.reason,
+      /empty/
+    );
+    assert.match(
+      attachClassRepo(projectDir, "backend", "/no/such/dir", "C").diagnostics[0]!.reason,
       /not a directory/
     );
     const nonGit = path.join(root, "plain");
     mkdirSync(nonGit, { recursive: true });
     assert.match(
-      attachClassRepo(projectDir, "backend", nonGit).diagnostics[0]!.reason,
+      attachClassRepo(projectDir, "backend", nonGit, "C").diagnostics[0]!.reason,
       /git worktree/
     );
   });
+});
+
+test("coherence requires policy and rejects policy A on ready rows", () => {
+  withProject(
+    definition(`    backend:
+      state: "ready"
+      path: "/tmp/backend"`),
+    ({ projectDir }) => {
+      assert.match(
+        validateClassRecordCoherence(projectDir, "backend")!.reason,
+        /policy must be present/
+      );
+    }
+  );
+
+  withProject(
+    definition(`    backend:
+      state: "ready"
+      path: "/tmp/backend"
+      policy: "A"`),
+    ({ projectDir }) => {
+      assert.match(validateClassRecordCoherence(projectDir, "backend")!.reason, /policy A/);
+    }
+  );
+});
+
+test("coherence accepts deferred policy A only with an empty path", () => {
+  withProject(
+    definition(`    backend:
+      state: "deferred"
+      path: ""
+      policy: "A"`),
+    ({ projectDir }) => {
+      assert.equal(validateClassRecordCoherence(projectDir, "backend"), undefined);
+    }
+  );
+
+  withProject(
+    definition(`    backend:
+      state: "deferred"
+      path: "/repo/backend"
+      policy: "A"`),
+    ({ projectDir }) => {
+      assert.match(validateClassRecordCoherence(projectDir, "backend")!.reason, /policy A/);
+    }
+  );
 });
