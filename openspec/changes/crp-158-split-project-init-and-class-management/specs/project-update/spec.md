@@ -1,48 +1,54 @@
 ## ADDED Requirements
 
-### Requirement: Project class mutation and contract reconciliation have separate commands
+### Requirement: Reconcile captures class policy before a repository path
 
-Updating class membership, class policy, repository state, or repository path SHALL be performed only by `overmind project add-class-and-repo`. Reconciling contracts for ready unreconciled classes SHALL be performed by `overmind project reconcile`. Neither command SHALL change the legacy project-level `project_type_code` or `project_type_label`.
+For each deferred class it prompts, `overmind project reconcile` SHALL first ask for the class policy: `A` (the repository will be generated), `B` (existing repository, partial context), or `C` (existing repository, code-first). Policy `A` SHALL record `policy: "A"` with `state: "deferred"` and an empty path, and SHALL NOT ask for a repository path. Policy `B` or `C` SHALL ask for a repository path under the existing validation and single-retry rules; a valid path SHALL record the selected policy with `state: "ready"` and the canonical absolute path, and a blank path SHALL record the selected policy while the class stays deferred with an empty path. Blank input or closed input at the policy prompt SHALL leave the class record unchanged. Reconcile SHALL be the only writer of class policy, repository path, and `ready` state.
 
-#### Scenario: Deferred class is made ready through class management
+#### Scenario: Policy A keeps the class deferred without a path prompt
 
-- **WHEN** an operator wants to attach a repository to a deferred class
-- **THEN** the operator runs `overmind project add-class-and-repo`, selects the existing class, proposes its policy and ready path, and confirms the replacement
+- **WHEN** the operator answers `A` for a deferred `frontend` class
+- **THEN** `frontend` records `policy: "A"` with `state: "deferred"` and an empty path, and no repository path is requested
 
-#### Scenario: Reconcile does not mutate class attachment
+#### Scenario: Policy C binds an existing repository
 
-- **WHEN** `overmind project reconcile` encounters a deferred class
-- **THEN** it leaves that class unchanged and considers only ready classes whose contract reconciliation is pending
+- **WHEN** the operator answers `C` for a deferred `backend` class and supplies a valid non-empty directory
+- **THEN** `backend` records `policy: "C"`, `state: "ready"`, and the canonical absolute repository path
 
-### Requirement: Reconcile selects a project and explains reconciliation-only intent
+#### Scenario: Selected policy is recorded, not hardcoded
 
-`overmind project reconcile` SHALL retain project selection through explicit existing `--path`, single-project auto-selection, or interactive selection with a finish option. Before an interactively selected reconciliation session, it SHALL explain that class/repository changes use `overmind project add-class-and-repo` and that reconcile processes ready unreconciled classes and may offer to commit reconciliation results. Declining or closed input SHALL abort cleanly with no changes and a success exit.
+- **WHEN** the operator answers `B` and supplies a valid repository path
+- **THEN** the class records `policy: "B"` rather than `policy: "C"`
 
-#### Scenario: Guidance distinguishes class management from reconciliation
+#### Scenario: Deferred class stays prompted on later runs
 
-- **WHEN** the operator selects a project interactively for reconciliation
-- **THEN** the guidance names `overmind project add-class-and-repo` as the class/repository mutation command and asks for confirmation before reconciliation begins
+- **WHEN** a class remains deferred after a reconcile run
+- **THEN** the next `overmind project reconcile` run prompts that class again
 
-#### Scenario: Reconcile with only deferred classes is a no-op
+## MODIFIED Requirements
 
-- **WHEN** the selected project has no ready class awaiting contract reconciliation
-- **THEN** reconcile reports no pending reconciliation work and exits successfully without asking for a repository path
+### Requirement: Reconcile absorbs project selection and reconciliation-intent guidance
 
-#### Scenario: Declining reconciliation aborts cleanly
+`overmind project reconcile` SHALL retain the existing project-selection behavior (explicit `--path`, single-project auto-selection, or interactive selection with a finish option) and SHALL, before running the reconciliation session on the interactive path, present reconciliation-intent guidance — stating that this runs repository binding for deferred classes, one-time contract reconciliation, and an optional commit, and that `overmind project add-class` is the command for adding a class or resetting an existing one — and confirm before proceeding. Declining the confirmation, or closing input (EOF), SHALL abort cleanly with no changes and a success exit. The project-level `project_type_code` SHALL NOT be modified by reconcile or by `overmind project add-class`.
 
-- **WHEN** the operator declines reconciliation confirmation or closes input at that prompt
-- **THEN** no project file is changed and the command exits successfully
+#### Scenario: Guidance and confirmation precede reconciliation
+
+- **WHEN** the operator selects a project interactively
+- **THEN** the guidance names `overmind project add-class` as the class-membership command and the operator is asked to confirm before the reconciliation session runs
+
+#### Scenario: Declining aborts cleanly
+
+- **WHEN** the operator declines the reconciliation confirmation or closes input at the prompt
+- **THEN** no changes are made to the project and the command exits successfully
+
+#### Scenario: project_type_code left untouched
+
+- **WHEN** a project is reconciled or a class is added or reset
+- **THEN** the project's `project_type_code` is not modified, keeping the reconcile clean-worktree/commit unit intact
 
 ## REMOVED Requirements
 
 ### Requirement: Project update is the reconcile flow only
 
-**Reason**: Project update now has two explicit owners: class/repository metadata changes and ready-class contract reconciliation.
+**Reason**: `overmind project add-class` becomes a second project-update verb for class membership, so reconcile is no longer the single update path.
 
-**Migration**: Use `overmind project add-class-and-repo` for class or repository changes and `overmind project reconcile` after ready classes need contract reconciliation.
-
-### Requirement: Reconcile absorbs project selection and reconciliation-intent guidance
-
-**Reason**: The former guidance describes attach plus reconciliation, while attachment moves to the dedicated class-management command.
-
-**Migration**: Reconcile retains project selection and confirmation under the new reconciliation-only requirement; use class management before reconcile when metadata must change.
+**Migration**: Use `overmind project add-class` to add a class or reset an existing one, and `overmind project reconcile` to bind repositories and reconcile contracts.

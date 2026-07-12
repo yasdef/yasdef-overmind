@@ -1,8 +1,8 @@
 ## Context
 
-The current `createProject` primitive captures project name, one-or-more classes, one ready/deferred repository decision per class, and project type before it creates any files. Class membership therefore exists only as a creation-time decision. Later attachment is embedded in `project reconcile`, which combines repository mutation with contract reconciliation.
+Today two commands write `class_repo_paths`. `project create` captures a ready-or-deferred repository decision per class before the project exists, and `project reconcile` prompts every deferred class to attach a repository, writing `state: "ready"`, the canonical path, and a hardcoded `policy: "C"`. Creation is therefore the only place class membership can be declared, and reconcile is the only place a repository can be bound — but only for a class that creation already declared and left deferred.
 
-The persisted model already separates project-level origin from class-level repository state:
+The persisted model is:
 
 ```yaml
 meta_info:
@@ -11,127 +11,113 @@ meta_info:
     - backend
   class_repo_paths:
     backend:
-      state: "ready"
-      path: "/absolute/repo/path"
-      policy: "C"
+      state: "deferred"
+      path: ""
+      policy: "A"
 ```
 
-This change makes that separation explicit in the interaction model. `project_type_code` remains project metadata selected once during project creation. Each class receives its own `policy`, `state`, and `path` through a reusable class-management subprocess.
+This change keeps repository binding exactly where it already lives and instead removes it from creation, so that one command owns each decision:
 
-The existing `project init` command initializes project-level ASDLC artifacts and is not renamed or repurposed. In this design, "initialize project" means the base portion of `project create`, avoiding a collision with that command.
+| Decision | Owner |
+|---|---|
+| project identity, project type | `project create` |
+| class membership (which classes exist) | `project create`, `project add-class` |
+| class policy, repository path, `ready` | `project reconcile` |
 
 ## Goals / Non-Goals
 
 **Goals:**
 
-- Allow a valid project record and project repository to be created with no classes.
-- Make class/repository configuration reusable immediately after creation and through a separate command later.
-- Persist class-level policy `A`, `B`, or `C` independently from project-level `project_type_code`.
-- Give operators reversible navigation before mutation and explicit approval before replacing an existing class record.
-- Give one subsystem ownership of class/repository metadata mutation.
+- Make project creation total: it cannot fail on a repository path, because it never asks for one.
+- Give class membership a command that works at any point in a project's life, not only at creation.
+- Give a mis-bound class a way back to deferred so reconcile can rebind it.
+- Keep exactly one implementation that writes class policy, repository path, and `ready` state.
 
 **Non-Goals:**
 
-- Multi-repository-per-class support; `project_classes` and `class_repo_paths` retain one record per supported class.
-- New project-create or class-management CLI flags.
-- Changing project name normalization, project folder naming, metadata registration, template steps, or initial git identity behavior.
-- Defining new policy `B`/`C` divergence semantics beyond persisting the selected policy and existing downstream interpretation.
-- Rewriting existing deployed project definitions.
+- Multiple repositories per class; one record per supported class is retained.
+- Changing project name normalization, folder naming, metadata registration, template seeding, or initial git identity behavior.
+- Removing or repurposing the project-level `project_type_code`.
+- Defining downstream `A`/`B`/`C` interpretation beyond persisting the selected policy.
 
 ## Decisions
 
-### 1. Base creation completes before optional class management
+### 1. Creation declares classes; it never touches repositories
 
-`createProject` captures name and project-level type, writes a definition with `project_classes: []` and `class_repo_paths: {}`, appends the runtime metadata record, initializes the project git repository, and creates the existing initial commit. Only after that succeeds does the CLI ask whether to add classes.
+`project create` asks for the project name, the project type, and which of `backend`, `frontend`, `mobile`, `infrastructure` the project has. Each selected class is written in canonical order as:
 
-On yes, the CLI invokes the same class-management primitive against the new project root. On no or closed input, the already-created base project remains a successful result. This keeps creation failure/rollback boundaries unchanged and prevents a later class prompt from undoing a valid project.
-
-Alternative: delay all filesystem creation until the optional class loop finishes. Rejected because it keeps the two subprocesses coupled and makes "create without classes" a special abort path rather than a valid project state.
-
-### 2. One reusable class-management state machine serves both entry points
-
-The post-create handoff passes the known project root directly. The standalone `overmind project add-class-and-repo` command resolves the runtime root and reuses project discovery: current project when invoked from one, the only project when exactly one exists, or interactive project selection when several exist. The command accepts no path flag.
-
-```text
-already added: backend (repo deferred), frontend (repo ready)   <- info only
-class menu
-  1 add new class ─> choose class ─> choose A/B/C or escape
-  2 all done              │                    │
-                           │ escape             └─> class menu
-                           └────────────────────────> class menu
-
-policy A ───────────────────────────> proposed deferred + empty path
-policy B/C ─> add repo now/later
-                  later ────────────> proposed deferred + empty path
-                  now ─> path check ─> proposed ready + canonical path
-                             invalid ─> add repo now/later
-
-new class ──────────────────────────> stage proposal ─> class menu
-existing class ─> show old/new ─> confirm ─> stage or discard ─> class menu
-all done ─> atomically persist staged changes ─> optional commit
+```yaml
+backend:
+  state: "deferred"
+  path: ""
+  policy: "A"
 ```
 
-Before the add-or-finish menu, the subprocess prints an informational summary of already-added classes and their repository state, for example `already added: backend (repo deferred), frontend (repo ready)`. The summary is display only; it is omitted when no class is configured yet.
+Selecting no class is valid and produces empty class collections. Creation then prints that `overmind project reconcile` binds repositories.
 
-The class picker itself lists all four supported classes on every pass with plain labels. Existing classes remain selectable so the replacement path stays reachable. The policy picker includes an explicit escape/back option because the line-oriented `InteractionPort` does not receive a portable physical Escape key event.
+Alternative: keep the ready-or-deferred question in creation. Rejected because it forces every repository decision into the moment of creation, adds a validation/retry loop to a command that otherwise cannot fail on operator input, and duplicates the binding logic reconcile already owns.
 
-### 3. Policy determines the allowed state/path shape
+### 2. Seeded `policy: "A"` is a default, not a claim
 
-The class record invariants are:
+A class with no repository has nothing to classify, so the seeded policy is a placeholder that reconcile overwrites when the operator states what the repository actually is. `A` is used as that placeholder because a class row is written with a concrete policy value rather than an absent field.
 
-| Policy | Repository decision | Persisted state | Persisted path |
-|---|---|---|---|
-| `A` | not asked | `deferred` | empty |
-| `B` | later | `deferred` | empty |
-| `B` | valid path now | `ready` | canonical absolute path |
-| `C` | later | `deferred` | empty |
-| `C` | valid path now | `ready` | canonical absolute path |
+Nothing in the coordinator reads `policy` today; it is write-only metadata whose only constraint is coherence validation. That makes the placeholder free now. **The first consumer that branches on per-class policy must not treat a deferred `A` as "greenfield, generate this repository"** — a deferred `A` means the operator has not stated the policy yet. Only a policy recorded through reconcile is an operator statement.
 
-Policy `A` is blueprint/deferred by construction and never prompts for a repository. Policy `B` or `C` records the selected policy even when repository attachment is deferred. This differs from `project_type_code`: changing a class never changes the project-level code or label.
+### 3. Reconcile asks the policy before the path
 
-### 4. Repository validation reuses the project-create contract
+Reconcile keeps prompting every deferred class in definition order. The prompt gains a first question:
 
-An add-now path must be non-blank, exist, be a directory, and contain at least one entry; it is then canonicalized to an absolute real path. A failed check emits the reason and returns to the add-now/add-later decision, allowing either retry or defer.
+```text
+deferred class
+  policy? ─ A ──> keep deferred, empty path, record policy A
+            B/C ─> repository path? ─ blank ─> keep deferred, record policy B/C
+                                    │ valid ─> ready + canonical path + policy B/C
+                                    └ invalid ─> one retry, then keep deferred
+            blank/EOF ─> class unchanged
+```
 
-Alternative: require `.git`, as `project reconcile` attachment currently does. Rejected for this change because the requested class-management contract matches current project-create validation. Scan/readiness gates remain responsible for any stronger repository prerequisites they require.
+Policy `A` means the repository does not exist yet, so there is nothing to ask for and nothing to validate. Policy `B` or `C` means an existing repository, so the existing path validation and single-retry rule apply unchanged.
 
-### 5. Existing-class replacement is compare-and-confirm
+The list of prompted classes stays "every deferred class", not "every class without a policy". A deferred class is by definition unbound, so asking about it on the next run is correct; blank already means "still not yet".
 
-The primitive builds the complete proposed `{ policy, state, path }` record before mutation. If the class exists and the proposal differs, it displays the current and proposed values and requires explicit yes/no confirmation. No, escape before confirmation, or closed input discards that proposal and returns/stops without changing that class. An identical proposal is reported as unchanged and does not prompt or write.
+### 4. Membership changes only ever produce a deferred class
 
-Accepted changes are staged in memory for the session. `all done` writes `project_classes` and `class_repo_paths` once through an atomic mutation, preserving unrelated `meta_info` fields and the complete `steps` block. Class keys and `project_classes` use canonical order. A policy, state, or path replacement clears `contract_reconciled` for that class because the evidence basis changed.
+`project add-class` offers two actions:
 
-### 6. Class management and reconciliation have distinct ownership
+- **add a class** that is not in `project_classes` — inserts the row in canonical order as deferred, empty path, policy `A`.
+- **change a class** that is in `project_classes` — resets that row to deferred, empty path, policy `A`, and clears `contract_reconciled`.
 
-`project add-class-and-repo` is the sole interactive writer of class membership, policy, state, and path. `project reconcile` stops prompting over deferred classes and only reconciles ready classes whose `contract_reconciled` flag is not true. Its guidance and tests are updated to describe reconciliation rather than attachment plus reconciliation.
+Both actions land a class in exactly the state creation produces, and reconcile binds it on the next run. The command never asks for a repository path, never asks for a policy, and never writes `ready`.
 
-This removes duplicate mutation paths. It also means an operator who chose later returns to `project add-class-and-repo`, selects the existing class, proposes the ready path, and confirms the replacement before reconciliation.
+Alternative: let "change a class" take a new repository path directly. Rejected — that reintroduces a second implementation of policy/path/ready writing next to reconcile's, which is the coupling this change exists to remove.
 
-### 7. Class-management writes use the project repository transaction boundary
+### 5. Membership writes use the project repository transaction boundary
 
-Before the first persisted mutation, a git-backed project must have a clean worktree. At `all done`, accepted changes are atomically written as one definition update. If the project is a git worktree and changes were written, the command offers one commit using a class-configuration commit message; declining retains the accepted definition change and reports that it remains uncommitted. Git inspection or commit failures are typed diagnostics and never claim a clean commit.
+`project add-class` resolves the runtime root and reuses existing project discovery: the current project when invoked from one, the only project when exactly one exists, interactive selection otherwise. It accepts no arguments and no path flag, and prints the selected project before the first prompt.
 
-The post-create handoff starts from the clean initial project commit. This keeps project repository history distinct from runtime metadata and attached class repositories.
+Before its write, a git-backed project must have a clean worktree. The command mutates one class per invocation as a single definition update, then offers one commit; declining retains the accepted uncommitted change and reports that state. Git inspection or commit failures are typed diagnostics and never claim a clean commit.
+
+### 6. Policy coherence widens to `A|B|C`
+
+`validateClassRecordCoherence` currently rejects any policy other than `B` or `C`. Every class row written by creation and by `add-class` carries policy `A`, so the rule widens to `A|B|C`, with `A` valid only alongside `deferred` state and an empty path. `ready` continues to require a non-empty canonical path.
 
 ## Risks / Trade-offs
 
-- [A newly created empty project cannot run class-dependent initialization] -> Readiness reports the missing class configuration and directs the operator to `overmind project add-class-and-repo`; creation itself remains valid.
-- [Policy `A` expands the currently accepted class policy set from `B|C`] -> Update parsers, coherence validation, fixtures, and downstream policy unions together; enforce `A` only with deferred/empty state.
-- [Removing attachment from reconcile changes an established operator path] -> Update reconcile guidance and pending-work messages to name the class-management command before reconciliation.
-- [A declined class-management commit leaves a dirty project that blocks later managed mutations] -> Report the exact dirty state and require the operator to commit or revert before another transactional command.
-- [Existing definitions may omit class policy] -> Keep them readable; require an explicit policy only when a class is newly added or replaced through this command.
-- [The standalone command can target the wrong project in a multi-project workspace] -> Reuse explicit interactive project selection and print the selected project before the first class prompt.
+- [A deferred `A` is indistinguishable from an operator-stated `A`] -> Accepted; policy has no consumer today. Decision 2 records the constraint the first consumer must honor.
+- [An operator who already has all repositories now runs two commands instead of one] -> Accepted; creation gains totality and the binding path is the same one used for every later repository.
+- [A class reset to deferred loses its reconciliation evidence] -> Intended: `contract_reconciled` is cleared because the repository binding it was based on is gone.
+- [A declined `add-class` commit leaves a dirty project that blocks later managed mutations] -> Report the exact dirty state and require the operator to commit or revert before another transactional command.
 
 ## Migration Plan
 
-1. Add the class-record model, validation, atomic mutation, and deterministic interaction primitive with focused tests.
-2. Refactor project creation to emit empty class collections and add the optional post-create handoff.
-3. Add `overmind project add-class-and-repo` with shared project discovery and project-repository transaction behavior.
-4. Remove deferred attachment from reconcile and update all readiness/guidance paths to direct class changes to the new command.
-5. Update parser/coherence consumers for policy `A`, docs, usage output, and package tests.
+1. Widen policy coherence to `A|B|C` and thread the selected policy through `applyClassAttachment` and `attachClassRepo`.
+2. Add the policy prompt to the reconcile deferred-class loop, keeping policy `A` path-free.
+3. Remove repository capture from `project create`, allow an empty class selection, and seed selected classes as deferred/`A`.
+4. Add the membership mutation and the `project add-class` command with project discovery and the project-repository transaction boundary.
+5. Update docs, usage output, and package tests.
 6. Run coordinator tests, root verification, strict OpenSpec validation, and `git diff --check`.
 
-Rollback restores mandatory class capture inside `project create` and reconcile-owned attachment. Project definitions written by the new flow remain structurally readable; classless projects require class configuration before rollback-era creation assumptions can be satisfied.
+Rollback restores repository capture in creation and the hardcoded `policy: "C"` in attachment. Definitions written by the new flow remain valid inputs to the rollback-era reconcile flow, which reads deferred classes and ignores policy.
 
 ## Open Questions
 
