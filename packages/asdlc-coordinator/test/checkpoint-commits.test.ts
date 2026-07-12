@@ -56,10 +56,9 @@ test("a non-worktree root is a typed skip, never a throw", () => {
   try {
     const result = new RepoGitAdapter().checkpoint(root, "before step 8.4 (semantic review)");
     assert.equal(result.kind, "notWorktree");
-    assert.match(
-      renderCheckpointNotice(result, "before step 8.4 (semantic review)"),
-      /not a git repository/
-    );
+    const notice = renderCheckpointNotice(result, "before step 8.4 (semantic review)");
+    assert.match(notice, /repository root is not a git worktree/);
+    assert.doesNotMatch(notice, /runtime root/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

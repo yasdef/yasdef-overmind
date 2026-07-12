@@ -114,7 +114,7 @@ test("phases execute in catalog order with checkpoints at the right boundaries",
     seedFeature(projectDir, "wip-1", ["project_surface_struct_resp_map_backend.md"]);
     const rel = path.join(projectPathRel, "wip-1");
     const fake = fakeExecutor();
-    const checkpoint = new RecordingCheckpoint();
+    const checkpoint = new RecordingCheckpoint({ kind: "clean" }, { forbiddenRoots: [root] });
     const interaction = new StubInteraction([
       "continue",
       rel,
@@ -155,6 +155,45 @@ test("phases execute in catalog order with checkpoints at the right boundaries",
       CHECKPOINT_LABELS.before84,
       CHECKPOINT_LABELS.after84
     ]);
+    assert.deepEqual(checkpoint.roots, [projectDir, projectDir, projectDir, projectDir]);
+  });
+});
+
+test("non-worktree checkpoint notices render and the feature flow continues", async () => {
+  await withWorkspace({}, async ({ root, projectDir, projectPathRel }) => {
+    seedFeature(projectDir, "wip-1", ["project_surface_struct_resp_map_backend.md"]);
+    const rel = path.join(projectPathRel, "wip-1");
+    const fake = fakeExecutor();
+    const checkpoint = new RecordingCheckpoint({ kind: "notWorktree" }, { forbiddenRoots: [root] });
+    const interaction = new StubInteraction([
+      "continue",
+      rel,
+      true, // 5
+      true, // 5.1
+      true, // 6
+      true, // 7
+      "forward",
+      true, // 7.1
+      true, // 8
+      true, // 8.1
+      true, // 8.2
+      true, // 8.3
+      true // 8.4
+    ]);
+    const { deps, lines } = baseDeps(root, projectDir, projectPathRel, interaction, {
+      resumeInput: "5",
+      executeStep: fake.execute,
+      checkpoint
+    });
+    const outcome = await runFeatureFlow(deps);
+
+    assert.equal(outcome.kind, "completed");
+    assert.deepEqual(checkpoint.roots, [projectDir, projectDir, projectDir, projectDir]);
+    assert.equal(
+      lines.filter((line) => /repository root is not a git worktree/.test(line)).length,
+      4
+    );
+    assert.ok(lines.every((line) => !/runtime root/.test(line)));
   });
 });
 
@@ -220,7 +259,7 @@ test("declining the final optional phase finishes cleanly and checkpoints after 
   await withWorkspace({}, async ({ root, projectDir, projectPathRel }) => {
     seedFeature(projectDir, "wip-1");
     const rel = path.join(projectPathRel, "wip-1");
-    const checkpoint = new RecordingCheckpoint();
+    const checkpoint = new RecordingCheckpoint({ kind: "clean" }, { forbiddenRoots: [root] });
     const interaction = new StubInteraction(["continue", rel, false]);
     const { deps, lines } = baseDeps(root, projectDir, projectPathRel, interaction, {
       resumeInput: "8.4",
@@ -235,6 +274,7 @@ test("declining the final optional phase finishes cleanly and checkpoints after 
       )
     );
     assert.deepEqual(checkpoint.labels, [CHECKPOINT_LABELS.before84, CHECKPOINT_LABELS.after84]);
+    assert.deepEqual(checkpoint.roots, [projectDir, projectDir]);
   });
 });
 

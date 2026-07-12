@@ -5,7 +5,7 @@ Feature-flow checkpoint commits target the ASDLC runtime root (`orchestrator/run
 ## What Changes
 
 - Feature-flow checkpoint commits run against the **project repository root** (`deps.projectRoot`) instead of the runtime root, at the same preserved boundaries (before steps 5.1, 7.1, 8.4; after 8.4 success/clean decline). This is the same repository scope project create, project init, and project reconcile commits already use.
-- `RepoGitAdapter` and the typed `CheckpointResult` degradation are unchanged: a non-git project still yields a `notWorktree` notice and the run continues.
+- `RepoGitAdapter` and the typed `CheckpointResult` degradation are unchanged: a non-git project still yields a `notWorktree` notice and the run continues. The notice wording names the supplied repository root instead of the runtime root.
 - `checkpoint-commits` and `feature-orchestrator` tests assert the project-root scope (and that runtime-root paths are never the checkpoint target).
 - No CLI changes, no new flags, no behavior change at the checkpoint boundaries themselves.
 

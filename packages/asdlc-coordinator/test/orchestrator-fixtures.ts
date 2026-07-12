@@ -207,10 +207,18 @@ export class StubInteraction implements InteractionPort {
 /** A checkpoint port that records requested labels and returns a fixed result. */
 export class RecordingCheckpoint implements CheckpointPort {
   public readonly labels: string[] = [];
+  public readonly roots: string[] = [];
 
-  constructor(private readonly result: CheckpointResult = { kind: "clean" }) {}
+  constructor(
+    private readonly result: CheckpointResult = { kind: "clean" },
+    private readonly options: { forbiddenRoots?: string[] } = {}
+  ) {}
 
-  checkpoint(_root: string, label: string): CheckpointResult {
+  checkpoint(root: string, label: string): CheckpointResult {
+    if (this.options.forbiddenRoots?.includes(root)) {
+      throw new Error(`checkpoint received forbidden root: ${root}`);
+    }
+    this.roots.push(root);
     this.labels.push(label);
     return this.result;
   }

@@ -61,9 +61,8 @@ export class RepoGitAdapter {
   }
 
   /**
-   * Stage all runtime-root changes (`git add -A`, matching the shell's scope) and
-   * commit them with a checkpoint message. Any obstacle degrades to a typed
-   * result and never throws.
+   * Stage all supplied-root changes (`git add -A`) and commit them with a
+   * checkpoint message. Any obstacle degrades to a typed result and never throws.
    */
   checkpoint(root: string, label: string): CheckpointResult {
     if (!this.available()) return { kind: "unavailable" };
@@ -91,7 +90,7 @@ export function renderCheckpointNotice(result: CheckpointResult, label: string):
     case "unavailable":
       return `Checkpoint commit skipped (${label}): git not found in PATH.`;
     case "notWorktree":
-      return `Checkpoint commit skipped (${label}): runtime root is not a git repository.`;
+      return `Checkpoint commit skipped (${label}): repository root is not a git worktree.`;
     case "addFailed":
       return `Checkpoint commit notice (${label}): git add exited ${result.exitCode}; continuing without checkpoint.`;
     case "commitFailed":

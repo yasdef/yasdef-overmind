@@ -162,7 +162,7 @@ export async function runFeatureFlow(deps: FeatureFlowDeps): Promise<FeatureFlow
     if (beforeLabel) {
       deps.emit(
         renderCheckpointNotice(
-          deps.checkpoint.checkpoint(deps.workspaceRoot, beforeLabel),
+          deps.checkpoint.checkpoint(deps.projectRoot, beforeLabel),
           beforeLabel
         )
       );
@@ -172,9 +172,7 @@ export async function runFeatureFlow(deps: FeatureFlowDeps): Promise<FeatureFlow
 
     if (step.id === "8.4" && (outcome.kind === "completed" || outcome.kind === "finished")) {
       const label = CHECKPOINT_LABELS.after84;
-      deps.emit(
-        renderCheckpointNotice(deps.checkpoint.checkpoint(deps.workspaceRoot, label), label)
-      );
+      deps.emit(renderCheckpointNotice(deps.checkpoint.checkpoint(deps.projectRoot, label), label));
     }
 
     if (outcome.kind === "stoppedByOperator") return { kind: "stoppedByOperator" };

@@ -13,7 +13,7 @@ Consequences of the current scope under that model: every checkpoint returns the
 
 **Non-Goals:**
 
-- No change to `RepoGitAdapter`, `CheckpointResult`, or the notice rendering.
+- No change to `RepoGitAdapter` or `CheckpointResult`; `notWorktree` notice wording is corrected to describe the supplied repository root.
 - No change to which steps have checkpoint boundaries.
 - No change to project-level or class-repository git scopes (architecture invariant 4 in `design_docs/e2e_orchestrator_migration/06_sh_remove_plan.md ## Architecture invariants` keeps the scopes distinct — this change corrects which scope the feature flow uses, it does not merge scopes).
 - No CLI flags, no docs surface changes.
