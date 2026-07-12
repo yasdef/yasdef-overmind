@@ -562,29 +562,31 @@ test("overmind init validates package payload before creating a missing target",
   });
 });
 
-test("overmind init refuses file targets without writing", () => {
+test("overmind init re-prompts for file targets without writing", () => {
   withTempRoot((root) => {
     const target = path.join(root, "target-file");
     writeFileSync(target, "operator file\n");
 
-    const output = runInstallerBin(root, `${target}\n`);
+    const output = runInstallerBin(root, `${target}\n\n`);
 
-    assert.equal(output.status, 2);
+    assert.equal(output.status, 0);
     assert.match(output.stderr, new RegExp(`non-directory target: ${escapeRegExp(target)}`));
+    assert.match(output.stdout, /No ASDLC workspace target selected; nothing installed\./);
     assert.equal(readFileSync(target, "utf8"), "operator file\n");
   });
 });
 
-test("overmind init refuses dangling symlink targets without raw mkdir errors", () => {
+test("overmind init re-prompts for dangling symlink targets without raw mkdir errors", () => {
   withTempRoot((root) => {
     const target = path.join(root, "dangling-symlink");
     symlinkSync(path.join(root, "missing-real-target"), target);
 
-    const output = runInstallerBin(root, `${target}\n`);
+    const output = runInstallerBin(root, `${target}\n\n`);
 
-    assert.equal(output.status, 2);
+    assert.equal(output.status, 0);
     assert.match(output.stderr, new RegExp(`non-directory target: ${escapeRegExp(target)}`));
     assert.doesNotMatch(output.stderr, /EEXIST/);
+    assert.match(output.stdout, /No ASDLC workspace target selected; nothing installed\./);
   });
 });
 
@@ -628,36 +630,43 @@ test("overmind init blank or closed input exits zero and writes nothing", () => 
   });
 });
 
-test("overmind init refuses non-empty non-workspace answers without writing", () => {
+test("overmind init re-prompts for non-empty non-workspace answers", () => {
   withTempRoot((root) => {
     const childCwd = path.join(root, "child-cwd");
-    const target = path.join(root, "non-workspace");
+    const badTarget = path.join(root, "non-workspace");
+    const validTarget = path.join(root, "valid-workspace");
     mkdirSync(childCwd);
-    mkdirSync(target);
-    writeFileSync(path.join(target, "notes.txt"), "operator data\n");
+    mkdirSync(badTarget);
+    writeFileSync(path.join(badTarget, "notes.txt"), "operator data\n");
 
-    const output = runInstallerBin(childCwd, `${target}\n`);
+    const output = runInstallerBin(childCwd, `${badTarget}\n${validTarget}\n`);
 
-    assert.equal(output.status, 2);
+    assert.equal(output.status, 0);
     assert.match(
       output.stderr,
-      new RegExp(`non-empty non-workspace directory: ${escapeRegExp(target)}`)
+      new RegExp(`non-empty non-workspace directory: ${escapeRegExp(badTarget)}`)
     );
-    assert.deepEqual(readdirSync(target), ["notes.txt"]);
-    assert.equal(readFileSync(path.join(target, "notes.txt"), "utf8"), "operator data\n");
-    assert.equal(existsSync(path.join(target, ".overmind")), false);
+    assert.match(
+      output.stdout,
+      new RegExp(`Overmind workspace bootstrapped: ${escapeRegExp(validTarget)}`)
+    );
+    assert.deepEqual(readdirSync(badTarget), ["notes.txt"]);
+    assert.equal(readFileSync(path.join(badTarget, "notes.txt"), "utf8"), "operator data\n");
+    assert.equal(existsSync(path.join(badTarget, ".overmind")), false);
+    assert.equal(existsSync(path.join(validTarget, ".overmind", "overmind.js")), true);
   });
 });
 
-test("overmind init rejects unsupported leading-tilde answers without writing", () => {
+test("overmind init re-prompts for unsupported leading-tilde answers without writing", () => {
   withTempRoot((root) => {
     const childCwd = path.join(root, "child-cwd");
     mkdirSync(childCwd);
 
-    const output = runInstallerBin(childCwd, "~junk-workspace-test\n");
+    const output = runInstallerBin(childCwd, "~junk-workspace-test\n\n");
 
-    assert.equal(output.status, 2);
+    assert.equal(output.status, 0);
     assert.match(output.stderr, /Unsupported home path syntax: ~junk-workspace-test/);
+    assert.match(output.stdout, /No ASDLC workspace target selected; nothing installed\./);
     assert.deepEqual(readdirSync(childCwd), []);
     assert.equal(existsSync(path.join(childCwd, "~junk-workspace-test")), false);
   });

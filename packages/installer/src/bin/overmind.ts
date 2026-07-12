@@ -6,6 +6,16 @@ import { classifyInstallTarget, installProject, resolveInstallTarget } from "../
 
 const [, , command, extra] = process.argv;
 
+type PromptSelection =
+  | {
+      resolvedTarget: string;
+      classification: Extract<
+        ReturnType<typeof classifyInstallTarget>,
+        { kind: "clean-install" | "update" }
+      >;
+    }
+  | undefined;
+
 if (command !== "init" || extra !== undefined) {
   process.stderr.write("ERROR: Usage: overmind init\n");
   process.exitCode = 2;
@@ -19,34 +29,15 @@ function relative(root: string, target: string): string {
 
 async function runInit(): Promise<void> {
   try {
-    const selectedTarget = await promptForTarget();
-    if (selectedTarget === undefined || selectedTarget.trim() === "") {
+    const selected = await promptForTarget();
+    if (selected === undefined) {
       process.stdout.write("No ASDLC workspace target selected; nothing installed.\n");
       process.exitCode = 0;
       return;
     }
 
-    const resolvedTarget = resolveInstallTarget(selectedTarget);
-    const classification = classifyInstallTarget(resolvedTarget);
-
-    if (classification.kind === "refuse-not-directory") {
-      process.stderr.write(
-        `ERROR: Refusing to install into non-directory target: ${resolvedTarget}\n`
-      );
-      process.exitCode = 2;
-      return;
-    }
-
-    if (classification.kind === "refuse-not-empty") {
-      process.stderr.write(
-        `ERROR: Refusing to install into non-empty non-workspace directory: ${resolvedTarget}\n`
-      );
-      process.exitCode = 2;
-      return;
-    }
-
-    const result = installProject(resolvedTarget);
-    reportInstallResult(result, classification.kind);
+    const result = installProject(selected.resolvedTarget);
+    reportInstallResult(result, selected.classification.kind);
     process.exitCode = 0;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -55,22 +46,57 @@ async function runInit(): Promise<void> {
   }
 }
 
-function promptForTarget(): Promise<string | undefined> {
+function promptForTarget(): Promise<PromptSelection> {
   const readline = createInterface({ input: stdin, output: stdout });
 
   return new Promise((resolve) => {
     let settled = false;
-    const finish = (value: string | undefined): void => {
+    const finish = (value: PromptSelection): void => {
       if (settled) return;
       settled = true;
       readline.close();
       resolve(value);
     };
+    const prompt = (): void => {
+      readline.setPrompt("ASDLC workspace path: ");
+      readline.prompt();
+    };
 
-    readline.once("line", finish);
+    readline.on("line", (value) => {
+      if (value.trim() === "") {
+        finish(undefined);
+        return;
+      }
+
+      let resolvedTarget;
+      try {
+        resolvedTarget = resolveInstallTarget(value);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        process.stderr.write(`ERROR: ${message}\n`);
+        prompt();
+        return;
+      }
+
+      const classification = classifyInstallTarget(resolvedTarget);
+      if (classification.kind === "refuse-not-directory") {
+        process.stderr.write(
+          `ERROR: Refusing to install into non-directory target: ${resolvedTarget}\n`
+        );
+        prompt();
+        return;
+      }
+      if (classification.kind === "refuse-not-empty") {
+        process.stderr.write(
+          `ERROR: Refusing to install into non-empty non-workspace directory: ${resolvedTarget}\n`
+        );
+        prompt();
+        return;
+      }
+      finish({ resolvedTarget, classification });
+    });
     readline.once("close", () => finish(undefined));
-    readline.setPrompt("ASDLC workspace path: ");
-    readline.prompt();
+    prompt();
   });
 }
 
