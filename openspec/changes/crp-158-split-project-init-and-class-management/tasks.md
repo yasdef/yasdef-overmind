@@ -1,6 +1,6 @@
 ## 1. Policy-Aware Attachment
 
-- [ ] 1.1 Widen `validateClassRecordCoherence` in `packages/asdlc-coordinator/src/repo/attach.ts` from `B|C` to `A|B|C`, accepting policy `A` only with `state: "deferred"` and an empty path, and keeping `ready` bound to a non-empty canonical path.
+- [ ] 1.1 Rewrite `validateClassRecordCoherence` in `packages/asdlc-coordinator/src/repo/attach.ts` to require a `policy` on every class row and accept only `A|B|C`, with `A` valid only alongside `state: "deferred"` and an empty path, `ready` bound to a non-empty canonical path, and `deferred` bound to an empty path; drop the current missing-policy tolerance and the `B|C` restriction.
 - [ ] 1.2 Replace the hardcoded `policy: "C"` in `applyClassAttachment` (`src/parse/project-definition.ts`) with the policy supplied by the caller, and thread that policy through `attachClassRepo`.
 - [ ] 1.3 Update parse/attach tests for each policy value, incoherent policy/state combinations, and preservation of unrelated metadata and the `steps` block.
 

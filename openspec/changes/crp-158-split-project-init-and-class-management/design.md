@@ -99,7 +99,9 @@ Before its write, a git-backed project must have a clean worktree. The command m
 
 ### 6. Policy coherence widens to `A|B|C`
 
-`validateClassRecordCoherence` currently rejects any policy other than `B` or `C`. Every class row written by creation and by `add-class` carries policy `A`, so the rule widens to `A|B|C`, with `A` valid only alongside `deferred` state and an empty path. `ready` continues to require a non-empty canonical path.
+`validateClassRecordCoherence` currently accepts a missing policy and rejects any policy other than `B` or `C`. Both halves are wrong under this change: creation, `add-class`, and reconcile all write a policy, so every class row carries one. The rule becomes: `policy` is required and is one of `A|B|C`; `A` is valid only alongside `deferred` state and an empty path; `ready` requires a non-empty canonical path; `deferred` requires an empty path.
+
+The missing-policy tolerance existed only for rows written by the old creation flow, which recorded state and path without a policy. Those rows are not produced by any writer after this change, so the tolerance is dropped rather than retained.
 
 ## Risks / Trade-offs
 
@@ -117,7 +119,7 @@ Before its write, a git-backed project must have a clean worktree. The command m
 5. Update docs, usage output, and package tests.
 6. Run coordinator tests, root verification, strict OpenSpec validation, and `git diff --check`.
 
-Rollback restores repository capture in creation and the hardcoded `policy: "C"` in attachment. Definitions written by the new flow remain valid inputs to the rollback-era reconcile flow, which reads deferred classes and ignores policy.
+Overmind has no installed base and no prior on-disk project definitions, so each step replaces the previous behavior outright: no compatibility shim, no dual-shape parsing, and no fixtures for definitions written by the old flow.
 
 ## Open Questions
 

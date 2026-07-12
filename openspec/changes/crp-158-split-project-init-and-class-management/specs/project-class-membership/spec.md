@@ -44,7 +44,7 @@ The change action SHALL offer the classes present in `meta_info.project_classes`
 
 ### Requirement: Membership changes are coherent and preserve unrelated definition content
 
-A membership mutation SHALL write one class row as a single definition update, preserving unrelated `meta_info` fields and every line of the top-level `steps:` block. A written row SHALL satisfy class-record coherence: policy `A` SHALL be valid only with `state: "deferred"` and an empty path.
+A membership mutation SHALL write one class row as a single definition update, preserving unrelated `meta_info` fields and every line of the top-level `steps:` block. Every class row SHALL carry a `policy` of `A`, `B`, or `C`; policy `A` SHALL be valid only with `state: "deferred"` and an empty path.
 
 #### Scenario: Unrelated definition content is preserved
 
