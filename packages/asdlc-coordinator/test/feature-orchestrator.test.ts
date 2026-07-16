@@ -10,11 +10,15 @@ import {
   type StepResult
 } from "../src/runner/index.js";
 import { StubAgentRunner } from "../src/runner/agent-runner.js";
+import type { ConfirmRequest } from "../src/interaction/index.js";
 import type { StepDefinition } from "../src/sequencing/step-catalog.js";
-import { CHECKPOINT_LABELS, type ProjectGitPort } from "../src/git/index.js";
+import { CHECKPOINT_LABELS, type CheckpointResult, type ProjectGitPort } from "../src/git/index.js";
+import { writeFeatureState } from "../src/state/index.js";
 import {
   RecordingCheckpoint,
+  RecordingTerminalChain,
   StubInteraction,
+  passingTerminalChain,
   seedCompleteFeature,
   stubExecutorDeps,
   withWorkspace
@@ -77,6 +81,14 @@ function fakeExecutor(options: FakeExecutorOptions = {}): {
   return { calls, execute };
 }
 
+/**
+ * A checkpoint result that both reports a dirty worktree and commits, so a test
+ * exercises the prompted completion boundary rather than its clean-tree shortcut.
+ */
+function committedResult(): CheckpointResult {
+  return { kind: "committed", message: `Checkpoint: ${CHECKPOINT_LABELS.featureCompletion}` };
+}
+
 function seedFeature(projectDir: string, name: string, extras: string[] = []): string {
   const dir = path.join(projectDir, name);
   mkdirSync(dir, { recursive: true });
@@ -106,6 +118,10 @@ function baseDeps(
     clock: { now: () => 1 },
     overmindCliPath: path.join(root, ".overmind", "overmind.js"),
     modelsPath: path.join(root, ".setup", "models.md"),
+    // Seeded features hold placeholder artifacts that would fail the real
+    // deterministic gates; orchestration tests that care about terminal
+    // enforcement override this explicitly.
+    terminalGateChain: passingTerminalChain,
     emit: (line) => lines.push(line),
     emitError: (line) => lines.push(line),
     ...overrides
@@ -118,7 +134,7 @@ test("phases execute in catalog order with checkpoints at the right boundaries",
     seedFeature(projectDir, "wip-1", ["project_surface_struct_resp_map_backend.md"]);
     const rel = path.join(projectPathRel, "wip-1");
     const fake = fakeExecutor();
-    const checkpoint = new RecordingCheckpoint({ kind: "clean" }, { forbiddenRoots: [root] });
+    const checkpoint = new RecordingCheckpoint(committedResult(), { forbiddenRoots: [root] });
     const interaction = new StubInteraction([
       "continue",
       rel,
@@ -132,7 +148,8 @@ test("phases execute in catalog order with checkpoints at the right boundaries",
       true, // 8.1
       true, // 8.2
       true, // 8.3
-      true // 8.4
+      true, // 8.4
+      true // completion commit boundary
     ]);
     const { deps, lines } = baseDeps(root, projectDir, projectPathRel, interaction, {
       resumeInput: "5",
@@ -157,7 +174,7 @@ test("phases execute in catalog order with checkpoints at the right boundaries",
       CHECKPOINT_LABELS.before51,
       CHECKPOINT_LABELS.before71,
       CHECKPOINT_LABELS.before84,
-      CHECKPOINT_LABELS.after84
+      CHECKPOINT_LABELS.featureCompletion
     ]);
     assert.deepEqual(checkpoint.roots, [projectDir, projectDir, projectDir, projectDir]);
   });
@@ -182,7 +199,8 @@ test("non-worktree checkpoint notices render and the feature flow continues", as
       true, // 8.1
       true, // 8.2
       true, // 8.3
-      true // 8.4
+      true, // 8.4
+      true // completion commit boundary
     ]);
     const { deps, lines } = baseDeps(root, projectDir, projectPathRel, interaction, {
       resumeInput: "5",
@@ -259,12 +277,12 @@ test("declining an optional phase before required work skips and continues", asy
   });
 });
 
-test("declining the final optional phase finishes cleanly and checkpoints after 8.4", async () => {
+test("declining the final optional phase finishes cleanly and reaches the completion boundary", async () => {
   await withWorkspace({}, async ({ root, projectDir, projectPathRel }) => {
     seedFeature(projectDir, "wip-1");
     const rel = path.join(projectPathRel, "wip-1");
-    const checkpoint = new RecordingCheckpoint({ kind: "clean" }, { forbiddenRoots: [root] });
-    const interaction = new StubInteraction(["continue", rel, false]);
+    const checkpoint = new RecordingCheckpoint(committedResult(), { forbiddenRoots: [root] });
+    const interaction = new StubInteraction(["continue", rel, false, true]);
     const { deps, lines } = baseDeps(root, projectDir, projectPathRel, interaction, {
       resumeInput: "8.4",
       executeStep: fakeExecutor().execute,
@@ -277,7 +295,10 @@ test("declining the final optional phase finishes cleanly and checkpoints after 
         /no remaining required phases after declined optional phase 8.4/.test(line)
       )
     );
-    assert.deepEqual(checkpoint.labels, [CHECKPOINT_LABELS.before84, CHECKPOINT_LABELS.after84]);
+    assert.deepEqual(checkpoint.labels, [
+      CHECKPOINT_LABELS.before84,
+      CHECKPOINT_LABELS.featureCompletion
+    ]);
     assert.deepEqual(checkpoint.roots, [projectDir, projectDir]);
   });
 });
@@ -294,6 +315,115 @@ test("closing the input stream during a confirmation stops cleanly", async () =>
     const outcome = await runFeatureFlow(deps);
     assert.equal(outcome.kind, "stoppedByOperator");
     assert.ok(lines.some((line) => /input stream closed during confirmation at 6/.test(line)));
+  });
+});
+
+/**
+ * Executor double for a review step whose post-session mutable-artifact gate fails
+ * with the given classification. Records calls so tests can prove no auto-retry.
+ */
+function gateFailingExecutor(
+  stepId: string,
+  exitCode: number
+): {
+  calls: string[];
+  execute: (step: StepDefinition, bindings: StepBindings) => Promise<StepResult>;
+} {
+  const calls: string[] = [];
+  const execute = async (step: StepDefinition): Promise<StepResult> => {
+    calls.push(step.id);
+    if (step.id !== stepId) {
+      return { stepId: step.id, ok: true, exitCode: 0, diagnostics: [], actionResults: [] };
+    }
+    return {
+      stepId: step.id,
+      ok: false,
+      exitCode,
+      diagnostics: [
+        {
+          severity: "error",
+          source: "step-executor:post-session-gate",
+          reason: `Post-session gate failed for ${step.id} (exit ${exitCode}).`
+        }
+      ],
+      actionResults: []
+    };
+  };
+  return { calls, execute };
+}
+
+test("post-session exit 1 propagates into the flow result and is not checkpointed or retried", async () => {
+  await withWorkspace({}, async ({ root, projectDir, projectPathRel }) => {
+    seedFeature(projectDir, "wip-1");
+    const rel = path.join(projectPathRel, "wip-1");
+    const fake = gateFailingExecutor("5.1", 1);
+    const checkpoint = new RecordingCheckpoint({ kind: "clean" }, { forbiddenRoots: [root] });
+    const interaction = new StubInteraction(["continue", rel, true]); // confirm 5.1
+    const { deps } = baseDeps(root, projectDir, projectPathRel, interaction, {
+      resumeInput: "5.1",
+      executeStep: fake.execute,
+      checkpoint
+    });
+    const outcome = await runFeatureFlow(deps);
+    assert.equal(outcome.kind, "failed");
+    if (outcome.kind === "failed") {
+      assert.equal(outcome.exitCode, 1);
+      assert.equal(outcome.resumeStep, "5.1");
+    }
+    // The before-5.1 checkpoint fired, but no advance/after-checkpoint happened.
+    assert.deepEqual(checkpoint.labels, [CHECKPOINT_LABELS.before51]);
+    // The failing review step ran exactly once: no automatic re-dispatch.
+    assert.deepEqual(fake.calls, ["5.1"]);
+  });
+});
+
+test("post-session exit 2 propagates its higher-severity classification into the flow result", async () => {
+  await withWorkspace({}, async ({ root, projectDir, projectPathRel }) => {
+    seedFeature(projectDir, "wip-1");
+    const rel = path.join(projectPathRel, "wip-1");
+    const fake = gateFailingExecutor("8.4", 2);
+    const checkpoint = new RecordingCheckpoint({ kind: "clean" }, { forbiddenRoots: [root] });
+    const interaction = new StubInteraction(["continue", rel, true]); // confirm 8.4
+    const { deps } = baseDeps(root, projectDir, projectPathRel, interaction, {
+      resumeInput: "8.4",
+      executeStep: fake.execute,
+      checkpoint
+    });
+    const outcome = await runFeatureFlow(deps);
+    assert.equal(outcome.kind, "failed");
+    if (outcome.kind === "failed") {
+      assert.equal(outcome.exitCode, 2);
+      assert.equal(outcome.resumeStep, "8.4");
+    }
+    // Only the before-8.4 checkpoint fired; the after-8.4 checkpoint never ran.
+    assert.deepEqual(checkpoint.labels, [CHECKPOINT_LABELS.before84]);
+    assert.deepEqual(fake.calls, ["8.4"]);
+  });
+});
+
+test("an operator-driven later 8.4 run whose gates pass follows the existing checkpoint path", async () => {
+  await withWorkspace({}, async ({ root, projectDir, projectPathRel }) => {
+    seedFeature(projectDir, "wip-1");
+    const rel = path.join(projectPathRel, "wip-1");
+    const fake = fakeExecutor(); // step 8.4 succeeds
+    const checkpoint = new RecordingCheckpoint(committedResult(), { forbiddenRoots: [root] });
+    const interaction = new StubInteraction(["continue", rel, true, true]); // 8.4, commit
+    const { deps } = baseDeps(root, projectDir, projectPathRel, interaction, {
+      resumeInput: "8.4",
+      executeStep: fake.execute,
+      checkpoint
+    });
+    const outcome = await runFeatureFlow(deps);
+    assert.equal(outcome.kind, "completed");
+    assert.deepEqual(
+      fake.calls.map((call) => call.id),
+      ["8.4"]
+    );
+    // The passing run checkpoints before 8.4 and again at the completion boundary.
+    assert.deepEqual(checkpoint.labels, [
+      CHECKPOINT_LABELS.before84,
+      CHECKPOINT_LABELS.featureCompletion
+    ]);
   });
 });
 
@@ -692,5 +822,568 @@ test("run step 3 boundary refuses a declined reconciliation commit via the real 
     }
     assert.ok(interaction.log.every((line) => !line.startsWith("input:")));
     assert.deepEqual(readdirSync(projectDir).sort(), before.sort());
+  });
+});
+
+// --- CRP-166: terminal gate chain at the plan-completion boundary ------------
+
+/** Chain that fails with a scripted aggregate, recording when it was invoked. */
+function failingTerminalChain(
+  exitCode: 1 | 2,
+  repairStep: string,
+  reason = "terminal gate failed"
+): RecordingTerminalChain {
+  return new RecordingTerminalChain({
+    exitCode,
+    repairStep,
+    failed: 1,
+    diagnostics: [{ severity: "error", source: "terminal-gate-chain", reason, stepId: repairStep }]
+  });
+}
+
+test("terminal chain runs after an accepted 8.4 and before the completion commit boundary", async () => {
+  await withWorkspace({}, async ({ root, projectDir, projectPathRel }) => {
+    seedFeature(projectDir, "wip-1");
+    const rel = path.join(projectPathRel, "wip-1");
+    const chain = new RecordingTerminalChain({ exitCode: 0 });
+    const checkpoint = new RecordingCheckpoint(committedResult());
+    const interaction = new StubInteraction(["continue", rel, true, true]);
+    const { deps } = baseDeps(root, projectDir, projectPathRel, interaction, {
+      resumeInput: "8.4",
+      executeStep: fakeExecutor().execute,
+      terminalGateChain: chain.run,
+      checkpoint
+    });
+
+    const outcome = await runFeatureFlow(deps);
+    assert.equal(outcome.kind, "completed");
+    assert.equal(chain.calls.length, 1);
+    assert.equal(chain.calls[0]!.featurePath, path.join(root, rel));
+    assert.equal(chain.calls[0]!.cwd, root);
+    assert.deepEqual(checkpoint.labels, [
+      CHECKPOINT_LABELS.before84,
+      CHECKPOINT_LABELS.featureCompletion
+    ]);
+  });
+});
+
+test("a failing terminal chain blocks the completion commit boundary and plan completion", async () => {
+  await withWorkspace({}, async ({ root, projectDir, projectPathRel }) => {
+    seedFeature(projectDir, "wip-1");
+    const rel = path.join(projectPathRel, "wip-1");
+    const chain = failingTerminalChain(1, "5", "requirements_ears.md: invalid EARS bullet");
+    const checkpoint = new RecordingCheckpoint();
+    const interaction = new StubInteraction(["continue", rel, true]);
+    const { deps, lines } = baseDeps(root, projectDir, projectPathRel, interaction, {
+      resumeInput: "8.4",
+      executeStep: fakeExecutor().execute,
+      terminalGateChain: chain.run,
+      checkpoint
+    });
+
+    const outcome = await runFeatureFlow(deps);
+    assert.equal(outcome.kind, "failed");
+    if (outcome.kind === "failed") {
+      assert.equal(outcome.exitCode, 1);
+      // The earliest owning step is what the operator resumes from.
+      assert.equal(outcome.resumeStep, "5");
+      assert.match(outcome.diagnostics[0]!.reason, /invalid EARS bullet/);
+    }
+    // No completion commit boundary and no plan-complete output.
+    assert.deepEqual(checkpoint.labels, [CHECKPOINT_LABELS.before84]);
+    assert.ok(lines.every((line) => !/reached end of configured phase map/.test(line)));
+  });
+});
+
+test("a declined 8.4 does not announce a finished feature when the chain then fails", async () => {
+  await withWorkspace({}, async ({ root, projectDir, projectPathRel }) => {
+    seedFeature(projectDir, "wip-1");
+    const rel = path.join(projectPathRel, "wip-1");
+    const chain = failingTerminalChain(1, "5");
+    const interaction = new StubInteraction(["continue", rel, false]);
+    const { deps, lines } = baseDeps(root, projectDir, projectPathRel, interaction, {
+      resumeInput: "8.4",
+      executeStep: fakeExecutor().execute,
+      terminalGateChain: chain.run
+    });
+
+    const outcome = await runFeatureFlow(deps);
+
+    // The optional-decline notice announces a finished feature, so it must stay
+    // behind the terminal gate rather than preceding a failure.
+    assert.equal(outcome.kind, "failed");
+    assert.ok(lines.every((line) => !/Execution finished/.test(line)));
+  });
+});
+
+test("a declined 8.4 announces the finished feature once the chain passes", async () => {
+  await withWorkspace({}, async ({ root, projectDir, projectPathRel }) => {
+    seedFeature(projectDir, "wip-1");
+    const rel = path.join(projectPathRel, "wip-1");
+    const chain = new RecordingTerminalChain({ exitCode: 0 });
+    const interaction = new StubInteraction(["continue", rel, false]);
+    const { deps, lines } = baseDeps(root, projectDir, projectPathRel, interaction, {
+      resumeInput: "8.4",
+      executeStep: fakeExecutor().execute,
+      terminalGateChain: chain.run
+    });
+
+    const outcome = await runFeatureFlow(deps);
+
+    assert.equal(outcome.kind, "finished");
+    assert.ok(
+      lines.some((line) =>
+        /no remaining required phases after declined optional phase 8.4/.test(line)
+      )
+    );
+  });
+});
+
+test("a terminal runtime failure carries exit two through the flow unchanged", async () => {
+  await withWorkspace({}, async ({ root, projectDir, projectPathRel }) => {
+    seedFeature(projectDir, "wip-1");
+    const rel = path.join(projectPathRel, "wip-1");
+    const chain = failingTerminalChain(2, "8.3", "implementation-plan gate cannot run");
+    const interaction = new StubInteraction(["continue", rel, true]);
+    const { deps } = baseDeps(root, projectDir, projectPathRel, interaction, {
+      resumeInput: "8.4",
+      executeStep: fakeExecutor().execute,
+      terminalGateChain: chain.run
+    });
+
+    const outcome = await runFeatureFlow(deps);
+    assert.equal(outcome.kind, "failed");
+    if (outcome.kind === "failed") {
+      assert.equal(outcome.exitCode, 2);
+      assert.equal(outcome.resumeStep, "8.3");
+    }
+  });
+});
+
+test("terminal chain runs once when 8.4 is declined, before the finished outcome", async () => {
+  await withWorkspace({}, async ({ root, projectDir, projectPathRel }) => {
+    seedFeature(projectDir, "wip-1");
+    const rel = path.join(projectPathRel, "wip-1");
+    const chain = new RecordingTerminalChain({ exitCode: 0 });
+    const interaction = new StubInteraction(["continue", rel, false]);
+    const { deps } = baseDeps(root, projectDir, projectPathRel, interaction, {
+      resumeInput: "8.4",
+      executeStep: fakeExecutor().execute,
+      terminalGateChain: chain.run
+    });
+
+    const outcome = await runFeatureFlow(deps);
+    assert.equal(outcome.kind, "finished");
+    assert.equal(chain.calls.length, 1);
+  });
+});
+
+test("terminal chain runs once at the catalog end, before plan-complete output", async () => {
+  await withWorkspace({}, async ({ root, projectDir, projectPathRel }) => {
+    seedFeature(projectDir, "wip-1");
+    const rel = path.join(projectPathRel, "wip-1");
+    const chain = failingTerminalChain(1, "8.3", "implementation_plan.md: header missing");
+    // Accept 8.3, then accept 8.4 so the loop runs to the end of the phase map.
+    const interaction = new StubInteraction(["continue", rel, true, true]);
+    const { deps, lines } = baseDeps(root, projectDir, projectPathRel, interaction, {
+      resumeInput: "8.3",
+      executeStep: fakeExecutor().execute,
+      terminalGateChain: chain.run
+    });
+
+    const outcome = await runFeatureFlow(deps);
+    assert.equal(outcome.kind, "failed");
+    // The 8.4 boundary already enforced it; the catalog end must not run it again.
+    assert.equal(chain.calls.length, 1);
+    assert.ok(lines.every((line) => !/reached end of configured phase map/.test(line)));
+  });
+});
+
+test("terminal chain is not invoked when an earlier action fails or the operator stops", async () => {
+  await withWorkspace({}, async ({ root, projectDir, projectPathRel }) => {
+    seedFeature(projectDir, "wip-1", ["project_surface_struct_resp_map_backend.md"]);
+    const rel = path.join(projectPathRel, "wip-1");
+
+    const failChain = new RecordingTerminalChain({ exitCode: 0 });
+    const failing = new StubInteraction(["continue", rel, true]);
+    const { deps: failDeps } = baseDeps(root, projectDir, projectPathRel, failing, {
+      resumeInput: "6",
+      executeStep: fakeExecutor({ failStep: "6" }).execute,
+      terminalGateChain: failChain.run
+    });
+    assert.equal((await runFeatureFlow(failDeps)).kind, "failed");
+    assert.equal(failChain.calls.length, 0);
+
+    const stopChain = new RecordingTerminalChain({ exitCode: 0 });
+    const stopping = new StubInteraction(["continue", rel, false]);
+    const { deps: stopDeps } = baseDeps(root, projectDir, projectPathRel, stopping, {
+      resumeInput: "6",
+      executeStep: fakeExecutor().execute,
+      terminalGateChain: stopChain.run
+    });
+    assert.equal((await runFeatureFlow(stopDeps)).kind, "stoppedByOperator");
+    assert.equal(stopChain.calls.length, 0);
+  });
+});
+
+test("an explicit repair resume reopens the valid cached completed feature", async () => {
+  await withWorkspace({}, async ({ root, projectDir, projectPathRel }) => {
+    const featureDir = seedCompleteFeature(projectDir, "done-1");
+    writeFeatureState(projectDir, path.relative(root, featureDir));
+
+    // Step 5 owns the earliest terminal failure; resuming there reopens the
+    // cached feature even though artifact scanning calls it complete.
+    const chain = new RecordingTerminalChain({ exitCode: 0 });
+    const fake = fakeExecutor();
+    const interaction = new StubInteraction([
+      true, // 5
+      true, // 5.1
+      true, // 6
+      true, // 7 confirm
+      "forward", // 7 class loop
+      true, // 7.1
+      true, // 8
+      true, // 8.1
+      true, // 8.2
+      true, // 8.3
+      true // 8.4
+    ]);
+    const { deps, lines } = baseDeps(root, projectDir, projectPathRel, interaction, {
+      resumeInput: "5",
+      executeStep: fake.execute,
+      terminalGateChain: chain.run
+    });
+
+    const outcome = await runFeatureFlow(deps);
+    assert.ok(
+      lines.some((line) =>
+        /Reopening completed cached feature at explicit repair step 5: /.test(line)
+      )
+    );
+    assert.equal(fake.calls[0]!.id, "5");
+    // Completion is only reported after the terminal chain passes.
+    assert.equal(chain.calls.length, 1);
+    assert.equal(outcome.kind, "completed");
+  });
+});
+
+test("a repair resume with no cached feature reports actionable guidance", async () => {
+  await withWorkspace({}, async ({ root, projectDir, projectPathRel }) => {
+    seedCompleteFeature(projectDir, "done-1");
+    const interaction = new StubInteraction([]);
+    const { deps } = baseDeps(root, projectDir, projectPathRel, interaction, {
+      resumeInput: "8.3",
+      executeStep: fakeExecutor().execute
+    });
+    const outcome = await runFeatureFlow(deps);
+    assert.equal(outcome.kind, "startupError");
+    if (outcome.kind === "startupError") {
+      assert.match(outcome.diagnostics[0]!.reason, /cached feature_path/);
+      assert.doesNotMatch(outcome.diagnostics[0]!.reason, /use --resume 3 first/);
+    }
+  });
+});
+
+// --- CRP-169: the feature-completion commit boundary -------------------------
+
+const COMMIT_PROMPT = "Commit completed feature work?";
+
+/** Commit-boundary prompts only, so step confirmations do not inflate the count. */
+function commitPrompts(interaction: StubInteraction): ConfirmRequest[] {
+  return interaction.confirmRequests.filter((request) => request.message === COMMIT_PROMPT);
+}
+
+test("an accepted 8.4 and its catalog-end fall-through reach the commit boundary once", async () => {
+  await withWorkspace({}, async ({ root, projectDir, projectPathRel }) => {
+    seedFeature(projectDir, "wip-1");
+    const rel = path.join(projectPathRel, "wip-1");
+    const chain = new RecordingTerminalChain({ exitCode: 0 });
+    const checkpoint = new RecordingCheckpoint(committedResult());
+    // Accepting 8.4 completes the last catalog step, so the loop then falls
+    // through to its end: one completion, one prompt, one commit.
+    const interaction = new StubInteraction(["continue", rel, true, true]);
+    const { deps, lines } = baseDeps(root, projectDir, projectPathRel, interaction, {
+      resumeInput: "8.4",
+      executeStep: fakeExecutor().execute,
+      terminalGateChain: chain.run,
+      checkpoint
+    });
+
+    const outcome = await runFeatureFlow(deps);
+    assert.equal(outcome.kind, "completed");
+    assert.equal(chain.calls.length, 1);
+    assert.equal(commitPrompts(interaction).length, 1);
+    assert.equal(commitPrompts(interaction)[0]!.defaultValue, true);
+    assert.deepEqual(
+      checkpoint.labels.filter((label) => label === CHECKPOINT_LABELS.featureCompletion),
+      [CHECKPOINT_LABELS.featureCompletion]
+    );
+    assert.ok(
+      lines.some((line) =>
+        line.includes(
+          `Checkpoint commit created: Checkpoint: ${CHECKPOINT_LABELS.featureCompletion}`
+        )
+      )
+    );
+  });
+});
+
+test("a declined 8.4 reaches the commit boundary before the finished outcome", async () => {
+  await withWorkspace({}, async ({ root, projectDir, projectPathRel }) => {
+    seedFeature(projectDir, "wip-1");
+    const rel = path.join(projectPathRel, "wip-1");
+    const checkpoint = new RecordingCheckpoint(committedResult());
+    const interaction = new StubInteraction(["continue", rel, false, true]);
+    const { deps, lines } = baseDeps(root, projectDir, projectPathRel, interaction, {
+      resumeInput: "8.4",
+      executeStep: fakeExecutor().execute,
+      checkpoint
+    });
+
+    const outcome = await runFeatureFlow(deps);
+    assert.equal(outcome.kind, "finished");
+    assert.equal(commitPrompts(interaction).length, 1);
+    assert.deepEqual(checkpoint.labels, [
+      CHECKPOINT_LABELS.before84,
+      CHECKPOINT_LABELS.featureCompletion
+    ]);
+    assert.ok(
+      lines.some((line) =>
+        /no remaining required phases after declined optional phase 8.4/.test(line)
+      )
+    );
+  });
+});
+
+test("a run whose scanner reports nothing remaining reaches the commit boundary", async () => {
+  await withWorkspace({}, async ({ root, projectDir, projectPathRel }) => {
+    // Scaffolding produces a complete feature, so the pre-loop scan finds no
+    // remaining required step — the ordinary resumed-run shape (CRP-169 path 1).
+    const fake = fakeExecutor({ scaffoldComplete: { projectDir, root, name: "new-feat-1" } });
+    const checkpoint = new RecordingCheckpoint(committedResult());
+    const interaction = new StubInteraction([true, true]); // scaffold, commit
+    const { deps, lines } = baseDeps(root, projectDir, projectPathRel, interaction, {
+      executeStep: fake.execute,
+      checkpoint
+    });
+
+    const outcome = await runFeatureFlow(deps);
+    assert.equal(outcome.kind, "finished");
+    assert.equal(commitPrompts(interaction).length, 1);
+    assert.deepEqual(checkpoint.labels, [CHECKPOINT_LABELS.featureCompletion]);
+    assert.ok(
+      lines.some((line) => /scanner reports no remaining required steps/.test(line)),
+      "the finished message still reaches the operator"
+    );
+  });
+});
+
+test("declining the commit prompt leaves the work uncommitted and keeps the outcome", async () => {
+  await withWorkspace({}, async ({ root, projectDir, projectPathRel }) => {
+    seedFeature(projectDir, "wip-1");
+    const rel = path.join(projectPathRel, "wip-1");
+    const checkpoint = new RecordingCheckpoint(committedResult());
+    const interaction = new StubInteraction(["continue", rel, true, false]);
+    const { deps, lines } = baseDeps(root, projectDir, projectPathRel, interaction, {
+      resumeInput: "8.4",
+      executeStep: fakeExecutor().execute,
+      checkpoint
+    });
+
+    const outcome = await runFeatureFlow(deps);
+    assert.equal(outcome.kind, "completed");
+    assert.deepEqual(checkpoint.labels, [CHECKPOINT_LABELS.before84]);
+    assert.ok(
+      lines.some((line) =>
+        line.includes(
+          `Checkpoint commit declined by operator (${CHECKPOINT_LABELS.featureCompletion}): completed feature work left uncommitted.`
+        )
+      )
+    );
+  });
+});
+
+test("a closed input stream at the commit boundary declines without stopping the run", async () => {
+  await withWorkspace({}, async ({ root, projectDir, projectPathRel }) => {
+    seedFeature(projectDir, "wip-1");
+    const rel = path.join(projectPathRel, "wip-1");
+    const checkpoint = new RecordingCheckpoint(committedResult());
+    // Nothing scripted for the commit prompt: the stream closes while it is open.
+    const interaction = new StubInteraction(["continue", rel, true]);
+    const { deps, lines } = baseDeps(root, projectDir, projectPathRel, interaction, {
+      resumeInput: "8.4",
+      executeStep: fakeExecutor().execute,
+      checkpoint
+    });
+
+    const outcome = await runFeatureFlow(deps);
+    assert.equal(outcome.kind, "completed");
+    assert.deepEqual(checkpoint.labels, [CHECKPOINT_LABELS.before84]);
+    assert.ok(
+      lines.some((line) =>
+        line.includes(
+          `Checkpoint commit declined (input closed) (${CHECKPOINT_LABELS.featureCompletion}): completed feature work left uncommitted.`
+        )
+      )
+    );
+    assert.ok(lines.every((line) => !/Execution stopped/.test(line)));
+  });
+});
+
+test("a clean project worktree reports nothing to commit without prompting", async () => {
+  await withWorkspace({}, async ({ root, projectDir, projectPathRel }) => {
+    seedFeature(projectDir, "wip-1");
+    const rel = path.join(projectPathRel, "wip-1");
+    const checkpoint = new RecordingCheckpoint({ kind: "clean" });
+    const interaction = new StubInteraction(["continue", rel, true]);
+    const { deps, lines } = baseDeps(root, projectDir, projectPathRel, interaction, {
+      resumeInput: "8.4",
+      executeStep: fakeExecutor().execute,
+      checkpoint
+    });
+
+    const outcome = await runFeatureFlow(deps);
+    assert.equal(outcome.kind, "completed");
+    assert.equal(commitPrompts(interaction).length, 0);
+    assert.deepEqual(checkpoint.labels, [CHECKPOINT_LABELS.before84]);
+    assert.ok(
+      lines.some((line) =>
+        line.includes(
+          `Checkpoint commit skipped (${CHECKPOINT_LABELS.featureCompletion}): nothing to commit.`
+        )
+      )
+    );
+  });
+});
+
+test("every commit obstacle is a notice that preserves the flow outcome", async () => {
+  const obstacles: Array<{ result: CheckpointResult; expected: RegExp }> = [
+    { result: { kind: "unavailable" }, expected: /git not found in PATH/ },
+    { result: { kind: "notWorktree" }, expected: /is not a git worktree/ },
+    { result: { kind: "addFailed", exitCode: 3 }, expected: /git add exited 3/ },
+    { result: { kind: "commitFailed", exitCode: 4 }, expected: /git commit exited 4/ }
+  ];
+
+  for (const obstacle of obstacles) {
+    await withWorkspace({}, async ({ root, projectDir, projectPathRel }) => {
+      seedFeature(projectDir, "wip-1");
+      const rel = path.join(projectPathRel, "wip-1");
+      const checkpoint = new RecordingCheckpoint(obstacle.result);
+      const interaction = new StubInteraction(["continue", rel, true, true]);
+      const { deps, lines } = baseDeps(root, projectDir, projectPathRel, interaction, {
+        resumeInput: "8.4",
+        executeStep: fakeExecutor().execute,
+        checkpoint
+      });
+
+      const outcome = await runFeatureFlow(deps);
+      assert.equal(outcome.kind, "completed", `${obstacle.result.kind} changed the outcome`);
+      assert.deepEqual(checkpoint.labels, [
+        CHECKPOINT_LABELS.before84,
+        CHECKPOINT_LABELS.featureCompletion
+      ]);
+      assert.ok(
+        lines.some(
+          (line) =>
+            obstacle.expected.test(line) && line.includes(CHECKPOINT_LABELS.featureCompletion)
+        ),
+        `${obstacle.result.kind} produced no completion notice`
+      );
+    });
+  }
+});
+
+test("a failing terminal chain reaches no commit prompt and no commit", async () => {
+  await withWorkspace({}, async ({ root, projectDir, projectPathRel }) => {
+    seedFeature(projectDir, "wip-1");
+    const rel = path.join(projectPathRel, "wip-1");
+    const checkpoint = new RecordingCheckpoint(committedResult());
+    const interaction = new StubInteraction(["continue", rel, true, true]);
+    const { deps } = baseDeps(root, projectDir, projectPathRel, interaction, {
+      resumeInput: "8.4",
+      executeStep: fakeExecutor().execute,
+      terminalGateChain: failingTerminalChain(1, "8.3").run,
+      checkpoint
+    });
+
+    const outcome = await runFeatureFlow(deps);
+    assert.equal(outcome.kind, "failed");
+    if (outcome.kind === "failed") assert.equal(outcome.resumeStep, "8.3");
+    assert.equal(commitPrompts(interaction).length, 0);
+    assert.deepEqual(checkpoint.labels, [CHECKPOINT_LABELS.before84]);
+  });
+});
+
+test("runs that never complete feature work reach no commit boundary", async () => {
+  const assertNoBoundary = (
+    interaction: StubInteraction,
+    checkpoint: RecordingCheckpoint,
+    label: string
+  ): void => {
+    assert.equal(commitPrompts(interaction).length, 0, `${label} prompted for a commit`);
+    assert.equal(
+      checkpoint.labels.includes(CHECKPOINT_LABELS.featureCompletion),
+      false,
+      `${label} reached the commit boundary`
+    );
+  };
+
+  // A phase failure.
+  await withWorkspace({}, async ({ root, projectDir, projectPathRel }) => {
+    seedFeature(projectDir, "wip-1");
+    const rel = path.join(projectPathRel, "wip-1");
+    const checkpoint = new RecordingCheckpoint(committedResult());
+    const interaction = new StubInteraction(["continue", rel, true]);
+    const { deps } = baseDeps(root, projectDir, projectPathRel, interaction, {
+      resumeInput: "6",
+      executeStep: fakeExecutor({ failStep: "6" }).execute,
+      checkpoint
+    });
+    assert.equal((await runFeatureFlow(deps)).kind, "failed");
+    assertNoBoundary(interaction, checkpoint, "phase failure");
+  });
+
+  // An operator stop at a required phase.
+  await withWorkspace({}, async ({ root, projectDir, projectPathRel }) => {
+    seedFeature(projectDir, "wip-1");
+    const rel = path.join(projectPathRel, "wip-1");
+    const checkpoint = new RecordingCheckpoint(committedResult());
+    const interaction = new StubInteraction(["continue", rel, false]);
+    const { deps } = baseDeps(root, projectDir, projectPathRel, interaction, {
+      resumeInput: "6",
+      executeStep: fakeExecutor().execute,
+      checkpoint
+    });
+    assert.equal((await runFeatureFlow(deps)).kind, "stoppedByOperator");
+    assertNoBoundary(interaction, checkpoint, "operator stop");
+  });
+
+  // Refused pending project work.
+  await withWorkspace(
+    { definition: { classRepoPaths: { backend: { state: "ready" } } } },
+    async ({ root, projectDir, projectPathRel }) => {
+      const checkpoint = new RecordingCheckpoint(committedResult());
+      const interaction = new StubInteraction([]);
+      const { deps } = baseDeps(root, projectDir, projectPathRel, interaction, {
+        executeStep: fakeExecutor().execute,
+        checkpoint
+      });
+      assert.equal((await runFeatureFlow(deps)).kind, "refusedPendingWork");
+      assertNoBoundary(interaction, checkpoint, "refused pending work");
+    }
+  );
+
+  // A startup error from an unresolvable resume token.
+  await withWorkspace({}, async ({ root, projectDir, projectPathRel }) => {
+    seedFeature(projectDir, "wip-1");
+    const checkpoint = new RecordingCheckpoint(committedResult());
+    const interaction = new StubInteraction([]);
+    const { deps } = baseDeps(root, projectDir, projectPathRel, interaction, {
+      resumeInput: "99",
+      executeStep: fakeExecutor().execute,
+      checkpoint
+    });
+    assert.equal((await runFeatureFlow(deps)).kind, "startupError");
+    assertNoBoundary(interaction, checkpoint, "startup error");
   });
 });

@@ -21,6 +21,7 @@ const REQUIRED_META_KEYS = [
   "feature_id",
   "feature_title",
   "source_feature_br_summary",
+  "source_user_br_input",
   "source_requirements_ears",
   "review_status",
   "last_updated"
@@ -30,6 +31,7 @@ const REQUIRED_FINDING_FIELDS = [
   "severity",
   "state",
   "source_br_summary_reference",
+  "source_user_br_input_reference",
   "related_requirement_targets",
   "gap_summary",
   "recommendation",
@@ -40,6 +42,10 @@ const REQUIRED_FINDING_FIELDS = [
 ] as const;
 
 type Section = "1" | "2" | "3" | "";
+
+// A finished ledger must strip the template's `<...>` hints; a leftover angle-bracket
+// token is an unresolved placeholder, not real content.
+const TEMPLATE_HINT = /<[^<>]+>/;
 
 interface FindingBlock {
   fields: Map<string, string>;
@@ -150,6 +156,14 @@ export function validateEarsReviewContent(content: string): string[] {
     }
   }
 
+  for (const [key, value] of meta) {
+    if (TEMPLATE_HINT.test(value)) {
+      failQuality(
+        `meta key '${key}' still contains an unresolved template hint in angle brackets; every <...> template hint must be replaced or removed`
+      );
+    }
+  }
+
   const reviewStatus = (meta.get("review_status") ?? "").toLowerCase();
   if (reviewStatus !== "in_progress" && reviewStatus !== "complete") {
     failQuality("review_status must be in_progress or complete");
@@ -174,6 +188,14 @@ export function validateEarsReviewContent(content: string): string[] {
     for (const key of REQUIRED_FINDING_FIELDS) {
       if (isUnfilled(finding.fields.get(key))) {
         failQuality(`finding block ${findingNumber} missing or unfilled key: ${key}`);
+      }
+    }
+
+    for (const [key, value] of finding.fields) {
+      if (TEMPLATE_HINT.test(value)) {
+        failQuality(
+          `finding block ${findingNumber} field '${key}' still contains an unresolved template hint in angle brackets; every <...> template hint must be replaced or removed`
+        );
       }
     }
 

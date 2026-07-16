@@ -1,6 +1,40 @@
 import { isUnfilled, parseBulletField, readRequiredTextFile } from "./markdown.js";
 
-import type { MissingBrData, RisedItem } from "../types/index.js";
+import type { MissingBrData, RisedItem, RisedItemSource } from "../types/index.js";
+
+/** Locator text stops at the ledger separator so free-form item text cannot leak in. */
+const LEDGER_SOURCE_PATTERN = /source\s*=\s*([^;]+)(?:;|$)/i;
+
+export function normalizeLedgerLocatorPart(value: string): string {
+  return value.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+/**
+ * Reads every `<section> -> <field>` locator of one ledger item. A single answered
+ * question often covers several BR fields that restate the same fact, so an item
+ * may list them comma-separated; a one-locator item is the same syntax with one
+ * element. Parts without `->` are skipped rather than guessed at.
+ */
+export function parseRisedItemSources(line: string): RisedItemSource[] {
+  const payload = line.match(LEDGER_SOURCE_PATTERN)?.[1];
+  if (payload === undefined) {
+    return [];
+  }
+
+  const sources: RisedItemSource[] = [];
+  for (const part of payload.split(",")) {
+    const separator = part.indexOf("->");
+    if (separator < 0) {
+      continue;
+    }
+    const section = normalizeLedgerLocatorPart(part.slice(0, separator));
+    const field = normalizeLedgerLocatorPart(part.slice(separator + 2));
+    if (section !== "" && field !== "") {
+      sources.push({ section, field });
+    }
+  }
+  return sources;
+}
 
 export function readMissingBrData(filePath: string): MissingBrData {
   const content = readRequiredTextFile(filePath);
@@ -11,6 +45,7 @@ export function readMissingBrData(filePath: string): MissingBrData {
   let inLoopDecision = false;
   let hasFilledAnswer = false;
   let hasFilledUnresolvedAfterStop = false;
+  let unresolvedAfterStop: string | undefined;
 
   for (const line of lines) {
     const trimmed = line.trim();
@@ -30,7 +65,7 @@ export function readMissingBrData(filePath: string): MissingBrData {
         risedState = "true";
       }
       const id = line.match(/rised_item_[0-9]+/)?.[0] ?? "rised_item_unknown";
-      risedItems.push({ id, raw: line, risedState });
+      risedItems.push({ id, raw: line, risedState, sources: parseRisedItemSources(line) });
     }
 
     const field = parseBulletField(line);
@@ -41,8 +76,14 @@ export function readMissingBrData(filePath: string): MissingBrData {
     if (inLatestAnswers && field.key === "answers" && !isUnfilled(field.value)) {
       hasFilledAnswer = true;
     }
-    if (inLoopDecision && field.key === "unresolved_after_stop" && !isUnfilled(field.value)) {
-      hasFilledUnresolvedAfterStop = true;
+    if (inLoopDecision && field.key === "unresolved_after_stop") {
+      // The terminal contract is an exact literal, so a quoted variant must not
+      // normalize into a pass. The pending path keeps the normalized value: a
+      // pending summary is free text, where quoting carries no meaning.
+      unresolvedAfterStop = field.rawValue;
+      if (!isUnfilled(field.value)) {
+        hasFilledUnresolvedAfterStop = true;
+      }
     }
   }
 
@@ -51,6 +92,7 @@ export function readMissingBrData(filePath: string): MissingBrData {
     content,
     risedItems,
     hasFilledAnswer,
-    hasFilledUnresolvedAfterStop
+    hasFilledUnresolvedAfterStop,
+    unresolvedAfterStop
   };
 }

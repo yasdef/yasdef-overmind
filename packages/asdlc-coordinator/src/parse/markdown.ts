@@ -30,7 +30,16 @@ export function isUnfilled(value: string | undefined): boolean {
   return normalized === "" || normalized.toUpperCase() === "[UNFILLED]";
 }
 
-export function parseBulletField(line: string): { key: string; value: string } | undefined {
+/**
+ * Splits a `- key: value` bullet into its parts.
+ *
+ * `value` is normalized (trimmed and unquoted) because quoting is presentational
+ * for almost every field. `rawValue` is only trimmed, for the rare field whose
+ * contract is an exact literal and must therefore reject a quoted variant.
+ */
+export function parseBulletField(
+  line: string
+): { key: string; value: string; rawValue: string } | undefined {
   const normalized = line.replace(/^\s*-\s*/, "");
   const colonIndex = normalized.indexOf(":");
   if (colonIndex < 0) {
@@ -40,9 +49,11 @@ export function parseBulletField(line: string): { key: string; value: string } |
   if (key === "") {
     return undefined;
   }
+  const rawValue = trimValue(normalized.slice(colonIndex + 1));
   return {
     key,
-    value: normalizeValue(normalized.slice(colonIndex + 1))
+    value: stripQuotes(rawValue),
+    rawValue
   };
 }
 
@@ -91,7 +102,7 @@ export function getBlockField(content: string, fieldName: string): string {
     const blockLines: string[] = [];
     for (let cursor = index + 1; cursor < lines.length; cursor += 1) {
       const candidate = lines[cursor]!;
-      if (/^-\s+[A-Za-z0-9_-]+:\s*/.test(candidate) || /^##\s+/.test(candidate)) {
+      if (isBlockBoundary(candidate)) {
         break;
       }
       if (candidate.startsWith("  ")) {
@@ -106,14 +117,53 @@ export function getBlockField(content: string, fieldName: string): string {
 }
 
 export function getScalarField(content: string, fieldName: string): string | undefined {
-  const lines = content.split(/\r?\n/);
-  for (const line of lines) {
+  for (const line of scalarFieldLines(content)) {
     const field = parseBulletField(line);
     if (field?.key === fieldName) {
       return field.value;
     }
   }
   return undefined;
+}
+
+/**
+ * Document lines eligible to hold a scalar field, with `key: |` block bodies removed.
+ *
+ * A block body is indented free text — a captured story, a pasted Jira description —
+ * so a bullet-shaped line inside it is content, not a field. `parseBulletField`
+ * tolerates leading whitespace, so without this filter a body line such as
+ * `  - request_summary: ...` parses as the document's `request_summary`, and
+ * because scanning returns the first match it wins over the real field written
+ * after the block. Block termination mirrors `getBlockField`, so both parsers
+ * agree on where a body ends.
+ */
+function scalarFieldLines(content: string): string[] {
+  const lines: string[] = [];
+  let inBlockBody = false;
+
+  for (const line of content.split(/\r?\n/)) {
+    if (inBlockBody) {
+      if (!isBlockBoundary(line)) {
+        continue;
+      }
+      inBlockBody = false;
+    }
+    if (isBlockFieldStart(line)) {
+      inBlockBody = true;
+      continue;
+    }
+    lines.push(line);
+  }
+
+  return lines;
+}
+
+function isBlockFieldStart(line: string): boolean {
+  return /^-\s+[A-Za-z0-9_-]+:\s*\|\s*$/.test(line);
+}
+
+function isBlockBoundary(line: string): boolean {
+  return /^-\s+[A-Za-z0-9_-]+:\s*/.test(line) || /^##\s+/.test(line);
 }
 
 function escapeRegExp(value: string): string {

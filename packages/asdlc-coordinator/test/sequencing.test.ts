@@ -74,6 +74,25 @@ test("catalog ids exactly match definition and feature actions are concrete", ()
   );
 });
 
+test("step 5 keeps the summary-only guard while step 5.1 guards both business sources", () => {
+  function sessionGuardFiles(stepId: string): string[][] {
+    const step = STEP_CATALOG.find((candidate) => candidate.id === stepId);
+    assert.ok(step, `Missing step ${stepId}`);
+    return step.actions
+      .filter(
+        (action): action is Extract<typeof action, { kind: "session" }> => action.kind === "session"
+      )
+      .flatMap((action) =>
+        action.readOnlyGuards
+          .filter((guard) => guard.mode === "mustExistUnchanged")
+          .map((guard) => (guard as { files: string[] }).files)
+      );
+  }
+
+  assert.deepEqual(sessionGuardFiles("5"), [["feature_br_summary.md"]]);
+  assert.deepEqual(sessionGuardFiles("5.1"), [["feature_br_summary.md", "user_br_input.md"]]);
+});
+
 test("evaluate reports every step, filters classes, projects next step and summary", () => {
   withProject((root, project, feature) => {
     writeFileSync(path.join(project, "common_contract_definition.md"), "complete\n");

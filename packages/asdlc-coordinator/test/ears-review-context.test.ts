@@ -41,7 +41,13 @@ test("ears-review context assembles runtime paths, allowed writes, gate command,
     assert.match(
       result.text ?? "",
       new RegExp(
-        `read_only_br_source: ${escapeRegExp(path.join(featureDir, "feature_br_summary.md"))}`
+        `authoritative_br_summary_source: ${escapeRegExp(path.join(featureDir, "feature_br_summary.md"))}`
+      )
+    );
+    assert.match(
+      result.text ?? "",
+      new RegExp(
+        `raw_user_input_backstop_source: ${escapeRegExp(path.join(featureDir, "user_br_input.md"))}`
       )
     );
     assert.match(
@@ -97,6 +103,16 @@ test("ears-review context exits 2 when upstream BR summary is missing", () => {
     const result = buildEarsReviewContext(path.relative(root, featureDir), root);
     assert.equal(result.exitCode, 2);
     assert.match(result.errorMessage ?? "", /Upstream BR summary is required/);
+  });
+});
+
+test("ears-review context exits 2 when raw user input is missing", () => {
+  withWorkspace((root) => {
+    const featureDir = createFeatureFixture(root, { userInput: null });
+    writeRequirements(featureDir);
+    const result = buildEarsReviewContext(path.relative(root, featureDir), root);
+    assert.equal(result.exitCode, 2);
+    assert.match(result.errorMessage ?? "", /Raw user business input is required/);
   });
 });
 

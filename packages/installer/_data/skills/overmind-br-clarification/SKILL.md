@@ -48,7 +48,7 @@ User BR clarification phase is finished. Nothing else to do now; press Ctrl-C so
 2. If no unresolved questions exist, ask no questions. Run `node .overmind/overmind.js gate br-clarification <feature-path>`; if it exits `0`, finish with the required final response line. If it exits `1` or `2`, follow the gate exit-code handling above.
 3. Briefly explain the process: questions will be asked one at a time; the operator may answer or reply `skip for now` to defer a question.
 4. Ask only the first unresolved question and wait for the reply before asking the next question.
-5. When the operator answers, write the business answer to `feature_br_summary.md`, set the matching `rised_item_N` entry to `rised=true`, and add one pointer-only `- answers:` destination line in `## 6. Latest User Answers`.
+5. When the operator answers, write the business answer to `feature_br_summary.md` in every field the item's `source=` locator list names, set the matching `rised_item_N` entry to `rised=true`, and add one pointer-only `- answers:` destination line per field written in `## 6. Latest User Answers`. An item may only become `rised=true` once each field it names carries the answered wording: a partially applied answer leaves the remaining fields stale while the task-to-BR gate treats every named field as settled. When that answer was the last `rised=false` item, also set `## 7. Loop Decision -> unresolved_after_stop` to exactly `none`, and leave `## 1. Gate Status -> gate_result` unchanged.
 6. When the operator replies `skip for now` or otherwise declines to answer, leave that item `rised=false`, write no answer content for it, and move to the next question in the same pass.
 7. After each pass, run `node .overmind/overmind.js gate br-clarification <feature-path>`.
 8. If the gate exits `1`, do not declare completion, do not emit the final response line, and do not advance to the next phase. Start a new round and re-offer deferred questions until every tracked item is answered and the gate exits `0`.
@@ -97,13 +97,21 @@ Asset paths are relative to this loaded skill directory. Do not resolve them thr
 5. If a user-provided link does not answer the current unresolved item, ignore that link for both BR content and linked-artifact preservation.
 6. If a user-provided link contains more information than needed, write only the business content that answers the current question to `feature_br_summary.md`.
 7. Write actual answer content only to `feature_br_summary.md`.
-8. After an item is actually discussed with user and its answer is written to `feature_br_summary.md`, update the matching `rised_item_N` entry to `rised=true`.
-9. Record answer destinations in `missing_br_data.md` using one deterministic pointer entry per discussed item:
+8. After an item is actually discussed with user and its answer is written to `feature_br_summary.md` in every field the item's `source=` locator list names, update the matching `rised_item_N` entry to `rised=true`.
+9. Record answer destinations in `missing_br_data.md` using one deterministic pointer entry per destination field written:
    - `- answers: This was recorded in ## <section-number>. <section-title> - <field/item-id>.`
-10. Rerun `node .overmind/overmind.js gate br-clarification <feature-path>`.
-11. If the gate exits `1`, continue the loop and do not declare completion.
-12. Stop only when the gate exits `0` and all tracked `rised_item_N` entries are `rised=true`.
-13. Do not stop early while any tracked `rised_item_N` remains `rised=false`.
+10. When that update leaves every tracked `rised_item_N` at `rised=true`, set `## 7. Loop Decision -> unresolved_after_stop` to exactly `none` in the same write, before rerunning the gate.
+11. Rerun `node .overmind/overmind.js gate br-clarification <feature-path>`.
+12. If the gate exits `1`, continue the loop and do not declare completion.
+13. Stop only when the gate exits `0` and all tracked `rised_item_N` entries are `rised=true`.
+14. Do not stop early while any tracked `rised_item_N` remains `rised=false`.
+
+### Ledger Terminal State
+
+- The ledger is terminal when `## 3. Unresolved Items Ledger (Rised)` is empty, or when every `rised_item_N` is `rised=true`.
+- In either terminal state, `## 7. Loop Decision -> unresolved_after_stop` must be exactly `none`; write it as part of recording the final answer, before the next gate run.
+- While at least one `rised_item_N` is `rised=false`, keep `unresolved_after_stop` as a filled concise unresolved summary.
+- `## 1. Gate Status -> gate_result` is historical evidence of the gate round that produced the ledger: preserve every pre-existing `gate_result` line and value exactly. A historical `gate_result: failed` is never itself a reason for the gate to fail, and does not need rewriting to reach exit `0`.
 
 ### Deterministic Ledger Markers
 
@@ -111,6 +119,9 @@ Asset paths are relative to this loaded skill directory. Do not resolve them thr
   - `- rised_item_N: source=<section> -> <field>; rised=false; unresolved_item=<text>`
 - Discussed/raised entries:
   - `- rised_item_N: source=<section> -> <field>; rised=true; unresolved_item=<text>`
+- One question may cover several BR fields that restate the same fact. Such an item names them all in the same `source=` list, comma-separated, and the list is authoritative for where the answer must land:
+  - `- rised_item_N: source=<section> -> <field>, <section> -> <field>; rised=true; unresolved_item=<text>`
+- Preserve the `source=` locator list exactly when updating an item; never drop a field from it.
 - Numbering rules:
   - deterministic and gap-free
   - `N` starts at `1`
@@ -119,7 +130,7 @@ Asset paths are relative to this loaded skill directory. Do not resolve them thr
 
 - Section shape:
   - `## 6. Latest User Answers` may contain one or more repeated `- answers:` lines.
-  - Use one `- answers:` line per discussed item.
+  - Use one `- answers:` line per destination field written. An item whose `source=` locator list names several fields therefore produces one line per named field.
 - Canonical format:
   - `- answers: This was recorded in ## <section-number>. <section-title> - <field/item-id>.`
 - Interpretation:

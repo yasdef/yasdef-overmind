@@ -131,6 +131,23 @@ export async function scaffoldFeature(
     );
   }
 
+  // A new feature must not start on top of uncommitted work (CRP-169 D6). The
+  // mid-run checkpoints stage the whole project root, so a previous feature's
+  // artifacts — including work whose completion commit the operator declined —
+  // would otherwise be swept into this feature's commits. Continuing an existing
+  // feature is unaffected: uncommitted work there belongs to that feature.
+  const worktree = deps.projectGit.worktreeStatus(projectRoot);
+  if (worktree.kind === "dirty") {
+    return fail(
+      `Project worktree has uncommitted changes, so a new feature cannot be started: ${formatDirtyPaths(worktree.paths)}. Commit or discard them, then retry with overmind run --path ${projectPathRel}. Continuing an existing feature does not require a clean worktree.`
+    );
+  }
+  if (worktree.kind !== "clean") {
+    return fail(
+      `Unable to inspect the project worktree before feature scaffolding for ${projectPathRel}: ${describePathInspectionFailure(worktree)}. Resolve project Git inspection, then retry starting the feature with overmind run --path ${projectPathRel}.`
+    );
+  }
+
   const featureId = await requireInput(deps, "Feature ID:", deps.featureId, emit);
   const featureTitle = await requireInput(deps, "Feature title:", deps.featureTitle, emit);
 
@@ -237,6 +254,15 @@ function classifyPendingProjectCheckpoint(
     kind: "blocked",
     reason: `Unable to inspect project checkpoint state before feature scaffolding for ${projectPathRel}: ${describePathInspectionFailure(inspect)}. Resolve project Git inspection, then retry starting the feature with overmind run --path ${projectPathRel}.`
   };
+}
+
+const MAX_LISTED_DIRTY_PATHS = 5;
+
+/** Name the uncommitted paths that block a new feature, capped so the refusal stays readable. */
+function formatDirtyPaths(paths: string[]): string {
+  const remaining = paths.length - MAX_LISTED_DIRTY_PATHS;
+  const listed = paths.slice(0, MAX_LISTED_DIRTY_PATHS).join(", ");
+  return remaining > 0 ? `${listed} (and ${remaining} more)` : listed;
 }
 
 function describePathInspectionFailure(

@@ -182,3 +182,109 @@ test("a stale cache is ignored with a notice and selection continues", async () 
     assert.ok(lines.some((line) => /Ignoring stale saved feature_path cache/.test(line)));
   });
 });
+
+/**
+ * CRP-166 D7: a terminal failure is not persisted, so when a completed cached
+ * feature and an unfinished feature coexist the coordinator cannot infer whether
+ * an explicit repair resume means "repair the completed one" or "continue the
+ * unfinished one". Both are offered; neither is chosen silently.
+ */
+test("an explicit repair resume reaches the completed cached feature past unfinished ones", async () => {
+  await withWorkspace({}, async ({ root, projectDir, projectPathRel }) => {
+    const completed = path.relative(root, seedCompleteFeature(projectDir, "done-1"));
+    seedUnfinishedFeature(projectDir, "wip-1");
+    writeFeatureState(projectDir, completed);
+    const { lines, emit } = collector();
+    const interaction = new StubInteraction(["continue", completed]);
+
+    const decision = await resolveFeatureTarget({
+      workspaceRoot: root,
+      projectRoot: projectDir,
+      projectPathRel,
+      resumeStepId: "5",
+      interaction,
+      emit
+    });
+
+    assert.deepEqual(decision, { kind: "resumeCompleted", featurePath: completed });
+    assert.ok(
+      interaction.selectRequests.at(-1)!.includes(completed),
+      "the completed cached feature must be offered for repair"
+    );
+    assert.ok(
+      interaction.selectLabels
+        .at(-1)!
+        .some((label) => /completed; reopen for repair at step 5/.test(label))
+    );
+    assert.ok(
+      lines.some((line) =>
+        /Reopening completed cached feature at explicit repair step 5/.test(line)
+      )
+    );
+    // The cache already names this feature; reopening it writes nothing.
+    assert.ok(lines.every((line) => !/Saved feature_path/.test(line)));
+  });
+});
+
+test("an explicit repair resume still continues an unfinished feature when that is chosen", async () => {
+  await withWorkspace({}, async ({ root, projectDir, projectPathRel }) => {
+    const completed = path.relative(root, seedCompleteFeature(projectDir, "done-1"));
+    const unfinished = path.relative(root, seedUnfinishedFeature(projectDir, "wip-1"));
+    writeFeatureState(projectDir, completed);
+    const { lines, emit } = collector();
+
+    const decision = await resolveFeatureTarget({
+      workspaceRoot: root,
+      projectRoot: projectDir,
+      projectPathRel,
+      resumeStepId: "5",
+      interaction: new StubInteraction(["continue", unfinished]),
+      emit
+    });
+
+    // No hijack: the ordinary "continue this unfinished feature at step 5" intent
+    // is preserved, and the selection is persisted as the new cached target.
+    assert.deepEqual(decision, { kind: "continue", featurePath: unfinished });
+    assert.ok(lines.some((line) => new RegExp(`Saved feature_path: ${unfinished}`).test(line)));
+  });
+});
+
+test("an ordinary run does not offer the completed cached feature", async () => {
+  await withWorkspace({}, async ({ root, projectDir, projectPathRel }) => {
+    const completed = path.relative(root, seedCompleteFeature(projectDir, "done-1"));
+    const unfinished = path.relative(root, seedUnfinishedFeature(projectDir, "wip-1"));
+    writeFeatureState(projectDir, completed);
+    const interaction = new StubInteraction(["continue", unfinished]);
+
+    const decision = await resolveFeatureTarget({
+      workspaceRoot: root,
+      projectRoot: projectDir,
+      projectPathRel,
+      interaction,
+      emit: collector().emit
+    });
+
+    assert.deepEqual(decision, { kind: "continue", featurePath: unfinished });
+    assert.deepEqual(interaction.selectRequests.at(-1), [unfinished]);
+  });
+});
+
+test("a cached feature that is itself unfinished is not duplicated as a repair option", async () => {
+  await withWorkspace({}, async ({ root, projectDir, projectPathRel }) => {
+    const unfinished = path.relative(root, seedUnfinishedFeature(projectDir, "wip-1"));
+    writeFeatureState(projectDir, unfinished);
+    const interaction = new StubInteraction(["continue", unfinished]);
+
+    const decision = await resolveFeatureTarget({
+      workspaceRoot: root,
+      projectRoot: projectDir,
+      projectPathRel,
+      resumeStepId: "5",
+      interaction,
+      emit: collector().emit
+    });
+
+    assert.deepEqual(decision, { kind: "continue", featurePath: unfinished });
+    assert.deepEqual(interaction.selectRequests.at(-1), [unfinished]);
+  });
+});

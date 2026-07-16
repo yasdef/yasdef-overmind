@@ -39,13 +39,21 @@ The model owns the context/write/gate/repair loop. Do not ask the operator for d
 
 Do not modify `external_sources.yaml`, rule files, model config, or any other input file.
 
-If the quality gate cannot pass after confirmed edits were applied, end with this exact line:
+This phase has one interactive pause and two terminal outcomes. Each response ends with exactly one of the three lines below, chosen by the state that currently holds.
+
+Awaiting confirmation — you have presented proposed replacements and the operator's decision is pending. This is the active state until the operator replies; end the response with this exact line, then resume the flow on their reply:
+
+```text
+surface-map MCP placeholder enrichment is awaiting your confirmation. Reply to confirm or decline the proposed replacements to continue this phase
+```
+
+Cannot complete — the quality gate still fails after confirmed edits were applied. End with this exact line:
 
 ```text
 surface-map MCP placeholder enrichment cannot be completed with current inputs. Please provide instructions what to do, or adjust artifacts and rerun this phase
 ```
 
-When the enrichment is finished (all confirmed edits applied and gates passed, or no enrichment was needed), end your final response with this exact last line:
+Finished — the phase has settled: every operator-confirmed edit is applied with a passing gate, or enrichment was skipped (`no_op`, no reachable source, or the operator declined every replacement). End the final response with this exact line:
 
 ```text
 surface-map MCP placeholder enrichment phase is finished. Nothing else to do now; press Ctrl-C so orchestrator can start the next phase
@@ -91,6 +99,7 @@ Optional Step `7.1`: Inspect existing surface-map artifacts from Step `7` for li
 ### Confirmation Requirement
 
 - Do NOT apply any replacement before the operator explicitly confirms.
+- While the operator's decision is pending, treat the phase as in the awaiting-confirmation state and end with its line; reach the finished line only once every proposed replacement has been confirmed-and-gated or declined.
 - If the operator declines any or all replacements, leave the target fields as `<to be defined during implementation>`.
 - If MCP returns no useful guidance, ambiguous guidance, or the confirmation is unclear, leave the placeholder unchanged.
 

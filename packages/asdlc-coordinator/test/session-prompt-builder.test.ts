@@ -90,7 +90,8 @@ Runtime bindings:
 - ASDLC workspace root: /runtime
 - Current working directory for all commands: /runtime
 - Feature path: projects/project-a/feature-alpha
-- Read-only BR summary artifact: projects/project-a/feature-alpha/feature_br_summary.md
+- Read-only authoritative BR summary artifact: projects/project-a/feature-alpha/feature_br_summary.md
+- Read-only raw user input backstop artifact: projects/project-a/feature-alpha/user_br_input.md
 - Mutable EARS artifact: projects/project-a/feature-alpha/requirements_ears.md
 - Review ledger artifact: projects/project-a/feature-alpha/requirements_ears_review.md
 - Overmind CLI: .overmind/overmind.js

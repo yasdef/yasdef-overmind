@@ -25,6 +25,7 @@ import {
 } from "../context/index.js";
 import { collectReadyRepoPaths } from "../repo/index.js";
 import { runBrClarificationReadiness } from "../readiness/index.js";
+import type { MutableArtifactGate } from "../sequencing/review-session-contract.js";
 import type { Action, StepDefinition } from "../sequencing/step-catalog.js";
 import {
   syncContractDeltaStep,
@@ -33,6 +34,7 @@ import {
   syncSurfaceMapStep
 } from "../sync/index.js";
 import type { ContextResult, Diagnostic, ReadinessResult, SyncStepResult } from "../types/index.js";
+import { NON_CLASS_GATE_REGISTRY, type GateValidator } from "../validate/gate-registry.js";
 import type { SurfaceMapClass } from "../validate/surface-map.js";
 
 import type { AgentRunner } from "./agent-runner.js";
@@ -105,6 +107,12 @@ export interface StepExecutorDeps {
   sync: Record<string, SyncFn>;
   readiness: Record<string, ReadinessFn>;
   write: Record<string, WriteFn>;
+  /**
+   * Non-class gate validators used for post-session mutable-artifact re-gating
+   * (CRP-165 D2). Injectable so orchestration-only tests can pass explicit
+   * passing/failing stubs; defaults to the same registry as the standalone CLI.
+   */
+  gateRegistry?: Record<string, GateValidator>;
   /** Ports consumed by interactive write primitives (scaffold-feature). */
   projectGit: ProjectGitPort;
   interaction?: InteractionPort;
@@ -153,6 +161,7 @@ export const defaultStepExecutorDeps: StepExecutorDeps = {
     "br-clarification-readiness": (featurePath, cwd) =>
       runBrClarificationReadiness(featurePath, cwd)
   },
+  gateRegistry: NON_CLASS_GATE_REGISTRY,
   projectGit: new RepoGitProjectAdapter(),
   write: {
     "scaffold-feature": async (bindings, deps) => {
@@ -322,17 +331,10 @@ async function executeSessionAction(
 
   diagnostics.push(...verifyReadOnlyGuards(snapshot));
 
-  if (agentResult.exitCode === 0) {
-    diagnostics.push(
-      ...assertRequiredOutputs(
-        resolveActionOutputPaths(action, {
-          runtimeRoot: bindings.runtimeRoot,
-          featurePath: bindings.featurePath,
-          targetClass: bindings.targetClass
-        })
-      )
-    );
-  } else {
+  // A non-zero agent return is authoritative and not a completion candidate, so
+  // post-session gates do not run (D3). Guard-verification diagnostics already
+  // collected above remain in the result alongside the agent failure.
+  if (agentResult.exitCode !== 0) {
     diagnostics.push({
       severity: "error",
       source: "agent-runner",
@@ -340,16 +342,105 @@ async function executeSessionAction(
         ? `Agent failed for skill '${action.skillName}': ${agentResult.errorMessage}`
         : `Agent exited with code ${agentResult.exitCode} for skill '${action.skillName}'.`
     });
+    return { action, status: "failed", exitCode: agentResult.exitCode, diagnostics };
   }
 
-  const failed =
-    agentResult.exitCode !== 0 || diagnostics.some((item) => item.severity === "error");
-  return {
-    action,
-    status: failed ? "failed" : "success",
-    exitCode: failed ? (agentResult.exitCode === 0 ? 2 : agentResult.exitCode) : 0,
-    diagnostics
-  };
+  // Agent exited 0: run the existing integrity checks, then the full declared
+  // post-session gate set. Required-output and guard violations are integrity
+  // failures (exit 2); recoverable gate failures are exit 1 (D3).
+  diagnostics.push(
+    ...assertRequiredOutputs(
+      resolveActionOutputPaths(action, {
+        runtimeRoot: bindings.runtimeRoot,
+        featurePath: bindings.featurePath,
+        targetClass: bindings.targetClass
+      })
+    )
+  );
+  const integrityError = diagnostics.some((item) => item.severity === "error");
+
+  let gateExit: 0 | 1 | 2 = 0;
+  if (action.postSessionGates && action.postSessionGates.length > 0) {
+    const gateOutcome = runPostSessionGates(action.postSessionGates, bindings, deps);
+    diagnostics.push(...gateOutcome.diagnostics);
+    gateExit = gateOutcome.exitCode;
+  }
+
+  if (integrityError || gateExit === 2) {
+    return { action, status: "failed", exitCode: 2, diagnostics };
+  }
+  if (gateExit === 1) {
+    return { action, status: "failed", exitCode: 1, diagnostics };
+  }
+  return { action, status: "success", exitCode: 0, diagnostics };
+}
+
+/**
+ * Run every declared post-session gate against the current feature state (D3).
+ * The whole ordered set runs even after an earlier gate fails, so diagnostics
+ * reflect the complete post-session state. Returns the aggregate exit
+ * classification: `2` when any gate is unregistered, throws, or returns exit `2`;
+ * `1` when at least one gate returns exit `1` and no exit-`2` condition exists;
+ * `0` when every gate passes.
+ */
+function runPostSessionGates(
+  gates: readonly MutableArtifactGate[],
+  bindings: StepBindings,
+  deps: StepExecutorDeps
+): { diagnostics: Diagnostic[]; exitCode: 0 | 1 | 2 } {
+  const registry = deps.gateRegistry ?? NON_CLASS_GATE_REGISTRY;
+  const diagnostics: Diagnostic[] = [];
+  let exitCode: 0 | 1 | 2 = 0;
+
+  for (const { artifact, gate } of gates) {
+    const validator = registry[gate];
+    if (!validator) {
+      diagnostics.push({
+        severity: "error",
+        source: "step-executor:post-session-gate",
+        reason: `Post-session gate '${gate}' for ${artifact} is not registered.`
+      });
+      exitCode = 2;
+      continue;
+    }
+
+    let result;
+    try {
+      result = validator({
+        featurePath: bindings.featurePath,
+        runtimeRoot: bindings.runtimeRoot
+      });
+    } catch (error) {
+      diagnostics.push({
+        severity: "error",
+        source: "step-executor:post-session-gate",
+        reason: `Post-session gate '${gate}' for ${artifact} could not run: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      });
+      exitCode = 2;
+      continue;
+    }
+
+    if (result.exitCode === 0) continue;
+
+    const detail =
+      result.exitCode === 2
+        ? (result.errorMessage ?? "gate runtime error")
+        : result.problems.join("; ");
+    diagnostics.push({
+      severity: "error",
+      source: "step-executor:post-session-gate",
+      reason: `Post-session gate '${gate}' failed for ${artifact}: ${detail}`
+    });
+    if (result.exitCode === 2) {
+      exitCode = 2;
+    } else if (exitCode !== 2) {
+      exitCode = 1;
+    }
+  }
+
+  return { diagnostics, exitCode };
 }
 
 async function executeDeterministicAction(

@@ -98,16 +98,34 @@ export function renderCheckpointNotice(result: CheckpointResult, label: string):
   }
 }
 
-/** Checkpoint boundary labels, preserved verbatim from the shell orchestrator. */
+/**
+ * Notice for a completion commit the operator did not authorize. Both causes leave
+ * the finished work on disk, so the wording names that state rather than an error.
+ */
+export function renderCommitDeclineNotice(
+  label: string,
+  cause: "operator" | "inputClosed"
+): string {
+  const reason = cause === "operator" ? "declined by operator" : "declined (input closed)";
+  return `Checkpoint commit ${reason} (${label}): completed feature work left uncommitted.`;
+}
+
+/**
+ * Checkpoint boundary labels. The three pre-step labels are preserved verbatim from
+ * the shell orchestrator; `featureCompletion` names the end-of-feature boundary the
+ * operator confirms (CRP-169 D5), which is no longer tied to step 8.4 running.
+ */
 export const CHECKPOINT_LABELS = {
   before51: "before step 5.1 (EARS review)",
   before71: "before step 7.1 (MCP enrichment)",
   before84: "before step 8.4 (semantic review)",
-  after84: "after step 8.4 (semantic review)"
+  featureCompletion: "feature work complete"
 } as const;
 
 /** Port the orchestrator uses to request checkpoints; the CLI supplies `RepoGitAdapter`. */
 export interface CheckpointPort {
+  /** Probed at the completion boundary so a clean worktree is never prompted about (D3). */
+  isClean(root: string): boolean;
   checkpoint(root: string, label: string): CheckpointResult;
 }
 

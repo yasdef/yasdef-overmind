@@ -31,6 +31,10 @@ function summaryWithReady(value = "false", repoContext = ""): string {
 }
 
 function missingData(entry: string): string {
+  // A ledger with no pending item is terminal, so its loop decision must read `none`.
+  const unresolvedAfterStop = entry.includes("rised=false")
+    ? "Pending business clarification."
+    : "none";
   return `# Missing Business Data
 
 ## 3. Unresolved Items Ledger (Rised)
@@ -40,7 +44,7 @@ ${entry}
 - answers: This was recorded in ## 7. Business Rules and Decision Logic - BR-1.
 
 ## 7. Loop Decision
-- unresolved_after_stop: Pending business clarification.
+- unresolved_after_stop: ${unresolvedAfterStop}
 `;
 }
 

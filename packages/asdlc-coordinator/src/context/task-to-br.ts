@@ -1,7 +1,13 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 
-import { displayPath, readUserBrInput, resolveInputPath } from "../parse/index.js";
+import {
+  deriveCapturedSourceRefs,
+  displayPath,
+  formatSourceRefs,
+  readUserBrInput,
+  resolveInputPath
+} from "../parse/index.js";
 
 import type { ContextResult } from "../types/index.js";
 
@@ -29,6 +35,11 @@ export function buildTaskToBrContext(inputPath: string, cwd = process.cwd()): Co
   const userInput = readUserBrInput(userInputPath);
   const featurePathForCommand = displayPath(featureDir, cwd);
   const sourceFile = userInput.epicStorySourceFile ?? "[UNFILLED]";
+  const sourceRefs = deriveCapturedSourceRefs({
+    userInputPath,
+    epicStorySourceFile: userInput.epicStorySourceFile,
+    cwd
+  });
   const jiraNames = sourceFile.startsWith("jira:")
     ? extractJiraSourceNames(path.join(cwd, ".setup", "external_sources.yaml"))
     : [];
@@ -57,6 +68,10 @@ export function buildTaskToBrContext(inputPath: string, cwd = process.cwd()): Co
     `- epic_story_source_file: ${sourceFile}`,
     `- request_summary: ${userInput.requestSummary ?? "[UNFILLED]"}`,
     `- additional_business_context: ${userInput.additionalBusinessContext ?? "[UNFILLED]"}`,
+    "",
+    "## Required Source References",
+    `- required_source_refs: ${formatSourceRefs(sourceRefs.required)}`,
+    "- Write every listed reference into feature_br_summary.md -> ## 1. Document Meta -> source_refs as semicolon-delimited elements, keeping the listed order and preserving any additional populated reference already present.",
     "",
     "## Epic/Story Input",
     userInput.epicOrStory.trim() === "" ? "[UNFILLED]" : userInput.epicOrStory,

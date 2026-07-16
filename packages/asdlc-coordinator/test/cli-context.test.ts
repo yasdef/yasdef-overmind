@@ -126,6 +126,10 @@ test("overmind context task-to-br emits assembled context and Jira branch", () =
       /gate_command: node \.overmind\/overmind\.js gate task-to-br projects\/project-a\/feature-alpha/
     );
     assert.match(result.stdout, /epic_story_source_file: jira:AUTH-241/);
+    assert.match(
+      result.stdout,
+      /required_source_refs: projects\/project-a\/feature-alpha\/user_br_input\.md; jira:AUTH-241/
+    );
     assert.match(result.stdout, /eligible_jira_mcp_source_names:/);
     assert.match(result.stdout, /  - jira-main/);
   });
@@ -176,6 +180,10 @@ test("overmind capture task-to-br writes user_br_input.md from a local story fil
     );
     assert.equal(context.status, 0);
     assert.match(context.stdout, /As a user I need captured input\./);
+    assert.match(
+      context.stdout,
+      /required_source_refs: projects\/project-a\/feature-alpha\/user_br_input\.md; projects\/project-a\/feature-alpha\/story\.md/
+    );
   });
 });
 

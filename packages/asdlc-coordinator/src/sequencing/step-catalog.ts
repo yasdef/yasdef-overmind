@@ -1,3 +1,9 @@
+import {
+  EARS_REVIEW_MUTABLE_GATES,
+  PLAN_SEMANTIC_REVIEW_MUTABLE_GATES,
+  type MutableArtifactGate
+} from "./review-session-contract.js";
+
 export type ReadOnlyGuard =
   | { mode: "fromContext" }
   | { mode: "mustExistUnchanged"; files: string[] }
@@ -14,6 +20,11 @@ export type Action =
       readOnlyGuards: ReadOnlyGuard[];
       requiredOutputs: string[];
       runIf?: RunPredicate;
+      /**
+       * Mutable-artifact gates the coordinator revalidates after a successful
+       * agent return, sourced from the shared review-session contract (CRP-165 D1).
+       */
+      postSessionGates?: readonly MutableArtifactGate[];
     }
   | { kind: "check" | "write"; name: string };
 
@@ -30,12 +41,18 @@ const contextGuard: ReadOnlyGuard[] = [{ mode: "fromContext" }];
 const brSummaryGuard: ReadOnlyGuard[] = [
   { mode: "mustExistUnchanged", files: ["feature_br_summary.md"] }
 ];
+const earsReviewSourceGuard: ReadOnlyGuard[] = [
+  { mode: "mustExistUnchanged", files: ["feature_br_summary.md", "user_br_input.md"] }
+];
 const session = (
   skillName: string,
   modelPhase: string,
   requiredOutputs: string[],
   options: Partial<
-    Pick<Extract<Action, { kind: "session" }>, "requiresSync" | "runIf" | "readOnlyGuards">
+    Pick<
+      Extract<Action, { kind: "session" }>,
+      "requiresSync" | "runIf" | "readOnlyGuards" | "postSessionGates"
+    >
   > = {}
 ): Action => ({
   kind: "session",
@@ -136,7 +153,8 @@ export const STEP_CATALOG: StepDefinition[] = [
     resumeAliases: ["ears-review", "4.1-optional"],
     actions: [
       session("ears-review", "requirements_ears_review", ["requirements_ears_review.md"], {
-        readOnlyGuards: brSummaryGuard
+        readOnlyGuards: earsReviewSourceGuard,
+        postSessionGates: EARS_REVIEW_MUTABLE_GATES
       })
     ]
   },
@@ -255,7 +273,7 @@ export const STEP_CATALOG: StepDefinition[] = [
         "plan-semantic-review",
         "implementation_plan_semantic_review",
         ["implementation_plan_semantic_review.md"],
-        { readOnlyGuards: contextGuard }
+        { readOnlyGuards: contextGuard, postSessionGates: PLAN_SEMANTIC_REVIEW_MUTABLE_GATES }
       )
     ]
   }

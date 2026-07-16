@@ -27,22 +27,13 @@ import {
   syncPrerequisiteGapsStep
 } from "../sync/index.js";
 import {
-  validateTaskToBr,
-  validateRepoBrScan,
-  validateBrClarification,
-  validateRequirementsEars,
-  validateEarsReview,
-  validateContractDelta,
-  validateContractReconciliation,
-  validateAgentsMd,
+  CLASS_GATE_NAMES,
+  GATE_REGISTRY,
+  runTerminalGateChain,
   validateInitialCommonContract,
-  validateStackBlueprint,
-  validateSurfaceMap,
-  validateTechnicalRequirements,
-  validateImplementationSlices,
-  validatePrerequisiteGaps,
-  validateImplementationPlan,
-  validatePlanSemanticReview
+  type GateValidator,
+  type TerminalGateChainResult,
+  type TerminalGateChainRunner
 } from "../validate/index.js";
 
 import type {
@@ -104,24 +95,6 @@ type OutputStreams = {
   stderr: Pick<NodeJS.WriteStream, "write">;
 };
 
-const gateRegistry: Record<string, (targetPath: string) => GateResult> = {
-  "plan-semantic-review": validatePlanSemanticReview,
-  "implementation-plan": validateImplementationPlan,
-  "common-contract": validateInitialCommonContract,
-  "contract-delta": validateContractDelta,
-  "contract-reconciliation": validateContractReconciliation,
-  "agents-md": validateAgentsMd,
-  "stack-blueprint": validateStackBlueprint,
-  "br-clarification": validateBrClarification,
-  "ears-review": validateEarsReview,
-  "requirements-ears": validateRequirementsEars,
-  "task-to-br": validateTaskToBr,
-  "repo-br-scan": validateRepoBrScan,
-  "technical-requirements": validateTechnicalRequirements,
-  "implementation-slices": validateImplementationSlices,
-  "prerequisite-gaps": validatePrerequisiteGaps
-};
-
 const contextRegistry: Record<string, (featurePath: string) => ContextResult> = {
   "plan-semantic-review": buildPlanSemanticReviewContext,
   "implementation-plan": buildImplementationPlanContext,
@@ -152,13 +125,6 @@ const syncRegistry: Record<string, (featurePath: string) => SyncStepResult> = {
 
 const readinessRegistry: Record<string, (featurePath: string) => ReadinessResult> = {
   "br-clarification": runBrClarificationReadiness
-};
-
-const classGateRegistry: Record<
-  string,
-  (targetPath: string, klass: SurfaceMapClass) => GateResult
-> = {
-  "surface-map": validateSurfaceMap
 };
 
 const classContextRegistry: Record<
@@ -264,6 +230,10 @@ export interface CliAdapterOverrides {
   projectClock?: ProjectCreationClock;
   uuid?: UuidGenerator;
   temp?: TempFilePort;
+  /** Post-session gate registry override for orchestration-only tests (CRP-165). */
+  gateRegistry?: Record<string, GateValidator>;
+  /** Terminal feature-gate chain override for orchestration-only tests (CRP-166). */
+  terminalGateChain?: TerminalGateChainRunner;
 }
 
 export async function runCli(
@@ -296,7 +266,14 @@ export async function runCli(
   }
 
   if (command === "gate") {
-    return runGate(step, targetPath, args, streams);
+    return runGate(
+      step,
+      targetPath,
+      args,
+      streams,
+      cwd,
+      overrides.terminalGateChain ?? runTerminalGateChain
+    );
   }
   if (command === "context") {
     return runContext(step, targetPath, args, streams, cwd);
@@ -1009,8 +986,10 @@ async function runRun(
     executorDeps: {
       ...defaultStepExecutorDeps,
       agentRunner: overrides.agentRunner ?? new CodexAgentRunner(),
-      projectGit: overrides.projectGit ?? new RepoGitProjectAdapter()
+      projectGit: overrides.projectGit ?? new RepoGitProjectAdapter(),
+      ...(overrides.gateRegistry ? { gateRegistry: overrides.gateRegistry } : {})
     },
+    ...(overrides.terminalGateChain ? { terminalGateChain: overrides.terminalGateChain } : {}),
     checkpoint: overrides.checkpoint ?? new RepoGitAdapter(),
     clock: overrides.clock ?? { now: () => Math.floor(Date.now() / 1000) },
     overmindCliPath: path.join(workspaceRoot, ".overmind", "overmind.js"),
@@ -1073,7 +1052,12 @@ function mapOutcomeToExit(
         `Fix the error above and restart. It will continue from the correct step:\n` +
           `  overmind run --path ${projectPathRel} --resume ${outcome.resumeStep}\n`
       );
-      return 1;
+      // Preserve the executor's blocking-vs-recoverable classification at the
+      // process boundary: exit 2 for runtime/config failures (unregistered gate,
+      // runtime gate exit 2, integrity checks), exit 1 for everything else
+      // recoverable. Normalized to the 0/1/2 contract so raw agent exit codes
+      // (e.g. a 127 launch failure) do not leak through.
+      return outcome.exitCode === 2 ? 2 : 1;
   }
 }
 
@@ -1124,34 +1108,49 @@ function runGate(
   step: string | undefined,
   targetPath: string | undefined,
   args: string[],
-  streams: OutputStreams
+  streams: OutputStreams,
+  cwd: string,
+  terminalChain: TerminalGateChainRunner
 ): number {
   if (!step || !targetPath) {
     streams.stderr.write("ERROR: Usage: overmind gate <step> <path>\n");
     return 2;
   }
 
-  const classValidator = classGateRegistry[step];
+  if (step === "all") {
+    if (args.length > 0) {
+      streams.stderr.write("ERROR: Usage: overmind gate all <feature-path>\n");
+      return 2;
+    }
+    return renderTerminalChain(terminalChain(targetPath, cwd), streams);
+  }
+
   let result: GateResult;
-  if (classValidator) {
+  if (CLASS_GATE_NAMES.includes(step)) {
     const parsed = parseClassOption(args, "gate");
     if (parsed.error || !parsed.klass) {
       streams.stderr.write(`ERROR: ${parsed.error ?? "Missing required option: --class."}\n`);
       return 2;
     }
-    result = classValidator(targetPath, parsed.klass);
+    result = GATE_REGISTRY[step]!({
+      featurePath: targetPath,
+      runtimeRoot: cwd,
+      klass: parsed.klass
+    });
   } else {
-    const validator = gateRegistry[step];
+    const validator = GATE_REGISTRY[step];
     if (!validator) {
       streams.stderr.write(`ERROR: Unknown gate step: ${step}\n`);
       return 2;
     }
-    result =
-      step === "br-clarification"
-        ? validateBrClarification(targetPath, process.cwd(), {
-            onProgress: (line) => streams.stdout.write(`${line}\n`)
-          })
-        : validator(targetPath);
+    // The clarification loop is the only non-class gate that streams progress; the
+    // other registry wrappers ignore the sink, so passing it here is safe and keeps
+    // `overmind gate br-clarification` output identical to pre-registry dispatch.
+    result = validator({
+      featurePath: targetPath,
+      runtimeRoot: cwd,
+      onProgress: (line) => streams.stdout.write(`${line}\n`)
+    });
   }
   if (result.exitCode === 0) {
     streams.stdout.write(`${result.passMessage}\n`);
@@ -1167,6 +1166,44 @@ function runGate(
 
   streams.stderr.write(`ERROR: ${result.errorMessage ?? "Validation cannot run."}\n`);
   return 2;
+}
+
+/**
+ * Render one stable row per expanded terminal entry plus the aggregate counts,
+ * then return the chain's aggregate exit code unchanged. Recoverable problems and
+ * runtime errors are printed under their own row so the report stays auditable
+ * when several phases fail at once.
+ */
+function renderTerminalChain(chain: TerminalGateChainResult, streams: OutputStreams): number {
+  for (const entry of chain.entries) {
+    const scope = entry.klass ? `${entry.gate} --class ${entry.klass}` : entry.gate;
+    streams.stdout.write(`${entry.status.padEnd(7)} ${scope}  ${entry.artifact}\n`);
+    if (entry.status === "skipped" && entry.skipReason) {
+      streams.stdout.write(`        skipped: ${entry.skipReason}\n`);
+    }
+    if (entry.status === "failed") {
+      if (entry.result?.exitCode === 2) {
+        streams.stdout.write(`        error: ${entry.result.errorMessage ?? "gate cannot run"}\n`);
+      }
+      for (const problem of entry.result?.problems ?? []) {
+        streams.stdout.write(`        missing: ${problem}\n`);
+      }
+    }
+  }
+  streams.stdout.write(
+    `gate all summary: ${chain.passed} passed, ${chain.failed} failed, ${chain.skipped} skipped\n`
+  );
+
+  if (chain.exitCode === 0) return 0;
+  for (const diagnostic of chain.diagnostics) {
+    if (chain.entries.length === 0) streams.stderr.write(`ERROR: ${diagnostic.reason}\n`);
+  }
+  if (chain.repairStep) {
+    streams.stderr.write(
+      `Repair the earliest failing phase first, then rerun: overmind run --resume ${chain.repairStep}\n`
+    );
+  }
+  return chain.exitCode;
 }
 
 function runContext(

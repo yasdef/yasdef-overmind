@@ -57,6 +57,8 @@ When `agents_md_status: present`, run the bound `gate_command` first.
   - `source_blueprint: project_stack_blueprint_<target_class>.md`
   - `last_updated: YYYY-MM-DD`
 - Include durable engineering guidance for mission, non-negotiable rules, coding standards, testing, linting/quality gates, definition of done, and decision guidance.
+- Make `## Mission` rank code quality, maintainability, and testability ahead of delivery speed.
+- Name both the local and CI checks in `## Linting and Quality Gates`, and state a percentage coverage floor in `## Testing Standard`.
 - For frontend and mobile, include optional accessibility, internationalization, UI automation ID, and visual style sections only when the operator supplies those decisions or approves proposed bounded guidance.
 - Do not include workflow state, proposal metadata, source attribution, approval history, conversation transcript, feature work, implementation slices, or API contract governance.
 

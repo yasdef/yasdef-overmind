@@ -14,13 +14,12 @@
 
 ## 3. Unresolved Items Ledger (Rised)
 > Use deterministic format:
-> `- rised_item_N: source=<section> -> <field>; rised=false; unresolved_item=<text>`
+> `- rised_item_N: source=<section> -> <field>[, <section> -> <field>]; rised=false; unresolved_item=<text>`
 {{RISED_ITEMS}}
 
 ## 6. Latest User Answers
 > Keep `[UNFILLED]` while no ledger item has been discussed with user.
 > After discussion starts, replace the placeholder with one or more repeated `- answers:` entries.
-> Use one `- answers:` line per discussed item.
 > Canonical format:
 > `- answers: This was recorded in ## <section-number>. <section-title> - <field/item-id>.`
 - answers: [UNFILLED]

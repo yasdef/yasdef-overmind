@@ -1,7 +1,12 @@
 import path from "node:path";
 
 import type { ScaffoldClock } from "../capture/scaffold-feature.js";
-import { CHECKPOINT_LABELS, renderCheckpointNotice, type CheckpointPort } from "../git/index.js";
+import {
+  CHECKPOINT_LABELS,
+  renderCheckpointNotice,
+  renderCommitDeclineNotice,
+  type CheckpointPort
+} from "../git/index.js";
 import { InteractionClosedError, type InteractionPort } from "../interaction/index.js";
 import type { StepBindings, StepExecutorDeps, StepResult } from "../runner/index.js";
 import { executeStep as defaultExecuteStep } from "../runner/index.js";
@@ -9,6 +14,10 @@ import { evaluate, nextStep, resolveStep, STEP_CATALOG } from "../sequencing/ind
 import type { StepDefinition } from "../sequencing/step-catalog.js";
 import type { Diagnostic } from "../types/index.js";
 import type { SurfaceMapClass } from "../validate/surface-map.js";
+import {
+  runTerminalGateChain as defaultTerminalGateChain,
+  type TerminalGateChainRunner
+} from "../validate/terminal-gate-chain.js";
 
 import { persistFeatureState, resolveFeatureTarget } from "./feature-selection.js";
 import { detectProjectPendingWork } from "./pending-work.js";
@@ -18,15 +27,20 @@ export type PhaseOutcome =
   | { kind: "completed" }
   | { kind: "skippedOptional" }
   | { kind: "stoppedByOperator" }
-  | { kind: "finished" }
-  | { kind: "failed"; resumeStep: string; diagnostics: Diagnostic[] };
+  /**
+   * `completionMessage` is carried rather than emitted by the phase itself: it
+   * announces a finished feature, so it must not reach the operator until the
+   * terminal gate chain has passed (CRP-166 D6).
+   */
+  | { kind: "finished"; completionMessage?: string }
+  | { kind: "failed"; resumeStep: string; exitCode: number; diagnostics: Diagnostic[] };
 
 /** Aggregate result the CLI maps to exit codes and restart guidance. */
 export type FeatureFlowOutcome =
   | { kind: "completed" }
   | { kind: "finished" }
   | { kind: "stoppedByOperator" }
-  | { kind: "failed"; resumeStep: string; diagnostics: Diagnostic[] }
+  | { kind: "failed"; resumeStep: string; exitCode: number; diagnostics: Diagnostic[] }
   | { kind: "refusedPendingWork"; guidance: string[] }
   | { kind: "startupError"; diagnostics: Diagnostic[] };
 
@@ -47,6 +61,8 @@ export interface FeatureFlowDeps {
     bindings: StepBindings,
     executorDeps: StepExecutorDeps
   ) => Promise<StepResult>;
+  /** Injected terminal feature-gate chain (CRP-166 D6); defaults to the real runner. */
+  terminalGateChain?: TerminalGateChainRunner;
   emit: (line: string) => void;
   emitError: (line: string) => void;
 }
@@ -111,12 +127,41 @@ export async function runFeatureFlow(deps: FeatureFlowDeps): Promise<FeatureFlow
 
   const featureDir = path.join(deps.workspaceRoot, featurePath);
 
+  // Every successful terminal path routes through this one helper (CRP-166 D6,
+  // CRP-169 D1): the deterministic chain is a completion invariant, so plan-complete
+  // output, the completion commit boundary, and the success outcome all sit behind
+  // it. Run-once per invocation, so an accepted 8.4 followed by the catalog-end
+  // fall-through is one completion and prompts once.
+  let terminalFailure: FeatureFlowOutcome | undefined;
+  let completionRan = false;
+  const completeFeature = async (): Promise<FeatureFlowOutcome | undefined> => {
+    if (completionRan) return terminalFailure;
+    completionRan = true;
+    const chain = (deps.terminalGateChain ?? defaultTerminalGateChain)(
+      featureDir,
+      deps.workspaceRoot
+    );
+    if (chain.exitCode !== 0) {
+      terminalFailure = {
+        kind: "failed",
+        resumeStep: chain.repairStep ?? "8.3",
+        exitCode: chain.exitCode,
+        diagnostics: chain.diagnostics
+      };
+      return terminalFailure;
+    }
+    await commitCompletedFeature(deps);
+    return undefined;
+  };
+
   let startId: string;
   if (resumeStepId) {
     startId = resumeStepId;
   } else {
     const next = nextStep(evaluate(deps.workspaceRoot, deps.projectRoot, featureDir));
     if (!next) {
+      const failed = await completeFeature();
+      if (failed) return failed;
       deps.emit("Execution finished: scanner reports no remaining required steps.");
       return { kind: "finished" };
     }
@@ -170,18 +215,34 @@ export async function runFeatureFlow(deps: FeatureFlowDeps): Promise<FeatureFlow
 
     const outcome = await runStep(step, featurePath, index, deps);
 
+    // Step 8.4 is the last optional-review decision, accepted or declined, so
+    // completion runs here — after its post-session checks and before the commit
+    // boundary, which a terminal failure must not reach.
     if (step.id === "8.4" && (outcome.kind === "completed" || outcome.kind === "finished")) {
-      const label = CHECKPOINT_LABELS.after84;
-      deps.emit(renderCheckpointNotice(deps.checkpoint.checkpoint(deps.projectRoot, label), label));
+      const failed = await completeFeature();
+      if (failed) return failed;
     }
 
     if (outcome.kind === "stoppedByOperator") return { kind: "stoppedByOperator" };
-    if (outcome.kind === "finished") return { kind: "finished" };
+    if (outcome.kind === "finished") {
+      const failed = await completeFeature();
+      if (failed) return failed;
+      if (outcome.completionMessage) deps.emit(outcome.completionMessage);
+      return { kind: "finished" };
+    }
     if (outcome.kind === "failed") {
-      return { kind: "failed", resumeStep: outcome.resumeStep, diagnostics: outcome.diagnostics };
+      return {
+        kind: "failed",
+        resumeStep: outcome.resumeStep,
+        exitCode: outcome.exitCode,
+        diagnostics: outcome.diagnostics
+      };
     }
     // completed / skippedOptional continue.
   }
+
+  const terminalFailed = await completeFeature();
+  if (terminalFailed) return terminalFailed;
 
   deps.emit("Execution finished: reached end of configured phase map.");
   return { kind: "completed" };
@@ -190,10 +251,53 @@ export async function runFeatureFlow(deps: FeatureFlowDeps): Promise<FeatureFlow
     if (outcome.kind === "stoppedByOperator") return { kind: "stoppedByOperator" };
     if (outcome.kind === "finished") return { kind: "finished" };
     if (outcome.kind === "failed") {
-      return { kind: "failed", resumeStep: outcome.resumeStep, diagnostics: outcome.diagnostics };
+      return {
+        kind: "failed",
+        resumeStep: outcome.resumeStep,
+        exitCode: outcome.exitCode,
+        diagnostics: outcome.diagnostics
+      };
     }
     return { kind: "completed" };
   }
+}
+
+/**
+ * The feature-completion commit boundary (CRP-169): the one place a finished
+ * feature's work is offered to git. A clean worktree is reported without a prompt
+ * (D3), and every other answer or result — declined, input closed, or any commit
+ * obstacle — is a notice (D2/D4), so the caller's outcome and exit code stand.
+ */
+async function commitCompletedFeature(deps: FeatureFlowDeps): Promise<void> {
+  const label = CHECKPOINT_LABELS.featureCompletion;
+
+  if (deps.checkpoint.isClean(deps.projectRoot)) {
+    deps.emit(renderCheckpointNotice({ kind: "clean" }, label));
+    return;
+  }
+
+  let confirmed: boolean;
+  try {
+    confirmed = await deps.interaction.confirm({
+      message: "Commit completed feature work?",
+      defaultValue: true
+    });
+  } catch (error) {
+    if (error instanceof InteractionClosedError) {
+      // The feature is already complete, so there is nothing left to stop: a closed
+      // stream is a decline that preserves the terminal path's outcome.
+      deps.emit(renderCommitDeclineNotice(label, "inputClosed"));
+      return;
+    }
+    throw error;
+  }
+
+  if (!confirmed) {
+    deps.emit(renderCommitDeclineNotice(label, "operator"));
+    return;
+  }
+
+  deps.emit(renderCheckpointNotice(deps.checkpoint.checkpoint(deps.projectRoot, label), label));
 }
 
 async function runStep(
@@ -222,10 +326,10 @@ async function runStep(
         deps.emit(`Optional phase declined at ${step.id}; skipping.`);
         return { kind: "skippedOptional" };
       }
-      deps.emit(
-        `Execution finished: no remaining required phases after declined optional phase ${step.id}.`
-      );
-      return { kind: "finished" };
+      return {
+        kind: "finished",
+        completionMessage: `Execution finished: no remaining required phases after declined optional phase ${step.id}.`
+      };
     }
     deps.emit(`Execution stopped: user denied phase progression at ${step.id}.`);
     return { kind: "stoppedByOperator" };
@@ -271,7 +375,14 @@ async function executeCatalogStep(
   }
 
   if (!result.ok) {
-    return { kind: "failed", resumeStep: step.id, diagnostics: result.diagnostics };
+    // Propagate the executor's exit classification (post-session gate exit 1 vs
+    // exit 2) unchanged; the failed path is not checkpointed and is not retried.
+    return {
+      kind: "failed",
+      resumeStep: step.id,
+      exitCode: result.exitCode,
+      diagnostics: result.diagnostics
+    };
   }
   return { kind: "completed" };
 }
@@ -424,7 +535,14 @@ async function scaffoldNewFeature(
   }
 
   if (!result.ok) {
-    return { outcome: { kind: "failed", resumeStep: "3", diagnostics: result.diagnostics } };
+    return {
+      outcome: {
+        kind: "failed",
+        resumeStep: "3",
+        exitCode: result.exitCode,
+        diagnostics: result.diagnostics
+      }
+    };
   }
 
   const created = result.actionResults.find((action) => action.featurePath)?.featurePath;
@@ -433,6 +551,7 @@ async function scaffoldNewFeature(
       outcome: {
         kind: "failed",
         resumeStep: "3",
+        exitCode: 2,
         diagnostics: [
           {
             severity: "error",

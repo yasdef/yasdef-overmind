@@ -14,3 +14,5 @@ export * from "./prerequisite-gaps.js";
 export * from "./implementation-plan.js";
 export * from "./plan-semantic-review.js";
 export * from "./worker-assignment.js";
+export * from "./gate-registry.js";
+export * from "./terminal-gate-chain.js";

@@ -84,9 +84,16 @@ Asset paths are relative to this loaded skill directory. Do not resolve them thr
 - If a minimal inference is necessary for grammatical completeness, mark it inline with `[Inference]`.
 - Keep inferred content conservative and directly bounded by nearby BR facts.
 - If facts are missing or ambiguous, do not invent behavior.
-- Prefer narrower requirements; if narrowing still leaves uncertainty, add:
+- If uncertainty remains after applying the precedence rules below, add:
   - `Unresolved gap: <fact missing from BR summary>.`
 - Do not start a new user-question loop in this stage.
+
+### Broad and Specific Requirement Precedence
+
+- A specific rule, failure case, or example refines the broader BR requirement it belongs to.
+- Keep both the broad coverage and the specific case represented whenever they impose distinct testable obligations; express the refinement as an additional bullet in the same block, or as its own block when it carries independent verification.
+- A specific case replaces the broader requirement only when the BR summary explicitly states that the specific case is exhaustive, or records a clarification that explicitly narrows the broader scope.
+- Example: a BR requiring rejection of invalid Telegram user data plus a `rejection_cases` entry for a missing unique Telegram user id yields both the general invalid-data rejection and the missing-id rejection.
 
 ### Extraction Map From Structured BR
 
@@ -100,6 +107,7 @@ Extract conversion ingredients from these BR areas before drafting blocks:
 - State/data effects and persistence: `## 9. State and Data Expectations`.
 - Side effects and integration effects: `## 11. Integration and Dependency Context`.
 - NFR constraints: `## 12. Non-Functional Requirements`.
+- Testing and quality obligations: `### 12.5 Testing and quality -> required_test_levels` and `special_quality_constraints`.
 - Scope boundaries/non-goals: `## 5. Scope Definition` and `## 2.3 Explicitly stated in source`.
 
 ### Atomic Splitting Rules
@@ -154,6 +162,17 @@ The gate matches these patterns case-insensitively. Do not use free-form imperat
 - Use the emitted workspace root, feature path, read-only BR source, target EARS artifact, asset paths, allowed-write list, and gate command exactly.
 - Do not assume fixed source-repo paths or runner-specific skill install paths.
 - Run the gate command after every write or repair.
+
+### Final Coverage Sweep
+
+Before finalizing, walk the populated values of every area listed in `### Extraction Map From Structured BR` and confirm each applicable obligation has a destination in the current `requirements_ears.md`:
+
+- Functional, business-rule, permission, failure, state, and integration obligations appear as independently testable EARS bullets.
+- Explicit prohibitions and non-goals from `### 2.3 Explicitly stated in source -> stated_constraints` and `### 5.2 Out of scope -> out_of_scope_items` appear in `Scope` or `## Overview -> Out of scope`. A prohibition additionally becomes an EARS bullet only when it constrains what the system does at runtime, and only using behavior the BR already establishes. An exclusion that means the capability is not built in this feature stays in `Out of scope`: writing an EARS obligation for it invents a response the BR never stated.
+- NFR facts from `## 12. Non-Functional Requirements` become `NFR` blocks when they impose a product quality constraint.
+- `### 12.5 Testing and quality -> required_test_levels` and any applicable `special_quality_constraints` appear in the relevant `**Verification:**` fields. Promote one to an `NFR` block only when the BR states it as a product-level quality obligation; a release or CI gate is process, which `### Prohibited Content in EARS Statements` excludes from EARS bullets.
+
+This sweep is an authoring check inside this stage: it updates only the existing `requirements_ears.md` structure and produces no additional traceability or review artifact.
 
 ### Completion Gate
 

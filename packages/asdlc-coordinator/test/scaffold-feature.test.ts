@@ -298,3 +298,87 @@ test("bad project path and unsupported metadata yield actionable diagnostics", a
     }
   );
 });
+
+// --- CRP-169: a new feature may not start on uncommitted work ----------------
+
+/** Clean project baseline, with the whole-worktree probe scripted per test. */
+function projectGitWithWorktree(worktree: ReturnType<ProjectGitPort["worktreeStatus"]>) {
+  return { ...cleanProjectGit, worktreeStatus: () => worktree } satisfies ProjectGitPort;
+}
+
+test("scaffold refuses before input when the project worktree has uncommitted changes", async () => {
+  await withWorkspace({}, async ({ root, projectDir, projectPathRel }) => {
+    const before = readdirSync(projectDir);
+    const interaction = new StubInteraction(["FEAT-1", "Title"]);
+
+    const result = await scaffoldFeature(root, projectPathRel, {
+      interaction,
+      clock: clock(1),
+      projectGit: projectGitWithWorktree({
+        kind: "dirty",
+        paths: ["old-feature-1/implementation_plan.md", "old-feature-1/prerequisite_gaps.md"]
+      })
+    });
+
+    assert.equal(result.featurePath, undefined);
+    assert.deepEqual(readdirSync(projectDir), before, "no feature folder was created");
+    assert.equal(interaction.log.length, 0, "refused before asking for id/title");
+    const reason = result.diagnostics[0]!.reason;
+    assert.match(reason, /a new feature cannot be started/);
+    // The refusal names the blocking paths and both ways out.
+    assert.match(reason, /old-feature-1\/implementation_plan\.md/);
+    assert.match(reason, /old-feature-1\/prerequisite_gaps\.md/);
+    assert.match(reason, /Commit or discard them/);
+    assert.match(reason, new RegExp(`overmind run --path ${projectPathRel}`));
+    assert.match(reason, /Continuing an existing feature does not require a clean worktree/);
+  });
+});
+
+test("the refusal caps the paths it lists", async () => {
+  await withWorkspace({}, async ({ root, projectPathRel }) => {
+    const paths = Array.from({ length: 8 }, (_, index) => `feature-1/artifact-${index}.md`);
+    const result = await scaffoldFeature(root, projectPathRel, {
+      interaction: new StubInteraction(["FEAT-1", "Title"]),
+      clock: clock(1),
+      projectGit: projectGitWithWorktree({ kind: "dirty", paths })
+    });
+
+    const reason = result.diagnostics[0]!.reason;
+    assert.match(reason, /artifact-4\.md/);
+    assert.doesNotMatch(reason, /artifact-5\.md/);
+    assert.match(reason, /\(and 3 more\)/);
+  });
+});
+
+test("scaffold proceeds on a clean worktree and blocks when the probe cannot run", async () => {
+  await withWorkspace({}, async ({ root, projectPathRel }) => {
+    const clean = await scaffoldFeature(root, projectPathRel, {
+      interaction: new StubInteraction(["FEAT-1", "Title"]),
+      clock: clock(1),
+      projectGit: projectGitWithWorktree({ kind: "clean" })
+    });
+    assert.deepEqual(clean.diagnostics, []);
+    assert.ok(clean.featurePath);
+  });
+
+  await withWorkspace({}, async ({ root, projectDir, projectPathRel }) => {
+    const before = readdirSync(projectDir);
+    const result = await scaffoldFeature(root, projectPathRel, {
+      interaction: new StubInteraction(["FEAT-1", "Title"]),
+      clock: clock(1),
+      projectGit: projectGitWithWorktree({
+        kind: "inspectionFailed",
+        exitCode: 128,
+        stderr: "bad repo"
+      })
+    });
+
+    // An unverifiable worktree is never treated as clean.
+    assert.equal(result.featurePath, undefined);
+    assert.deepEqual(readdirSync(projectDir), before);
+    assert.match(
+      result.diagnostics[0]!.reason,
+      /Unable to inspect the project worktree .*git inspection failed with exit code 128: bad repo/
+    );
+  });
+});

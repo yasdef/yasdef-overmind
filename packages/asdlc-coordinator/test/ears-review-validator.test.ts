@@ -32,6 +32,7 @@ function validReview(): string {
 - feature_id: FEAT-REVIEW-001
 - feature_title: Payments access review
 - source_feature_br_summary: projects/project-a/feature-alpha/feature_br_summary.md
+- source_user_br_input: projects/project-a/feature-alpha/user_br_input.md
 - source_requirements_ears: projects/project-a/feature-alpha/requirements_ears.md
 - review_status: complete
 - last_updated: 2026-04-11
@@ -43,17 +44,18 @@ function validReview(): string {
 - user_question_format: Here is the finding: <finding summary>. I would recommend: <recommended change>. Should I add recommended changes? Please answer yes/no or provide your answer.
 
 ## 3. Findings Ledger
-### Finding 1 - Close missing ACTIVE guard
-- severity: Medium
+### Finding 1 - ACTIVE qualifier narrows duplicate-account rule
+- severity: High
 - state: added to ears
-- source_br_summary_reference: feature_br_summary.md -> access guard notes
-- related_requirement_targets: Requirement 8, Requirement 10
-- gap_summary: ACTIVE was missing after authentication.
-- recommendation: Add explicit ACTIVE post-auth guard.
-- suggested_ears_change: Update the affected requirements and add a new guard requirement if needed.
-- user_prompt: Here is the finding: ACTIVE was missing after authentication. I would recommend: add explicit ACTIVE post-auth guard behavior in requirements_ears.md. Should I add recommended changes? Please answer yes/no or provide your answer.
+- source_br_summary_reference: feature_br_summary.md -> BR-4 duplicate-account handling
+- source_user_br_input_reference: user_br_input.md -> section 2 story, duplicate same-type accounts forbidden
+- related_requirement_targets: Requirement 12
+- gap_summary: Raw input forbids duplicate same-type accounts outright, but summary and Requirement 12 only block them when the existing account is ACTIVE.
+- recommendation: Remove the ACTIVE qualifier so duplicates are rejected regardless of status.
+- suggested_ears_change: Update Requirement 12 to drop the ACTIVE guard condition.
+- user_prompt: Here is the finding: the ACTIVE qualifier narrows the raw duplicate-account rule. I would recommend: remove the ACTIVE qualifier in requirements_ears.md. Should I add recommended changes? Please answer yes/no or provide your answer.
 - user_response: yes
-- resolution_notes: Added ACTIVE guard wording to the affected requirements.
+- resolution_notes: Removed the ACTIVE qualifier from Requirement 12.
 `;
 }
 
@@ -64,6 +66,7 @@ function noFindingsReview(): string {
 - feature_id: FEAT-REVIEW-001
 - feature_title: Payments access review
 - source_feature_br_summary: projects/project-a/feature-alpha/feature_br_summary.md
+- source_user_br_input: projects/project-a/feature-alpha/user_br_input.md
 - source_requirements_ears: projects/project-a/feature-alpha/requirements_ears.md
 - review_status: complete
 - last_updated: 2026-04-11
@@ -184,8 +187,11 @@ test("ears-review validator reports missing finding field and invalid severity o
     writeReview(
       featureDir,
       validReview()
-        .replace("- source_br_summary_reference: feature_br_summary.md -> access guard notes\n", "")
-        .replace("- severity: Medium", "- severity: Critical")
+        .replace(
+          "- source_br_summary_reference: feature_br_summary.md -> BR-4 duplicate-account handling\n",
+          ""
+        )
+        .replace("- severity: High", "- severity: Critical")
         .replace("- state: added to ears", "- state: pending")
     );
 
@@ -197,6 +203,90 @@ test("ears-review validator reports missing finding field and invalid severity o
     );
     assert.match(result.problems.join("\n"), /finding block 1 has invalid severity: Critical/);
     assert.match(result.problems.join("\n"), /finding block 1 has invalid state: pending/);
+  });
+});
+
+test("ears-review validator requires dual-source metadata and finding reference", () => {
+  withWorkspace((root) => {
+    const featureDir = createFeatureFixture(root);
+
+    writeReview(
+      featureDir,
+      validReview().replace(
+        "- source_user_br_input: projects/project-a/feature-alpha/user_br_input.md\n",
+        ""
+      )
+    );
+    const missingMeta = validateEarsReview(featureDir, root);
+    assert.equal(missingMeta.exitCode, 1);
+    assert.match(
+      missingMeta.problems.join("\n"),
+      /missing or unfilled meta key: source_user_br_input/
+    );
+
+    writeReview(
+      featureDir,
+      validReview().replace(
+        "- source_user_br_input_reference: user_br_input.md -> section 2 story, duplicate same-type accounts forbidden\n",
+        ""
+      )
+    );
+    const missingReference = validateEarsReview(featureDir, root);
+    assert.equal(missingReference.exitCode, 1);
+    assert.match(
+      missingReference.problems.join("\n"),
+      /finding block 1 missing or unfilled key: source_user_br_input_reference/
+    );
+  });
+});
+
+test("ears-review validator accepts none raw reference on a non-raw finding", () => {
+  withWorkspace((root) => {
+    const featureDir = createFeatureFixture(root);
+    writeReview(
+      featureDir,
+      validReview().replace(
+        "- source_user_br_input_reference: user_br_input.md -> section 2 story, duplicate same-type accounts forbidden",
+        "- source_user_br_input_reference: none"
+      )
+    );
+
+    const result = validateEarsReview(featureDir, root);
+    assert.equal(result.exitCode, 0);
+  });
+});
+
+test("ears-review validator rejects leftover angle-bracket template hints", () => {
+  withWorkspace((root) => {
+    const featureDir = createFeatureFixture(root);
+
+    writeReview(
+      featureDir,
+      validReview().replace(
+        "- related_requirement_targets: Requirement 12",
+        "- related_requirement_targets: <Requirement ids to update, or `new requirement`>"
+      )
+    );
+    const findingHint = validateEarsReview(featureDir, root);
+    assert.equal(findingHint.exitCode, 1);
+    assert.match(
+      findingHint.problems.join("\n"),
+      /finding block 1 field 'related_requirement_targets' still contains an unresolved template hint in angle brackets/
+    );
+
+    writeReview(
+      featureDir,
+      validReview().replace(
+        "- feature_title: Payments access review",
+        "- feature_title: <feature title>"
+      )
+    );
+    const metaHint = validateEarsReview(featureDir, root);
+    assert.equal(metaHint.exitCode, 1);
+    assert.match(
+      metaHint.problems.join("\n"),
+      /meta key 'feature_title' still contains an unresolved template hint in angle brackets/
+    );
   });
 });
 

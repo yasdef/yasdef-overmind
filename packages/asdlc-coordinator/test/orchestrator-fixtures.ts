@@ -13,6 +13,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   InteractionClosedError,
+  type ConfirmRequest,
   type InteractionPort,
   type SelectRequest
 } from "../src/interaction/index.js";
@@ -20,6 +21,10 @@ import { defaultStepExecutorDeps, type StepExecutorDeps } from "../src/runner/in
 import { StubAgentRunner } from "../src/runner/agent-runner.js";
 import { STEP_CATALOG } from "../src/sequencing/index.js";
 import type { CheckpointPort, CheckpointResult } from "../src/git/index.js";
+import type {
+  TerminalGateChainResult,
+  TerminalGateChainRunner
+} from "../src/validate/terminal-gate-chain.js";
 
 const templatesDir = fileURLToPath(new URL("../../../../overmind/templates", import.meta.url));
 
@@ -168,6 +173,43 @@ export function seedCompleteFeature(projectDir: string, name: string): string {
   return featureDir;
 }
 
+/**
+ * Terminal-chain stub for orchestration-only tests (CRP-166). Seed features hold
+ * placeholder artifacts that would fail the real deterministic gates, so
+ * flow-focused runs inject a chain whose aggregate is scripted and record every
+ * invocation for ordering assertions.
+ */
+export class RecordingTerminalChain {
+  public readonly calls: Array<{ featurePath: string; cwd: string }> = [];
+
+  constructor(
+    private readonly result: Pick<TerminalGateChainResult, "exitCode"> &
+      Partial<TerminalGateChainResult> = { exitCode: 0 }
+  ) {}
+
+  readonly run: TerminalGateChainRunner = (featurePath, cwd) => {
+    this.calls.push({ featurePath, cwd });
+    return {
+      entries: [],
+      diagnostics: [],
+      passed: 0,
+      failed: 0,
+      skipped: 0,
+      ...this.result
+    };
+  };
+}
+
+/** Terminal chain that passes regardless of artifact content. */
+export const passingTerminalChain: TerminalGateChainRunner = () => ({
+  exitCode: 0,
+  entries: [],
+  diagnostics: [],
+  passed: 1,
+  failed: 0,
+  skipped: 0
+});
+
 export function validModelsMd(): string {
   const phases = new Set<string>();
   for (const step of STEP_CATALOG) {
@@ -189,6 +231,8 @@ export class StubInteraction implements InteractionPort {
   public readonly selectRequests: string[][] = [];
   /** Option labels presented on each `select` call, for asserting operator-facing copy. */
   public readonly selectLabels: string[][] = [];
+  /** Requests presented on each `confirm` call, for asserting prompt copy and defaults. */
+  public readonly confirmRequests: ConfirmRequest[] = [];
 
   constructor(private readonly script: Array<boolean | string>) {}
 
@@ -199,7 +243,8 @@ export class StubInteraction implements InteractionPort {
     return value;
   }
 
-  async confirm(): Promise<boolean> {
+  async confirm(request: ConfirmRequest): Promise<boolean> {
+    this.confirmRequests.push(request);
     const value = this.next("confirm");
     return typeof value === "boolean" ? value : /^(y|yes)$/i.test(String(value));
   }
@@ -215,15 +260,24 @@ export class StubInteraction implements InteractionPort {
   }
 }
 
-/** A checkpoint port that records requested labels and returns a fixed result. */
+/**
+ * A checkpoint port that records requested labels and returns a fixed result.
+ * Cleanliness defaults to whatever the fixed result implies, so a fixture that
+ * returns a real commit result also reports a dirty worktree to the completion
+ * boundary; `clean` overrides it explicitly.
+ */
 export class RecordingCheckpoint implements CheckpointPort {
   public readonly labels: string[] = [];
   public readonly roots: string[] = [];
 
   constructor(
     private readonly result: CheckpointResult = { kind: "clean" },
-    private readonly options: { forbiddenRoots?: string[] } = {}
+    private readonly options: { forbiddenRoots?: string[]; clean?: boolean } = {}
   ) {}
+
+  isClean(): boolean {
+    return this.options.clean ?? this.result.kind === "clean";
+  }
 
   checkpoint(root: string, label: string): CheckpointResult {
     if (this.options.forbiddenRoots?.includes(root)) {

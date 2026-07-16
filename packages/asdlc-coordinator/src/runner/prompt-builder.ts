@@ -97,7 +97,8 @@ const PROMPT_RECIPES: Record<string, PromptRecipe> = {
       `- ASDLC workspace root: ${bindings.runtimeRoot}`,
       `- Current working directory for all commands: ${bindings.runtimeRoot}`,
       `- Feature path: ${bindings.featurePath}`,
-      `- Read-only BR summary artifact: ${bindings.featurePath}/feature_br_summary.md`,
+      `- Read-only authoritative BR summary artifact: ${bindings.featurePath}/feature_br_summary.md`,
+      `- Read-only raw user input backstop artifact: ${bindings.featurePath}/user_br_input.md`,
       `- Mutable EARS artifact: ${bindings.featurePath}/requirements_ears.md`,
       `- Review ledger artifact: ${bindings.featurePath}/requirements_ears_review.md`,
       `- Overmind CLI: ${bindings.overmindCliPath}`

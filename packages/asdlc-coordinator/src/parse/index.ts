@@ -4,5 +4,6 @@ export * from "./markdown.js";
 export * from "./feature-path.js";
 export * from "./missing-br-data.js";
 export * from "./user-br-input.js";
+export * from "./source-refs.js";
 export * from "./project-classes.js";
 export * from "./project-definition.js";

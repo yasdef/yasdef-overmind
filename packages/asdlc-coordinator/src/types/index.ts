@@ -67,10 +67,27 @@ export interface UserBrInput {
   additionalBusinessContext?: string;
 }
 
+/**
+ * Normalized `source=<section> -> <field>` locator of a ledger item. Heading and
+ * field are lowercased with collapsed whitespace so comparison survives the
+ * spacing and casing variants operators write, while the artifact keeps its
+ * original text.
+ */
+export interface RisedItemSource {
+  section: string;
+  field: string;
+}
+
 export interface RisedItem {
   id: string;
   raw: string;
   risedState: "true" | "false" | "missing";
+  /**
+   * Every `<section> -> <field>` locator the item names, in written order. One
+   * answered question may cover several fields that restate the same fact. Empty
+   * when the item carries no parsable locator.
+   */
+  sources: RisedItemSource[];
 }
 
 export interface MissingBrData {
@@ -79,4 +96,9 @@ export interface MissingBrData {
   risedItems: RisedItem[];
   hasFilledAnswer: boolean;
   hasFilledUnresolvedAfterStop: boolean;
+  /**
+   * `## 7. Loop Decision -> unresolved_after_stop`, trimmed but not unquoted, so the
+   * exact-literal terminal check can reject a quoted variant. Undefined when absent.
+   */
+  unresolvedAfterStop?: string;
 }

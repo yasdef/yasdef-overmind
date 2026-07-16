@@ -312,6 +312,7 @@ node .overmind/overmind.js run --path projects/<project-id>
 node .overmind/overmind.js run --path projects/<project-id> --resume <step>
 node .overmind/overmind.js status projects/<project-id>
 node .overmind/overmind.js status projects/<project-id>/<feature-folder>
+node .overmind/overmind.js gate all projects/<project-id>/<feature-folder>
 \`\`\`
 
 - \`run\`: continue the next available workflow step for the active/default project context.
@@ -319,6 +320,7 @@ node .overmind/overmind.js status projects/<project-id>/<feature-folder>
 - \`run --path projects/<project-id> --resume <step>\`: resume from a named workflow step after fixing inputs or reviewing output.
 - \`status projects/<project-id>\`: show project-level progress across features and workflow steps.
 - \`status projects/<project-id>/<feature-folder>\`: show detailed progress for one feature.
+- \`gate all projects/<project-id>/<feature-folder>\`: re-validate every applicable existing feature artifact and print per-gate rows plus passed/failed/skipped counts. Exit \`0\` all applicable gates pass, \`1\` a recoverable artifact defect, \`2\` a path/runtime failure. \`run\` applies the same check before reporting a finished plan; on failure it names the earliest owning step, which you resume with \`run --path projects/<project-id> --resume <step>\`.
 
 ## Worker Commands
 

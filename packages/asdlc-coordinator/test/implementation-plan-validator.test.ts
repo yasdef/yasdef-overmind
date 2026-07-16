@@ -31,7 +31,7 @@ const catalogs: ImplementationPlanCatalogs = {
 };
 
 function validPlan(): string {
-  return `# Repository Implementation Plan
+  return `# Implementation Plan
 ### Step 1.1 Deliver operator login page [REQ-1]
 #### Repo: backend
 #### Depends on: none
@@ -61,6 +61,34 @@ test("implementation-plan gate: valid multi-repo plan and canonical surface matc
     true
   );
   assert.equal(implementationPlanSurfaceMatches("admin refunds page", "admin orders page"), false);
+});
+
+test("implementation-plan gate: the exact template header is required at byte zero", () => {
+  const headerProblem =
+    "implementation_plan.md must start with exact header: # Implementation Plan";
+
+  // Exact header, LF and CRLF, contributes no problem.
+  assert.deepEqual(validateImplementationPlanContent(validPlan(), catalogs), []);
+  assert.equal(
+    validateImplementationPlanContent(validPlan().replace(/\n/g, "\r\n"), catalogs).includes(
+      headerProblem
+    ),
+    false
+  );
+
+  // The measured migration defect: the plan begins directly with a step.
+  const headerless = validPlan().replace("# Implementation Plan\n", "");
+  assert.equal(headerless.startsWith("### Step 1.1"), true);
+  assert.deepEqual(validateImplementationPlanContent(headerless, catalogs), [headerProblem]);
+
+  // An alternate top-level heading is not accepted either.
+  assert.deepEqual(
+    validateImplementationPlanContent(
+      validPlan().replace("# Implementation Plan", "# Repository Implementation Plan"),
+      catalogs
+    ),
+    [headerProblem]
+  );
 });
 
 test("implementation-plan gate: structural failures are reported", () => {
@@ -169,7 +197,11 @@ test("implementation-plan gate: dependency and evidence token failures are repor
 
 test("implementation-plan gate: whole-plan coverage and preserved surfaces are enforced", () => {
   const cases: Array<[string, ImplementationPlanCatalogs, string]> = [
-    [validPlan().replace("# Repository", "# [UNFILLED] Repository"), catalogs, "[UNFILLED]"],
+    [
+      validPlan().replace("Deliver operator login page", "Deliver [UNFILLED] login page"),
+      catalogs,
+      "[UNFILLED]"
+    ],
     ["# empty plan\n", catalogs, "at least one step"],
     [validPlan().replace("#### Repo: frontend", "#### Repo: backend"), catalogs, "repo frontend"],
     [validPlan().replace("[NFR-1]", "[REQ-1]"), catalogs, "NFR-1"],

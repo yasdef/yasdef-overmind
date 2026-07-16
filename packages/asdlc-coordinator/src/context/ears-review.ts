@@ -2,6 +2,7 @@ import { existsSync, statSync } from "node:fs";
 import path from "node:path";
 
 import { displayPath, resolveInputPath } from "../parse/index.js";
+import { EARS_REVIEW_MUTABLE_GATES } from "../sequencing/review-session-contract.js";
 
 import type { ContextResult } from "../types/index.js";
 
@@ -16,11 +17,17 @@ export function buildEarsReviewContext(inputPath: string, cwd = process.cwd()): 
   }
 
   const brSummaryPath = path.join(featureDir, "feature_br_summary.md");
+  const userInputPath = path.join(featureDir, "user_br_input.md");
   const requirementsEarsPath = path.join(featureDir, "requirements_ears.md");
   const reviewLedgerPath = path.join(featureDir, "requirements_ears_review.md");
   if (!existsSync(brSummaryPath)) {
     return contextError(
       `Upstream BR summary is required before EARS review: ${displayPath(brSummaryPath, cwd)}`
+    );
+  }
+  if (!existsSync(userInputPath)) {
+    return contextError(
+      `Raw user business input is required before EARS review: ${displayPath(userInputPath, cwd)}`
     );
   }
   if (!existsSync(requirementsEarsPath)) {
@@ -37,7 +44,8 @@ export function buildEarsReviewContext(inputPath: string, cwd = process.cwd()): 
     `- workspace_root: ${cwd}`,
     `- feature_path: ${featureDir}`,
     `- feature_path_for_command: ${featurePathForCommand}`,
-    `- read_only_br_source: ${brSummaryPath}`,
+    `- authoritative_br_summary_source: ${brSummaryPath}`,
+    `- raw_user_input_backstop_source: ${userInputPath}`,
     `- requirements_ears_artifact: ${requirementsEarsPath}`,
     `- review_ledger_artifact: ${reviewLedgerPath}`,
     `- gate_command: node .overmind/overmind.js gate ears-review ${featurePathForCommand}`,
@@ -49,12 +57,11 @@ export function buildEarsReviewContext(inputPath: string, cwd = process.cwd()): 
     "- step_rule_location: inlined in SKILL.md",
     "",
     "## Allowed Write Surface",
-    "- requirements_ears.md",
-    "- requirements_ears_review.md",
+    ...EARS_REVIEW_MUTABLE_GATES.map((entry) => `- ${entry.artifact}`),
     "",
     "## Model Instructions",
     "- Treat the runtime paths above as authoritative for this invocation.",
-    "- Read feature_br_summary.md as input only.",
+    "- Read both feature_br_summary.md (authoritative clarified decisions) and user_br_input.md (raw drift backstop) as input only.",
     "- Update only the allowed-write artifacts listed above.",
     "- Follow the loaded SKILL.md for review rules and gate exit handling.",
     "- Run the gate command after every write or repair."

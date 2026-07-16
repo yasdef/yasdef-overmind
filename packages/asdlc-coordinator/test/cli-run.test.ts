@@ -9,6 +9,7 @@ import { writeFeatureState } from "../src/state/index.js";
 import {
   RecordingCheckpoint,
   StubInteraction,
+  passingTerminalChain,
   seedCompleteFeature,
   validModelsMd,
   withWorkspace
@@ -42,6 +43,18 @@ async function run(
   const code = await runCli(["node", "overmind", ...argv], streams, cwd, overrides);
   return { code, out };
 }
+
+/**
+ * Passing post-session gate stubs for orchestration-only CLI tests: seed features
+ * hold placeholder artifacts that would fail the real review gates (CRP-165), so
+ * flow-focused runs inject gates that pass regardless of artifact content.
+ */
+const passingGates: CliAdapterOverrides["gateRegistry"] = {
+  "requirements-ears": () => ({ exitCode: 0, passMessage: "ok", problems: [] }),
+  "ears-review": () => ({ exitCode: 0, passMessage: "ok", problems: [] }),
+  "implementation-plan": () => ({ exitCode: 0, passMessage: "ok", problems: [] }),
+  "plan-semantic-review": () => ({ exitCode: 0, passMessage: "ok", problems: [] })
+};
 
 test("run --help prints usage and exits zero", async () => {
   await withWorkspace({}, async ({ root }) => {
@@ -144,7 +157,9 @@ test("resume 8.4 on a completed cached feature completes and exits zero", async 
       interaction: new StubInteraction([true]),
       agentRunner: new StubAgentRunner(0),
       checkpoint: new RecordingCheckpoint(),
-      clock: { now: () => 1 }
+      clock: { now: () => 1 },
+      gateRegistry: passingGates,
+      terminalGateChain: passingTerminalChain
     });
     assert.equal(code, 0);
   });
@@ -158,7 +173,9 @@ test("with no --path a single project is auto-selected", async () => {
       interaction: new StubInteraction([true]),
       agentRunner: new StubAgentRunner(0),
       checkpoint: new RecordingCheckpoint(),
-      clock: { now: () => 1 }
+      clock: { now: () => 1 },
+      gateRegistry: passingGates,
+      terminalGateChain: passingTerminalChain
     });
     assert.equal(code, 0);
     assert.match(out.stdout, new RegExp(`Selected project: ${projectPathRel}`));
@@ -203,7 +220,9 @@ test("with multiple projects the operator can select one and it becomes the targ
       interaction: new StubInteraction([second, true]),
       agentRunner: new StubAgentRunner(0),
       checkpoint: new RecordingCheckpoint(),
-      clock: { now: () => 1 }
+      clock: { now: () => 1 },
+      gateRegistry: passingGates,
+      terminalGateChain: passingTerminalChain
     });
     assert.equal(code, 0);
   });
@@ -233,7 +252,9 @@ test("resume validates only the phases the plan reaches, not the whole catalog",
       interaction: new StubInteraction([true]),
       agentRunner: new StubAgentRunner(0),
       checkpoint: new RecordingCheckpoint(),
-      clock: { now: () => 1 }
+      clock: { now: () => 1 },
+      gateRegistry: passingGates,
+      terminalGateChain: passingTerminalChain
     });
     assert.equal(code, 0);
   });
@@ -250,5 +271,48 @@ test("a failed step exits one and prints the exact restart command", async () =>
     });
     assert.equal(code, 1);
     assert.match(out.stderr, new RegExp(`overmind run --path ${projectPathRel} --resume 8\\.4`));
+  });
+});
+
+test("a recoverable post-session gate failure exits one", async () => {
+  await withWorkspace({}, async ({ root, projectDir, projectPathRel }) => {
+    const featureDir = seedCompleteFeature(projectDir, "done-1");
+    writeFeatureState(projectDir, path.relative(root, featureDir));
+    const { code } = await run(["run", "--path", projectPathRel, "--resume", "8.4"], root, {
+      interaction: new StubInteraction([true]),
+      agentRunner: new StubAgentRunner(0),
+      checkpoint: new RecordingCheckpoint(),
+      clock: { now: () => 1 },
+      gateRegistry: {
+        ...passingGates,
+        // Recoverable artifact defect: exit 1.
+        "implementation-plan": () => ({ exitCode: 1, passMessage: "", problems: ["bad plan"] })
+      }
+    });
+    assert.equal(code, 1);
+  });
+});
+
+test("a runtime/config post-session gate failure exits two", async () => {
+  await withWorkspace({}, async ({ root, projectDir, projectPathRel }) => {
+    const featureDir = seedCompleteFeature(projectDir, "done-1");
+    writeFeatureState(projectDir, path.relative(root, featureDir));
+    const { code } = await run(["run", "--path", projectPathRel, "--resume", "8.4"], root, {
+      interaction: new StubInteraction([true]),
+      agentRunner: new StubAgentRunner(0),
+      checkpoint: new RecordingCheckpoint(),
+      clock: { now: () => 1 },
+      gateRegistry: {
+        ...passingGates,
+        // Gate cannot run: runtime failure, exit 2.
+        "implementation-plan": () => ({
+          exitCode: 2,
+          passMessage: "",
+          problems: [],
+          errorMessage: "gate cannot run"
+        })
+      }
+    });
+    assert.equal(code, 2);
   });
 });

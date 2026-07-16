@@ -101,6 +101,7 @@ export function completeSummary(): string {
 
 ## 1. Document Meta
 - source_type: User input
+- source_refs: projects/project-a/feature-alpha/user_br_input.md; feature-story.md
 - last_updated: 2026-03-20
 
 ## 2. Source Request Snapshot
@@ -143,7 +144,7 @@ export function goldenBasedValidSummary(): string {
 - project_type_code: B
 - project_type_label: Existing project with partial context
 - source_type: User input
-- source_refs: JIRA-AUTH-241
+- source_refs: projects/project-a/feature-alpha/user_br_input.md; feature-story.md
 - last_updated: 2026-03-18
 - ready_to_ears: false
 

@@ -6,6 +6,7 @@ import {
   parseImplementationSlicesProjectClasses,
   resolveFeatureWithinWorkspace
 } from "../parse/index.js";
+import { PLAN_SEMANTIC_REVIEW_MUTABLE_GATES } from "../sequencing/review-session-contract.js";
 import type { ContextResult } from "../types/index.js";
 import { buildReadOnlyInputManifest } from "./read-only-inputs.js";
 
@@ -79,8 +80,9 @@ export function buildPlanSemanticReviewContext(
       `- workspace_root: ${workspaceRoot}`,
       `- project_root: ${displayPath(projectDir, workspaceRoot)}`,
       `- feature_root: ${featurePath}`,
-      `- mutable_target: ${featurePath}/implementation_plan.md`,
-      `- mutable_target: ${featurePath}/implementation_plan_semantic_review.md`,
+      ...PLAN_SEMANTIC_REVIEW_MUTABLE_GATES.map(
+        (entry) => `- mutable_target: ${featurePath}/${entry.artifact}`
+      ),
       `- review_gate_command: node .overmind/overmind.js gate plan-semantic-review ${featurePath}`,
       `- implementation_plan_gate_command: node .overmind/overmind.js gate implementation-plan ${featurePath}`,
       "",
@@ -95,8 +97,7 @@ export function buildPlanSemanticReviewContext(
       ...(activeClasses.length > 0 ? activeClasses.map((item) => `- ${item}`) : ["- none"]),
       "",
       "## Allowed Write Surface",
-      `- ${featurePath}/implementation_plan.md`,
-      `- ${featurePath}/implementation_plan_semantic_review.md`
+      ...PLAN_SEMANTIC_REVIEW_MUTABLE_GATES.map((entry) => `- ${featurePath}/${entry.artifact}`)
     ];
     return { exitCode: 0, text: `${lines.join("\n")}\n`, readOnlyInputs: readOnlyManifest.paths };
   } catch (err) {

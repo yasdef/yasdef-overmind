@@ -1,6 +1,7 @@
 # Init Progress Definition
 
-Single source of truth (Mermaid embedded below).
+Canonical end-to-end process map for the Overmind workflow (Mermaid embedded below). It is authoritative for step sequence and phase boundaries; the packaged skills under `packages/installer/_data/skills/` and their coordinator gates are authoritative for operational and quality rules. For running the workflow, see the [operator guide](README.md).
+
 Operational note: `node .overmind/overmind.js project init --path projects/<project-id>` owns init steps 1.1 and 2 through the TypeScript coordinator and generic executor. For type A projects it commits the step 1.1 stack baseline before asking `Continue with common contract definition? [Y/n]`; yes continues into step 2, no pauses with step 2 pending and the same command resumes directly. `node .overmind/overmind.js run [--path projects/<project-id>]` runs the business requirements scaffold, resolves `feature_path`, evaluates selected-feature progress through the in-process sequencing core each run, then continues from the canonical next step (or `--resume <step>`). When `--path` is omitted, the command uses the only project under `projects/` or prompts the user to choose one. The last selected feature is cached in `projects/<project-id>/.overmind_feature_state.json`.
 
 ```mermaid
@@ -69,12 +70,14 @@ sequenceDiagram
         end
         PO->>PO: 4.2 EARS readiness check
       end
+      Note over PO: Ledger close-out: once every missing_br_data.md rised_item_N is rised=true, unresolved_after_stop is exactly none; pre-existing gate_result values stay as historical evidence.
       PO->>PO: 5. BR → EARS → requirements_ears.md
       opt 5.1 Optional EARS review
         loop Until no escalated findings
-          PO->>PO: 5.1 Review EARS vs feature_br_summary.md → requirements_ears_review.md
+          PO->>PO: 5.1 Review EARS vs authoritative feature_br_summary.md + raw user_br_input.md narrowing backstop → requirements_ears_review.md
           PO->>PO: Apply accepted edits or record rejection
         end
+        Note over PO: Post-session completion check: coordinator re-runs the requirements-ears gate over requirements_ears.md and the ears-review gate over requirements_ears_review.md; both must pass before 5.1 completes and checkpoints.
       end
       PO->>PO: 6. Contract delta → feature_contract_delta.md
       Note over PO: Per-class gating: classes with state ready contribute repo evidence, deferred classes skipped.
@@ -110,7 +113,11 @@ sequenceDiagram
       opt 8.4 Optional semantic review
         PO->>PO: 8.4 Semantic review → implementation_plan.md + implementation_plan_semantic_review.md
         Note over PO: in: init_progress_definition.yaml + implementation_plan.md + requirements_ears.md + technical_requirements.md + prerequisite_gaps.md + surface_map_*.md
+        Note over PO: Post-session completion check: coordinator re-runs the implementation-plan gate over implementation_plan.md and the plan-semantic-review gate over implementation_plan_semantic_review.md; both must pass before 8.4 completes and checkpoints.
       end
+
+      PO->>PO: Terminal validation → gate all <feature-path>
+      Note over PO: After the final optional-review decision the coordinator re-runs every applicable deterministic feature gate over the artifacts that exist. Aggregate exit 0 is required before plan completion is reported; a failure names the earliest owning step for an explicit repair resume.
     end
   end
 ```

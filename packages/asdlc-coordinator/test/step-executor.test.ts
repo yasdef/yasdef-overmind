@@ -1,4 +1,4 @@
-import { writeFileSync } from "node:fs";
+import { rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import assert from "node:assert/strict";
 import test from "node:test";
@@ -12,7 +12,8 @@ import {
   executeStep,
   type StepExecutorDeps
 } from "../src/runner/index.js";
-import type { ContextResult } from "../src/types/index.js";
+import type { ContextResult, GateResult } from "../src/types/index.js";
+import type { GateValidator } from "../src/validate/gate-registry.js";
 
 import { withRunnerWorkspace } from "./runner-fixtures.js";
 
@@ -22,6 +23,24 @@ function step(stepId: string) {
   return found;
 }
 
+/** Gate stub the executor invokes for post-session re-gating; passes by default. */
+function passingGate(): GateResult {
+  return { exitCode: 0, passMessage: "gate passed", problems: [] };
+}
+
+function gateReturning(exitCode: 0 | 1 | 2, problems: string[] = []): GateValidator {
+  return () => ({
+    exitCode,
+    passMessage: exitCode === 0 ? "gate passed" : "",
+    problems,
+    ...(exitCode === 2 ? { errorMessage: problems.join("; ") || "gate runtime error" } : {})
+  });
+}
+
+/**
+ * Default deps pass every review gate so guard-focused tests keep asserting guard
+ * behavior; gate-specific tests override `gateRegistry` (CRP-165).
+ */
 function baseDeps(overrides: Partial<StepExecutorDeps> = {}): StepExecutorDeps {
   return {
     agentRunner: new StubAgentRunner(0),
@@ -31,6 +50,12 @@ function baseDeps(overrides: Partial<StepExecutorDeps> = {}): StepExecutorDeps {
     context: {},
     sync: {},
     readiness: {},
+    gateRegistry: {
+      "requirements-ears": passingGate,
+      "ears-review": passingGate,
+      "implementation-plan": passingGate,
+      "plan-semantic-review": passingGate
+    },
     projectGit: defaultStepExecutorDeps.projectGit,
     write: {},
     ...overrides
@@ -439,6 +464,150 @@ test("executeStep applies step 1.1 read-only guards from agents-md context", asy
   });
 });
 
+test("executeStep step 5.1 rejects mutation of feature_br_summary.md on agent success", async () => {
+  await withRunnerWorkspace(async ({ root, featurePath, featureDir }) => {
+    const deps = baseDeps({
+      agentRunner: {
+        run: async () => {
+          writeFileSync(path.join(featureDir, "feature_br_summary.md"), "# tampered summary\n");
+          return { exitCode: 0 };
+        }
+      }
+    });
+
+    const result = await executeStep(
+      step("5.1"),
+      {
+        step: step("5.1"),
+        runtimeRoot: root,
+        featurePath,
+        overmindCliPath: ".overmind/overmind.js"
+      },
+      deps
+    );
+
+    assert.equal(result.ok, false);
+    assert.match(
+      result.diagnostics.map((item) => item.reason).join("\n"),
+      /mustExistUnchanged guard violation for .*feature_br_summary\.md/
+    );
+  });
+});
+
+test("executeStep step 5.1 rejects mutation of user_br_input.md even when the agent exits non-zero", async () => {
+  await withRunnerWorkspace(async ({ root, featurePath, featureDir }) => {
+    const deps = baseDeps({
+      agentRunner: {
+        run: async () => {
+          writeFileSync(path.join(featureDir, "user_br_input.md"), "# tampered input\n");
+          return { exitCode: 9 };
+        }
+      }
+    });
+
+    const result = await executeStep(
+      step("5.1"),
+      {
+        step: step("5.1"),
+        runtimeRoot: root,
+        featurePath,
+        overmindCliPath: ".overmind/overmind.js"
+      },
+      deps
+    );
+
+    assert.equal(result.ok, false);
+    const reasons = result.diagnostics.map((item) => item.reason).join("\n");
+    assert.match(reasons, /mustExistUnchanged guard violation for .*user_br_input\.md/);
+    assert.match(reasons, /Agent exited with code 9/);
+  });
+});
+
+test("executeStep step 5.1 rejects deletion of a guarded business source", async () => {
+  await withRunnerWorkspace(async ({ root, featurePath, featureDir }) => {
+    const deps = baseDeps({
+      agentRunner: {
+        run: async () => {
+          rmSync(path.join(featureDir, "user_br_input.md"));
+          return { exitCode: 0 };
+        }
+      }
+    });
+
+    const result = await executeStep(
+      step("5.1"),
+      {
+        step: step("5.1"),
+        runtimeRoot: root,
+        featurePath,
+        overmindCliPath: ".overmind/overmind.js"
+      },
+      deps
+    );
+
+    assert.equal(result.ok, false);
+    assert.match(
+      result.diagnostics.map((item) => item.reason).join("\n"),
+      /mustExistUnchanged guard violation for .*user_br_input\.md/
+    );
+  });
+});
+
+test("executeStep step 5.1 accepts an agent run that leaves both business sources unchanged", async () => {
+  await withRunnerWorkspace(async ({ root, featurePath, featureDir }) => {
+    const deps = baseDeps({
+      agentRunner: {
+        run: async () => {
+          writeFileSync(path.join(featureDir, "requirements_ears_review.md"), "# updated review\n");
+          return { exitCode: 0 };
+        }
+      }
+    });
+
+    const result = await executeStep(
+      step("5.1"),
+      {
+        step: step("5.1"),
+        runtimeRoot: root,
+        featurePath,
+        overmindCliPath: ".overmind/overmind.js"
+      },
+      deps
+    );
+
+    assert.equal(result.ok, true);
+  });
+});
+
+test("executeStep step 5 guards only feature_br_summary.md, not user_br_input.md", async () => {
+  await withRunnerWorkspace(async ({ root, featurePath, featureDir }) => {
+    const deps = baseDeps({
+      agentRunner: {
+        run: async () => {
+          // Step 5 (br-to-ears) generates requirements_ears.md and only summary is guarded;
+          // touching user_br_input.md must not trip the summary-only guard.
+          writeFileSync(path.join(featureDir, "user_br_input.md"), "# touched input\n");
+          writeFileSync(path.join(featureDir, "requirements_ears.md"), "# regenerated EARS\n");
+          return { exitCode: 0 };
+        }
+      }
+    });
+
+    const result = await executeStep(
+      step("5"),
+      {
+        step: step("5"),
+        runtimeRoot: root,
+        featurePath,
+        overmindCliPath: ".overmind/overmind.js"
+      },
+      deps
+    );
+
+    assert.equal(result.ok, true);
+  });
+});
+
 test("executeStep surfaces an agent launch failure as an actionable failed step", async () => {
   await withRunnerWorkspace(async ({ root, featurePath }) => {
     const deps = baseDeps({
@@ -741,5 +910,193 @@ steps:
     assert.equal(result.ok, true);
     assert.match(prompt, /Target class: backend/);
     assert.match(prompt, /project_surface_struct_resp_map_backend\.md/);
+  });
+});
+
+// --- CRP-165 post-session mutable-artifact gates ---
+
+function run51(root: string, featurePath: string, deps: StepExecutorDeps) {
+  return executeStep(
+    step("5.1"),
+    { step: step("5.1"), runtimeRoot: root, featurePath, overmindCliPath: ".overmind/overmind.js" },
+    deps
+  );
+}
+
+test("executeStep step 5.1 runs post-session gates in declared order and passes when all pass", async () => {
+  await withRunnerWorkspace(async ({ root, featurePath, featureDir }) => {
+    const order: string[] = [];
+    const deps = baseDeps({
+      agentRunner: {
+        run: async () => {
+          writeFileSync(path.join(featureDir, "requirements_ears_review.md"), "# review\n");
+          return { exitCode: 0 };
+        }
+      },
+      gateRegistry: {
+        "requirements-ears": () => {
+          order.push("requirements-ears");
+          return passingGate();
+        },
+        "ears-review": () => {
+          order.push("ears-review");
+          return passingGate();
+        }
+      }
+    });
+
+    const result = await run51(root, featurePath, deps);
+
+    assert.equal(result.ok, true);
+    assert.equal(result.exitCode, 0);
+    // Normative artifact first, ledger second (contract order).
+    assert.deepEqual(order, ["requirements-ears", "ears-review"]);
+  });
+});
+
+test("executeStep step 5.1 runs every gate even after the first fails and keeps all diagnostics", async () => {
+  await withRunnerWorkspace(async ({ root, featurePath }) => {
+    const order: string[] = [];
+    const deps = baseDeps({
+      gateRegistry: {
+        "requirements-ears": () => {
+          order.push("requirements-ears");
+          return { exitCode: 1, passMessage: "", problems: ["req 12 invalid EARS"] };
+        },
+        "ears-review": () => {
+          order.push("ears-review");
+          return { exitCode: 1, passMessage: "", problems: ["ledger finding open"] };
+        }
+      }
+    });
+
+    const result = await run51(root, featurePath, deps);
+
+    assert.equal(result.ok, false);
+    assert.deepEqual(order, ["requirements-ears", "ears-review"]);
+    const reasons = result.diagnostics.map((item) => item.reason).join("\n");
+    assert.match(reasons, /requirements_ears\.md/);
+    assert.match(reasons, /req 12 invalid EARS/);
+    assert.match(reasons, /requirements_ears_review\.md/);
+    assert.match(reasons, /ledger finding open/);
+  });
+});
+
+test("executeStep step 5.1 returns exit 1 when a gate is recoverably invalid and none are exit 2", async () => {
+  await withRunnerWorkspace(async ({ root, featurePath }) => {
+    const deps = baseDeps({
+      gateRegistry: {
+        "requirements-ears": gateReturning(1, ["invalid EARS"]),
+        "ears-review": gateReturning(0)
+      }
+    });
+
+    const result = await run51(root, featurePath, deps);
+
+    assert.equal(result.ok, false);
+    assert.equal(result.exitCode, 1);
+    assert.match(
+      result.diagnostics.map((item) => item.reason).join("\n"),
+      /Post-session gate 'requirements-ears' failed for requirements_ears\.md/
+    );
+  });
+});
+
+test("executeStep step 5.1 returns exit 2 when any gate returns exit 2, retaining both diagnostics", async () => {
+  await withRunnerWorkspace(async ({ root, featurePath }) => {
+    const deps = baseDeps({
+      gateRegistry: {
+        "requirements-ears": gateReturning(1, ["invalid EARS"]),
+        "ears-review": gateReturning(2, ["cannot read ledger"])
+      }
+    });
+
+    const result = await run51(root, featurePath, deps);
+
+    assert.equal(result.ok, false);
+    assert.equal(result.exitCode, 2);
+    const reasons = result.diagnostics.map((item) => item.reason).join("\n");
+    assert.match(reasons, /invalid EARS/);
+    assert.match(reasons, /cannot read ledger/);
+  });
+});
+
+test("executeStep step 5.1 treats an unregistered declared gate as exit 2 but runs the rest", async () => {
+  await withRunnerWorkspace(async ({ root, featurePath }) => {
+    const order: string[] = [];
+    const deps = baseDeps({
+      gateRegistry: {
+        // requirements-ears intentionally absent from the injected registry.
+        "ears-review": () => {
+          order.push("ears-review");
+          return passingGate();
+        }
+      }
+    });
+
+    const result = await run51(root, featurePath, deps);
+
+    assert.equal(result.ok, false);
+    assert.equal(result.exitCode, 2);
+    assert.deepEqual(order, ["ears-review"]);
+    assert.match(
+      result.diagnostics.map((item) => item.reason).join("\n"),
+      /Post-session gate 'requirements-ears' for requirements_ears\.md is not registered/
+    );
+  });
+});
+
+test("executeStep does not invoke post-session gates for a step without a declared set", async () => {
+  await withRunnerWorkspace(async ({ root, featurePath, featureDir }) => {
+    let gateCalls = 0;
+    const deps = baseDeps({
+      agentRunner: {
+        run: async () => {
+          writeFileSync(path.join(featureDir, "requirements_ears.md"), "# regenerated EARS\n");
+          return { exitCode: 0 };
+        }
+      },
+      gateRegistry: {
+        "requirements-ears": () => {
+          gateCalls += 1;
+          return passingGate();
+        }
+      }
+    });
+
+    // Step 5 (br-to-ears) declares no postSessionGates.
+    const result = await executeStep(
+      step("5"),
+      { step: step("5"), runtimeRoot: root, featurePath, overmindCliPath: ".overmind/overmind.js" },
+      deps
+    );
+
+    assert.equal(result.ok, true);
+    assert.equal(gateCalls, 0);
+  });
+});
+
+test("executeStep does not invoke post-session gates when the agent exits non-zero", async () => {
+  await withRunnerWorkspace(async ({ root, featurePath }) => {
+    let gateCalls = 0;
+    const deps = baseDeps({
+      agentRunner: { run: async () => ({ exitCode: 7 }) },
+      gateRegistry: {
+        "requirements-ears": () => {
+          gateCalls += 1;
+          return passingGate();
+        },
+        "ears-review": () => {
+          gateCalls += 1;
+          return passingGate();
+        }
+      }
+    });
+
+    const result = await run51(root, featurePath, deps);
+
+    assert.equal(result.ok, false);
+    assert.equal(result.exitCode, 7);
+    assert.equal(gateCalls, 0);
   });
 });

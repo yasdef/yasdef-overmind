@@ -162,6 +162,8 @@ steps:
       - condition: "If additional document analysis was repeated, each repeated run was triggered only by newly provided files."
       - condition: "If Q&A was used, user answers were first logged and then merged into feature_br_summary.md only after the Q&A session ended."
       - condition: "For project type A, the feature was checked and confirmed as a valid starting feature for a new project."
+      - condition: "After every tracked missing_br_data.md rised_item_N is rised=true, ## 7. Loop Decision -> unresolved_after_stop is exactly 'none'."
+      - condition: "Pre-existing missing_br_data.md ## 1. Gate Status -> gate_result values are preserved as historical evidence."
 
   - step_number: 5
     phase_name: "feature"
@@ -186,6 +188,8 @@ steps:
       - type: "document"
         value: "feature_br_summary.md"
       - type: "document"
+        value: "user_br_input.md"
+      - type: "document"
         value: "requirements_ears.md"
     finished_only_if_artefacts_present:
       - file: "requirements_ears_review.md"
@@ -195,9 +199,10 @@ steps:
           equals: "complete"
           section: "## 1. Document Meta"
     finished_only_if_conditions_meet:
-      - condition: "requirements_ears_review.md records the review findings discovered by checking requirements_ears.md against feature_br_summary.md."
+      - condition: "requirements_ears_review.md records the review findings discovered by checking requirements_ears.md against the authoritative feature_br_summary.md and by sweeping both feature_br_summary.md and requirements_ears.md against raw user_br_input.md for narrowing."
       - condition: "Each review finding is tracked with one state from: escalated, added to ears, rejected, postponed."
       - condition: "When review_status is complete, no escalated findings remain."
+      - condition: "Both mutable artifacts pass their owning post-session gates: requirements_ears.md passes the requirements-ears gate and requirements_ears_review.md passes the ears-review gate."
 
   - step_number: 6
     phase_name: "feature"
@@ -425,6 +430,7 @@ steps:
       - condition: "For project types B and C, missing prerequisites required to begin implementation are identified and included when needed."
       - condition: "For project type B, required refactoring of existing code is identified and included when needed."
       - condition: "This artifact does not redefine stable cross-project contract governance already captured in common_contract_definition.md."
+      - condition: "After the final optional implementation-plan semantic review decision, the terminal deterministic gate chain over every applicable existing feature artifact exits 0."
 
   - step_number: 8.4
     phase_name: "feature"
@@ -455,3 +461,4 @@ steps:
       - condition: "Findings use one type from: step_scope_overlap, technical_gap_mix, dependency_ordering, requirement_grouping, delivered_surface_consumption_unclear, repo_scaffold_readiness_unclear."
       - condition: "When findings exist, user-selected findings are applied to implementation_plan.md and each finding is marked with terminal decision state."
       - condition: "When no semantic findings are present, implementation_plan_semantic_review.md records no_findings: true."
+      - condition: "Both mutable artifacts pass their owning post-session gates: implementation_plan.md passes the implementation-plan gate and implementation_plan_semantic_review.md passes the plan-semantic-review gate."

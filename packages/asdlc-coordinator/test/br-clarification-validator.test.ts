@@ -21,7 +21,10 @@ function withWorkspace(fn: (root: string) => void): void {
   }
 }
 
-function missingDataWithLedger(entries: string): string {
+function missingDataWithLedger(
+  entries: string,
+  unresolvedAfterStop = "Pending business clarification."
+): string {
   return `# Missing Business Data
 
 ## 3. Unresolved Items Ledger (Rised)
@@ -31,9 +34,12 @@ ${entries}
 - answers: This was recorded in ## 7. Business Rules and Decision Logic - BR-1.
 
 ## 7. Loop Decision
-- unresolved_after_stop: Pending business clarification.
+- unresolved_after_stop: ${unresolvedAfterStop}
 `;
 }
+
+const terminalSummaryProblem =
+  "missing_br_data.md -> ## 7. Loop Decision -> unresolved_after_stop must be exactly `none` when the unresolved ledger is empty or every rised_item_N is rised=true";
 
 test("br-clarification validator passes when ledger is empty or all rised", () => {
   withWorkspace((root) => {
@@ -44,10 +50,53 @@ test("br-clarification validator passes when ledger is empty or all rised", () =
   withWorkspace((root) => {
     const featureDir = createFeatureFixture(root, {
       missingData: missingDataWithLedger(
-        "- rised_item_1: source=## 15. Open Questions -> critical_questions; rised=true; unresolved_item=Answered?"
+        "- rised_item_1: source=## 15. Open Questions -> critical_questions; rised=true; unresolved_item=Answered?",
+        "none"
       )
     });
     assert.equal(validateBrClarification(featureDir, root).exitCode, 0);
+  });
+});
+
+test("br-clarification validator fails an all-rised ledger with a stale terminal summary", () => {
+  withWorkspace((root) => {
+    const featureDir = createFeatureFixture(root, {
+      missingData: missingDataWithLedger(
+        "- rised_item_1: source=## 15. Open Questions -> critical_questions; rised=true; unresolved_item=Answered?",
+        "Waiting for user input."
+      )
+    });
+    const result = validateBrClarification(featureDir, root);
+    assert.equal(result.exitCode, 1);
+    assert.deepEqual(result.problems, [terminalSummaryProblem]);
+  });
+});
+
+test("overmind gate br-clarification reports a stale terminal summary through rule 1", () => {
+  withWorkspace((root) => {
+    const featureDir = createFeatureFixture(root, {
+      missingData: missingDataWithLedger(
+        "- rised_item_1: source=## 15. Open Questions -> critical_questions; rised=true; unresolved_item=Answered?",
+        "Waiting for user input."
+      )
+    });
+    const result = spawnSync(
+      process.execPath,
+      [bundlePath, "gate", "br-clarification", featureDir],
+      {
+        cwd: root,
+        encoding: "utf8"
+      }
+    );
+    assert.equal(result.status, 1);
+    assert.match(
+      result.stdout,
+      /^rule 1: task-to-br base business-context validation \.\.\. FAIL/m
+    );
+    assert.match(
+      result.stdout,
+      /^missing: missing_br_data\.md -> ## 7\. Loop Decision -> unresolved_after_stop must be exactly `none`/m
+    );
   });
 });
 
@@ -165,7 +214,8 @@ test("overmind gate br-clarification exits 0 for all-rised ledger", () => {
   withWorkspace((root) => {
     const featureDir = createFeatureFixture(root, {
       missingData: missingDataWithLedger(
-        "- rised_item_1: source=## 15. Open Questions -> critical_questions; rised=true; unresolved_item=A?"
+        "- rised_item_1: source=## 15. Open Questions -> critical_questions; rised=true; unresolved_item=A?",
+        "none"
       )
     });
     const result = spawnSync(

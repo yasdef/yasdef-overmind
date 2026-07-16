@@ -10,7 +10,7 @@ Scope: REST API + database-backed task tracking with auditable state changes.
 ## Overview
 - Product/Domain: Example task tracking system
 - Goals: Create, update, and query tasks with auditable state changes
-- Out of scope: Billing, multi-tenant org management
+- Out of scope: Billing, multi-tenant org management, time-tracking analytics reports
 
 ## Glossary
 - Task: A unit of work tracked by the system
@@ -47,10 +47,13 @@ This example intentionally keeps one primary obligation focus per block
 ### Requirement 2 — Reject invalid create-task requests
 **User Story:** As a client developer, I want deterministic validation failures, so that I can handle invalid create requests predictably.
 
-**Acceptance Criteria (EARS):**
-- IF a create-task request is missing a title, THEN THE Example Task Tracking Service SHALL reject the request with a validation error.
+The specific missing-title case refines the broad invalid-data obligation; both stay because each is independently testable.
 
-**Verification:** API test for `POST /tasks` with missing required fields returning validation errors.
+**Acceptance Criteria (EARS):**
+- IF a create-task request contains invalid task data, THEN THE Example Task Tracking Service SHALL reject the request with a validation error.
+- IF a create-task request is missing a title, THEN THE Example Task Tracking Service SHALL reject the request with a validation error identifying the missing title.
+
+**Verification:** Backend automated API tests for `POST /tasks` covering invalid task data generally and the missing-title case specifically.
 
 ---
 

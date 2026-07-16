@@ -6,7 +6,7 @@
 - project_type_code: B
 - project_type_label: Existing project with partial context
 - source_type: User input
-- source_refs: JIRA-AUTH-241
+- source_refs: projects/auth-platform/self-service-password-reset/user_br_input.md; jira:JIRA-AUTH-241
 - last_updated: 2026-03-18
 - ready_to_ears: false
 
@@ -22,7 +22,7 @@
 - stated_goals: Users can reset forgotten passwords without support tickets.
 - stated_scope: Request reset, validate token, set new password, notify user.
 - stated_acceptance_criteria: Expiring token, secure validation, audit trail.
-- stated_constraints: Must use existing email provider and rate-limit controls.
+- stated_constraints: Must use existing email provider and rate-limit controls; introduces no new identity provider and no SMS delivery channel.
 - stated_non_goals: No identity-provider migration in this feature.
 
 ## 3. Feature Intent
@@ -55,7 +55,7 @@
 - in_scope_items: Reset request endpoint, token verification, password update.
 
 ### 5.2 Out of scope
-- out_of_scope_items: Account signup, MFA enrollment, SSO user management.
+- out_of_scope_items: Account signup, MFA enrollment, SSO user management, SMS delivery channel.
 
 ### 5.3 Open scope boundaries
 - unclear_scope_points: rised=false; unresolved_item=Whether SMS fallback is required for pilot cohort.
@@ -125,7 +125,7 @@
 
 ### 12.4 Operational and rollout
 - migration_expectations: None for existing password hashes.
-- config_expectations: Token TTL and cooldown configured per environment.
+- config_expectations: Token TTL and cooldown configured per environment; no new identity-provider or SMS configuration is introduced.
 - rollout_constraints: Enable behind feature flag for one week.
 - backward_compatibility_expectations: Existing login API behavior unchanged.
 

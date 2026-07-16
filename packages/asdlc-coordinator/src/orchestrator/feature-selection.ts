@@ -5,6 +5,7 @@ import { InteractionClosedError, type InteractionPort } from "../interaction/ind
 import { evaluate, nextStep } from "../sequencing/index.js";
 import { readFeatureState, writeFeatureState } from "../state/index.js";
 import type { Diagnostic } from "../types/index.js";
+import { TERMINAL_REPAIR_STEPS } from "../validate/gate-registry.js";
 
 export interface DiscoveredFeature {
   /** Workspace-relative feature path. */
@@ -76,8 +77,9 @@ export function discoverProjectFeatures(
 
 /**
  * Resolve the run's feature target: new-vs-continue menus, resume constraints,
- * and completed-cache reopening for `--resume 8.4`. Routes every choice through
- * the interaction port and persists a selected unfinished feature.
+ * and completed-cache reopening for an explicit terminal repair resume. Routes
+ * every choice through the interaction port and persists a selected unfinished
+ * feature.
  */
 export async function resolveFeatureTarget(
   deps: FeatureSelectionDeps
@@ -93,14 +95,33 @@ export async function resolveFeatureTarget(
   const features = discoverProjectFeatures(workspaceRoot, projectRoot);
   const unfinished = features.filter((feature) => feature.unfinished);
 
+  // Artifact-presence scanning calls this feature complete, but terminal gate
+  // validation can still fail it (CRP-166 D7). An explicit `--resume` naming a
+  // step that owns a terminal repair is the operator's authorization to reopen
+  // the cached feature at that phase. `readFeatureState` only reports `valid`
+  // for a path that still resolves inside this project, so existence is settled.
+  const repairableCachedFeature =
+    resumeStepId &&
+    TERMINAL_REPAIR_STEPS.includes(resumeStepId) &&
+    cache.state === "valid" &&
+    cache.featurePath &&
+    !unfinished.some((feature) => feature.featurePath === cache.featurePath)
+      ? cache.featurePath
+      : undefined;
+
   try {
     if (unfinished.length > 0) {
-      return await selectFromUnfinished(unfinished, deps);
+      // Terminal failure is not persisted, so the coordinator cannot tell an
+      // intended repair of the completed cached feature from an intended
+      // continue of an unfinished one. Offer both and let the operator say.
+      return await selectFromUnfinished(unfinished, repairableCachedFeature, deps);
     }
 
-    if (resumeStepId === "8.4" && cache.state === "valid" && cache.featurePath) {
-      emit(`Resuming optional phase 8.4 for completed cached feature: ${cache.featurePath}`);
-      return { kind: "resumeCompleted", featurePath: cache.featurePath };
+    if (repairableCachedFeature) {
+      emit(
+        `Reopening completed cached feature at explicit repair step ${resumeStepId}: ${repairableCachedFeature}`
+      );
+      return { kind: "resumeCompleted", featurePath: repairableCachedFeature };
     }
 
     if (resumeStepId && resumeStepId !== "3") {
@@ -111,7 +132,7 @@ export async function resolveFeatureTarget(
             severity: "error",
             source: "feature-selection",
             reason:
-              "No unfinished feature context for this project. Run without --resume or use --resume 3 first."
+              "No unfinished feature and no valid completed-feature cache to reopen for this project. Repairing a completed feature requires its cached feature_path; otherwise run without --resume, or use --resume 3 to start a new feature."
           }
         ]
       };
@@ -130,12 +151,16 @@ export async function resolveFeatureTarget(
 
 async function selectFromUnfinished(
   unfinished: DiscoveredFeature[],
+  repairableCachedFeature: string | undefined,
   deps: FeatureSelectionDeps
 ): Promise<FeatureTargetDecision> {
   const { projectRoot, projectPathRel, resumeStepId, interaction, emit } = deps;
 
   emit(`Project feature selection for: ${projectPathRel}`);
   emit(`Found unfinished features: ${unfinished.length}`);
+  if (repairableCachedFeature) {
+    emit(`Completed cached feature available for repair: ${repairableCachedFeature}`);
+  }
 
   for (;;) {
     const mode = await interaction.select({
@@ -166,12 +191,31 @@ async function selectFromUnfinished(
     }
 
     const selected = await interaction.select({
-      message: "Choose unfinished feature:",
-      options: unfinished.map((feature) => ({
-        value: feature.featurePath,
-        label: `${feature.featurePath} [${feature.nextStepLine}]`
-      }))
+      message: repairableCachedFeature ? "Choose feature:" : "Choose unfinished feature:",
+      options: [
+        ...unfinished.map((feature) => ({
+          value: feature.featurePath,
+          label: `${feature.featurePath} [${feature.nextStepLine}]`
+        })),
+        ...(repairableCachedFeature
+          ? [
+              {
+                value: repairableCachedFeature,
+                label: `${repairableCachedFeature} [completed; reopen for repair at step ${resumeStepId}]`
+              }
+            ]
+          : [])
+      ]
     });
+
+    // The cache already points at the completed feature, so reopening it needs
+    // no write; only an unfinished selection changes the remembered target.
+    if (selected === repairableCachedFeature) {
+      emit(
+        `Reopening completed cached feature at explicit repair step ${resumeStepId}: ${selected}`
+      );
+      return { kind: "resumeCompleted", featurePath: selected };
+    }
     persistFeatureState(projectRoot, selected, emit);
     return { kind: "continue", featurePath: selected };
   }

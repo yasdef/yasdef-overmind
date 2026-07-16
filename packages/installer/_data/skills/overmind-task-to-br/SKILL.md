@@ -83,14 +83,16 @@ Asset paths are relative to this loaded skill directory. Do not resolve them thr
 7. Ensure `## 1. Document Meta` includes:
    - `source_type` containing `User input`
    - `last_updated` in `YYYY-MM-DD`
+   - `source_refs` containing every reference listed in the context block's `## Required Source References -> required_source_refs`
 8. `missing_br_data.md` is the unresolved-question ledger; keep question-state tracking there.
 9. Keep `feature_br_summary.md` as the source of truth for business content.
 10. This stage identifies unresolved gaps and prepares follow-up questions only; answer-handling lifecycle is governed by the downstream `overmind-br-clarification` skill.
 11. Do not silently assume missing details: every unresolved or low-confidence business detail MUST be externalized as `rised_item_N` (`rised=false`) in `missing_br_data.md`.
-12. Ambiguity triggers such as "fast", "better", "simple", "as needed", "TBD", and "etc." MUST be converted into explicit follow-up business questions and tracked as unresolved ledger items.
-13. Do not write generic placeholder FR/BR content. If a requirement/rule is not specific and traceable to user input, keep it `[UNFILLED]` and track the gap in `missing_br_data.md`.
-14. If the source is Jira, persist the fetched story/request text into `user_br_input.md` before finishing so downstream phases retain the actual source narrative.
-15. Always create or refresh `missing_br_data.md`, even when no unresolved business gaps are found.
+12. Ambiguity externalization applies to every populated business field listed in `### Ambiguity Scan Scope`: wording that stays unresolved and materially affects acceptance or verification MUST be converted into an explicit follow-up business question and tracked as an unresolved ledger item.
+13. Every explicit source prohibition (for example `no X`, `does not introduce X`, an Out of Scope entry, or a negative Definition of Done statement) MUST be recorded in `### 2.3 Explicitly stated in source -> stated_constraints` or `### 5.2 Out of scope -> out_of_scope_items`. The same statement MAY additionally be recorded in another relevant field such as `### 12.4 Operational and rollout -> config_expectations`; that additional placement alone does not satisfy this constraint.
+14. Do not write generic placeholder FR/BR content. If a requirement/rule is not specific and traceable to user input, keep it `[UNFILLED]` and track the gap in `missing_br_data.md`.
+15. If the source is Jira, persist the fetched story/request text into `user_br_input.md` before finishing so downstream phases retain the actual source narrative.
+16. Always create or refresh `missing_br_data.md`, even when no unresolved business gaps are found.
 
 ### Missing-Data Externalization
 
@@ -103,6 +105,7 @@ Asset paths are relative to this loaded skill directory. Do not resolve them thr
      - `## 14. Assumptions -> ### Needs validation -> assumptions_needing_validation`
      - `## 15. Open Questions`
      - `### 5.3 Open scope boundaries -> unclear_scope_points`
+     - every other field in `### Ambiguity Scan Scope` whose populated value stays unresolved or ambiguous
      into `missing_br_data.md` ledger with deterministic `rised_item_N` markers and `rised=false`.
    - For every newly created `rised_item_N`, set `rised=false`.
    - Set moved source BR values in `feature_br_summary.md` to `[UNFILLED]`.
@@ -120,13 +123,38 @@ Asset paths are relative to this loaded skill directory. Do not resolve them thr
    - keep `## 6. Latest User Answers -> answers` as `[UNFILLED]`
    - set `## 7. Loop Decision -> unresolved_after_stop` to `none`
 
+### Ledger Terminal State
+
+- The ledger is terminal when `## 3. Unresolved Items Ledger (Rised)` is empty, or when every `rised_item_N` is `rised=true`.
+- In either terminal state, set `## 7. Loop Decision -> unresolved_after_stop` to exactly `none`.
+- While at least one `rised_item_N` is `rised=false`, keep `unresolved_after_stop` as a filled concise unresolved summary.
+- `## 1. Gate Status -> gate_result` is historical evidence of the gate round that produced the ledger: preserve every pre-existing `gate_result` line and value exactly when updating the ledger.
+
 ### Deterministic Ledger Markers
 
 - Unresolved entries:
   - `- rised_item_N: source=<section> -> <field>; rised=false; unresolved_item=<text>`
+- When one question covers several fields that restate the same fact, name them all in the same `source=` list, comma-separated:
+  - `- rised_item_N: source=<section> -> <field>, <section> -> <field>; rised=false; unresolved_item=<text>`
 - Numbering rules:
   - deterministic and gap-free
   - `N` starts at `1`
+
+### Ambiguity Scan Scope
+
+- Scanned business fields:
+  - `## 2. Source Request Snapshot`, excluding `### 2.2 Raw source references`
+  - `## 3. Feature Intent` through `## 12. Non-Functional Requirements`
+  - `## 14. Assumptions`
+  - `## 15. Open Questions`
+- Closed ambiguity triggers enforced by the gate, matched case-insensitively as a whole word or phrase: `fast`, `better`, `simple`, `as needed`, `TBD`, `etc.`.
+- Unresolved trigger lifecycle:
+  1. add `- rised_item_N: source=<section> -> <field>; rised=false; unresolved_item=<business question>` to `missing_br_data.md`
+  2. set that BR field in `feature_br_summary.md` to `[UNFILLED]`
+  3. let the downstream `overmind-br-clarification` skill obtain the answer
+- One question per fact: a BR often restates the same fact as a constraint, a functional requirement, and a business rule. Raise one ledger item for that question and name every affected field in its `source=` locator list, rather than one item per field.
+- Confirmed wording: when the user explicitly confirms the original wording, answer that ledger item with `rised=true`. The populated values may stay in exactly the fields the item names. A field the item does not name stays unconfirmed, because the same trigger word can carry a different question elsewhere in the document.
+- The semantic rule reaches further than the closed trigger list: any populated wording in the scanned fields that stays unresolved and materially affects acceptance or verification is externalized the same way.
 
 ### Question Scope
 
@@ -140,8 +168,18 @@ Asset paths are relative to this loaded skill directory. Do not resolve them thr
 - Do not replace runtime bindings with fixed `overmind/product/...` assumptions.
 - Use the emitted feature path and artifact paths exactly when reading, writing, and running the gate.
 
+### Captured Source Binding
+
+1. The context block's `## Required Source References -> required_source_refs` lists every captured source that must appear in `feature_br_summary.md` `## 1. Document Meta -> source_refs`: the feature's `user_br_input.md` capture record followed by the `epic_story_source_file` locator it recorded (a workspace-relative story path, or `jira:<ticket>`).
+2. Write the references into `source_refs` as exact semicolon-delimited elements, copied verbatim from the context block.
+3. Use the canonical order for newly written values: the `user_br_input.md` capture record first, then the original story source.
+4. When `source_refs` already holds other populated references, merge the required references into the existing value and keep the additional ones; do not replace the field wholesale.
+5. Replace an `[UNFILLED]` placeholder rather than appending around it: the finished field contains only real source references.
+6. Example: `- source_refs: projects/auth-platform/self-service-password-reset/user_br_input.md; jira:JIRA-AUTH-241`
+
 ### Quality Criteria
 
+- `## 1. Document Meta -> source_refs` contains every required captured-source reference exactly as emitted in context.
 - `### 2.1 Original request summary -> short summary` is filled.
 - `### 3.1 Business goal -> primary_business_goal` is filled.
 - `## 6. Functional Requirements` has at least one meaningful one-line FR (`- FR-N: ...`).
@@ -149,7 +187,10 @@ Asset paths are relative to this loaded skill directory. Do not resolve them thr
 - `### Needs validation -> assumptions_needing_validation` has no unresolved non-`rised` value.
 - `## 15. Open Questions` has no unresolved non-`rised` value.
 - `### 5.3 Open scope boundaries -> unclear_scope_points` has no unresolved non-`rised` value.
+- Every populated field in `### Ambiguity Scan Scope` is free of unconfirmed ambiguity triggers; a retained trigger has an answered `rised=true` ledger item whose `source=` locator list names that field.
+- Every explicit source prohibition appears in `### 2.3 Explicitly stated in source -> stated_constraints` or `### 5.2 Out of scope -> out_of_scope_items`.
 - If `missing_br_data.md` contains unresolved `rised_item_N` entries, each entry has `rised=false` or `rised=true`, and `## 7. Loop Decision -> unresolved_after_stop` is filled.
+- If `missing_br_data.md` has an empty ledger or every `rised_item_N` is `rised=true`, `## 7. Loop Decision -> unresolved_after_stop` is exactly `none`.
 - `missing_br_data.md` exists for every completed task-to-BR run.
 - FR/BR lines are concrete and input-traceable; generic/buzzword-only placeholders are not accepted.
 - Every populated value is business-readable and traceable to user input.

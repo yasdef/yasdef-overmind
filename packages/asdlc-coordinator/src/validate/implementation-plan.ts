@@ -245,6 +245,14 @@ export function extractImplementationPlanRequiredSurfaces(content: string): stri
     .sort();
 }
 
+/**
+ * Structural sentinel for the template's leading heading (CRP-166 D4). A plan
+ * that lost `# Implementation Plan` and its preamble during migration still
+ * parses as steps, so the heading is the one mechanical marker the gate can
+ * anchor on. The following preamble prose stays outside exact-text validation.
+ */
+const IMPLEMENTATION_PLAN_HEADER = /^# Implementation Plan\r?\n/;
+
 export function validateImplementationPlanContent(
   content: string,
   catalogs: ImplementationPlanCatalogs
@@ -253,6 +261,9 @@ export function validateImplementationPlanContent(
   const fail = (message: string): void => {
     problems.push(message);
   };
+
+  if (!IMPLEMENTATION_PLAN_HEADER.test(content))
+    fail("implementation_plan.md must start with exact header: # Implementation Plan");
   const steps: PlanStep[] = [];
   let current: PlanStep | undefined;
   let lastMajor = -1;
