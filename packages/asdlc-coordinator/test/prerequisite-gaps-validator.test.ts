@@ -245,7 +245,9 @@ test("prerequisite-gaps gate: requirement coverage blocks carry required fields 
   );
   assert.deepEqual(extractScheduledSliceRefs(coverageEntry), ["slice-99"]);
   assert.deepEqual(extractImplementationPlanRequiredSurfaces(coverageEntry), ["Admin ghost page"]);
-  assert.deepEqual(extractRequiredMissingSurfaces(coverageEntry), ["Admin ghost page"]);
+  assert.deepEqual(extractRequiredMissingSurfaces(coverageEntry), [
+    { surface: "Admin ghost page", sliceRef: "slice-99" }
+  ]);
 });
 
 test("prerequisite-gaps gate: literal may be covered by catalog entry or technical surface", () => {

@@ -10,13 +10,13 @@ import { validateAgentsMd, validateAgentsMdContent } from "../src/validate/agent
 
 const backendGolden = fileURLToPath(
   new URL(
-    "../../../../overmind/golden_examples/project_agents_md_claude_md_be_GOLDEN_EXAMPLE.md",
+    "../../../../packages/installer/_data/skills/overmind-agents-md/assets/project_agents_md_claude_md_be_GOLDEN_EXAMPLE.md",
     import.meta.url
   )
 );
 const frontendGolden = fileURLToPath(
   new URL(
-    "../../../../overmind/golden_examples/project_agents_md_claude_md_fe_GOLDEN_EXAMPLE.md",
+    "../../../../packages/installer/_data/skills/overmind-agents-md/assets/project_agents_md_claude_md_fe_GOLDEN_EXAMPLE.md",
     import.meta.url
   )
 );

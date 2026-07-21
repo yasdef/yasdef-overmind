@@ -1,7 +1,7 @@
-import { existsSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 
-import { displayPath, resolveInputPath } from "../parse/index.js";
+import { displayPath, readUserBrInput, resolveInputPath } from "../parse/index.js";
 import { EARS_REVIEW_MUTABLE_GATES } from "../sequencing/review-session-contract.js";
 
 import type { ContextResult } from "../types/index.js";
@@ -18,6 +18,7 @@ export function buildEarsReviewContext(inputPath: string, cwd = process.cwd()): 
 
   const brSummaryPath = path.join(featureDir, "feature_br_summary.md");
   const userInputPath = path.join(featureDir, "user_br_input.md");
+  const missingDataPath = path.join(featureDir, "missing_br_data.md");
   const requirementsEarsPath = path.join(featureDir, "requirements_ears.md");
   const reviewLedgerPath = path.join(featureDir, "requirements_ears_review.md");
   if (!existsSync(brSummaryPath)) {
@@ -30,12 +31,20 @@ export function buildEarsReviewContext(inputPath: string, cwd = process.cwd()): 
       `Raw user business input is required before EARS review: ${displayPath(userInputPath, cwd)}`
     );
   }
+  if (!existsSync(missingDataPath)) {
+    return contextError(
+      `Clarification ledger is required before EARS review: ${displayPath(missingDataPath, cwd)}. Run the overmind-task-to-br skill for this feature before EARS review.`
+    );
+  }
   if (!existsSync(requirementsEarsPath)) {
     return contextError(
       `Upstream EARS requirements are required before EARS review: ${displayPath(requirementsEarsPath, cwd)}`
     );
   }
 
+  const userInput = readUserBrInput(userInputPath);
+  const capturedStory = userInput.epicOrStory.trim();
+  const clarificationLedger = readFileSync(missingDataPath, "utf8").trim();
   const featurePathForCommand = displayPath(featureDir, cwd);
   const lines = [
     "# ears-review context",
@@ -45,7 +54,8 @@ export function buildEarsReviewContext(inputPath: string, cwd = process.cwd()): 
     `- feature_path: ${featureDir}`,
     `- feature_path_for_command: ${featurePathForCommand}`,
     `- authoritative_br_summary_source: ${brSummaryPath}`,
-    `- raw_user_input_backstop_source: ${userInputPath}`,
+    `- raw_user_input_source: ${userInputPath}`,
+    `- clarification_ledger_source: ${missingDataPath}`,
     `- requirements_ears_artifact: ${requirementsEarsPath}`,
     `- review_ledger_artifact: ${reviewLedgerPath}`,
     `- gate_command: node .overmind/overmind.js gate ears-review ${featurePathForCommand}`,
@@ -59,9 +69,16 @@ export function buildEarsReviewContext(inputPath: string, cwd = process.cwd()): 
     "## Allowed Write Surface",
     ...EARS_REVIEW_MUTABLE_GATES.map((entry) => `- ${entry.artifact}`),
     "",
+    "## Raw Captured Story (read-only)",
+    capturedStory === "" ? "[UNFILLED]" : capturedStory,
+    "",
+    "## Clarification Evidence (read-only)",
+    clarificationLedger === "" ? "[UNFILLED]" : clarificationLedger,
+    "",
     "## Model Instructions",
     "- Treat the runtime paths above as authoritative for this invocation.",
-    "- Read both feature_br_summary.md (authoritative clarified decisions) and user_br_input.md (raw drift backstop) as input only.",
+    "- Read user_br_input.md (raw capture source), feature_br_summary.md (authoritative clarified decisions), and missing_br_data.md (clarification evidence) as input only.",
+    "- Compare the raw captured story with the BR summary and EARS for capture fidelity before comparing the BR summary with EARS for translation fidelity.",
     "- Update only the allowed-write artifacts listed above.",
     "- Follow the loaded SKILL.md for review rules and gate exit handling.",
     "- Run the gate command after every write or repair."

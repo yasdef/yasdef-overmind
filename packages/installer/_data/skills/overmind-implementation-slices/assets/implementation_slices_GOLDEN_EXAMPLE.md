@@ -35,7 +35,6 @@ This example focuses on executable slice discovery before full plan ordering. It
 - objective: Complete query read service + DTO mapping so projection-backed reads are usable and ready for latency verification.
 - first_increment: Query endpoint returns projection fields for happy-path requests.
 - prerequisites: none
-- preserved_operator_surface: none
 - evidence: gap/TECH_REQ-6, gap/TECH_REQ-NFR-1, comp/backend-order-query-controller
 - [ ] Implement read service + repository wiring for projection-backed query
 - [ ] Add controller DTO mapping and error-response alignment for query path
@@ -47,7 +46,6 @@ This example focuses on executable slice discovery before full plan ordering. It
 - objective: Deliver the missing protected operator workspace shell so operators can reach projection-backed order views.
 - first_increment: Operator can open the protected workspace shell entry and see projection-backed order status on first load.
 - prerequisites: Slice 1 backend payload stability
-- preserved_operator_surface: Protected operator workspace shell
 - evidence: gap/TECH_REQ-4, comp/frontend-order-projection-client
 - [ ] Deliver protected operator workspace shell route/page container and initial render path
 - [ ] Wire projection-backed status mapping into the workspace shell view state
@@ -59,7 +57,6 @@ This example focuses on executable slice discovery before full plan ordering. It
 - objective: Add supporting auth/session scaffolding needed by the workspace shell delivery slice.
 - first_increment: Session and token refresh flow works for shell access.
 - prerequisites: Slice 2 operator workspace shell delivery
-- preserved_operator_surface: none
 - evidence: gap/TECH_REQ-4, comp/frontend-order-projection-client
 - [ ] Add token refresh/session middleware used by workspace shell route guards
 - [ ] Add auth-state wiring for shell access bootstrap
@@ -71,7 +68,6 @@ This example focuses on executable slice discovery before full plan ordering. It
 - objective: Align mobile mapper/view-model to backend projection status fields.
 - first_increment: Mobile screen renders projection-backed status from backend payload.
 - prerequisites: Slice 1 backend payload stability
-- preserved_operator_surface: none
 - evidence: gap/TECH_REQ-4, comp/mobile-order-projection-client
 - [ ] Update mobile mapper for projection-backed status fields
 - [ ] Update view-model/screen state for projection-backed status handling

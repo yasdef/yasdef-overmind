@@ -55,7 +55,9 @@ Together these preserve the original intent — a required surface is delivered 
 
 Resolution therefore uses the number declared in the heading. The positional `number` stays as-is for every existing problem message, so no current gate output changes wording.
 
-Alternative considered: resolve by position and require headings to be sequential. Rejected because it adds a new structural rule to fix a lookup that can simply read what it is given.
+Uniqueness of the declared number is the precondition that makes this lookup well-defined: two headings carrying the same `<N>` leave "the slice that declares `<N>`" naming two different slices, and a link would bind to whichever appeared first. The gate therefore fails a duplicated number and draws no coverage conclusion for a link naming it. This is a structural rule so it fires at step `8.1`, where the slices are written and the ambiguity can be repaired, rather than in the terminal chain where it would be reported as a defect of the link.
+
+Alternative considered: resolve by position and require headings to be sequential. Rejected because it adds an ordering rule to fix a lookup that can simply read what it is given; requiring the declared number to identify one slice is not an ordering constraint.
 
 ### D4: Retire `preserved_operator_surface`
 

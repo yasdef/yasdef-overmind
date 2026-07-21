@@ -8,7 +8,10 @@ import assert from "node:assert/strict";
 
 const bundlePath = fileURLToPath(new URL("../overmind.js", import.meta.url));
 const templatePath = fileURLToPath(
-  new URL("../../../../overmind/templates/init_progress_definition_TEMPLATE.yaml", import.meta.url)
+  new URL(
+    "../../../../packages/installer/_data/templates/init_progress_definition_TEMPLATE.yaml",
+    import.meta.url
+  )
 );
 
 function withWorkspace(run: (root: string, project: string, feature: string) => void): void {

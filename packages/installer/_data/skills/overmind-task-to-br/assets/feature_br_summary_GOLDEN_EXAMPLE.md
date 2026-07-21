@@ -21,7 +21,7 @@
 ### 2.3 Explicitly stated in source
 - stated_goals: Users can reset forgotten passwords without support tickets.
 - stated_scope: Request reset, validate token, set new password, notify user.
-- stated_acceptance_criteria: Expiring token, secure validation, audit trail.
+- stated_acceptance_criteria: Expiring token, secure validation, audit trail, and a reset-status screen that shows exactly one of link sent, link expired, link already used, or password updated.
 - stated_constraints: Must use existing email provider and rate-limit controls; introduces no new identity provider and no SMS delivery channel.
 - stated_non_goals: No identity-provider migration in this feature.
 
@@ -58,7 +58,7 @@
 - out_of_scope_items: Account signup, MFA enrollment, SSO user management, SMS delivery channel.
 
 ### 5.3 Open scope boundaries
-- unclear_scope_points: rised=false; unresolved_item=Whether SMS fallback is required for pilot cohort.
+- unclear_scope_points: [UNFILLED]
 
 ## 6. Functional Requirements
 > Keep one item per atomic business requirement as a one-line entry.
@@ -67,11 +67,14 @@
 - FR-1: Registered end user can request a password-reset link using account email without opening a support ticket.
 - FR-2: System sends a one-time reset link after request validation and applicable rate-limit checks pass.
 - FR-3: Registered end user can set a new password when submitting a valid, unexpired, unused reset token.
+- FR-4: Registered end user sees a self-explanatory reset-status screen showing exactly one of: link sent, link expired, link already used, password updated.
+- FR-5: [UNFILLED]
 
 ## 7. Business Rules and Decision Logic
 - BR-1: Reset token expires 15 minutes after issuance.
 - BR-2: Successful password reset invalidates all active sessions and requires re-authentication.
 - BR-3: Reset requests for the same account are rate-limited to prevent abuse and token spam.
+- BR-4: A rejected reset attempt returns the same non-enumerating message for every rejection cause and never reveals whether the account exists.
 
 ## 8. Permissions and Access Constraints
 - who_can_do_what: Any registered user can request reset for own account.
@@ -91,13 +94,13 @@
 
 ## 10. Failure Cases and Edge Cases
 ### Negative and rejection cases
-- rejection_cases: Unknown email, expired token, reused token, weak password.
+- rejection_cases: Unknown email, expired token, reused token, weak password; each returns the same non-enumerating message naming the failed step and the next retry action.
 
 ### Edge cases
 - edge_cases: Multiple reset requests issued in short window.
 
 ### Recovery and retry expectations
-- retry_or_recovery_expectations: User can request new token after cooldown period.
+- retry_or_recovery_expectations: [UNFILLED]
 
 ## 11. Integration and Dependency Context
 - upstream_dependencies: Existing auth user store.
@@ -168,20 +171,20 @@
 
 ## 14. Assumptions
 ### Confirmed assumptions
-- confirmed_assumptions: Existing email provider SLA is sufficient.
+- confirmed_assumptions: Existing email provider SLA is sufficient; SMS fallback is excluded by the source, so no delivery-channel fallback is assumed.
 
 ### Working assumptions
 - working_assumptions: Support dashboard only needs read-only reset status.
 
 ### Needs validation
-- assumptions_needing_validation: rised=false; unresolved_item=Whether SMS fallback is required by compliance.
+- assumptions_needing_validation: [UNFILLED]
 
 ## 15. Open Questions
 ### Critical questions
-- critical_questions: rised=false; unresolved_item=Is forced MFA re-verification required after reset?
+- critical_questions: [UNFILLED]
 
 ### Non-critical questions
-- non_critical_questions: rised=false; unresolved_item=Should reset success email include device metadata?
+- non_critical_questions: [UNFILLED]
 
 ## 16. Linked Artifacts
 

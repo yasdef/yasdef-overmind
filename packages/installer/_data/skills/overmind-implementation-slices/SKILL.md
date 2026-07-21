@@ -85,14 +85,15 @@ Full global ordering, full REQ/NFR-to-step coverage enforcement, worker assignme
 - Use `feature_contract_delta.md` for contract, payload, schema, rollout, or compatibility prerequisites that affect whether a slice can begin.
 - Use `requirements_ears.md` to align slices with behavioral scope without forcing full REQ/NFR coverage in this phase.
 - For every required missing operator-facing surface identified by upstream evidence, include at least one explicit feature-delivery slice that delivers that surface itself.
-- Supporting auth/API/contract/state/coordination slices may be added, but never satisfy preserved operator-facing surface coverage by themselves.
+- Supporting auth/API/contract/state/coordination slices may be added, but never satisfy required operator-facing surface delivery by themselves.
+- Do not restate the delivered surface on the slice; Step 8.2 records the delivering slice as `slice_ref` on the prerequisite entry, and the gate reads coverage from there.
 - Prefer the smallest meaningful slice that produces a first usable/admin-visible increment or cleanly unblocks another real slice.
 - Pull first usable increments forward instead of burying them behind broad bucket work.
 - For thin frontend/mobile repos, decompose by shell, composition, state, API adapter, UX behavior, or focused tests rather than one broad client bucket.
 - Allow backend, frontend, and mobile slices to proceed independently unless a real contract or state dependency blocks independence.
 - Capture only local prerequisites needed to begin safely; do not force full cross-repo ordering.
 - Do not require every REQ, NFR, or evidence token in slice headings; Step 8.2 restores full ordering and traceability.
-- Preserve operator-facing coverage semantically across page/screen/shell/route, CLI/admin tool/job/endpoint, or equivalent wording.
+- Word a surface-delivering slice so its heading, objective, first increment, and bullets name the delivered page/screen/shell/route, CLI/admin tool/job/endpoint, or equivalent, rather than only its supporting scaffolding.
 - Mark assumptions as `[Inference]`.
 
 ## Coordination Slices

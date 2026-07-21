@@ -17,7 +17,10 @@ import {
 } from "../src/sequencing/index.js";
 
 const templatePath = fileURLToPath(
-  new URL("../../../../overmind/templates/init_progress_definition_TEMPLATE.yaml", import.meta.url)
+  new URL(
+    "../../../../packages/installer/_data/templates/init_progress_definition_TEMPLATE.yaml",
+    import.meta.url
+  )
 );
 
 function definition(classes = '["backend"]', type = "B"): string {

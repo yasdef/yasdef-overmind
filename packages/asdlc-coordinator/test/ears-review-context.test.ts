@@ -47,7 +47,13 @@ test("ears-review context assembles runtime paths, allowed writes, gate command,
     assert.match(
       result.text ?? "",
       new RegExp(
-        `raw_user_input_backstop_source: ${escapeRegExp(path.join(featureDir, "user_br_input.md"))}`
+        `raw_user_input_source: ${escapeRegExp(path.join(featureDir, "user_br_input.md"))}`
+      )
+    );
+    assert.match(
+      result.text ?? "",
+      new RegExp(
+        `clarification_ledger_source: ${escapeRegExp(path.join(featureDir, "missing_br_data.md"))}`
       )
     );
     assert.match(
@@ -82,6 +88,49 @@ test("ears-review context assembles runtime paths, allowed writes, gate command,
       result.text ?? "",
       /\.codex\/skills|\.claude\/skills|overmind\/templates|\.rules\/requirements_ears_review/
     );
+    // Raw input is the primary capture-fidelity source, never framed as a backstop.
+    assert.doesNotMatch(result.text ?? "", /backstop/i);
+  });
+});
+
+test("ears-review context inlines the raw captured story and the clarification ledger", () => {
+  withWorkspace((root) => {
+    const featureDir = createFeatureFixture(root, {
+      missingData: `# Missing Business Data
+
+## 3. Unresolved Items Ledger (Rised)
+- rised_item_1: retention window
+  - rised=true
+  - source= section 7 BR-9
+  - answer= retain moderation decisions for 90 days
+
+## 7. Loop Decision
+- unresolved_after_stop: none
+`
+    });
+    writeRequirements(featureDir);
+    const result = buildEarsReviewContext(path.relative(root, featureDir), root);
+    assert.equal(result.exitCode, 0);
+    const text = result.text ?? "";
+    assert.match(text, /## Raw Captured Story \(read-only\)/);
+    assert.match(text, /As a product owner I want invoice approval visibility\./);
+    assert.match(text, /## Clarification Evidence \(read-only\)/);
+    assert.match(text, /rised_item_1: retention window/);
+    assert.match(text, /source= section 7 BR-9/);
+    assert.match(
+      text,
+      /## Allowed Write Surface\n- requirements_ears\.md\n- requirements_ears_review\.md/
+    );
+  });
+});
+
+test("ears-review context exits 2 when the clarification ledger is missing", () => {
+  withWorkspace((root) => {
+    const featureDir = createFeatureFixture(root, { missingData: null });
+    writeRequirements(featureDir);
+    const result = buildEarsReviewContext(path.relative(root, featureDir), root);
+    assert.equal(result.exitCode, 2);
+    assert.match(result.errorMessage ?? "", /Clarification ledger is required/);
   });
 });
 

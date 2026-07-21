@@ -4,10 +4,9 @@ import path from "node:path";
 import test from "node:test";
 import assert from "node:assert/strict";
 
+import type { RequiredSurface } from "../src/validate/implementation-slices.js";
 import {
-  canonicalSurface,
   extractRequiredMissingSurfaces,
-  surfaceMatches,
   validateImplementationSlices,
   validateImplementationSlicesContent
 } from "../src/validate/implementation-slices.js";
@@ -41,7 +40,6 @@ function validArtifact(): string {
 - objective: Deliver the order query endpoint.
 - first_increment: Operator can call the order query endpoint.
 - prerequisites: none
-- preserved_operator_surface: Order query endpoint
 - evidence: gap/TECH_REQ-6, comp/backend-order-service
 - [ ] Implement the endpoint
 - [ ] Add endpoint tests
@@ -52,7 +50,6 @@ function validArtifact(): string {
 - objective: Keep the order page available.
 - first_increment: Operator sees order state on the page.
 - prerequisites: none
-- preserved_operator_surface: Order page
 - evidence: gap/TECH_REQ-NFR-1, comp/frontend-order-page
 - [ ] Verify page rendering
 - [x] Verify page navigation
@@ -64,7 +61,7 @@ function validArtifact(): string {
 `;
 }
 
-function problems(content: string, required: string[] = []): string[] {
+function problems(content: string, required: RequiredSurface[] = []): string[] {
   return validateImplementationSlicesContent(content, ACTIVE, required);
 }
 
@@ -72,19 +69,8 @@ function removeLine(content: string, key: string): string {
   return content.replace(new RegExp(`^- ${key}:.*\\n`, "m"), "");
 }
 
-test("implementation-slices gate: valid artifact and semantic surface helpers pass", () => {
+test("implementation-slices gate: valid artifact passes", () => {
   assert.deepEqual(problems(validArtifact()), []);
-  assert.equal(canonicalSurface("Admin sign-in screen"), "admin login page");
-  assert.equal(surfaceMatches("Operator login page", "Admin sign-in screen"), true);
-  assert.equal(
-    surfaceMatches("Protected operator workspace shell", "Admin workspace container"),
-    true
-  );
-  assert.equal(
-    surfaceMatches("Operator account lookup page", "Operator account search screen"),
-    true
-  );
-  assert.equal(surfaceMatches("Admin refunds page", "Admin orders page"), false);
 });
 
 test("implementation-slices gate: all sections and meta keys are required", () => {
@@ -145,7 +131,6 @@ test("implementation-slices gate: slice existence, planned status, and fields ar
     "objective",
     "first_increment",
     "prerequisites",
-    "preserved_operator_surface",
     "evidence"
   ]) {
     const broken = validArtifact().replace(
@@ -205,22 +190,128 @@ test("implementation-slices gate: evidence, checklist, boilerplate, and coordina
   assert.deepEqual(problems(validArtifact()), []);
 });
 
-test("implementation-slices gate: operator surface and prerequisite coverage are enforced", () => {
-  assert.ok(
-    problems(validArtifact().replace("Order query endpoint", "token refresh middleware")).some(
-      (p) => p.includes("not operator-facing")
-    )
+test("implementation-slices gate: a required surface is covered by its resolved slice link", () => {
+  assert.deepEqual(
+    problems(validArtifact(), [{ surface: "Order query endpoint", sliceRef: "slice-1" }]),
+    []
   );
+  assert.deepEqual(
+    problems(validArtifact(), [{ surface: "Admin refunds page", sliceRef: "slice-2" }]),
+    []
+  );
+});
+
+test("implementation-slices gate: an unresolved or unusable slice link fails", () => {
+  const unresolved = problems(validArtifact(), [
+    { surface: "Admin refunds page", sliceRef: "slice-9" }
+  ]);
+  assert.ok(
+    unresolved.some((p) => p.includes("Admin refunds page") && p.includes("slice-9")),
+    unresolved.join("\n")
+  );
+  for (const sliceRef of ["", "none", "Slice 2", "frontend-shell"]) {
+    const unusable = problems(validArtifact(), [{ surface: "Admin refunds page", sliceRef }]);
+    assert.ok(
+      unusable.some((p) => p.includes("unusable slice_ref") && p.includes("Admin refunds page")),
+      sliceRef
+    );
+  }
+});
+
+test("implementation-slices gate: a link to a supporting-only slice fails", () => {
   const supporting = validArtifact()
     .replace("### Slice 1: Backend query endpoint", "### Slice 1: Auth middleware")
     .replace("Deliver the order query endpoint.", "Add auth token middleware.")
     .replace("Operator can call the order query endpoint.", "Token state and middleware are ready.")
     .replace("Implement the endpoint", "Implement auth middleware")
     .replace("Add endpoint tests", "Add token adapter tests");
-  assert.ok(problems(supporting).some((p) => p.includes("supporting-only")));
-  assert.deepEqual(problems(validArtifact(), ["Order query endpoint"]), []);
+  const reported = problems(supporting, [{ surface: "Admin refunds page", sliceRef: "slice-1" }]);
   assert.ok(
-    problems(validArtifact(), ["Admin refunds page"]).some((p) => p.includes("Admin refunds page"))
+    reported.some(
+      (p) =>
+        p.includes("supporting-only") && p.includes("Admin refunds page") && p.includes("slice-1")
+    ),
+    reported.join("\n")
+  );
+  assert.deepEqual(problems(supporting), []);
+});
+
+test("implementation-slices gate: a link resolves by declared heading number, not position", () => {
+  const shuffled = validArtifact().replace(
+    "### Slice 1: Backend query endpoint",
+    "### Slice 5: Backend query endpoint"
+  );
+  assert.deepEqual(
+    problems(shuffled, [{ surface: "Order query endpoint", sliceRef: "slice-5" }]),
+    []
+  );
+  assert.ok(
+    problems(shuffled, [{ surface: "Order query endpoint", sliceRef: "slice-1" }]).some((p) =>
+      p.includes("not declared")
+    )
+  );
+});
+
+test("implementation-slices gate: duplicate declared slice numbers fail and resolve nothing", () => {
+  const duplicated = validArtifact().replace(
+    "### Slice 1: Backend query endpoint",
+    "### Slice 2: Backend query endpoint"
+  );
+  assert.deepEqual(problems(duplicated), ["slice candidates declare duplicate slice number: 2"]);
+  assert.deepEqual(
+    problems(duplicated, [{ surface: "Order query endpoint", sliceRef: "slice-2" }]),
+    ["slice candidates declare duplicate slice number: 2"]
+  );
+});
+
+test("implementation-slices gate: no required surfaces means no coverage failure", () => {
+  assert.deepEqual(problems(validArtifact(), []), []);
+  assert.deepEqual(
+    extractRequiredMissingSurfaces(`## 2. Prerequisite Catalog
+#### Prerequisite: Existing page
+- status: present_in_repo
+- surface_kind: present_user_reachable_surface
+- surface_identity: none
+- slice_ref: none
+#### Prerequisite: Sibling surface
+- status: scheduled_in_feature feature-b/8.1
+- surface_kind: required_missing_user_reachable_surface
+- surface_identity: Sibling admin page
+- slice_ref: none
+`),
+    []
+  );
+});
+
+test("implementation-slices gate: measured four-surface regression passes on resolved links", () => {
+  const slice = (number: number, title: string, surface: string): string =>
+    `### Slice ${number}: ${title}
+- repo: frontend
+- status: planned
+- objective: Deliver the ${surface} so operators can reach it.
+- first_increment: Operator opens the ${surface} and sees live state.
+- prerequisites: none
+- evidence: gap/TECH_REQ-4, comp/frontend-order-page
+- [ ] Deliver the ${surface} route and initial render path
+- [ ] Add focused coverage for the ${surface}
+`;
+  const artifact = validArtifact().replace(
+    /### Slice 2: Frontend order page[\s\S]*?(?=\n## 4\.)/,
+    [
+      slice(3, "Operator workspace shell", "protected operator workspace shell"),
+      slice(4, "Admin refunds page", "admin refunds page"),
+      slice(5, "Operator account lookup page", "operator account lookup page"),
+      slice(7, "Admin order detail page", "admin order detail page")
+    ].join("\n")
+  );
+  assert.deepEqual(
+    problems(artifact, [
+      { surface: "Protected operator workspace shell", sliceRef: "slice-3" },
+      { surface: "Admin refunds page", sliceRef: "slice-4" },
+      { surface: "Operator account lookup page", sliceRef: "slice-5" },
+      { surface: "Admin order detail page", sliceRef: "slice-7" }
+    ]),
+    []
   );
 });
 
@@ -268,6 +359,7 @@ test("implementation-slices gate: prerequisite parser selects required missing s
 - status: scheduled_in_slices
 - surface_kind: required_missing_user_reachable_surface
 - surface_identity: Admin refunds page
+- slice_ref: slice-2
 #### Prerequisite: Existing page
 - status: present_in_repo
 - surface_kind: required_missing_user_reachable_surface
@@ -285,8 +377,7 @@ test("implementation-slices gate: prerequisite parser selects required missing s
 - prerequisites: Refunds surface
 `;
   assert.deepEqual(extractRequiredMissingSurfaces(input), [
-    "Admin refunds page",
-    "Operator command"
+    { surface: "Admin refunds page", sliceRef: "slice-2" }
   ]);
 });
 
@@ -354,18 +445,14 @@ test("implementation-slices gate: missing siblings, definition, and supported cl
 
 test("implementation-slices gate: optional prerequisite gaps activates cross-check", () => {
   const root = mkdtempSync(path.join(tmpdir(), "slices-gate-prereq-"));
+  const gaps = (sliceRef: string): string =>
+    `#### Prerequisite: Required\n- status: scheduled_in_slices\n- surface_kind: required_missing_user_reachable_surface\n- surface_identity: Admin refunds page\n- slice_ref: ${sliceRef}\n`;
   try {
     const { feature } = fixture(root);
     assert.equal(validateImplementationSlices("projects/p1/feature-a", root).exitCode, 0);
-    writeFileSync(
-      path.join(feature, "prerequisite_gaps.md"),
-      `#### Prerequisite: Required\n- status: unmet\n- surface_kind: required_missing_user_reachable_surface\n- surface_identity: Admin refunds page\n`
-    );
+    writeFileSync(path.join(feature, "prerequisite_gaps.md"), gaps("slice-9"));
     assert.equal(validateImplementationSlices("projects/p1/feature-a", root).exitCode, 1);
-    writeFileSync(
-      path.join(feature, "prerequisite_gaps.md"),
-      `#### Prerequisite: Required\n- status: unmet\n- surface_kind: required_missing_user_reachable_surface\n- surface_identity: Order query endpoint\n`
-    );
+    writeFileSync(path.join(feature, "prerequisite_gaps.md"), gaps("slice-2"));
     assert.equal(validateImplementationSlices("projects/p1/feature-a", root).exitCode, 0);
   } finally {
     rmSync(root, { recursive: true, force: true });

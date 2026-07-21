@@ -44,7 +44,6 @@ for (const source of TERMINAL_SOURCES) {
 }
 
 const LEDGER_TEMPLATES = [
-  "overmind/templates/missing_br_data_TEMPLATE.md",
   "packages/installer/_data/skills/overmind-task-to-br/assets/missing_br_data_TEMPLATE.md"
 ] as const;
 

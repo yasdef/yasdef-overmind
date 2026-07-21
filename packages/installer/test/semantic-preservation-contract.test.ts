@@ -141,7 +141,7 @@ const emptyLedger = `# Missing Business Data
 const pendingErrorResponseLedger = `# Missing Business Data
 
 ## 2. Missing Business Fields
-- ambiguity trigger \`simple\` remains in ### Negative and rejection cases -> rejection_cases; move the unresolved wording to missing_br_data.md as rised_item_N with rised=false
+- none
 
 ## 3. Unresolved Items Ledger (Rised)
 - rised_item_1: source=### Negative and rejection cases -> rejection_cases; rised=false; unresolved_item=What exact error response must a rejected Telegram registration return?
@@ -153,13 +153,12 @@ const pendingErrorResponseLedger = `# Missing Business Data
 - unresolved_after_stop: Waiting for the required rejection response content.
 `;
 
-test("measured regression: ambiguous rejection response outside the legacy move list is rejected", () => {
+// Discovering that the rejection response is still open is the model's work in
+// step 4.1: the gate no longer decides business completeness from the wording
+// that survived into the BR.
+test("measured regression: the gate does not judge business completeness by BR wording", () => {
   withFeature(regressionSummary, emptyLedger, (featureDir, root) => {
-    const result = validateTaskToBr(featureDir, root);
-    assert.equal(result.exitCode, 1);
-    assert.deepEqual(result.problems, [
-      "ambiguity trigger `simple` remains in ### Negative and rejection cases -> rejection_cases; move the unresolved wording to missing_br_data.md as rised_item_N with rised=false and set that field to [UNFILLED], or record an answered rised=true item naming that field to confirm the wording"
-    ]);
+    assert.equal(validateTaskToBr(featureDir, root).exitCode, 0);
   });
 });
 
@@ -289,4 +288,239 @@ test("skill contract: required backend test levels reach verification", () => {
     /\*\*Verification:\*\* Backend automated API tests[^\n]*invalid task data generally and the missing-title case/
   );
   assert.match(earsGolden, /Out of scope:[^\n]*time-tracking analytics reports/);
+});
+
+// Step 4.1 owns semantic gap discovery. These assertions prove the skill states
+// the active-discovery rule and its business scope — not that a run produces any
+// particular wording or question count.
+test("skill contract: task-to-BR states an active business-gap discovery rule", () => {
+  const taskToBrSkill = readFileSync(packagedSkillFile("overmind-task-to-br", "SKILL.md"), "utf8");
+
+  assert.match(taskToBrSkill, /### Business Gap Discovery/);
+  // Every relevant unresolved or low-confidence detail leaves as a question.
+  assert.match(
+    taskToBrSkill,
+    /Externalize every relevant business detail that stays unresolved, or that you cannot state confidently[^\n]*instead of inferring an answer/
+  );
+  assert.match(
+    taskToBrSkill,
+    /A gap exists whenever a relevant business detail stays unresolved, or you cannot state it confidently/
+  );
+  // Imprecise wording is mandatory to clarify, over an open trigger set, and
+  // paraphrasing it away is not a resolution.
+  assert.match(
+    taskToBrSkill,
+    /MUST become a question unless the surrounding source content already makes the intended result concrete/
+  );
+  assert.match(taskToBrSkill, /These words are examples, not a closed list/);
+  assert.match(
+    taskToBrSkill,
+    /Rewriting that wording into another imprecise phrase, or dropping it from the BR, does not resolve the gap/
+  );
+  // Discovery runs on the source, so a passing gate proves nothing about it.
+  assert.match(taskToBrSkill, /A passing gate is not evidence that discovery was performed/);
+  // Consolidation: one gap, one ledger item, every affected field in the locator.
+  assert.match(
+    taskToBrSkill,
+    /One independent gap produces one ledger item[^\n]*\n?[^\n]*`source=` locator list/
+  );
+  // Business scope only; implementation choices stay out.
+  assert.match(
+    taskToBrSkill,
+    /business intent, actors, access, scope, rules, inputs, outputs, states, failures, and user-visible outcomes/
+  );
+  assert.match(
+    taskToBrSkill,
+    /Do not ask technical implementation, architecture, framework, deployment, or code-structure questions/
+  );
+  // No closed lexical policy survives in the skill.
+  assert.equal(/deterministic backstop over generated BR fields/.test(taskToBrSkill), false);
+  assert.equal(/Source-Obligation Review/.test(taskToBrSkill), false);
+});
+
+test("skill contract: consolidating semantic prose keeps the surrounding task-to-BR contracts", () => {
+  const taskToBrSkill = readFileSync(packagedSkillFile("overmind-task-to-br", "SKILL.md"), "utf8");
+
+  // Capture and runtime paths.
+  assert.match(taskToBrSkill, /node \.overmind\/overmind\.js capture task-to-br <feature-path>/);
+  assert.match(taskToBrSkill, /### Runtime Path Bindings/);
+  assert.match(
+    taskToBrSkill,
+    /Do not replace runtime bindings with fixed `overmind\/product\/\.\.\.` assumptions/
+  );
+  // Ledger syntax and terminal state.
+  assert.match(taskToBrSkill, /### Deterministic Ledger Markers/);
+  assert.match(
+    taskToBrSkill,
+    /- `- rised_item_N: source=<section> -> <field>; rised=false; unresolved_item=<text>`/
+  );
+  assert.match(taskToBrSkill, /### Ledger Terminal State/);
+  // A gate repair round must not thin the ledger step 4.2 consumes, and must
+  // still be able to fix the marker state the gate itself reports as invalid.
+  assert.match(
+    taskToBrSkill,
+    /On refresh, preserve every existing `rised_item_N`, including the items written by `### Business Gap Discovery`/
+  );
+  assert.match(
+    taskToBrSkill,
+    /restore a missing or malformed `rised` marker, and renumber to keep numbering deterministic and gap-free/
+  );
+  // Discovery owns which questions exist and where they point; gate output
+  // can never retire one.
+  assert.match(
+    taskToBrSkill,
+    /unless that discovery requires correcting, merging, or removing an item; gate output alone never removes one\. Keep every `rised=true` item unchanged\./
+  );
+  // The locator is a destination for step 4.2's answer, not an origin record.
+  assert.match(
+    taskToBrSkill,
+    /The `source=` locator names the affected BR field that step 4\.2 will populate\. Keep that field `\[UNFILLED\]` until the answer is recorded\./
+  );
+  // Source references and linked artifacts.
+  assert.match(taskToBrSkill, /### Captured Source Binding/);
+  assert.match(taskToBrSkill, /required_source_refs/);
+  assert.match(taskToBrSkill, /### Linked Artifact Extraction For Jira Sources/);
+  // Readiness handoff and the final gate loop.
+  assert.match(taskToBrSkill, /node \.overmind\/overmind\.js gate task-to-br <feature-path>/);
+  assert.match(taskToBrSkill, /`2`: runtime or validation failure/);
+  assert.match(
+    taskToBrSkill,
+    /Task-to-BR phase is finished\. Nothing else to do now; press Ctrl-C so orchestrator can start the next phase/
+  );
+  // Step 4.2 stays the consumer of the ledger this step produces.
+  assert.match(
+    taskToBrSkill,
+    /answer-handling lifecycle is governed by the downstream `overmind-br-clarification` skill/
+  );
+});
+
+interface LedgerItem {
+  id: string;
+  rised: string;
+  locators: { section: string; field: string }[];
+}
+
+function parseLedgerItems(ledger: string): LedgerItem[] {
+  return ledger
+    .split(/\r?\n/)
+    .map((line) =>
+      /^- (rised_item_\d+): source=(.+?); rised=(\w+); unresolved_item=/.exec(line.trim())
+    )
+    .filter((match): match is RegExpExecArray => match !== null)
+    .map((match) => ({
+      id: match[1] ?? "",
+      rised: match[3] ?? "",
+      locators: (match[2] ?? "").split(",").map((locator) => {
+        const [section, field] = locator.split("->").map((part) => part.trim());
+        return { section: section ?? "", field: field ?? "" };
+      })
+    }));
+}
+
+test("skill contract: ledger locators match the field state the BR example shows", () => {
+  const brGolden = readFileSync(
+    packagedSkillFile("overmind-task-to-br", "assets", "feature_br_summary_GOLDEN_EXAMPLE.md"),
+    "utf8"
+  );
+  const items = parseLedgerItems(
+    readFileSync(
+      packagedSkillFile("overmind-task-to-br", "assets", "missing_br_data_GOLDEN_EXAMPLE.md"),
+      "utf8"
+    )
+  );
+
+  // The example is a mid-loop snapshot, so it must demonstrate both ledger states.
+  assert.ok(items.some((item) => item.rised === "false"));
+  assert.ok(items.some((item) => item.rised === "true"));
+
+  // Step 4.2 writes each answer into the fields the locator names, so the pending
+  // question points at the requirement that decision belongs in.
+  assert.deepEqual(
+    items.filter((item) => item.rised === "false").map((item) => item.locators),
+    [
+      [{ section: "## 6. Functional Requirements", field: "FR-5" }],
+      [
+        {
+          section: "### Recovery and retry expectations",
+          field: "retry_or_recovery_expectations"
+        }
+      ],
+      [{ section: "### 5.3 Open scope boundaries", field: "unclear_scope_points" }]
+    ]
+  );
+
+  const brLines = brGolden.split(/\r?\n/).map((line) => line.trim());
+  for (const item of items) {
+    for (const { section, field } of item.locators) {
+      assert.equal(brLines.includes(section), true, `${item.id}: missing heading ${section}`);
+      const unfilled = brLines.includes(`- ${field}: [UNFILLED]`);
+      const populated = brLines.some(
+        (line) => line.startsWith(`- ${field}: `) && !line.endsWith("[UNFILLED]")
+      );
+      if (item.rised === "false") {
+        // Pending: the field waits for the answer step 4.2 will collect.
+        assert.equal(unfilled, true, `${item.id}: ${field} is not [UNFILLED]`);
+      } else {
+        // Answered: the agreed content is back in every field the item names.
+        assert.equal(populated, true, `${item.id}: answered ${field} is not populated`);
+      }
+    }
+  }
+});
+
+test("skill contract: task-to-BR examples show one consolidated question and no redundant one", () => {
+  const brGolden = readFileSync(
+    packagedSkillFile("overmind-task-to-br", "assets", "feature_br_summary_GOLDEN_EXAMPLE.md"),
+    "utf8"
+  );
+  const ledgerGolden = readFileSync(
+    packagedSkillFile("overmind-task-to-br", "assets", "missing_br_data_GOLDEN_EXAMPLE.md"),
+    "utf8"
+  );
+
+  // One acceptance-affecting decision restated in two BR fields is one ledger item.
+  const consolidated = parseLedgerItems(ledgerGolden).filter((item) =>
+    item.locators.some((locator) => locator.field === "rejection_cases")
+  );
+  assert.equal(consolidated.length, 1);
+  assert.deepEqual(consolidated[0]?.locators, [
+    { section: "### Negative and rejection cases", field: "rejection_cases" },
+    { section: "## 7. Business Rules and Decision Logic", field: "BR-4" }
+  ]);
+
+  // A detail the source states clearly enough to record produces no redundant
+  // question: the states that bound FR-4 are recorded in the source snapshot.
+  assert.match(brGolden, /- FR-4:[^\n]*reset-status screen showing exactly one of/);
+  assert.match(
+    brGolden,
+    /- stated_acceptance_criteria:[^\n]*link sent, link expired, link already used, or password updated/
+  );
+  assert.equal(/rised_item_\d+:[^\n]*FR-4/.test(ledgerGolden), false);
+
+  // Several active business gaps are illustrated, not one token-driven question.
+  assert.ok(parseLedgerItems(ledgerGolden).filter((item) => item.rised === "false").length >= 2);
+});
+
+test("skill contract: the task-to-BR example asks nothing the source already settled", () => {
+  const brGolden = readFileSync(
+    packagedSkillFile("overmind-task-to-br", "assets", "feature_br_summary_GOLDEN_EXAMPLE.md"),
+    "utf8"
+  );
+  const ledgerGolden = readFileSync(
+    packagedSkillFile("overmind-task-to-br", "assets", "missing_br_data_GOLDEN_EXAMPLE.md"),
+    "utf8"
+  );
+
+  // The source excludes the SMS delivery channel in its constraints and scope.
+  assert.match(brGolden, /- stated_constraints:[^\n]*no SMS delivery channel/);
+  assert.match(brGolden, /- out_of_scope_items:[^\n]*SMS delivery channel/);
+  // A settled exclusion is recorded as an assumption, never reopened as a question.
+  assert.match(brGolden, /- confirmed_assumptions:[^\n]*SMS fallback is excluded by the source/);
+  const questions = ledgerGolden
+    .split(/\r?\n/)
+    .filter((line) => line.trim().startsWith("- rised_item_"));
+  assert.ok(questions.length > 0);
+  for (const question of questions) {
+    assert.equal(/SMS/i.test(question), false, `ledger reopens settled scope: ${question}`);
+  }
 });

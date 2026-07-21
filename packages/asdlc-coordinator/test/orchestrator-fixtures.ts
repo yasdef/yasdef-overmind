@@ -26,7 +26,9 @@ import type {
   TerminalGateChainRunner
 } from "../src/validate/terminal-gate-chain.js";
 
-const templatesDir = fileURLToPath(new URL("../../../../overmind/templates", import.meta.url));
+const templatesDir = fileURLToPath(
+  new URL("../../../../packages/installer/_data/templates", import.meta.url)
+);
 
 const PROJECT_TYPE_LABELS: Record<string, string> = {
   A: "New project",

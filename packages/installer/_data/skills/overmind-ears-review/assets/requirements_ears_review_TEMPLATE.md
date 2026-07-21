@@ -1,8 +1,8 @@
 # Requirements EARS Extra Review - Template
 
-Use this artifact to track review findings discovered when `requirements_ears.md`
-is checked against the authoritative source `feature_br_summary.md` and the raw
-drift-detection backstop `user_br_input.md`.
+Use this artifact to track review findings recorded by the step 5.1 review of
+`requirements_ears.md` against its read-only sources `user_br_input.md`,
+`feature_br_summary.md`, and `missing_br_data.md`.
 
 ## 1. Document Meta
 - feature_id: [UNFILLED]
@@ -27,8 +27,8 @@ drift-detection backstop `user_br_input.md`.
 ### Finding <N> - <Short gap title>
 - severity: Medium
 - state: escalated
-- source_br_summary_reference: <section, bullet, or note in feature_br_summary.md that motivated the finding>
-- source_user_br_input_reference: <raw rule/location in user_br_input.md that was narrowed, or `none` when the finding is not motivated by raw-source drift>
+- source_br_summary_reference: <section, bullet, or note in feature_br_summary.md, or `none`>
+- source_user_br_input_reference: <section, bullet, or note in user_br_input.md, or `none`>
 - related_requirement_targets: <Requirement ids to update, or `new requirement`>
 - gap_summary: <what is missing, ambiguous, or inconsistent in requirements_ears.md>
 - recommendation: <recommended requirement change in plain language>

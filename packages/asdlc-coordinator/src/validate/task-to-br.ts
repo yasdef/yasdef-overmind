@@ -5,7 +5,6 @@ import {
   deriveCapturedSourceRefs,
   getScalarField,
   isUnfilled,
-  normalizeLedgerLocatorPart,
   parseBulletField,
   parseSourceRefs,
   readFeatureBrSummary,
@@ -15,31 +14,9 @@ import {
 } from "../parse/index.js";
 
 import type { CapturedSourceRefs } from "../parse/index.js";
-import type { GateResult, MissingBrData } from "../types/index.js";
+import type { GateResult } from "../types/index.js";
 
 const TERMINAL_UNRESOLVED_AFTER_STOP = "none";
-
-/**
- * Business-bearing sections scanned for ambiguity triggers. Document Meta,
- * Existing-System Context, and Linked Artifacts carry metadata, repo-scan
- * evidence, and artifact locators, so their wording is not source business text.
- */
-const AMBIGUITY_SCANNED_SECTIONS = new Set([2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15]);
-
-/**
- * Closed lexical backstop for the durable ambiguity rule. Whole-word/phrase
- * matching keeps derived words such as `faster` or `simplified` out of the
- * match; the semantic rule in the skill still covers ambiguity this list cannot
- * recognize.
- */
-const AMBIGUITY_TRIGGERS = ["fast", "better", "simple", "as needed", "TBD", "etc."] as const;
-const AMBIGUITY_TRIGGER_PATTERNS = AMBIGUITY_TRIGGERS.map((trigger) => ({
-  trigger,
-  pattern: new RegExp(
-    `(?<![A-Za-z0-9_])${trigger.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![A-Za-z0-9_])`,
-    "i"
-  )
-}));
 
 export function validateTaskToBr(inputPath: string, cwd = process.cwd()): GateResult {
   if (!inputPath || inputPath.trim() === "") {
@@ -93,11 +70,6 @@ function validateSummaryContent(
 ): string[] {
   const lines = content.split(/\r?\n/);
   const problems: string[] = [];
-  const ambiguityOccurrences: AmbiguityOccurrence[] = [];
-  let currentH2Heading = "";
-  let currentH3Heading = "";
-  let inScannedSection = false;
-  let inScannedSubsection = true;
   let inMeta = false;
   let inOriginalSummary = false;
   let inBusinessGoal = false;
@@ -130,8 +102,6 @@ function validateSummaryContent(
       inBusinessGoal = /^###\s+3\.1\s+Business\s+goal\s*$/.test(heading);
       inNeedsValidation = /^###\s+Needs\s+validation\s*$/.test(heading);
       inOpenScopeBoundaries = /^###\s+5\.3\s+Open\s+scope\s+boundaries\s*$/.test(heading);
-      currentH3Heading = heading;
-      inScannedSubsection = !/^###\s+2\.2\s+Raw\s+source\s+references\s*$/.test(heading);
       inMeta = false;
       if (inOriginalSummary) {
         sawOriginalSummary = true;
@@ -151,12 +121,6 @@ function validateSummaryContent(
       inOriginalSummary = false;
       inBusinessGoal = false;
       inNeedsValidation = false;
-      currentH2Heading = heading;
-      currentH3Heading = "";
-      inScannedSubsection = true;
-      inScannedSection = AMBIGUITY_SCANNED_SECTIONS.has(
-        Number.parseInt(heading.match(/^##\s+([0-9]+)\./)?.[1] ?? "", 10)
-      );
       if (inMeta) {
         sawMeta = true;
       }
@@ -217,26 +181,6 @@ function validateSummaryContent(
       !field.value.toLowerCase().includes("rised")
     ) {
       nonRisedScopePointsFound = true;
-    }
-
-    if (inScannedSection && inScannedSubsection && !isUnfilled(field.value)) {
-      const triggers = findAmbiguityTriggers(field.value);
-      if (triggers.length > 0) {
-        const location = currentH3Heading === "" ? currentH2Heading : currentH3Heading;
-        const confirmed = isConfirmedByLedger(
-          missingData,
-          field.key,
-          currentH2Heading,
-          currentH3Heading
-        );
-        for (const trigger of triggers) {
-          ambiguityOccurrences.push({
-            trigger,
-            field: `${location} -> ${field.key}`,
-            confirmed
-          });
-        }
-      }
     }
   }
 
@@ -312,8 +256,6 @@ function validateSummaryContent(
       "### 5.3 Open scope boundaries -> unresolved unclear_scope_points must be moved to missing_br_data.md as rised_item_N with rised=false"
     );
   }
-  problems.push(...describeAmbiguity(ambiguityOccurrences));
-
   // The ledger is terminal when it raised nothing, or when every raised item is
   // answered. An item without a valid rised state is reported separately and
   // never counts as terminal. `gate_result` is historical evidence of an earlier
@@ -354,80 +296,6 @@ function validateSummaryContent(
   }
 
   return problems;
-}
-
-interface AmbiguityOccurrence {
-  trigger: string;
-  /** `<section or subsection heading> -> <field key>`, as reported to the model. */
-  field: string;
-  confirmed: boolean;
-}
-
-/**
- * Reporting groups by trigger; confirmation stays per field. A BR routinely
- * restates one business fact as a constraint, a functional requirement, and a
- * business rule, so per-field reporting turns one open question into several
- * near-duplicate diagnostics. Evidence still has to name the field it clears:
- * one answered item may list every field its answer covers, and fields it does
- * not name remain reported, because the same trigger word can carry unrelated
- * questions in different fields.
- */
-function describeAmbiguity(occurrences: AmbiguityOccurrence[]): string[] {
-  const byTrigger = new Map<string, AmbiguityOccurrence[]>();
-  for (const occurrence of occurrences) {
-    if (occurrence.confirmed) {
-      continue;
-    }
-    const group = byTrigger.get(occurrence.trigger);
-    if (group) {
-      group.push(occurrence);
-    } else {
-      byTrigger.set(occurrence.trigger, [occurrence]);
-    }
-  }
-
-  const problems: string[] = [];
-  for (const [trigger, group] of byTrigger) {
-    const fields = group.map((occurrence) => occurrence.field).join(", ");
-    const target = group.length === 1 ? "that field" : "those fields";
-    problems.push(
-      `ambiguity trigger \`${trigger}\` remains in ${fields}; move the unresolved wording to missing_br_data.md as rised_item_N with rised=false and set ${target} to [UNFILLED], or record an answered rised=true item naming ${target} to confirm the wording`
-    );
-  }
-  return problems;
-}
-
-/**
- * Every trigger the value carries, not just the first. A field reading
- * `fast and simple response as needed` holds three separate questions, and
- * confirmation is per field: reporting one trigger would let the operator
- * confirm wording whose other ambiguities were never shown to them.
- */
-function findAmbiguityTriggers(value: string): string[] {
-  return AMBIGUITY_TRIGGER_PATTERNS.filter(({ pattern }) => pattern.test(value)).map(
-    ({ trigger }) => trigger
-  );
-}
-
-/**
- * An answered ledger item is the durable evidence that the operator confirmed the
- * original wording of the fields it names. The locator section may name either
- * the enclosing `##` section or the `###` subsection that holds the field, so
- * both are accepted.
- */
-function isConfirmedByLedger(
-  missingData: MissingBrData,
-  fieldKey: string,
-  h2Heading: string,
-  h3Heading: string
-): boolean {
-  const field = normalizeLedgerLocatorPart(fieldKey);
-  const sections = [normalizeLedgerLocatorPart(h2Heading), normalizeLedgerLocatorPart(h3Heading)];
-  return missingData.risedItems.some(
-    (item) =>
-      item.risedState === "true" &&
-      item.sources.some((source) => source.field === field && sections.includes(source.section))
-  );
 }
 
 function gatePassed(): GateResult {

@@ -29,7 +29,6 @@ const SLICE_FIELDS = [
   "objective",
   "first_increment",
   "prerequisites",
-  "preserved_operator_surface",
   "evidence"
 ] as const;
 const HANDOFF_KEYS = [
@@ -40,9 +39,19 @@ const HANDOFF_KEYS = [
 
 interface SliceBlock {
   number: number;
+  declaredNumber: number;
   heading: string;
   fields: Map<string, string>;
   bullets: string[];
+}
+
+/**
+ * A required missing operator-facing surface as recorded in `prerequisite_gaps.md`,
+ * carrying the slice link that decides its coverage (CRP-171 D1).
+ */
+export interface RequiredSurface {
+  surface: string;
+  sliceRef: string;
 }
 
 export function validateImplementationSlices(inputPath: string, cwd = process.cwd()): GateResult {
@@ -113,7 +122,7 @@ export function validateImplementationSlices(inputPath: string, cwd = process.cw
 export function validateImplementationSlicesContent(
   content: string,
   activeClasses: Set<string>,
-  requiredSurfaces: string[] = []
+  requiredSurfaces: RequiredSurface[] = []
 ): string[] {
   const problems: string[] = [];
   const fail = (message: string): void => {
@@ -139,10 +148,11 @@ export function validateImplementationSlicesContent(
       if (section !== "") seenSections.add(section);
       continue;
     }
-    const sliceHeading = rawLine.match(/^###\s+Slice\s+[0-9]+:/);
+    const sliceHeading = rawLine.match(/^###\s+Slice\s+([0-9]+):/);
     if (section === "3" && sliceHeading) {
       currentSlice = {
         number: slices.length + 1,
+        declaredNumber: Number(sliceHeading[1]),
         heading: normalize(rawLine),
         fields: new Map(),
         bullets: []
@@ -194,8 +204,12 @@ export function validateImplementationSlicesContent(
     fail("traceability_scope must be slice_level_only");
 
   let plannedCount = 0;
-  const coveredSurfaces: string[] = [];
+  const slicesByDeclaredNumber = new Map<number, SliceBlock>();
+  const duplicateNumbers = new Set<number>();
   for (const slice of slices) {
+    if (slicesByDeclaredNumber.has(slice.declaredNumber))
+      duplicateNumbers.add(slice.declaredNumber);
+    else slicesByDeclaredNumber.set(slice.declaredNumber, slice);
     for (const key of SLICE_FIELDS)
       if (unfilled(slice.fields.get(key)))
         fail(`slice ${slice.number} missing or unfilled key: ${key}`);
@@ -233,61 +247,71 @@ export function validateImplementationSlicesContent(
     }
     if (slice.bullets.length < 2)
       fail(`slice ${slice.number} must include at least 2 concrete checklist bullets`);
-
-    const preservedSurface = (slice.fields.get("preserved_operator_surface") ?? "").trim();
-    if (preservedSurface.toLowerCase() !== "none") {
-      if (!hasSurfaceTerms(preservedSurface))
-        fail(
-          `slice ${slice.number} preserved_operator_surface is not operator-facing: ${preservedSurface}`
-        );
-      const coverageText = [
-        slice.heading,
-        slice.fields.get("objective"),
-        slice.fields.get("first_increment"),
-        ...slice.bullets
-      ]
-        .join(" ")
-        .toLowerCase();
-      if (looksSupportingOnly(coverageText))
-        fail(
-          `slice ${slice.number} marks preserved_operator_surface but describes supporting-only scaffolding work`
-        );
-      coveredSurfaces.push(preservedSurface);
-    }
   }
   if (slices.length < 1) fail("slice candidates section must contain at least one Slice block");
   if (plannedCount < 1) fail("slice candidates must contain at least one planned slice");
-  for (const requiredSurface of requiredSurfaces) {
-    if (!coveredSurfaces.some((candidate) => surfaceMatches(requiredSurface, candidate))) {
+  for (const number of [...duplicateNumbers].sort((left, right) => left - right))
+    fail(`slice candidates declare duplicate slice number: ${number}`);
+  for (const { surface, sliceRef } of requiredSurfaces) {
+    const reference = sliceRef.trim();
+    const parsed = reference.match(/^slice-([0-9]+)$/i);
+    if (!parsed) {
       fail(
-        `required missing operator-facing surface is not preserved by any slice: ${requiredSurface}`
+        `required missing operator-facing surface has an unusable slice_ref: ${surface} -> ${reference === "" ? "(empty)" : reference}`
       );
+      continue;
     }
+    // A duplicated number makes the link ambiguous; the duplicate itself is already
+    // reported, so no coverage conclusion is drawn from an arbitrary matching slice.
+    if (duplicateNumbers.has(Number(parsed[1]))) continue;
+    const linked = slicesByDeclaredNumber.get(Number(parsed[1]));
+    if (!linked) {
+      fail(
+        `required missing operator-facing surface is linked to a slice that is not declared: ${surface} -> ${reference}`
+      );
+      continue;
+    }
+    const coverageText = [
+      linked.heading,
+      linked.fields.get("objective"),
+      linked.fields.get("first_increment"),
+      ...linked.bullets
+    ]
+      .join(" ")
+      .toLowerCase();
+    if (looksSupportingOnly(coverageText))
+      fail(
+        `required missing operator-facing surface is linked to a slice describing supporting-only scaffolding work: ${surface} -> ${reference}`
+      );
   }
   for (const key of HANDOFF_KEYS)
     if (unfilled(handoff.get(key))) fail(`missing or unfilled handoff key: ${key}`);
   return problems;
 }
 
-export function extractRequiredMissingSurfaces(content: string): string[] {
-  const surfaces = new Set<string>();
+export function extractRequiredMissingSurfaces(content: string): RequiredSurface[] {
+  const surfaces = new Map<string, RequiredSurface>();
   let inPrerequisite = false;
   let status = "";
   let surfaceKind = "";
   let surfaceIdentity = "";
+  let sliceRef = "";
   const flush = (): void => {
     if (
       inPrerequisite &&
-      (status === "scheduled_in_slices" || status === "unmet") &&
+      status === "scheduled_in_slices" &&
       surfaceKind === "required_missing_user_reachable_surface" &&
       !unfilledOrNone(surfaceIdentity)
     ) {
-      surfaces.add(surfaceIdentity.trim());
+      const surface = surfaceIdentity.trim();
+      const reference = unfilledPlaceholder(sliceRef) ? "" : sliceRef.trim();
+      surfaces.set(`${surface} ${reference}`, { surface, sliceRef: reference });
     }
     inPrerequisite = false;
     status = "";
     surfaceKind = "";
     surfaceIdentity = "";
+    sliceRef = "";
   };
   for (const line of content.split(/\r?\n/)) {
     if (/^#### Prerequisite:/.test(line)) {
@@ -305,35 +329,10 @@ export function extractRequiredMissingSurfaces(content: string): string[] {
     if (kv.key === "status") status = kv.value;
     else if (kv.key === "surface_kind") surfaceKind = kv.value;
     else if (kv.key === "surface_identity") surfaceIdentity = kv.value;
+    else if (kv.key === "slice_ref") sliceRef = kv.value;
   }
   flush();
-  return [...surfaces].sort();
-}
-
-export function canonicalSurface(value: string): string {
-  return value
-    .toLowerCase()
-    .trim()
-    .replace(/sign[\s-]*in|log[\s-]*in|authenticate|authentication/g, "login")
-    .replace(/screen|view/g, "page")
-    .replace(/path|url|entry\s*point|entry/g, "route")
-    .replace(/portal|console|dashboard/g, "route")
-    .replace(/container/g, "shell")
-    .replace(/search|find/g, "lookup")
-    .replace(/cli\s+tool|admin\s+tool|tooling\s+command|tool\s+command/g, "command")
-    .replace(/cli/g, "command")
-    .replace(/scheduled\s+task|cron\s+job/g, "job")
-    .replace(/rest\s+endpoint|api\s+endpoint|http\s+endpoint/g, "endpoint")
-    .replace(/\b(?:post|get|put|patch|delete)\s+\/\S+/g, "endpoint")
-    .replace(/[^a-z0-9]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-export function hasSurfaceTerms(value: string): boolean {
-  return /(?:login|shell|route|lookup|page|workspace|form|command|job|endpoint|tool|link)/.test(
-    canonicalSurface(value)
-  );
+  return [...surfaces.values()].sort((left, right) => left.surface.localeCompare(right.surface));
 }
 
 export function looksSupportingOnly(value: string): boolean {
@@ -347,35 +346,6 @@ export function looksSupportingOnly(value: string): boolean {
       lower
     );
   return hasSupport && !hasSurface;
-}
-
-export function surfaceMatches(requiredValue: string, candidateValue: string): boolean {
-  const required = canonicalSurface(requiredValue);
-  const candidate = canonicalSurface(candidateValue);
-  if (required === "" || candidate === "") return false;
-  if (required === candidate || candidate.includes(required) || required.includes(candidate))
-    return true;
-  const candidateTokens = new Set(candidate.split(/\s+/));
-  let sharedSpecific = 0;
-  let requiredSpecific = 0;
-  let sharedContent = 0;
-  let requiredContent = 0;
-  for (const token of required.split(/\s+/)) {
-    if (/^(?:login|shell|route|lookup|command|job|endpoint|tool)$/.test(token)) {
-      requiredSpecific += 1;
-      if (candidateTokens.has(token)) sharedSpecific += 1;
-    } else if (!/^(?:page|form|link)$/.test(token) && !isWeakContentToken(token)) {
-      requiredContent += 1;
-      if (candidateTokens.has(token)) sharedContent += 1;
-    }
-  }
-  if (requiredSpecific > 0)
-    return requiredContent > 0 ? sharedSpecific > 0 && sharedContent > 0 : sharedSpecific > 0;
-  return sharedContent >= 2;
-}
-
-function isWeakContentToken(token: string): boolean {
-  return /^(?:operator|admin|user|protected|authenticated|workflow|surface|account)$/.test(token);
 }
 
 function parseKeyValue(line: string): { key: string; value: string } | undefined {

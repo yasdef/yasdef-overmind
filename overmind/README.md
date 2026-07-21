@@ -111,7 +111,7 @@ node .overmind/overmind.js run --path projects/<project-id>
 ### Requirements — steps `5`–`5.1`
 
 - **`5` Convert Business Requirements Structuring to EARS** — produces `requirements_ears.md` from the clarified summary.
-- **`5.1` (optional) requirement_ears extra review** — an independent review pass that checks the EARS requirements against the clarified summary and the raw story, and records findings in `requirements_ears_review.md`. It may amend `requirements_ears.md`.
+- **`5.1` (optional) requirement_ears extra review** — an independent review pass that first checks how faithfully the raw story was captured in the summary and the EARS requirements, then checks how faithfully the clarified summary was translated into EARS. Findings are recorded in `requirements_ears_review.md`, and accepted ones may amend `requirements_ears.md`.
 
 **Checkpoint.** `requirements_ears.md` is a required human review. Read it yourself before continuing.
 

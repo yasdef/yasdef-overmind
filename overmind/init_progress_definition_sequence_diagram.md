@@ -74,7 +74,7 @@ sequenceDiagram
       PO->>PO: 5. BR → EARS → requirements_ears.md
       opt 5.1 Optional EARS review
         loop Until no escalated findings
-          PO->>PO: 5.1 Review EARS vs authoritative feature_br_summary.md + raw user_br_input.md narrowing backstop → requirements_ears_review.md
+          PO->>PO: 5.1 Review raw user_br_input.md capture fidelity, then authoritative feature_br_summary.md → EARS translation fidelity → requirements_ears_review.md
           PO->>PO: Apply accepted edits or record rejection
         end
         Note over PO: Post-session completion check: coordinator re-runs the requirements-ears gate over requirements_ears.md and the ears-review gate over requirements_ears_review.md; both must pass before 5.1 completes and checkpoints.

@@ -27,7 +27,7 @@ The `implementation-slices` gate SHALL decide coverage of a required missing ope
 
 ### Requirement: A link resolves against the slice's declared heading number
 
-The gate SHALL resolve a `slice_ref` of the form `slice-<N>` against the number declared in a slice heading `### Slice <N>:`, independent of that slice's position in the document.
+The gate SHALL resolve a `slice_ref` of the form `slice-<N>` against the number declared in a slice heading `### Slice <N>:`, independent of that slice's position in the document, and SHALL require each declared slice number to be unique.
 
 #### Scenario: Slice headings are not in ascending order
 
@@ -38,6 +38,12 @@ The gate SHALL resolve a `slice_ref` of the form `slice-<N>` against the number 
 
 - **WHEN** a `slice_ref` for a required missing operator-facing surface does not have the form `slice-<N>`
 - **THEN** the gate fails, naming the surface and the unusable reference
+
+#### Scenario: Two slices declare the same number
+
+- **WHEN** `implementation_slices.md` declares more than one slice heading carrying the same `<N>`
+- **THEN** the gate fails, naming the duplicated slice number
+- **AND** the gate reaches no coverage conclusion for a `slice_ref` naming that number
 
 ### Requirement: Surface coverage is recorded once
 

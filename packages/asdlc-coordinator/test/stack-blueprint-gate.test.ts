@@ -11,12 +11,15 @@ import { validateStackBlueprint } from "../src/validate/stack-blueprint.js";
 
 const backendGolden = fileURLToPath(
   new URL(
-    "../../../../overmind/golden_examples/project_stack_blueprint_be_GOLDEN_EXAMPLE.md",
+    "../../../../packages/installer/_data/skills/overmind-stack-blueprint/assets/project_stack_blueprint_be_GOLDEN_EXAMPLE.md",
     import.meta.url
   )
 );
 const initTemplate = fileURLToPath(
-  new URL("../../../../overmind/templates/init_progress_definition_TEMPLATE.yaml", import.meta.url)
+  new URL(
+    "../../../../packages/installer/_data/templates/init_progress_definition_TEMPLATE.yaml",
+    import.meta.url
+  )
 );
 
 async function withProject(fn: (projectDir: string) => void | Promise<void>): Promise<void> {

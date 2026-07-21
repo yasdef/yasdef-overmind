@@ -36,7 +36,6 @@ This phase prioritizes thin vertical cuts, first usable increments, and minimal 
 - objective: [UNFILLED]
 - first_increment: [UNFILLED]
 - prerequisites: [none|UNFILLED]
-- preserved_operator_surface: [none|UNFILLED]
 - evidence: [gap/TECH_REQ-1 | gap/TECH_REQ-NFR-1, comp/component-slug]
 - [ ] [UNFILLED concrete implementation slice]
 - [ ] [UNFILLED concrete implementation slice]
@@ -60,7 +59,6 @@ A feature where a shared contract must be frozen before parallel downstream impl
 - objective: Freeze the shared order payload contract before parallel downstream implementation begins.
 - first_increment: Contract document is reviewed and frozen for consumer repo alignment.
 - prerequisites: none
-- preserved_operator_surface: none
 - evidence: gap/TECH_REQ-4, comp/backend-order-service
 - [ ] Draft shared order payload contract document and circulate for review
 - [ ] Confirm all consumer repo owners acknowledge the frozen contract before downstream slices start
@@ -71,7 +69,6 @@ A feature where a shared contract must be frozen before parallel downstream impl
 - objective: Deliver the backend order query endpoint returning projection-backed results.
 - first_increment: Backend order query endpoint returns correct projection-backed order status.
 - prerequisites: none
-- preserved_operator_surface: none
 - evidence: gap/TECH_REQ-6, comp/backend-order-service
 - [ ] Implement read service and repository wiring for projection-backed query
 - [ ] Add controller mapping and integration tests for the query endpoint
@@ -90,7 +87,6 @@ A feature with no cross-repo contract ambiguity. No coordination slice is emitte
 - objective: Deliver the backend order query endpoint returning projection-backed results.
 - first_increment: Backend order query endpoint returns correct projection-backed order status.
 - prerequisites: none
-- preserved_operator_surface: none
 - evidence: gap/TECH_REQ-6, comp/backend-order-service
 - [ ] Implement read service and repository wiring for projection-backed query
 - [ ] Add controller mapping and integration tests for the query endpoint
@@ -101,7 +97,6 @@ A feature with no cross-repo contract ambiguity. No coordination slice is emitte
 - objective: Map projection-backed order status fields in the frontend client.
 - first_increment: Frontend order list reflects projection-backed status without page reload.
 - prerequisites: none
-- preserved_operator_surface: none
 - evidence: gap/TECH_REQ-4, comp/frontend-order-client
 - [ ] Update frontend API adapter to map projection status fields from backend payload
 - [ ] Update order list UI state and rendering for projection-backed status display

@@ -14,7 +14,7 @@
 - surface_kind: [required_missing_user_reachable_surface | present_user_reachable_surface | transport_or_internal_execution_gap]
 - surface_identity: [UNFILLED | none]
 - evidence: [UNFILLED]
-- slice_ref: [UNFILLED | none]
+- slice_ref: [UNFILLED slice-<N> matching a `### Slice <N>:` heading in implementation_slices.md | none]
 
 ## 3. Requirement Coverage
 

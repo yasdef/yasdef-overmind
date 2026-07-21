@@ -34,11 +34,6 @@ function packagedTemplateSourcePath(templateName: string): string {
   return path.join(packageRoot(), "_data", "templates", templateName);
 }
 
-/** Canonical source template under overmind/templates that the packaged copy mirrors. */
-function canonicalTemplateSourcePath(templateName: string): string {
-  return path.resolve(packageRoot(), "..", "..", "overmind", "templates", templateName);
-}
-
 function packagedSetupSourcePath(setupName: string): string {
   return path.join(packageRoot(), "_data", "setup", setupName);
 }
@@ -780,19 +775,6 @@ test("fresh install and update both deploy the built coordinator bundle at .over
     assert.equal(readFileSync(cliPath, "utf8"), bundle);
     assert.ok(readFileSync(cliPath, "utf8").includes("Post-session gate"));
   });
-});
-
-test("packaged runtime templates match the canonical overmind/templates source", () => {
-  // The installer ships its own copy of each runtime template; keep it byte-identical
-  // to the canonical source so installed workspaces never receive a stale workflow
-  // definition (e.g. missing the CRP-165 post-session gate completion conditions).
-  for (const templateName of RUNTIME_TEMPLATES) {
-    assert.equal(
-      readFileSync(packagedTemplateSourcePath(templateName), "utf8"),
-      readFileSync(canonicalTemplateSourcePath(templateName), "utf8"),
-      `${templateName} drifted from overmind/templates/${templateName}`
-    );
-  }
 });
 
 function typeADefinition(): string {
@@ -1686,14 +1668,53 @@ test("fresh install exposes ears-review skill, assets, commands, and final lines
       assert.equal(skillText.includes(successLine), true);
       assert.equal(skillText.includes(infeasibleLine), true);
 
-      // Dual-source contract: raw backstop, narrowing sweep, and mandatory citations.
+      // Dual-fidelity contract: ordered raw-capture then clarified-BR translation passes.
       assert.match(skillText, /user_br_input\.md/);
-      assert.match(skillText, /Mandatory Raw-Input Narrowing Sweep/);
+      assert.match(skillText, /missing_br_data\.md/);
+      assert.match(skillText, /### Pass 1 - Raw Capture Fidelity/);
+      assert.match(skillText, /### Pass 2 - Clarified-BR Translation Fidelity/);
+      assert.ok(
+        skillText.indexOf("### Pass 1 - Raw Capture Fidelity") <
+          skillText.indexOf("### Pass 2 - Clarified-BR Translation Fidelity"),
+        "raw capture fidelity must be contracted before translation fidelity"
+      );
+      // Complete raw-drift taxonomy, not a narrowing-only sweep.
+      for (const category of [
+        /\*\*lost obligation:\*\*/,
+        /\*\*removed guard:\*\*/,
+        /\*\*added guard:\*\*/,
+        /\*\*unsupported broadening:\*\*/,
+        /\*\*unsupported narrowing:\*\*/,
+        /\*\*actor or state change:\*\*/,
+        /\*\*contradiction:\*\*/,
+        /\*\*invented behavior:\*\*/
+      ]) {
+        assert.match(skillText, category);
+      }
+      assert.doesNotMatch(skillText, /Mandatory Raw-Input Narrowing Sweep/);
+      // Raw input is the primary capture-fidelity source, never framed as a backstop.
+      assert.doesNotMatch(skillText, /backstop/i);
       assert.match(skillText, /ACTIVE/);
+      assert.match(skillText, /OFFCHAIN_POINTS/);
+      assert.match(skillText, /rised=true/);
       assert.match(skillText, /source_user_br_input_reference/);
-      // No new ears-review CLI command or flag was introduced.
+      // A confirmed clarified decision that EARS already states still terminates as added to ears.
+      assert.match(
+        skillText,
+        /Use `added to ears` when `requirements_ears\.md` reflects the accepted business decision, either because the review applied an edit or because EARS already matched the confirmed decision and no edit was required\./
+      );
+      assert.match(skillText, /leave EARS unchanged, set the finding to `added to ears`/);
+      // A fully lost obligation has no BR location to cite; the literal none is the contract.
+      assert.match(
+        skillText,
+        /Set `source_br_summary_reference` to a concrete `feature_br_summary\.md` locator when corresponding BR content exists, and to the literal `none` when the raw obligation is entirely absent from the BR\./
+      );
+      // no_findings requires both comparisons.
+      assert.match(skillText, /no_findings: true` only after both Pass 1 and Pass 2/);
+      // No new ears-review CLI command, flag, artifact, model session, or phase was introduced.
       assert.doesNotMatch(skillText, /context ears-review <feature-path> --/);
       assert.doesNotMatch(skillText, /gate ears-review <feature-path> --/);
+      assert.doesNotMatch(skillText, /step 5\.2|second (model )?session|additional model call/i);
 
       const templateText = readFileSync(
         path.join(skillDir, "assets", "requirements_ears_review_TEMPLATE.md"),
@@ -1701,6 +1722,16 @@ test("fresh install exposes ears-review skill, assets, commands, and final lines
       );
       assert.match(templateText, /- source_user_br_input: \[UNFILLED\]/);
       assert.match(templateText, /- source_user_br_input_reference:/);
+      assert.doesNotMatch(templateText, /backstop/i);
+      // Both citation placeholders stay neutral; when `none` is valid lives only in SKILL.md.
+      assert.match(
+        templateText,
+        /- source_br_summary_reference: <section, bullet, or note in feature_br_summary\.md, or `none`>/
+      );
+      assert.match(
+        templateText,
+        /- source_user_br_input_reference: <section, bullet, or note in user_br_input\.md, or `none`>/
+      );
 
       const goldenText = readFileSync(
         path.join(skillDir, "assets", "requirements_ears_review_GOLDEN_EXAMPLE.md"),
@@ -1708,6 +1739,7 @@ test("fresh install exposes ears-review skill, assets, commands, and final lines
       );
       assert.match(goldenText, /- source_user_br_input: /);
       assert.match(goldenText, /ACTIVE qualifier narrows duplicate-account prohibition/);
+      assert.match(goldenText, /precondition lost before EARS/);
       assert.match(goldenText, /- source_user_br_input_reference: user_br_input\.md ->/);
       assert.match(goldenText, /- source_user_br_input_reference: none/);
     }
@@ -1758,6 +1790,39 @@ test("installed ears-review contract requires a three-location finding for the A
       assert.match(activeFinding, /- source_user_br_input_reference: user_br_input\.md ->/);
       assert.match(activeFinding, /- source_br_summary_reference: feature_br_summary\.md ->/);
       assert.match(activeFinding, /- related_requirement_targets: Requirement 12/);
+
+      // The golden example also shows removed-guard recovery with raw, BR, and EARS evidence.
+      const removedGuardFinding = goldenText
+        .split(/^### /m)
+        .find((block) => /precondition lost before EARS/.test(block));
+      assert.ok(removedGuardFinding, "golden example must include the removed-guard finding");
+      assert.match(removedGuardFinding, /- source_user_br_input_reference: user_br_input\.md ->/);
+      assert.match(removedGuardFinding, /- source_br_summary_reference: feature_br_summary\.md ->/);
+      assert.match(removedGuardFinding, /- related_requirement_targets: Requirement \d+/);
+
+      // A raw-only finding: the obligation never reached the BR, so there is no BR locator.
+      const lostObligationFinding = goldenText
+        .split(/^### /m)
+        .find((block) => /- source_br_summary_reference: none/.test(block));
+      assert.ok(lostObligationFinding, "golden example must include an entirely-absent-BR finding");
+      assert.match(lostObligationFinding, /- source_user_br_input_reference: user_br_input\.md ->/);
+      assert.match(lostObligationFinding, /- related_requirement_targets: \S+/);
+
+      // A confirmed clarified decision that EARS already satisfied terminates without an edit.
+      const noEditFinding = goldenText
+        .split(/^### /m)
+        .find((block) => /No EARS change required/.test(block));
+      assert.ok(noEditFinding, "golden example must include a confirmed no-edit finding");
+      assert.match(noEditFinding, /- state: added to ears/);
+      assert.match(noEditFinding, /- resolution_notes: [^\n]*no edit was required/);
+
+      // And a BR-only translation finding that truthfully uses the literal none.
+      const translationFinding = goldenText
+        .split(/^### /m)
+        .find((block) => /- source_user_br_input_reference: none/.test(block));
+      assert.ok(translationFinding, "golden example must include a BR-only translation finding");
+      assert.match(translationFinding, /- source_br_summary_reference: feature_br_summary\.md ->/);
+      assert.match(translationFinding, /rised_item_\d+/);
     }
   });
 });
@@ -2020,8 +2085,7 @@ function seedTerminalChainFeature(root: string): string {
  * Materialize the coordinator's shared valid-feature fixture (CRP-166): a feature
  * whose other deterministic artifacts genuinely pass their gates, so the only
  * failure is the plan's missing `# Implementation Plan` header and step `8.3`
- * owns the repair. Read as data across the workspace boundary, the same way the
- * packaged-template parity test reaches the canonical `overmind/templates`.
+ * owns the repair. Read as data across the workspace boundary.
  */
 function validFeatureFixtureDir(): string {
   return path.resolve(
@@ -2231,15 +2295,31 @@ test("fresh install propagates task-to-BR and requirements-EARS semantic-preserv
     for (const runnerDir of RUNNER_DIRS) {
       const taskToBrDir = path.join(root, runnerDir, "skills", "overmind-task-to-br");
       const taskToBrSkill = readFileSync(path.join(taskToBrDir, "SKILL.md"), "utf8");
-      assert.match(taskToBrSkill, /### Ambiguity Scan Scope/);
-      assert.match(taskToBrSkill, /`fast`, `better`, `simple`, `as needed`, `TBD`, `etc\.`/);
+      assert.match(taskToBrSkill, /### Business Field Scope/);
       assert.match(
         taskToBrSkill,
         /Every explicit source prohibition[^\n]*`### 2\.3 Explicitly stated in source -> stated_constraints` or `### 5\.2 Out of scope -> out_of_scope_items`/
       );
+      assert.match(taskToBrSkill, /### Business Gap Discovery/);
       assert.match(
         taskToBrSkill,
-        /answered `rised=true` ledger item whose `source=` locator list names that field/
+        /Externalize every relevant business detail that stays unresolved, or that you cannot state confidently/
+      );
+      assert.match(taskToBrSkill, /One independent gap produces one ledger item/);
+      // Discovery is model-owned: no closed lexical policy is installed.
+      assert.equal(/Source-Obligation Review/.test(taskToBrSkill), false);
+      assert.equal(/deterministic backstop over generated BR fields/.test(taskToBrSkill), false);
+      assert.equal(/Closed ambiguity triggers enforced by the gate/.test(taskToBrSkill), false);
+      // Discovery is an authoring method: no new command, flag, artifact, or phase.
+      assert.match(taskToBrSkill, /not a template section or an artifact/);
+      assert.equal(
+        readdirSync(path.join(taskToBrDir, "assets")).sort().join(","),
+        [
+          "feature_br_summary_GOLDEN_EXAMPLE.md",
+          "feature_br_summary_TEMPLATE.md",
+          "missing_br_data_GOLDEN_EXAMPLE.md",
+          "missing_br_data_TEMPLATE.md"
+        ].join(",")
       );
 
       const brGolden = readFileSync(
@@ -2262,7 +2342,7 @@ test("fresh install propagates task-to-BR and requirements-EARS semantic-preserv
       );
       assert.match(
         ledgerGolden,
-        /source=### Negative and rejection cases -> rejection_cases, ## 7\. Business Rules and Decision Logic -> BR-4; rised=false/
+        /source=### Negative and rejection cases -> rejection_cases, ## 7\. Business Rules and Decision Logic -> BR-4; rised=true/
       );
 
       const earsDir = path.join(root, runnerDir, "skills", "overmind-requirements-ears");
