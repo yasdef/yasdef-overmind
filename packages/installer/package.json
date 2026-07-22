@@ -1,0 +1,21 @@
+{
+  "name": "overmind-installer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "overmind": "dist/src/bin/overmind.js"
+  },
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint \"{src,test}/**/*.ts\"",
+    "format:check": "prettier --check \"{src,test}/**/*.ts\" package.json tsconfig.json",
+    "test": "npm run build && node --test --experimental-test-coverage \"dist/test/**/*.test.js\""
+  },
+  "dependencies": {
+    "asdlc-coordinator": "0.1.0"
+  }
+}

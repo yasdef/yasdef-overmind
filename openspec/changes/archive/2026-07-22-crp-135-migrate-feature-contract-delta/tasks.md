@@ -1,0 +1,83 @@
+## 1. Preflight Inventory
+
+- [x] 1.1 Re-read `feature_contract_delta.sh`, `feature_contract_delta_rule.md`, and `check_feature_contract_delta_quality.sh`; record the old-responsibility → new-owner inventory (context/gate/sync/skill; no capture, no readiness verb; cross-class trigger + sibling lister → ported TS) per the step-by-step guide
+- [x] 1.2 Extract every old final-response line (success + infeasibility), gate exit-code rule, required-input check, read-only-input set (BR + EARS + common-contract + pending sibling deltas), single-target allowed-write, `delta_needed` true/false branch rules, §5 cross-class authoring rules + gate-exemption, ready-repo scan/sync behavior, and pending-sibling-delta collection into the parity checklist
+- [x] 1.3 List the scenarios in `tests/ai_scripts/check_feature_contract_delta_quality_tests.sh` and `tests/ai_scripts/init_feature_contract_delta_tests.sh` (section/meta/delta-block/handoff, delta_needed true/false, empty/unfilled, §5-exempt; required-input, ready-repo sync, sibling-delta, read-only-input, model-produced-file cases) to port; note the shared `check_cross_class_peer_trigger_tests.sh` / `list_committed_sibling_features_tests.sh` stay and their cases are mirrored in TS
+
+## 2. asdlc-coordinator core — shared module ports
+
+- [x] 2.1 Implement `repo/list-committed-sibling-features.ts`: committed siblings = sibling feature folders under the project root (excluding the current feature) that contain `implementation_plan.md`, parity with `common_libs/list_committed_sibling_features.sh`; export from `repo/index.ts`
+- [x] 2.2 Implement `repo/cross-class-peer-trigger.ts`: return `active` when `project_type_code == A` and a backend is present and (another class present OR backend_count > 1), else `inactive`, parity with `helper/check_cross_class_peer_trigger.sh` (same `meta_info` parse + inline/block `project_classes`); export from `repo/index.ts`
+
+## 3. asdlc-coordinator core — validator, context, sync
+
+- [x] 3.1 Implement `validate/contract-delta.ts`: port `check_feature_contract_delta_quality.sh` one-for-one — empty/whitespace fail; `[UNFILLED]` fail; required sections (`## 1. Document Meta`, `## 2. Delta Summary`, `## 3. Contract Delta Items`, `## 4. Track Handoff Signals`); required filled meta keys (`feature_id`, `feature_title`, `project_type_code`, `source_requirements_ears`, `source_common_contract_definition`, `delta_needed`, `last_updated`); `delta_needed` ∈ {true, false}; `delta_needed: true` ⇒ ≥1 `### Delta N:` block each with filled `delta_kind`/`related_baseline_contract`/`change_scope`/`compatibility_impact`/`verification_expectation` and no `no_contract_delta_required: true`; `delta_needed: false` ⇒ `- no_contract_delta_required: true` present and zero Delta blocks; filled `backend_handoff` + `frontend_mobile_handoff`; §5 NOT validated; same key/value normalization; exit `0/1/2` with `quality gate failed: …` messages; export from `validate/index.ts`
+- [x] 3.2 Implement `context/contract-delta.ts`: resolve feature path + `projects/<id>` root (exit `2` if not under `projects/<id>/<feature>`); resolve read-only `feature_br_summary.md` + `requirements_ears.md` + project `common_contract_definition.md` (exit `2` if any absent) + `init_progress_definition.yaml`; `collectReadyRepoPaths` + `checkRepoBranchState` per ready repo (block/exit `2` verbatim); collect pending sibling `feature_contract_delta.md` via `list-committed-sibling-features`; compute `cross_class_peer_trigger` via the ported module; emit one block with workspace root, project root, feature root, three read-only sources, ready-repo list, pending sibling-delta list, `cross_class_peer_trigger` value, single allowed-write (`feature_contract_delta.md`), exact gate command, skill-relative asset refs; no repo writes; export from `context/index.ts`
+- [x] 3.3 Implement `sync/contract-delta.ts`: sync ready repos to default branch via `collectReadyRepoPaths` + `syncRepoToDefaultBranch` (mirror `sync/repo-br-scan.ts`); exit `0` with synced count / no-op, exit `2` with blocking messages; export from `sync/index.ts`
+
+## 4. asdlc-coordinator core — CLI wiring
+
+- [x] 4.1 Register `contract-delta` in `gateRegistry`, `contextRegistry`, and `syncRegistry` in `cli/run.ts`
+- [x] 4.2 Confirm unknown-step + missing-arg usage errors behave with parity to the other verbs for `gate`/`context`/`sync contract-delta`
+
+## 5. asdlc-coordinator core — tests
+
+- [x] 5.1 `gate contract-delta` tests: exit `0` complete delta (both `delta_needed: true` and `false` shapes); exit `1` for each — empty target, `[UNFILLED]`, missing each section/meta key, `delta_needed: true` with no Delta block / `no_contract_delta_required: true` / missing each Delta field, `delta_needed: false` without the no-delta line / with a Delta block, missing each handoff key; §5-exempt (identical sections 1–4 with and without §5 both pass); exit `2` runtime error and missing target; assert actionable messages — porting `check_feature_contract_delta_quality_tests.sh`
+- [x] 5.2 `context contract-delta` tests: assembled block content + three read-only sources + ready-repo list + pending sibling-delta list + `cross_class_peer_trigger` value + single allowed-write + exact gate command; missing each required input exits `2`; non-`projects/<id>/<feature>` path exits `2`; dirty/wrong-branch ready repo blocks (exit `2` verbatim); skill-relative asset paths (no `.codex`/`.claude` hardcoding)
+- [x] 5.3 `sync contract-delta` tests: ready repos synced (count), no-ready-repos no-op, unsyncable repo blocks (exit `2`)
+- [x] 5.4 Shared-module tests: `list-committed-sibling-features` (only folders with `implementation_plan.md`, current feature excluded) and `cross-class-peer-trigger` (active/inactive parity cases mirroring the shell tests)
+- [x] 5.5 Run `npm test --workspace packages/asdlc-coordinator` green
+
+## 6. Skill package
+
+- [x] 6.1 Create `packages/installer/_data/skills/overmind-contract-delta/SKILL.md` with frontmatter, purpose, required invocation, exact `context`/`gate contract-delta` commands, single allowed-write (`feature_contract_delta.md`), gate exit-code handling, and BOTH literal final-response lines (success + infeasibility) — only here
+- [x] 6.2 Inline `feature_contract_delta_rule.md` into `SKILL.md` (feature-level-changes-only scope, `delta_needed` true/false rules, evidence/`[Inference]`/no-invention rules, pending-sibling-overlap report-not-resolve rule, §5 cross-class authoring rules gated on the context `cross_class_peer_trigger` value, read-only inputs + single-target boundary, runtime path bindings); do not keep a separate rule asset
+- [x] 6.3 Copy `feature_contract_delta_TEMPLATE.md` and `feature_contract_delta_GOLDEN_EXAMPLE.md` into `assets/` (preserve filenames); use skill-relative `assets/...` references
+- [x] 6.4 Run the parity sweep table (old script+rule+helper vs SKILL.md+context+gate+sync); resolve every `missing` row — confirm both terminal lines live only in `SKILL.md`, the `delta_needed` branch + §5 authoring rules are preserved, the cross-class trigger is consumed from context, and the four-class read-only / single-target boundary is preserved
+
+## 7. Installer + setup staging
+
+- [x] 7.1 Add `overmind-contract-delta` to `PACKAGED_SKILLS` in `packages/installer/src/init.ts` (install to `.codex`/`.claude`, payload validation, install metadata); keep `.overmind/overmind.js` the single CLI
+- [x] 7.2 Add `overmind-contract-delta` to skill-staging in `project_setup_first_init_machine.sh`; add preflight checks for its canonical folder/`SKILL.md`/`assets/`
+- [x] 7.3 Remove staging of `feature_contract_delta.sh` (command array), `feature_contract_delta_rule.md` (rule array), and `check_feature_contract_delta_quality.sh` (helper array); keep the shared `check_cross_class_peer_trigger.sh` + `list_committed_sibling_features.sh` and the downstream un-migrated step assets staged; **retain** the `feature_contract_delta` row in `.setup/models.md` (the phase still runs, now via the skill launcher, which binds that row); ensure update mode removes stale staged copies
+- [x] 7.4 Extend `packages/installer/test/init.test.ts` for the sixth skill (its enumeration is a hardcoded literal, not imported from `init.ts`): add `overmind-contract-delta` to the test's `ALL_SKILLS` and add its `SKILL_ASSET_CHECKS` entry (the `feature_contract_delta_TEMPLATE.md` + `feature_contract_delta_GOLDEN_EXAMPLE.md` asset names) so the install assertions cover `SKILL.md` + both assets across `.codex`/`.claude`, the `result.skillPaths` metadata `deepEqual` covers all six skills (twelve paths), and the no-CLI-copy assertion covers the new skill; add atomic-failure cases asserting `installProject` throws and writes no runner target when the packaged `overmind-contract-delta` `SKILL.md` is missing and (separately) when its `assets/` is missing
+- [x] 7.5 Extend the setup shell suites for the sixth skill: assert `project_setup_asdlc_tests.sh` (fresh) and `project_setup_update_project_tests.sh` (update) stage `.codex/skills/overmind-contract-delta/SKILL.md` + `assets/` and `.claude/...`, that update mode repairs a missing/stale `overmind-contract-delta` folder, and that the migrated `feature_contract_delta.sh`/rule/helper are no longer staged while the shared cross-class/sibling helpers remain
+- [x] 7.6 Run `npm test --workspace packages/installer`, `bash tests/ai_scripts/project_setup_asdlc_tests.sh`, and `bash tests/ai_scripts/project_setup_update_project_tests.sh` green
+
+## 8. Feature e2e wiring
+
+- [x] 8.1 Add `build_contract_delta_prompt` + `run_contract_delta_skill` (thin launcher: runtime bindings + exact `context`/`gate contract-delta` commands only; no literal final lines, no §5 rules, no gate handling), mirroring the phase 4.1 (pre-sync) + phase 5.1 (read-only guard) launchers; apply the migration-guide e2e safeguards explicitly: run `overmind sync contract-delta` before the session, run Codex from the ASDLC runtime root, preflight-check that the installed `overmind-contract-delta` skill and `.overmind/overmind.js` exist before launching, and capture the model exit code without leaking `set -e`
+- [x] 8.1a Bind and load the model config (migration-guide §7.1–§7.3): add the launcher constants `CONTRACT_DELTA_MODEL_PHASE="feature_contract_delta"` (reuse the existing `.setup/models.md` row — do not add a new row or rename it) and `CONTRACT_DELTA_SKILL_FILE=".codex/skills/overmind-contract-delta/SKILL.md"`, reusing the shared `MODELS_FILE`/`OVERMIND_CLI_FILE`; in `run_contract_delta_skill` call `load_model_config "$models_path" "$CONTRACT_DELTA_MODEL_PHASE"` to populate `MODEL_CMD`/`MODEL_MODEL`/`MODEL_ARGS` from `.setup/models.md`, then assert `MODEL_CMD=codex` (die otherwise) and build the Codex command from the loaded `MODEL_MODEL`/`MODEL_ARGS` — do not hardcode the model or args and do not inherit stale globals from a prior phase
+- [x] 8.2 Re-add the deterministic read-only-input guard in `run_contract_delta_skill` (porting `ensure_readonly_inputs_unchanged`): snapshot every read-only input (`feature_br_summary.md`, `requirements_ears.md`, project `common_contract_definition.md`, and each pending sibling `feature_contract_delta.md`, resolved as the context resolves them) before launching and `cmp -s`-assert each byte-unchanged after, failing the phase with an actionable error if any differs; also assert the model produced `feature_contract_delta.md`. The `cmp` sweep MUST run on every exit path — evaluate it before returning the captured model exit code, including when the model exited non-zero; on a read-only drift, `die` with the read-only-corruption error even when the model also exited non-zero (do not early-`return "$model_rc"` ahead of the comparison)
+- [x] 8.3 Rewire phase 6 to run the contract-delta skill session and remove the `feature_contract_delta.sh` entry from the phase-6 `phase_scripts` list; add restart guidance resuming at phase 6; no deterministic post-skill artifact step beyond the read-only-input guard
+- [x] 8.4 Update `tests/ai_scripts/project_add_feature_e2e_tests.sh`: assert phase 6 runs `overmind sync contract-delta` then launches the skill (stub `codex`), prompt has exact commands and neither literal final line nor the §5 rules, the orchestrator does not run the gate, the launcher loads the `feature_contract_delta` row from `.setup/models.md` and invokes the stubbed `codex` with the row's configured model/args (not hardcoded), phase 6 fails when that row's command is not `codex`, phase 6 fails before launching when the installed `overmind-contract-delta` skill or `.overmind/overmind.js` is missing, phase 6 fails after the run when the stubbed model mutates any read-only input (including a sibling delta), phase 6 fails with the read-only-corruption error (not a silent pass-through) when the stubbed model mutates a read-only input AND exits non-zero, and phase 6 fails with the required-output error when the stubbed model exits 0 without producing `feature_contract_delta.md`; run green
+- [x] 8.5 Retrofit the every-exit-path guard ordering onto the shipped phase 5.1 launcher (`run_ears_review_skill`, CRP-134 gap per design D10): move the `feature_br_summary.md` `cmp` comparison so it is evaluated before the non-zero model exit returns, and `die` with the read-only-corruption error on BR drift even when the model also exited non-zero; limit the edit to the guard ordering, leaving step 5.1's skill/gate/context/prompt/final lines unchanged
+- [x] 8.6 Extend `tests/ai_scripts/project_add_feature_e2e_tests.sh`: assert phase 5.1 fails with the read-only-corruption error when the stubbed model mutates `feature_br_summary.md` AND exits non-zero, still propagates the model failure when the BR is untouched and the model exits non-zero, and still passes when the BR is untouched and the model exits zero; run green
+
+## 9. Clean break + docs
+
+- [x] 9.1 Delete `feature_contract_delta.sh`, `feature_contract_delta_rule.md`, `check_feature_contract_delta_quality.sh`, `tests/ai_scripts/init_feature_contract_delta_tests.sh`, `tests/ai_scripts/check_feature_contract_delta_quality_tests.sh` (leave the shared `check_cross_class_peer_trigger.sh` / `list_committed_sibling_features.sh` and their tests in place)
+- [x] 9.2 Remove all references to the deleted files from setup staging arrays, shell test listings, the `CLAUDE.md` and `AGENTS.md` test lists, `README.md`/`QUICKRUN.md`
+- [x] 9.3 Mark step 6 **done** in `design_docs/to_skills_migration/migration_to_skill_architecture_overview.md` Steps→Skills table
+
+## 10. Verification
+
+- [x] 10.1 Run `npm test --workspace packages/asdlc-coordinator`, `npm test --workspace packages/installer`, `bash tests/ai_scripts/project_setup_asdlc_tests.sh`, `bash tests/ai_scripts/project_setup_update_project_tests.sh`, `bash tests/ai_scripts/project_add_feature_e2e_tests.sh`
+- [x] 10.2 `git diff --check` and `openspec validate crp-135-migrate-feature-contract-delta --strict`
+- [x] 10.3 Manual smoke: build, stage workspace, confirm `.codex`/`.claude` `overmind-contract-delta/SKILL.md` + `.overmind/overmind.js`, run `sync contract-delta`, `context contract-delta` (exit `2` when an input missing, `0` with the block when present), and `gate contract-delta` against an incomplete then complete fixture (exit `1` then `0`)
+
+## 11. Review follow-up — one read-only manifest
+
+- [x] 11.1 Make `context contract-delta` emit one stable `- read_only_input: <workspace-relative-path>` manifest entry for every base and pending-sibling read-only input; extend coordinator context tests
+- [x] 11.2 Make the phase-6 launcher invoke context after sync, snapshot exactly its emitted manifest, block before model launch on context/manifest failure, and remove its direct dependency on `list_committed_sibling_features.sh`
+- [x] 11.3 Extend the feature e2e tests for context-owned sibling protection, context failure before model launch, and absence of the shell-lister dependency
+- [x] 11.4 Run the focused coordinator and feature-e2e suites, `git diff --check`, and strict OpenSpec validation
+
+## 12. Review follow-up — skill-local contract-delta assets
+
+- [x] 12.1 Remove the contract-delta template and golden example from flat runtime staging; update fresh-setup expectations and prove update mode removes stale flat copies while preserving skill-local assets
+- [x] 12.2 Run the setup suites, `git diff --check`, and strict OpenSpec validation
+
+## 13. Review follow-up — current deployability references
+
+- [x] 13.1 Remove the deleted contract-delta shell script from the repository-local deployability meta-skill, scan it for other deleted CRP-135 paths, validate the skill, run `git diff --check`, and run strict OpenSpec validation

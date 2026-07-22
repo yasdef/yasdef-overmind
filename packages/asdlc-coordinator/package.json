@@ -1,0 +1,33 @@
+{
+  "name": "asdlc-coordinator",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "overmind": "dist/overmind.js"
+  },
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    },
+    "./workspace": {
+      "types": "./dist/src/workspace/index.d.ts",
+      "default": "./dist/src/workspace/index.js"
+    },
+    "./sequencing": {
+      "types": "./dist/src/sequencing/index.d.ts",
+      "default": "./dist/src/sequencing/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && esbuild src/bin/overmind.ts --bundle --platform=node --format=esm --define:__OVERMIND_BUNDLED_VERSION__=$(node -p \"JSON.stringify(require('./package.json').version)\") --outfile=dist/overmind.js && chmod +x dist/overmind.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint \"{src,test}/**/*.ts\"",
+    "format:check": "prettier --check \"{src,test}/**/*.ts\" package.json tsconfig.json",
+    "test": "npm run build && node --test --experimental-test-coverage \"dist/test/**/*.test.js\""
+  },
+  "dependencies": {}
+}
