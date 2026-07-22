@@ -6,6 +6,8 @@ Overmind plans and assigns work. It does not execute implementation, and it does
 
 > ⚠️ **Pre-alpha.** Interfaces, artifacts, and workflow steps change without notice, and things may break. Take precautions before pointing it at a repository you care about.
 
+Current version: **v0.1.0** — see [`CHANGELOG.md`](CHANGELOG.md) for release notes.
+
 - **Operator guide:** [`overmind/README.md`](overmind/README.md) — the complete workflow, commands, checkpoints, and recovery.
 - **Process map:** [`overmind/init_progress_definition_sequence_diagram.md`](overmind/init_progress_definition_sequence_diagram.md) — canonical end-to-end sequence.
 

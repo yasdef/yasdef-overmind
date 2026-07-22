@@ -45,6 +45,7 @@ import type {
 } from "../types/index.js";
 import type { SurfaceMapClass } from "../validate/surface-map.js";
 import { detectRuntimeRoot, discoverProjects, resolveProjectPath } from "../workspace/index.js";
+import { getOvermindVersion } from "../version.js";
 import { loadRunnerConfig, resolveRunnerPhase } from "../config/index.js";
 import {
   createTtyInteractionPort,
@@ -244,6 +245,11 @@ export async function runCli(
 ): Promise<number> {
   const [command, step, targetPath, ...args] = argv.slice(2);
 
+  if (command === "--version" || command === "-v") {
+    streams.stdout.write(`${getOvermindVersion()}\n`);
+    return 0;
+  }
+
   if (command === "run") {
     return runRun(argv.slice(3), streams, cwd, overrides);
   }
@@ -289,7 +295,7 @@ export async function runCli(
   }
 
   streams.stderr.write(
-    "ERROR: Usage: overmind <run|project create|project add-class|project init|project reconcile|worker register|worker assign|capture|context|gate|sync|readiness> ... | overmind status <path>\n"
+    "ERROR: Usage: overmind <run|project create|project add-class|project init|project reconcile|worker register|worker assign|capture|context|gate|sync|readiness> ... | overmind status <path> | overmind --version\n"
   );
   return 2;
 }

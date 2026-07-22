@@ -1,8 +1,14 @@
 #!/usr/bin/env node
+import { createRequire } from "node:module";
 import { stdin, stdout } from "node:process";
 import { createInterface } from "node:readline";
 
 import { classifyInstallTarget, installProject, resolveInstallTarget } from "../init.js";
+
+// Path is relative to the compiled dist/src/bin/overmind.js, not this source file.
+const packageJson = createRequire(import.meta.url)("../../../package.json") as {
+  version: string;
+};
 
 const [, , command, extra] = process.argv;
 
@@ -16,8 +22,11 @@ type PromptSelection =
     }
   | undefined;
 
-if (command !== "init" || extra !== undefined) {
-  process.stderr.write("ERROR: Usage: overmind init\n");
+if (command === "--version" || command === "-v") {
+  process.stdout.write(`${packageJson.version}\n`);
+  process.exitCode = 0;
+} else if (command !== "init" || extra !== undefined) {
+  process.stderr.write("ERROR: Usage: overmind init | overmind --version\n");
   process.exitCode = 2;
 } else {
   void runInit();
