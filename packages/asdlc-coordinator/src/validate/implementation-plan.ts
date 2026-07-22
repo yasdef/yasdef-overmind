@@ -37,6 +37,7 @@ interface PlanStep {
 }
 
 const SUPPORTED_CLASSES = new Set(["backend", "frontend", "mobile"]);
+const HTTP_METHOD_AND_PATH = /\b(?:get|head|post|put|delete|connect|options|trace|patch)\s+\/\S+/;
 
 export function validateImplementationPlan(inputPath: string, cwd = process.cwd()): GateResult {
   if (!inputPath || inputPath.trim() === "")
@@ -499,7 +500,7 @@ export function canonicalImplementationPlanSurface(value: string): string {
     .replace(/cli/g, "command")
     .replace(/scheduled\s+task|cron\s+job/g, "job")
     .replace(/rest\s+endpoint|api\s+endpoint|http\s+endpoint/g, "endpoint")
-    .replace(/\b(?:post|get|put|patch|delete)\s+\/\S+/g, "endpoint")
+    .replace(new RegExp(HTTP_METHOD_AND_PATH, "g"), "endpoint")
     .replace(/[^a-z0-9]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
@@ -547,7 +548,8 @@ function looksSupportingOnly(value: string): boolean {
     ) &&
     !/(login|sign[ -]?in|route|page|screen|shell|workspace|entry|lookup|search|dashboard|portal|console|form|command|cli|job|endpoint|tool|http|deep link|deeplink)/.test(
       value
-    )
+    ) &&
+    !HTTP_METHOD_AND_PATH.test(value)
   );
 }
 function isWeakContentToken(token: string): boolean {

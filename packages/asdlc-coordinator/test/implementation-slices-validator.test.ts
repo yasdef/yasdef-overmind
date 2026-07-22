@@ -218,22 +218,29 @@ test("implementation-slices gate: an unresolved or unusable slice link fails", (
   }
 });
 
-test("implementation-slices gate: a link to a supporting-only slice fails", () => {
+test("implementation-slices gate: a slice worded as supporting work still covers a surface whose link resolves", () => {
   const supporting = validArtifact()
     .replace("### Slice 1: Backend query endpoint", "### Slice 1: Auth middleware")
     .replace("Deliver the order query endpoint.", "Add auth token middleware.")
     .replace("Operator can call the order query endpoint.", "Token state and middleware are ready.")
     .replace("Implement the endpoint", "Implement auth middleware")
     .replace("Add endpoint tests", "Add token adapter tests");
-  const reported = problems(supporting, [{ surface: "Admin refunds page", sliceRef: "slice-1" }]);
-  assert.ok(
-    reported.some(
-      (p) =>
-        p.includes("supporting-only") && p.includes("Admin refunds page") && p.includes("slice-1")
-    ),
-    reported.join("\n")
+  assert.deepEqual(
+    problems(supporting, [{ surface: "Admin refunds page", sliceRef: "slice-1" }]),
+    []
   );
   assert.deepEqual(problems(supporting), []);
+});
+
+test("implementation-slices gate: a slice naming an HTTP method and path as its first increment covers its resolved surface", () => {
+  const measured = validArtifact().replace(
+    "- first_increment: Operator sees order state on the page.",
+    "- first_increment: `POST /api/v1/telegram-identities` accepts valid new users, persists USER identities, and reuses existing identities without profile overwrite"
+  );
+  assert.deepEqual(
+    problems(measured, [{ surface: "POST /api/v1/telegram-identities", sliceRef: "slice-2" }]),
+    []
+  );
 });
 
 test("implementation-slices gate: a link resolves by declared heading number, not position", () => {

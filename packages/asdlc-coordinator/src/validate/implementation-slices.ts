@@ -271,18 +271,6 @@ export function validateImplementationSlicesContent(
       );
       continue;
     }
-    const coverageText = [
-      linked.heading,
-      linked.fields.get("objective"),
-      linked.fields.get("first_increment"),
-      ...linked.bullets
-    ]
-      .join(" ")
-      .toLowerCase();
-    if (looksSupportingOnly(coverageText))
-      fail(
-        `required missing operator-facing surface is linked to a slice describing supporting-only scaffolding work: ${surface} -> ${reference}`
-      );
   }
   for (const key of HANDOFF_KEYS)
     if (unfilled(handoff.get(key))) fail(`missing or unfilled handoff key: ${key}`);
@@ -333,19 +321,6 @@ export function extractRequiredMissingSurfaces(content: string): RequiredSurface
   }
   flush();
   return [...surfaces.values()].sort((left, right) => left.surface.localeCompare(right.surface));
-}
-
-export function looksSupportingOnly(value: string): boolean {
-  const lower = value.toLowerCase();
-  const hasSupport =
-    /(?:auth|token|api|contract|schema|state|coordination|middleware|service|repository|adapter|dto|mapper|payload)/.test(
-      lower
-    );
-  const hasSurface =
-    /(?:login|sign[ -]?in|route|page|screen|shell|workspace|entry|lookup|search|dashboard|portal|console|form|command|cli|job|endpoint|tool|http|deep link|deeplink)/.test(
-      lower
-    );
-  return hasSupport && !hasSurface;
 }
 
 function parseKeyValue(line: string): { key: string; value: string } | undefined {

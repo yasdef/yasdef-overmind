@@ -63,6 +63,63 @@ test("implementation-plan gate: valid multi-repo plan and canonical surface matc
   assert.equal(implementationPlanSurfaceMatches("admin refunds page", "admin orders page"), false);
 });
 
+test("implementation-plan gate: a step naming an HTTP method and path as its preserved surface is not flagged as supporting-only", () => {
+  const measuredCatalogs: ImplementationPlanCatalogs = {
+    activeClasses: new Set(["backend"]),
+    requirementRefs: ["REQ-1"],
+    evidence: {
+      reqAll: ["gap/TECH_REQ-1"],
+      reqUnresolved: ["gap/TECH_REQ-1"],
+      compAll: ["comp/backend-order-service"],
+      compUnresolved: ["comp/backend-order-service"],
+      repoUnresolved: ["backend"]
+    },
+    scheduledSliceRefs: ["slice-1"],
+    requiredSurfaces: ["POST /api/v1/telegram-identities"]
+  };
+  const measuredPlan = `# Implementation Plan
+### Step 1.1 Implement telegram identities API service [REQ-1]
+#### Repo: backend
+#### Depends on: none
+#### Evidence: gap/TECH_REQ-1, comp/backend-order-service, slice/slice-1
+#### Preserved Surface: POST /api/v1/telegram-identities
+- [ ] Plan and discuss the step
+- [ ] \`POST /api/v1/telegram-identities\` accepts valid new users and persists identities
+- [ ] Review step implementation
+`;
+  assert.deepEqual(validateImplementationPlanContent(measuredPlan, measuredCatalogs), []);
+});
+
+test("implementation-plan gate: HTTP method recognition covers HEAD and OPTIONS, not only CRUD verbs", () => {
+  assert.equal(canonicalImplementationPlanSurface("HEAD /health"), "endpoint");
+  assert.equal(canonicalImplementationPlanSurface("OPTIONS /resource"), "endpoint");
+
+  const healthCatalogs: ImplementationPlanCatalogs = {
+    activeClasses: new Set(["backend"]),
+    requirementRefs: ["REQ-1"],
+    evidence: {
+      reqAll: ["gap/TECH_REQ-1"],
+      reqUnresolved: ["gap/TECH_REQ-1"],
+      compAll: ["comp/backend-order-service"],
+      compUnresolved: ["comp/backend-order-service"],
+      repoUnresolved: ["backend"]
+    },
+    scheduledSliceRefs: ["slice-1"],
+    requiredSurfaces: ["HEAD /health"]
+  };
+  const healthPlan = `# Implementation Plan
+### Step 1.1 Implement health check API service [REQ-1]
+#### Repo: backend
+#### Depends on: none
+#### Evidence: gap/TECH_REQ-1, comp/backend-order-service, slice/slice-1
+#### Preserved Surface: HEAD /health
+- [ ] Plan and discuss the step
+- [ ] \`HEAD /health\` returns API service health
+- [ ] Review step implementation
+`;
+  assert.deepEqual(validateImplementationPlanContent(healthPlan, healthCatalogs), []);
+});
+
 test("implementation-plan gate: the exact template header is required at byte zero", () => {
   const headerProblem =
     "implementation_plan.md must start with exact header: # Implementation Plan";

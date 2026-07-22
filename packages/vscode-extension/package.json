@@ -1,6 +1,6 @@
 {
   "name": "overmind-vscode-extension",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "publisher": "yasdef",
   "type": "module",
@@ -39,7 +39,7 @@
     "test": "npm run build && node --test --experimental-test-coverage \"dist/test/**/*.test.js\""
   },
   "dependencies": {
-    "asdlc-coordinator": "0.1.0"
+    "asdlc-coordinator": "0.1.1"
   },
   "devDependencies": {
     "@types/vscode": "^1.101.0"

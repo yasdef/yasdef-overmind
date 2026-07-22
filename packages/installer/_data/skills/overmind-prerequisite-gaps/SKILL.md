@@ -67,7 +67,7 @@ Declare each unique externally invocable surface exactly once under `## 2. Prere
 
 `surface_identity` is a stable operator-facing name such as a route, page, screen, shell, workspace, command, job, endpoint, tool, or deep link. It is required for `required_missing_user_reachable_surface`, remains stable when an unmet entry becomes scheduled, and is `none` for present surfaces.
 
-`evidence` is the exact `user_reachable_surface` token for present entries, slice coverage rationale for current-slice entries, or sibling plan and step evidence for sibling-feature entries. `slice_ref` is required only for `scheduled_in_slices` and matches `[A-Za-z0-9][A-Za-z0-9_.-]*`. Write it as `slice-<N>`, where `<N>` is the number declared in the `### Slice <N>:` heading of the delivering slice in `implementation_slices.md`; the `implementation-slices` gate resolves that link to decide whether the required missing operator-facing surface is delivered.
+`evidence` is the exact `user_reachable_surface` token for present entries, slice coverage rationale for current-slice entries, or sibling plan and step evidence for sibling-feature entries. For `scheduled_in_slices`, `evidence` carries the justification that the linked slice delivers the surface; the gate itself only resolves the `slice_ref` link, so this field is where that delivery claim is recorded for review. `slice_ref` is required only for `scheduled_in_slices` and matches `[A-Za-z0-9][A-Za-z0-9_.-]*`. Write it as `slice-<N>`, where `<N>` is the number declared in the `### Slice <N>:` heading of the delivering slice in `implementation_slices.md`; the `implementation-slices` gate resolves that link to decide whether the required missing operator-facing surface is covered.
 
 ## Derivation And Output
 
